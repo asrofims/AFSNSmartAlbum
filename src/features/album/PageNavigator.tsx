@@ -91,7 +91,6 @@ export function PageNavigator() {
           <div className={styles.drawerList}>
             {allSpreads.map((spread) => {
               const isActive = activeSpreadId === spread.id;
-              const isCover = spread.type === 'cover';
 
               return (
                 <div
@@ -103,7 +102,7 @@ export function PageNavigator() {
                   title={spread.name}
                 >
                   {/* Miniature Spread Preview */}
-                  <div className={`${styles.miniSpread} ${isCover ? styles.miniCover : ''}`}>
+                  <div className={styles.miniSpread}>
                     <div className={styles.miniLeftPage} />
                     <div className={styles.miniGutter} />
                     <div className={styles.miniRightPage} />
@@ -111,32 +110,30 @@ export function PageNavigator() {
 
                   {/* Card Label & Actions */}
                   <div className={styles.cardInfoRow}>
-                    <span className={styles.cardIndexText}>{isCover ? 'Cover' : `${spread.spreadIndex}`}</span>
+                    <span className={styles.cardIndexText}>{spread.spreadIndex}</span>
                     <span className={styles.cardNameText}>{spread.name}</span>
 
-                    {/* Quick Actions (Duplicate / Delete for interior spreads) */}
-                    {!isCover && (
-                      <div className={styles.cardActions}>
+                    {/* Quick Actions (Duplicate / Delete) */}
+                    <div className={styles.cardActions}>
+                      <button
+                        type="button"
+                        className={styles.cardActionBtn}
+                        onClick={(e) => handleDuplicateSpread(e, spread)}
+                        title="Duplicate this spread"
+                      >
+                        📋
+                      </button>
+                      {allSpreads.length > 1 && (
                         <button
                           type="button"
-                          className={styles.cardActionBtn}
-                          onClick={(e) => handleDuplicateSpread(e, spread)}
-                          title="Duplicate this spread"
+                          className={`${styles.cardActionBtn} ${styles.cardActionBtnDanger}`}
+                          onClick={(e) => handleDeleteRequest(e, spread)}
+                          title="Delete this spread"
                         >
-                          📋
+                          🗑
                         </button>
-                        {allSpreads.length > 2 && (
-                          <button
-                            type="button"
-                            className={`${styles.cardActionBtn} ${styles.cardActionBtnDanger}`}
-                            onClick={(e) => handleDeleteRequest(e, spread)}
-                            title="Delete this spread"
-                          >
-                            🗑
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -192,7 +189,7 @@ export function PageNavigator() {
           >
             {allSpreads.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.type === 'cover' ? '📕 Cover Spread' : `📖 ${s.name}`}
+                {`📖 ${s.name}`}
               </option>
             ))}
           </select>

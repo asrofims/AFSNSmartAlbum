@@ -33,14 +33,8 @@ const mockProject: Project = {
 // 1. Test Initial Album Creation (Model 1-2)
 const album = createInitialAlbum(mockProject);
 console.assert(album.id === 'album-test-proj-1', 'Album ID should match project');
-console.assert(album.totalSpreads === 2, `Total spreads should be 2 (Cover + Spread 1), got ${album.totalSpreads}`);
+console.assert(album.totalSpreads === 1, `Total spreads should be 1 (Spread 1), got ${album.totalSpreads}`);
 console.assert(album.totalPages === 2, `Total interior pages should be 2, got ${album.totalPages}`);
-
-// Verify Cover Spread
-console.assert(album.coverSpread.type === 'cover', 'Cover spread should have type cover');
-console.assert(album.coverSpread.leftPage?.type === 'cover_back', 'Cover left page should be back cover');
-console.assert(album.coverSpread.rightPage?.type === 'cover_front', 'Cover right page should be front cover');
-console.assert(album.coverSpread.gutterWidth === 6, `Cover spine width should be 6mm, got ${album.coverSpread.gutterWidth}`);
 
 // Verify Spread 1 (Pages 1-2)
 const spread1 = album.spreads[0];
@@ -67,16 +61,15 @@ console.assert(spread3.rightPage?.pageNumber === 6, `Spread 3 right page should 
 album.spreads.push(spread2);
 album.spreads.push(spread3);
 const recalculated = recalculateAlbumPageNumbers(album);
-console.assert(recalculated.totalSpreads === 4, `Total spreads should now be 4, got ${recalculated.totalSpreads}`);
+console.assert(recalculated.totalSpreads === 3, `Total spreads should now be 3, got ${recalculated.totalSpreads}`);
 console.assert(recalculated.totalPages === 6, `Total pages should now be 6, got ${recalculated.totalPages}`);
 
 // 5. Test Getting All Spreads Sequential Order
 const allSpreads = getAllAlbumSpreads(recalculated);
-console.assert(allSpreads.length === 4, `All spreads should have length 4, got ${allSpreads.length}`);
-console.assert(allSpreads[0].type === 'cover', 'First spread should be cover');
-console.assert(allSpreads[1].name === 'Spread 1 (Pages 1-2)', 'Second spread should be Spread 1 (Pages 1-2)');
-console.assert(allSpreads[2].name === 'Spread 2 (Pages 3-4)', 'Third spread should be Spread 2 (Pages 3-4)');
-console.assert(allSpreads[3].name === 'Spread 3 (Pages 5-6)', 'Fourth spread should be Spread 3 (Pages 5-6)');
+console.assert(allSpreads.length === 3, `All spreads should have length 3, got ${allSpreads.length}`);
+console.assert(allSpreads[0].name === 'Spread 1 (Pages 1-2)', 'First spread should be Spread 1 (Pages 1-2)');
+console.assert(allSpreads[1].name === 'Spread 2 (Pages 3-4)', 'Second spread should be Spread 2 (Pages 3-4)');
+console.assert(allSpreads[2].name === 'Spread 3 (Pages 5-6)', 'Third spread should be Spread 3 (Pages 5-6)');
 
 // 6. Test Inch-based Album
 const inchProject: Project = {

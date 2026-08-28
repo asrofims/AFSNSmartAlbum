@@ -59,8 +59,8 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const album = createInitialAlbum(project);
     set({
       currentAlbum: album,
-      activeSpreadId: album.spreads[0]?.id || album.coverSpread.id,
-      activeSpreadIndex: album.spreads.length > 0 ? 1 : 0, // Default to Spread 1 (Pages 2-3) if exists, else Cover
+      activeSpreadId: album.spreads[0]?.id || '',
+      activeSpreadIndex: 0, // Default to Spread 1 (Pages 1-2)
       selectedPageId: null,
     });
   },
@@ -132,12 +132,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       spreads: updatedSpreads,
     });
 
-    const newIndex = updatedAlbum.spreads.findIndex((s) => s.id === newSpread.id) + 1;
+    const newIndex = updatedAlbum.spreads.findIndex((s) => s.id === newSpread.id);
 
     set({
       currentAlbum: updatedAlbum,
       activeSpreadId: newSpread.id,
-      activeSpreadIndex: newIndex,
+      activeSpreadIndex: Math.max(0, newIndex),
       selectedPageId: null,
     });
   },
@@ -146,10 +146,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const { currentAlbum, activeSpreadId } = get();
     if (!currentAlbum) return;
 
-    // Cover spread cannot be deleted
-    if (currentAlbum.coverSpread.id === spreadId) return;
-
-    // Must have at least 1 interior spread
+    // Must have at least 1 spread
     if (currentAlbum.spreads.length <= 1) return;
 
     const filtered = currentAlbum.spreads.filter((s) => s.id !== spreadId);
@@ -160,13 +157,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     const all = getAllAlbumSpreads(updatedAlbum);
     let nextActiveId = activeSpreadId;
-    let nextIndex = 1;
+    let nextIndex = 0;
 
     if (activeSpreadId === spreadId) {
-      const fallbackSpread = all[1] || all[0];
+      const fallbackSpread = all[0];
       if (fallbackSpread) {
         nextActiveId = fallbackSpread.id;
-        nextIndex = all.findIndex((s) => s.id === fallbackSpread.id);
+        nextIndex = 0;
       }
     } else {
       nextIndex = all.findIndex((s) => s.id === activeSpreadId);
@@ -183,8 +180,6 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   duplicateSpread: (spreadId: string, project: Project) => {
     const { currentAlbum } = get();
     if (!currentAlbum) return;
-
-    if (currentAlbum.coverSpread.id === spreadId) return;
 
     const targetIdx = currentAlbum.spreads.findIndex((s) => s.id === spreadId);
     if (targetIdx === -1) return;
@@ -212,7 +207,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     set({
       currentAlbum: updatedAlbum,
       activeSpreadId: duplicated.id,
-      activeSpreadIndex: targetIdx + 2, // Cover is 0, so target + 1 + 1
+      activeSpreadIndex: targetIdx + 1,
       selectedPageId: null,
     });
   },

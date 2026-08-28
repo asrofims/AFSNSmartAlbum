@@ -146,7 +146,7 @@ export function createInitialAlbum(project: Project): Album {
     projectId: project.id,
     coverSpread,
     spreads: [spread1],
-    totalSpreads: 2, // Cover + Spread 1
+    totalSpreads: 1, // Spread 1
     totalPages: 2,   // 2 interior pages (Pages 1-2)
   };
 }
@@ -241,7 +241,7 @@ export function recalculateAlbumPageNumbers(album: Album): Album {
   });
 
   const totalPages = updatedSpreads.length * 2;
-  const totalSpreads = 1 + updatedSpreads.length;
+  const totalSpreads = updatedSpreads.length;
 
   return {
     ...album,
@@ -252,8 +252,8 @@ export function recalculateAlbumPageNumbers(album: Album): Album {
 }
 
 /**
- * Returns all spreads in sequential display order (Cover Spread first, followed by interior spreads).
+ * Returns all album spreads in sequential order.
  */
 export function getAllAlbumSpreads(album: Album): Spread[] {
-  return [album.coverSpread, ...album.spreads];
+  return album.spreads;
 }

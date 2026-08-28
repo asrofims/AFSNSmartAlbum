@@ -27,7 +27,6 @@ export function AlbumStructurePanel() {
   if (!activeSpread) return null;
 
   const unit = currentProject.canvasUnit;
-  const isCover = activeSpread.type === 'cover';
 
   return (
     <div className={styles.container}>
@@ -54,7 +53,7 @@ export function AlbumStructurePanel() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>Active Spread</span>
-          <span className={styles.typeBadge}>{isCover ? 'Cover' : 'Interior'}</span>
+          <span className={styles.typeBadge}>Sheet</span>
         </div>
 
         <div className={styles.infoRow}>
@@ -90,9 +89,7 @@ export function AlbumStructurePanel() {
               onChange={() => toggleGuide('gutter')}
               className={styles.checkbox}
             />
-            <span className={styles.toggleText}>
-              {isCover ? 'Spine / Gutter Fold' : 'Center Gutter Crease'}
-            </span>
+            <span className={styles.toggleText}>Center Gutter Crease</span>
           </label>
 
           {/* Bleed Guide */}
@@ -128,7 +125,7 @@ export function AlbumStructurePanel() {
         <div className={styles.inputGroup}>
           {/* Gutter Width */}
           <div className={styles.inputRow}>
-            <span className={styles.inputLabel}>{isCover ? 'Spine Width' : 'Gutter Crease'}</span>
+            <span className={styles.inputLabel}>Gutter Crease</span>
             <div className={styles.inputWrapper}>
               <NumberInput
                 value={activeSpread.gutterWidth}
