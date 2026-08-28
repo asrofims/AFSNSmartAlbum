@@ -1,0 +1,312 @@
+.workspace {
+  display: grid;
+  height: 100vh;
+  width: 100vw;
+  grid-template-rows: var(--toolbar-height, 42px) 1fr auto;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'toolbar toolbar'
+    'canvas right'
+    'filmstrip filmstrip';
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+}
+
+.toolbar {
+  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  user-select: none;
+  z-index: 10;
+}
+
+.toolbarSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.brandIcon {
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+}
+
+.activeProjectBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-md);
+  max-width: 240px;
+}
+
+.projectNameText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--font-weight-medium);
+}
+
+.toolButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toolButton:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-subtle);
+}
+
+.toolButtonActive {
+  background-color: var(--color-surface-active) !important;
+  color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.toolbarSeparator {
+  width: 1px;
+  height: 20px;
+  background-color: var(--color-border);
+  margin: 0 var(--space-1);
+}
+
+/* Canvas Area */
+.canvas {
+  grid-area: canvas;
+  background-color: var(--color-bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Right Panel: Collapsible Properties */
+.rightPanel {
+  grid-area: right;
+  width: 280px;
+  background-color: var(--color-bg-secondary);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 5;
+  transition: width var(--transition-normal), opacity var(--transition-normal);
+}
+
+.propertyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.propSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.propTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.propRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.propValue {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.colorSwatchSmall {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid var(--color-border);
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+/* Bottom Filmstrip / Photo Tray */
+.filmstripPanel {
+  grid-area: filmstrip;
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 8;
+  transition: height var(--transition-normal);
+}
+
+.filmstripHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px var(--space-3);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-xs);
+  user-select: none;
+  height: 28px;
+}
+
+.filmstripTitleArea {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.filmstripActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.filmstripContent {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: var(--space-3);
+}
+
+.filmstripEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Album Spread Canvas Viewport */
+.spreadViewport {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+
+.spreadContainer {
+  display: flex;
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  position: relative;
+  transition: transform var(--transition-fast);
+}
+
+.leftPage,
+.rightPage {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pageGuide {
+  position: absolute;
+  border: 1px dashed rgba(74, 158, 255, 0.4);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.pageNumberBadge {
+  position: absolute;
+  bottom: 8px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.centerGutterLine {
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.4));
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  z-index: 5;
+  position: relative;
+}
+
+/* Spread Navigation Bar */
+.spreadNavBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.spreadNavText {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}

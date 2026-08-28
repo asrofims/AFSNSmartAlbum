@@ -1,0 +1,85 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.mainRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hiddenInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.hexInput {
+  width: 80px;
+  height: 28px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  padding: 0 var(--space-2);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.hexInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.presetGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.presetSwatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.presetSwatch:hover:not(.presetActive) {
+  transform: scale(1.1);
+  border-color: var(--color-accent);
+}
+
+.presetActive {
+  border-color: var(--color-accent);
+  border-width: 2px;
+}

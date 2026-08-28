@@ -1,0 +1,461 @@
+.filmstrip {
+  grid-area: filmstrip;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  z-index: 20;
+  user-select: none;
+  position: relative;
+  transition: height var(--transition-fast);
+}
+
+.filmstrip.collapsed {
+  height: auto;
+}
+
+.filmstrip.dragOver {
+  background-color: rgba(59, 130, 246, 0.08);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+}
+
+.progressBarContainer {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid var(--color-accent);
+  padding: var(--space-2) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.progressTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progressTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.progressPercent {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressBarTrack {
+  height: 6px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent) 0%, #60a5fa 100%);
+  border-radius: 3px;
+  transition: width 0.15s ease-out;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+.progressFileName {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background-color: var(--color-surface);
+  gap: var(--space-2);
+}
+
+.leftHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.countBadge {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.filtersGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--space-2);
+  background-color: var(--color-bg-primary);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.filterBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.filterBtn:hover {
+  color: var(--color-text-primary);
+}
+
+.filterBtn.active {
+  background-color: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.rightHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.missingAlertBtn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  padding: 3px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.searchInput {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-md);
+  width: 120px;
+  outline: none;
+  transition: border-color var(--transition-fast), width var(--transition-fast);
+}
+
+.searchInput:focus {
+  border-color: var(--color-accent);
+  width: 160px;
+}
+
+.sortSelect {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+}
+
+.toggleBtn {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.body {
+  height: 148px;
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  background-color: var(--color-bg-primary);
+}
+
+/* Custom Filmstrip Scrollbar */
+.body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: 3px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+.photoList {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: 2px;
+}
+
+.photoCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100px;
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  gap: 4px;
+}
+
+.thumbnailWrapper {
+  width: 100px;
+  height: 100px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.photoCard:hover .thumbnailWrapper {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.cardMissing .thumbnailWrapper {
+  border-color: #f59e0b;
+}
+
+.thumbnailImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbnailPlaceholder {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.missingBadge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(245, 158, 11, 0.9);
+  color: #000;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+  padding: 1px 0;
+  cursor: pointer;
+}
+
+.favBtn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(0, 0, 0, 0.55);
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  opacity: 0;
+}
+
+.photoCard:hover .favBtn,
+.favActive {
+  opacity: 1;
+}
+
+.favActive {
+  color: #fbbf24 !important;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.deletePhotoBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(0, 0, 0, 0.55);
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.photoCard:hover .deletePhotoBtn {
+  opacity: 1;
+}
+
+.deletePhotoBtn:hover {
+  background-color: #ef4444;
+  color: #fff;
+}
+
+.bottomOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 4px 4px 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usedTag {
+  font-size: 9px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.usedActive {
+  color: #10b981;
+  font-weight: var(--font-weight-bold);
+}
+
+.dimTag {
+  font-size: 9px;
+  color: var(--color-text-muted);
+}
+
+.fileNameText {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  max-width: 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.dropzoneOverlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.85);
+  border: 2px dashed var(--color-accent);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  pointer-events: none;
+}
+
+.emptyState {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+}
+
+.loadingState {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

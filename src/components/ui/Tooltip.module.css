@@ -1,0 +1,66 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip {
+  position: absolute;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1100;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.top {
+  bottom: calc(100% + var(--space-1));
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+}
+
+.top.visible {
+  transform: translateX(-50%) scale(1);
+}
+
+.bottom {
+  top: calc(100% + var(--space-1));
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+}
+
+.bottom.visible {
+  transform: translateX(-50%) scale(1);
+}
+
+.left {
+  right: calc(100% + var(--space-1));
+  top: 50%;
+  transform: translateY(-50%) scale(0.95);
+}
+
+.left.visible {
+  transform: translateY(-50%) scale(1);
+}
+
+.right {
+  left: calc(100% + var(--space-1));
+  top: 50%;
+  transform: translateY(-50%) scale(0.95);
+}
+
+.right.visible {
+  transform: translateY(-50%) scale(1);
+}
