@@ -15,6 +15,7 @@ import {
   alignFrames,
   distributeFrames,
   applyFixedGap,
+  calculateMultiFrameResize,
   matchFrameDimensions,
 } from '../src/domain/editor';
 
@@ -199,5 +200,23 @@ console.assert(fixedGapUpdates[2].geometry.x === 220, `Third frame positioned at
 // 11. Test Match Dimensions Math
 const matchW = matchFrameDimensions([frame1, frame2, frame3], 'width');
 console.assert(matchW.every((u) => u.geometry.width === 100), 'All frames should match width of first frame (100mm)');
+
+// 12. Test Multi-Frame Resize with Preserved Gap Spacing (2 frames with 5mm gap resized from 205mm to 265mm)
+const initialGroup = [
+  { id: 'fA', x: 0, y: 0, width: 100, height: 80 },
+  { id: 'fB', x: 105, y: 0, width: 100, height: 80 },
+];
+const initialBounds = { x: 0, y: 0, width: 205, height: 80 };
+const newBounds = { x: 0, y: 0, width: 265, height: 104 };
+const multiResizeUpdates = calculateMultiFrameResize(initialGroup, initialBounds, newBounds);
+
+console.assert(multiResizeUpdates[0].geometry.width === 130, `Frame A new width should be 130, got ${multiResizeUpdates[0].geometry.width}`);
+console.assert(multiResizeUpdates[0].geometry.x === 0, `Frame A new x should be 0, got ${multiResizeUpdates[0].geometry.x}`);
+console.assert(multiResizeUpdates[1].geometry.width === 130, `Frame B new width should be 130, got ${multiResizeUpdates[1].geometry.width}`);
+console.assert(multiResizeUpdates[1].geometry.x === 135, `Frame B new x should be 135, got ${multiResizeUpdates[1].geometry.x}`);
+
+// Calculate preserved gap between Frame A (x=0, w=130 -> right=130) and Frame B (x=135)
+const preservedGap = (multiResizeUpdates[1].geometry.x ?? 0) - ((multiResizeUpdates[0].geometry.x ?? 0) + (multiResizeUpdates[0].geometry.width ?? 0));
+console.assert(preservedGap === 5, `Gap between frames must remain strictly 5mm after resize, got ${preservedGap}mm`);
 
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, and Snapping tests passed successfully!');

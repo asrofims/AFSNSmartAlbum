@@ -71,6 +71,10 @@ function roundToTenth(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+export function roundToHundredth(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -969,7 +973,7 @@ export function distributeFrames(
     return sorted.map((f, i) => {
       const targetX = minX + cumulativeWidth + i * gapPerItem;
       cumulativeWidth += f.width;
-      return { id: f.id, geometry: { x: roundToTenth(targetX) } };
+      return { id: f.id, geometry: { x: roundToHundredth(targetX) } };
     });
   } else {
     // Sort frames strictly from top to bottom
@@ -986,7 +990,7 @@ export function distributeFrames(
     return sorted.map((f, i) => {
       const targetY = minY + cumulativeHeight + i * gapPerItem;
       cumulativeHeight += f.height;
-      return { id: f.id, geometry: { y: roundToTenth(targetY) } };
+      return { id: f.id, geometry: { y: roundToHundredth(targetY) } };
     });
   }
 }
@@ -1002,24 +1006,193 @@ export function applyFixedGap(
   if (frames.length < 2) return [];
 
   if (direction === 'horizontal') {
-    const sorted = [...frames].sort((a, b) => (a.x + a.width / 2) - (b.x + b.width / 2));
+    const sorted = [...frames].sort((a, b) => a.x - b.x || a.y - b.y);
     if (!sorted[0]) return [];
     let currentX = sorted[0].x;
     return sorted.map((f) => {
-      const update = { id: f.id, geometry: { x: roundToTenth(currentX) } };
+      const update = { id: f.id, geometry: { x: roundToHundredth(currentX) } };
       currentX += f.width + gap;
       return update;
     });
   } else {
-    const sorted = [...frames].sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
+    const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
     if (!sorted[0]) return [];
     let currentY = sorted[0].y;
     return sorted.map((f) => {
-      const update = { id: f.id, geometry: { y: roundToTenth(currentY) } };
+      const update = { id: f.id, geometry: { y: roundToHundredth(currentY) } };
       currentY += f.height + gap;
       return update;
     });
   }
+}
+
+export interface FrameBounds {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Calculates resized dimensions and positions for multiple frames while strictly preserving
+ * the exact inter-frame gap spacing (both horizontally and vertically).
+ */
+export function calculateMultiFrameResize(
+  initialFrames: FrameBounds[],
+  initialGroupBounds: RectBounds,
+  newGroupBounds: RectBounds
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (initialFrames.length === 0) return [];
+  if (initialFrames.length === 1) {
+    const f = initialFrames[0];
+    if (!f) return [];
+    const scaleX = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
+    const scaleY = initialGroupBounds.height > 0 ? newGroupBounds.height / initialGroupBounds.height : 1;
+    return [{
+      id: f.id,
+      geometry: {
+        x: roundToHundredth(newGroupBounds.x),
+        y: roundToHundredth(newGroupBounds.y),
+        width: roundToHundredth(Math.max(1, f.width * scaleX)),
+        height: roundToHundredth(Math.max(1, f.height * scaleY)),
+      },
+    }];
+  }
+
+  // --- 1. Horizontal Column Clustering & Gap Preservation ---
+  const sortedByX = [...initialFrames].sort((a, b) => a.x - b.x);
+  const columnClusters: FrameBounds[][] = [];
+  const colClusterTolerance = 2.0; // mm
+
+  for (const f of sortedByX) {
+    const matchingCol = columnClusters.find((col) =>
+      col.some((item) => Math.abs(item.x - f.x) < colClusterTolerance)
+    );
+    if (matchingCol) {
+      matchingCol.push(f);
+    } else {
+      columnClusters.push([f]);
+    }
+  }
+
+  columnClusters.sort((a, b) => {
+    const minA = Math.min(...a.map((f) => f.x));
+    const minB = Math.min(...b.map((f) => f.x));
+    return minA - minB;
+  });
+
+  const columnWidths = columnClusters.map((col) => Math.max(...col.map((f) => f.width)));
+  const horizontalGaps: number[] = [];
+  for (let i = 0; i < columnClusters.length - 1; i++) {
+    const colA = columnClusters[i];
+    const colB = columnClusters[i + 1];
+    if (!colA || !colB) continue;
+    const maxRightA = Math.max(...colA.map((f) => f.x + f.width));
+    const minLeftB = Math.min(...colB.map((f) => f.x));
+    horizontalGaps.push(Math.max(0, minLeftB - maxRightA));
+  }
+
+  const totalHorizontalGaps = horizontalGaps.reduce((sum, g) => sum + g, 0);
+  const totalColsWidth = columnWidths.reduce((sum, w) => sum + w, 0);
+  const availableNewWidth = Math.max(1, newGroupBounds.width - totalHorizontalGaps);
+  const scaleX = totalColsWidth > 0 ? availableNewWidth / totalColsWidth : 1;
+
+  const newColPositions: number[] = [];
+  let curColX = newGroupBounds.x;
+  for (let i = 0; i < columnClusters.length; i++) {
+    newColPositions.push(curColX);
+    const newColW = (columnWidths[i] ?? 0) * scaleX;
+    const gap = horizontalGaps[i] ?? 0;
+    curColX += newColW + gap;
+  }
+
+  const frameXUpdates = new Map<string, { x: number; width: number }>();
+  columnClusters.forEach((col, colIdx) => {
+    const baseColX = newColPositions[colIdx] ?? newGroupBounds.x;
+    for (const f of col) {
+      const origColMinX = Math.min(...col.map((item) => item.x));
+      const internalOffset = (f.x - origColMinX) * scaleX;
+      frameXUpdates.set(f.id, {
+        x: roundToHundredth(baseColX + internalOffset),
+        width: roundToHundredth(Math.max(1, f.width * scaleX)),
+      });
+    }
+  });
+
+  // --- 2. Vertical Row Clustering & Gap Preservation ---
+  const sortedByY = [...initialFrames].sort((a, b) => a.y - b.y);
+  const rowClusters: FrameBounds[][] = [];
+  const rowClusterTolerance = 2.0; // mm
+
+  for (const f of sortedByY) {
+    const matchingRow = rowClusters.find((row) =>
+      row.some((item) => Math.abs(item.y - f.y) < rowClusterTolerance)
+    );
+    if (matchingRow) {
+      matchingRow.push(f);
+    } else {
+      rowClusters.push([f]);
+    }
+  }
+
+  rowClusters.sort((a, b) => {
+    const minA = Math.min(...a.map((f) => f.y));
+    const minB = Math.min(...b.map((f) => f.y));
+    return minA - minB;
+  });
+
+  const rowHeights = rowClusters.map((row) => Math.max(...row.map((f) => f.height)));
+  const verticalGaps: number[] = [];
+  for (let i = 0; i < rowClusters.length - 1; i++) {
+    const rowA = rowClusters[i];
+    const rowB = rowClusters[i + 1];
+    if (!rowA || !rowB) continue;
+    const maxBottomA = Math.max(...rowA.map((f) => f.y + f.height));
+    const minTopB = Math.min(...rowB.map((f) => f.y));
+    verticalGaps.push(Math.max(0, minTopB - maxBottomA));
+  }
+
+  const totalVerticalGaps = verticalGaps.reduce((sum, g) => sum + g, 0);
+  const totalRowsHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+  const availableNewHeight = Math.max(1, newGroupBounds.height - totalVerticalGaps);
+  const scaleY = totalRowsHeight > 0 ? availableNewHeight / totalRowsHeight : 1;
+
+  const newRowPositions: number[] = [];
+  let curRowY = newGroupBounds.y;
+  for (let i = 0; i < rowClusters.length; i++) {
+    newRowPositions.push(curRowY);
+    const newRowH = (rowHeights[i] ?? 0) * scaleY;
+    const gap = verticalGaps[i] ?? 0;
+    curRowY += newRowH + gap;
+  }
+
+  const frameYUpdates = new Map<string, { y: number; height: number }>();
+  rowClusters.forEach((row, rowIdx) => {
+    const baseRowY = newRowPositions[rowIdx] ?? newGroupBounds.y;
+    for (const f of row) {
+      const origRowMinY = Math.min(...row.map((item) => item.y));
+      const internalOffset = (f.y - origRowMinY) * scaleY;
+      frameYUpdates.set(f.id, {
+        y: roundToHundredth(baseRowY + internalOffset),
+        height: roundToHundredth(Math.max(1, f.height * scaleY)),
+      });
+    }
+  });
+
+  return initialFrames.map((f) => {
+    const xUpdate = frameXUpdates.get(f.id);
+    const yUpdate = frameYUpdates.get(f.id);
+    return {
+      id: f.id,
+      geometry: {
+        x: xUpdate?.x ?? roundToHundredth(f.x),
+        y: yUpdate?.y ?? roundToHundredth(f.y),
+        width: xUpdate?.width ?? roundToHundredth(f.width),
+        height: yUpdate?.height ?? roundToHundredth(f.height),
+      },
+    };
+  });
 }
 
 /**

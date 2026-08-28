@@ -11,6 +11,10 @@ import {
   calculateSnapping,
   calculateResizeSnapping,
   calculateImageOffset,
+  calculateMultiFrameResize,
+  FrameBounds,
+  RectBounds,
+  roundToHundredth,
   getPhotoAspect,
   clamp,
   intersectRect,
@@ -217,6 +221,11 @@ function PhotoFrameNode({
         onDragEnd(e);
       }}
       onTransformEnd={() => {
+        if (isMultiSelectActive) {
+          // Multi-selection transform is handled globally by Transformer.onTransformEnd to preserve gaps!
+          return;
+        }
+
         const node = shapeRef.current;
         if (!node) return;
 
@@ -244,10 +253,10 @@ function PhotoFrameNode({
         node.scaleY(1);
 
         onFrameChange({
-          x: Math.round((node.x() / scaleFactor) * 10) / 10,
-          y: Math.round((node.y() / scaleFactor) * 10) / 10,
-          width: Math.round(rawW * 10) / 10,
-          height: Math.round(rawH * 10) / 10,
+          x: roundToHundredth(node.x() / scaleFactor),
+          y: roundToHundredth(node.y() / scaleFactor),
+          width: roundToHundredth(rawW),
+          height: roundToHundredth(rawH),
           rotation: Math.round(node.rotation()),
         });
       }}
@@ -458,6 +467,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
@@ -1492,6 +1502,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   anchor === 'bottom-left' ||
                   anchor === 'bottom-right';
                 tr.keepRatio(isCorner || selectedFrameIds.length > 1);
+
+                if (selectedFrameIds.length > 1 && activeSpread) {
+                  const selectedFrames = (activeSpread.elements || [])
+                    .filter((f) => selectedFrameIds.includes(f.id))
+                    .map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                  if (selectedFrames.length > 0) {
+                    const minX = Math.min(...selectedFrames.map((f) => f.x));
+                    const minY = Math.min(...selectedFrames.map((f) => f.y));
+                    const maxX = Math.max(...selectedFrames.map((f) => f.x + f.width));
+                    const maxY = Math.max(...selectedFrames.map((f) => f.y + f.height));
+                    multiTransformInitialStateRef.current = {
+                      frames: selectedFrames,
+                      bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+                    };
+                  }
+                } else {
+                  multiTransformInitialStateRef.current = null;
+                }
               }}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits (allow tiny micro sizes down to 4px)
@@ -1542,10 +1571,54 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               }}
               onTransformEnd={() => {
                 clearSnapLines();
-                if (trRef.current) {
-                  trRef.current.keepRatio(true);
-                  trRef.current.update();
+                const tr = trRef.current;
+                if (!tr) return;
+
+                if (selectedFrameIds.length > 1 && multiTransformInitialStateRef.current && activeSpread) {
+                  const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
+                  const selectedNodes = selectedFrameIds
+                    .map((id) => stageRef.current?.findOne(`#${id}`))
+                    .filter(Boolean) as Konva.Node[];
+
+                  if (selectedNodes.length > 0) {
+                    const pixelBoxes = selectedNodes.map((n) => {
+                      const sx = Math.abs(n.scaleX());
+                      const sy = Math.abs(n.scaleY());
+                      return {
+                        x: n.x(),
+                        y: n.y(),
+                        width: n.width() * sx,
+                        height: n.height() * sy,
+                      };
+                    });
+
+                    const minPxX = Math.min(...pixelBoxes.map((b) => b.x));
+                    const minPxY = Math.min(...pixelBoxes.map((b) => b.y));
+                    const maxPxX = Math.max(...pixelBoxes.map((b) => b.x + b.width));
+                    const maxPxY = Math.max(...pixelBoxes.map((b) => b.y + b.height));
+
+                    const newGroupBounds: RectBounds = {
+                      x: minPxX / scaleFactor,
+                      y: minPxY / scaleFactor,
+                      width: (maxPxX - minPxX) / scaleFactor,
+                      height: (maxPxY - minPxY) / scaleFactor,
+                    };
+
+                    selectedNodes.forEach((n) => {
+                      n.scaleX(1);
+                      n.scaleY(1);
+                    });
+
+                    const updates = calculateMultiFrameResize(initialFrames, initialBounds, newGroupBounds);
+                    if (updates.length > 0) {
+                      batchUpdateFrames(activeSpread.id, updates);
+                    }
+                  }
+                  multiTransformInitialStateRef.current = null;
                 }
+
+                tr.keepRatio(true);
+                tr.update();
               }}
             />
 
