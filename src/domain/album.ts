@@ -1,5 +1,6 @@
 import { Project } from './project';
 import { Unit } from './units';
+import { PhotoFrameElement } from './editor';
 
 export type PageType = 'cover_front' | 'cover_back' | 'left' | 'right' | 'single';
 export type SpreadType = 'cover' | 'interior';
@@ -15,6 +16,7 @@ export interface Page {
   safeArea: number;
   backgroundColor: string;
   backgroundType: 'solid' | 'gradient' | 'image';
+  elements?: PhotoFrameElement[];
 }
 
 export interface Spread {
@@ -29,6 +31,7 @@ export interface Spread {
   bleed: number;
   safeArea: number;
   backgroundColor: string;
+  elements: PhotoFrameElement[];
 }
 
 export interface Album {
@@ -93,6 +96,7 @@ export function createInitialAlbum(project: Project): Album {
     bleed: bleedVal,
     safeArea: marginVal,
     backgroundColor: project.backgroundColor || '#1e293b',
+    elements: [],
   };
 
   // 2. Initial Interior Spread (Spread 1: Page 1 & Page 2)
@@ -134,6 +138,7 @@ export function createInitialAlbum(project: Project): Album {
     bleed: bleedVal,
     safeArea: marginVal,
     backgroundColor: '#FFFFFF',
+    elements: [],
   };
 
   return {
@@ -205,6 +210,7 @@ export function createInteriorSpread(
     bleed: bleedVal,
     safeArea: marginVal,
     backgroundColor: '#FFFFFF',
+    elements: [],
   };
 }
 

@@ -45,18 +45,18 @@
 - [x] Page navigation
 
 ## Phase 4 — Editor
-- [ ] Canvas
-- [ ] Select
-- [ ] Move
-- [ ] Resize
-- [ ] Crop
-- [ ] Rotate
-- [ ] Zoom
-- [ ] Pan
-- [ ] Snap
-- [ ] Guides
-- [ ] Multi-select
-- [ ] Copy / Paste
+- [x] Canvas
+- [x] Select
+- [x] Move
+- [x] Resize
+- [x] Crop
+- [x] Rotate
+- [x] Zoom
+- [x] Pan
+- [x] Snap
+- [x] Guides
+- [x] Multi-select
+- [x] Copy / Paste
 
 ## Phase 5 — Persistence
 - [ ] Save

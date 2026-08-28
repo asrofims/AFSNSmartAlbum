@@ -248,12 +248,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     });
   };
 
-  // Card Drag Handler for Folder Organization
+  // Card Drag Handler for Folder Organization & Canvas Placement
   const handleCardDragStart = (e: React.DragEvent, photo: Photo) => {
     if (!selectedPhotoIds.includes(photo.id)) {
       selectPhoto(photo.id, 'single', sortedPhotos);
     }
-    e.dataTransfer.setData('application/json', JSON.stringify(selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id]));
+    e.dataTransfer.setData('application/json', JSON.stringify(photo));
+    e.dataTransfer.setData('text/plain', photo.id);
+    e.dataTransfer.effectAllowed = 'copyMove';
   };
 
   // Execute Photo Deletion after ConfirmDialog

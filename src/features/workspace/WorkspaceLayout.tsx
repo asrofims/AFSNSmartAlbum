@@ -10,7 +10,8 @@ import { formatDimensions } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
-import { SpreadCanvas } from '../album/SpreadCanvas';
+import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
+import { FrameToolbar } from '../editor/FrameToolbar';
 import { PageNavigator } from '../album/PageNavigator';
 import styles from './WorkspaceLayout.module.css';
 
@@ -207,7 +208,10 @@ export function WorkspaceLayout() {
           {!currentProject ? (
             <WelcomeScreen />
           ) : (
-            <SpreadCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
+            <>
+              <KonvaEditorCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
+              <FrameToolbar />
+            </>
           )}
         </main>
 
