@@ -647,14 +647,14 @@ export function calculateSnapping(
 }
 
 /**
- * Calculates smart resize snapping to match neighbor frame dimensions, alignment lines, and spread targets.
+ * Calculates smart resize snapping to match neighbor frame dimensions and edge alignments cleanly.
  */
 export function calculateResizeSnapping(
   current: RectBounds,
-  spreadWidth: number,
-  spreadHeight: number,
-  safeArea: number,
-  gutterWidth: number,
+  _spreadWidth: number,
+  _spreadHeight: number,
+  _safeArea: number,
+  _gutterWidth: number,
   otherFrames: RectBounds[],
   threshold: number = 3.0,
   unit: string = 'mm'
@@ -663,149 +663,122 @@ export function calculateResizeSnapping(
   const snapLines: SnapLine[] = [];
   const gapGuides: GapGuide[] = [];
 
-  const singlePageW = (spreadWidth - gutterWidth) / 2;
-  const leftPageCenter = singlePageW / 2;
-  const spineLeft = singlePageW;
-  const spineCenter = spreadWidth / 2;
-  const spineRight = singlePageW + gutterWidth;
-  const rightPageCenter = spineRight + singlePageW / 2;
+  const right = x + width;
+  const bottom = y + height;
 
-  const vTargets = [
-    { pos: 0, label: 'Left Outer Edge' },
-    { pos: leftPageCenter, label: 'Left Page Center' },
-    { pos: spineLeft, label: 'Left Page Inner Edge' },
-    { pos: spineCenter, label: 'Center Spine' },
-    { pos: spineRight, label: 'Right Page Inner Edge' },
-    { pos: rightPageCenter, label: 'Right Page Center' },
-    { pos: spreadWidth, label: 'Right Outer Edge' },
-    ...(safeArea > 0
-      ? [
-          { pos: safeArea, label: 'Safe Margin Left' },
-          { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
-          { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
-          { pos: spreadWidth - safeArea, label: 'Safe Margin Right' },
-        ]
-      : []),
-  ];
+  // 1. Primary: Dimension Matching (Match Width / Match Height)
+  let bestWidthDiff = threshold + 1;
+  let bestWidthMatch: { other: RectBounds; val: number } | null = null;
 
-  const hTargets = [
-    { pos: 0, label: 'Top Edge' },
-    { pos: spreadHeight / 2, label: 'Center Horizontal' },
-    { pos: spreadHeight, label: 'Bottom Edge' },
-    ...(safeArea > 0
-      ? [
-          { pos: safeArea, label: 'Safe Margin Top' },
-          { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' },
-        ]
-      : []),
-  ];
+  let bestHeightDiff = threshold + 1;
+  let bestHeightMatch: { other: RectBounds; val: number } | null = null;
 
   for (const other of otherFrames) {
-    vTargets.push(
-      { pos: other.x, label: 'Align Left' },
-      { pos: other.x + other.width / 2, label: 'Align Center X' },
-      { pos: other.x + other.width, label: 'Align Right' }
-    );
-    hTargets.push(
-      { pos: other.y, label: 'Align Top' },
-      { pos: other.y + other.height / 2, label: 'Align Center Y' },
-      { pos: other.y + other.height, label: 'Align Bottom' }
-    );
+    // Width matching
+    const wDiff = Math.abs(width - other.width);
+    if (wDiff <= threshold && wDiff < bestWidthDiff) {
+      bestWidthDiff = wDiff;
+      bestWidthMatch = { other, val: other.width };
+    }
 
-    // Dimension matching (Width / Height)
-    if (Math.abs(width - other.width) <= threshold) {
-      width = other.width;
-      snapLines.push({
+    // Height matching
+    const hDiff = Math.abs(height - other.height);
+    if (hDiff <= threshold && hDiff < bestHeightDiff) {
+      bestHeightDiff = hDiff;
+      bestHeightMatch = { other, val: other.height };
+    }
+  }
+
+  if (bestWidthMatch) {
+    const o = bestWidthMatch.other;
+    width = bestWidthMatch.val;
+    snapLines.push({
+      type: 'vertical',
+      position: x + width,
+      start: Math.min(y, o.y),
+      end: Math.max(y + height, o.y + o.height),
+      label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
+    });
+  }
+
+  if (bestHeightMatch) {
+    const o = bestHeightMatch.other;
+    height = bestHeightMatch.val;
+    snapLines.push({
+      type: 'horizontal',
+      position: y + height,
+      start: Math.min(x, o.x),
+      end: Math.max(x + width, o.x + o.width),
+      label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
+    });
+  }
+
+  // 2. Secondary: Clean Edge Alignment with Nearest Frames
+  let bestEdgeV: SnapLine | null = null;
+  let bestEdgeVDiff = threshold + 1;
+
+  let bestEdgeH: SnapLine | null = null;
+  let bestEdgeHDiff = threshold + 1;
+
+  for (const other of otherFrames) {
+    const otherRight = other.x + other.width;
+    const otherBottom = other.y + other.height;
+
+    // Check Right Edge alignment
+    const diffR_R = Math.abs(right - otherRight);
+    if (diffR_R <= threshold && diffR_R < bestEdgeVDiff) {
+      bestEdgeVDiff = diffR_R;
+      bestEdgeV = {
         type: 'vertical',
-        position: x + width,
+        position: otherRight,
         start: Math.min(y, other.y),
-        end: Math.max(y + height, other.y + other.height),
-        label: `Match Width (${roundToTenth(width)} ${unit})`,
-      });
+        end: Math.max(bottom, otherBottom),
+        label: 'Rata Kanan',
+      };
     }
-
-    if (Math.abs(height - other.height) <= threshold) {
-      height = other.height;
-      snapLines.push({
-        type: 'horizontal',
-        position: y + height,
-        start: Math.min(x, other.x),
-        end: Math.max(x + width, other.x + other.width),
-        label: `Match Height (${roundToTenth(height)} ${unit})`,
-      });
-    }
-  }
-
-  // Right Edge Snapping
-  const currentRight = x + width;
-  for (const target of vTargets) {
-    if (Math.abs(currentRight - target.pos) <= threshold) {
-      width = Math.max(5, target.pos - x);
-      snapLines.push({
+    const diffR_L = Math.abs(right - other.x);
+    if (diffR_L <= threshold && diffR_L < bestEdgeVDiff) {
+      bestEdgeVDiff = diffR_L;
+      bestEdgeV = {
         type: 'vertical',
-        position: target.pos,
-        start: 0,
-        end: spreadHeight,
-        label: target.label,
-      });
-      break;
+        position: other.x,
+        start: Math.min(y, other.y),
+        end: Math.max(bottom, otherBottom),
+        label: 'Sejajar Sisi',
+      };
     }
-  }
 
-  // Bottom Edge Snapping
-  const currentBottom = y + height;
-  for (const target of hTargets) {
-    if (Math.abs(currentBottom - target.pos) <= threshold) {
-      height = Math.max(5, target.pos - y);
-      snapLines.push({
+    // Check Bottom Edge alignment
+    const diffB_B = Math.abs(bottom - otherBottom);
+    if (diffB_B <= threshold && diffB_B < bestEdgeHDiff) {
+      bestEdgeHDiff = diffB_B;
+      bestEdgeH = {
         type: 'horizontal',
-        position: target.pos,
-        start: 0,
-        end: spreadWidth,
-        label: target.label,
-      });
-      break;
+        position: otherBottom,
+        start: Math.min(x, other.x),
+        end: Math.max(right, otherRight),
+        label: 'Rata Bawah',
+      };
+    }
+    const diffB_T = Math.abs(bottom - other.y);
+    if (diffB_T <= threshold && diffB_T < bestEdgeHDiff) {
+      bestEdgeHDiff = diffB_T;
+      bestEdgeH = {
+        type: 'horizontal',
+        position: other.y,
+        start: Math.min(x, other.x),
+        end: Math.max(right, otherRight),
+        label: 'Sejajar Sisi',
+      };
     }
   }
 
-  // Calculate gap to right neighbor during resize
-  const rightNeighborFrames = otherFrames.filter((f) => f.x >= x + width - threshold);
-  if (rightNeighborFrames.length > 0) {
-    const sorted = rightNeighborFrames.sort((a, b) => a.x - b.x);
-    const firstRight = sorted[0];
-    if (firstRight) {
-      const gap = firstRight.x - (x + width);
-      if (gap > 0 && gap <= 80) {
-        gapGuides.push({
-          type: 'horizontal',
-          start: x + width,
-          end: firstRight.x,
-          crossPos: Math.min(y + height / 2, firstRight.y + firstRight.height / 2),
-          distance: roundToTenth(gap),
-          label: `${roundToTenth(gap)} ${unit}`,
-        });
-      }
-    }
+  // Only display edge lines if dimension line is not active on that axis
+  if (bestEdgeV && !bestWidthMatch) {
+    snapLines.push(bestEdgeV);
   }
-
-  // Calculate gap to bottom neighbor during resize
-  const bottomNeighborFrames = otherFrames.filter((f) => f.y >= y + height - threshold);
-  if (bottomNeighborFrames.length > 0) {
-    const sorted = bottomNeighborFrames.sort((a, b) => a.y - b.y);
-    const firstBottom = sorted[0];
-    if (firstBottom) {
-      const gap = firstBottom.y - (y + height);
-      if (gap > 0 && gap <= 80) {
-        gapGuides.push({
-          type: 'vertical',
-          start: y + height,
-          end: firstBottom.y,
-          crossPos: Math.min(x + width / 2, firstBottom.x + firstBottom.width / 2),
-          distance: roundToTenth(gap),
-          label: `${roundToTenth(gap)} ${unit}`,
-        });
-      }
-    }
+  if (bestEdgeH && !bestHeightMatch) {
+    snapLines.push(bestEdgeH);
   }
 
   return {
