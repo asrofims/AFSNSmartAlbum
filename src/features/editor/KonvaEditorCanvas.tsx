@@ -188,8 +188,9 @@ function PhotoFrameNode({
         const node = shapeRef.current;
         if (!node) return;
         const scaleX = Math.abs(node.scaleX());
+        const scaleY = Math.abs(node.scaleY());
         const liveW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        const liveH = Math.max(2, liveW / naturalAspect);
+        const liveH = Math.max(2, (node.height() * scaleY) / scaleFactor);
         setLiveDimensions({
           w: Math.round(liveW * 10) / 10,
           h: Math.round(liveH * 10) / 10,
@@ -201,8 +202,9 @@ function PhotoFrameNode({
         if (!node) return;
 
         const scaleX = Math.abs(node.scaleX());
+        const scaleY = Math.abs(node.scaleY());
         const newW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        const newH = Math.max(2, newW / naturalAspect);
+        const newH = Math.max(2, (node.height() * scaleY) / scaleFactor);
 
         // Reset node scale and update width/height
         node.scaleX(1);
@@ -937,8 +939,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               ref={trRef}
               visible={!editingCropFrameId}
               rotateEnabled
-              keepRatio={true}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+              keepRatio={false}
+              enabledAnchors={[
+                'top-left',
+                'top-center',
+                'top-right',
+                'middle-right',
+                'bottom-right',
+                'bottom-center',
+                'bottom-left',
+                'middle-left',
+              ]}
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
@@ -949,7 +960,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               borderDash={editingCropFrameId ? [5, 3] : [4, 3]}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits
-                if (newBox.width < 20 || newBox.height < 20) {
+                if (newBox.width < 15 || newBox.height < 15) {
                   return oldBox;
                 }
                 return newBox;
