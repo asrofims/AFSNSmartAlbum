@@ -54,6 +54,7 @@ pub fn run() {
             commands::project_commands::list_recent_projects,
             commands::project_commands::delete_project,
             commands::project_commands::clear_recent_projects,
+            commands::project_commands::update_project_spacing,
             commands::photo_commands::select_and_import_files,
             commands::photo_commands::select_and_import_folder,
             commands::photo_commands::import_file_paths,

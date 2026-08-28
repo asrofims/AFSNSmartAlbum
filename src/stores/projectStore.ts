@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Project, ProjectSettings } from '../domain/project';
+import { Unit } from '../domain/units';
 
 interface ProjectState {
   currentProject: Project | null;
@@ -11,6 +12,7 @@ interface ProjectState {
   openNewProject: () => void;
   closeNewProject: () => void;
   setCurrentProject: (project: Project | null) => void;
+  updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
   closeProject: () => void;
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
@@ -30,6 +32,44 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   closeNewProject: () => set({ isNewProjectOpen: false, error: null }),
 
   setCurrentProject: (project) => set({ currentProject: project }),
+
+  updateProjectSpacing: async (spacingValue: number, spacingUnit?: Unit) => {
+    const current = get().currentProject;
+    if (!current) return;
+    const unit = spacingUnit || current.spacingUnit;
+    const updatedProject: Project = {
+      ...current,
+      spacingValue: Number(spacingValue),
+      spacingUnit: unit,
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      currentProject: updatedProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+    }));
+
+    // Update in Tauri DB
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('update_project_spacing', {
+        id: current.id,
+        spacingValue: Number(spacingValue),
+        spacingUnit: unit,
+      });
+    } catch (err) {
+      console.warn('[AFSN] update_project_spacing via Tauri failed, fallback:', err);
+    }
+
+    // Update in localStorage
+    try {
+      const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
+      const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
+      localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
+    } catch (e) {
+      console.warn('[AFSN] localStorage write error:', e);
+    }
+  },
 
   closeProject: () => set({ currentProject: null }),
 

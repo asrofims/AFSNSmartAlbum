@@ -101,3 +101,15 @@ pub fn clear_recent_projects(db: State<'_, Database>) -> Result<(), String> {
     log::info!("clear_recent_projects");
     db.clear_recent_projects().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn update_project_spacing(
+    db: State<'_, Database>,
+    id: String,
+    spacing_value: f64,
+    spacing_unit: String,
+) -> Result<(), String> {
+    log::info!("update_project_spacing: id={}, value={}, unit={}", id, spacing_value, spacing_unit);
+    db.update_project_spacing(&id, spacing_value, &spacing_unit)
+        .map_err(|e| e.to_string())
+}

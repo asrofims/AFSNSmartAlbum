@@ -455,6 +455,15 @@ impl Database {
         }
     }
 
+    pub fn update_project_spacing(&self, id: &str, spacing_value: f64, spacing_unit: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE projects SET spacing_value = ?1, spacing_unit = ?2, updated_at = datetime('now') WHERE id = ?3",
+            rusqlite::params![spacing_value, spacing_unit, id],
+        )?;
+        Ok(())
+    }
+
     pub fn list_recent_projects(&self, limit: i32) -> SqliteResult<Vec<ProjectRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

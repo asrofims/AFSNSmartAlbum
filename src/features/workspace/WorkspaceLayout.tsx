@@ -8,7 +8,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
-import { formatDimensions } from '../../domain/units';
+import { formatDimensions, convertUnit, Unit } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
 import { FilmstripTray } from '../photos/FilmstripTray';
@@ -24,6 +24,7 @@ export function WorkspaceLayout() {
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
+  const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
 
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
@@ -313,6 +314,81 @@ export function WorkspaceLayout() {
                 <div className={styles.propRow}>
                   <span>Resolution</span>
                   <span className={styles.propValue}>{currentProject.canvasDpi} DPI</span>
+                </div>
+              </div>
+
+              {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Aturan Celah Foto (Photo Spacing)</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Celah Default (Project Gap)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '120px' }}>
+                      <NumberInput
+                        value={currentProject.spacingValue}
+                        onChange={(val) => {
+                          const num = Math.max(0, val);
+                          updateProjectSpacing(num, currentProject.spacingUnit);
+                          setCustomGapValue(num);
+                        }}
+                        min={0}
+                        max={100}
+                        step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <select
+                        value={currentProject.spacingUnit}
+                        onChange={(e) => {
+                          const newUnit = e.target.value as Unit;
+                          updateProjectSpacing(currentProject.spacingValue, newUnit);
+                        }}
+                        style={{
+                          fontSize: '10px',
+                          backgroundColor: 'var(--color-bg-secondary)',
+                          color: 'var(--color-text-primary)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                        <option value="inch">in</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Quick Action to apply project spacing to currently selected frames */}
+                  {selectedFrameIds.length >= 2 && activeSpread && (
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        onClick={() => {
+                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          applyFixedGapToSelected(activeSpread.id, 'horizontal', gapInMm);
+                        }}
+                        title={`Terapkan celah default (${currentProject.spacingValue} ${currentProject.spacingUnit}) secara Horizontal`}
+                      >
+                        ⇿ Terapkan Gap H
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        onClick={() => {
+                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          applyFixedGapToSelected(activeSpread.id, 'vertical', gapInMm);
+                        }}
+                        title={`Terapkan celah default (${currentProject.spacingValue} ${currentProject.spacingUnit}) secara Vertikal`}
+                      >
+                        ⇳ Terapkan Gap V
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
