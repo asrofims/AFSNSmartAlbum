@@ -62,35 +62,18 @@ function PhotoFrameNode({
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
 
-  // Calculate cover fit scale and dimensions for photo inside frame
-  let naturalW = imageObj ? imageObj.naturalWidth : pixelW;
-  let naturalH = imageObj ? imageObj.naturalHeight : pixelH;
-  if (naturalW === 0) naturalW = 1;
-  if (naturalH === 0) naturalH = 1;
-
-  const frameAspect = pixelW / Math.max(1, pixelH);
-  const imgAspect = naturalW / naturalH;
-
-  let renderImgW = pixelW;
-  let renderImgH = pixelH;
-  let offsetX = 0;
-  let offsetY = 0;
-
+  // Window Masking Model:
+  // The Image Layer has its own fixed width and height (imageWidth, imageHeight).
+  // When frame window width/height changes, the image behind it stays untouched and stationary!
+  const imgPhysicalW = frame.imageWidth || frame.originalWidth || frame.width;
+  const imgPhysicalH = frame.imageHeight || frame.originalHeight || frame.height;
   const currentScale = frame.cropScale || 1.0;
 
-  if (imgAspect > frameAspect) {
-    // Image is wider than frame
-    renderImgH = pixelH * currentScale;
-    renderImgW = renderImgH * imgAspect;
-    offsetX = (pixelW - renderImgW) / 2 + (frame.cropX || 0) * scaleFactor;
-    offsetY = (frame.cropY || 0) * scaleFactor;
-  } else {
-    // Image is taller than frame
-    renderImgW = pixelW * currentScale;
-    renderImgH = renderImgW / imgAspect;
-    offsetX = (frame.cropX || 0) * scaleFactor;
-    offsetY = (pixelH - renderImgH) / 2 + (frame.cropY || 0) * scaleFactor;
-  }
+  const renderImgW = imgPhysicalW * scaleFactor * currentScale;
+  const renderImgH = imgPhysicalH * scaleFactor * currentScale;
+
+  const offsetX = (frame.cropX || 0) * scaleFactor;
+  const offsetY = (frame.cropY || 0) * scaleFactor;
 
   return (
     <Group
@@ -209,13 +192,11 @@ function PhotoFrameNode({
             onDragEnd={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
-                const defaultOffsetX = (pixelW - renderImgW) / 2;
-                const defaultOffsetY = (pixelH - renderImgH) / 2;
-                const deltaX = (e.target.x() - defaultOffsetX) / scaleFactor;
-                const deltaY = (e.target.y() - defaultOffsetY) / scaleFactor;
+                const newCropX = e.target.x() / scaleFactor;
+                const newCropY = e.target.y() / scaleFactor;
                 onChange({
-                  cropX: Math.round(deltaX * 10) / 10,
-                  cropY: Math.round(deltaY * 10) / 10,
+                  cropX: Math.round(newCropX * 10) / 10,
+                  cropY: Math.round(newCropY * 10) / 10,
                 });
               }
             }}

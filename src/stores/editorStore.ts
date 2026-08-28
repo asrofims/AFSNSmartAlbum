@@ -130,6 +130,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoAspect: photoAspect,
       originalWidth: Math.round(frameW * 10) / 10,
       originalHeight: Math.round(frameH * 10) / 10,
+      imageWidth: Math.round(frameW * 10) / 10,
+      imageHeight: Math.round(frameH * 10) / 10,
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,
@@ -437,12 +439,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
     if (!frame) return;
 
-    const aspect = frame.photoAspect || (frame.width / Math.max(1, frame.height));
+    const aspect = frame.photoAspect || ((frame.imageWidth || frame.width) / Math.max(1, frame.imageHeight || frame.height));
     const newHeight = Math.round((frame.width / aspect) * 10) / 10;
 
     const { updateFrameGeometry } = get();
     updateFrameGeometry(spreadId, frameId, {
       height: newHeight,
+      imageWidth: frame.width,
+      imageHeight: newHeight,
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,
@@ -450,10 +454,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   resetCrop: (spreadId, frameId) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    const activeSpread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
+    if (!frame) return;
+
+    const imgW = frame.imageWidth || frame.width;
+    const imgH = frame.imageHeight || frame.height;
+    const centerX = Math.round(((frame.width - imgW) / 2) * 10) / 10;
+    const centerY = Math.round(((frame.height - imgH) / 2) * 10) / 10;
+
     const { updateFrameGeometry } = get();
     updateFrameGeometry(spreadId, frameId, {
-      cropX: 0,
-      cropY: 0,
+      cropX: centerX,
+      cropY: centerY,
       cropScale: 1.0,
     });
   },

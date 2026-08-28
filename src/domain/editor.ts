@@ -20,6 +20,10 @@ export interface PhotoFrameElement {
   originalWidth?: number;
   originalHeight?: number;
 
+  // Image layer dimensions behind the frame window
+  imageWidth?: number;
+  imageHeight?: number;
+
   // Internal Crop inside frame
   cropX: number; // offset in px/ratio
   cropY: number;
