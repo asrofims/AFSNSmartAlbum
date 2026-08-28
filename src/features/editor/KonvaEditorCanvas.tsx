@@ -140,8 +140,9 @@ function PhotoFrameNode({
         if (!node) return;
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
-        const liveW = Math.max(1, (node.width() * scaleX) / scaleFactor);
-        const liveH = Math.max(1, (node.height() * scaleY) / scaleFactor);
+        const currentScale = Math.max(scaleX, scaleY);
+        const liveW = Math.max(5, frame.width * currentScale);
+        const liveH = Math.max(5, liveW / naturalAspect);
         setLiveDimensions({
           w: Math.round(liveW * 10) / 10,
           h: Math.round(liveH * 10) / 10,
@@ -154,13 +155,14 @@ function PhotoFrameNode({
 
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
+        const currentScale = Math.max(scaleX, scaleY);
 
         // Reset node scale and update width/height
         node.scaleX(1);
         node.scaleY(1);
 
-        const newW = Math.max(5, (node.width() * scaleX) / scaleFactor);
-        const newH = Math.max(5, (node.height() * scaleY) / scaleFactor);
+        const newW = Math.max(5, frame.width * currentScale);
+        const newH = Math.max(5, newW / naturalAspect);
 
         onFrameChange({
           x: Math.round((node.x() / scaleFactor) * 10) / 10,

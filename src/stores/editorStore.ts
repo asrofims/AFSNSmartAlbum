@@ -108,6 +108,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       frameH = pageH * 0.8;
       frameW = frameH * photoAspect;
     }
+    frameW = Math.round(frameW * 10) / 10;
+    frameH = Math.round((frameW / photoAspect) * 10) / 10;
 
     // Default position centered on left page or at drop point
     const posX = pos?.x !== undefined ? pos.x - frameW / 2 : (pageW - frameW) / 2;
