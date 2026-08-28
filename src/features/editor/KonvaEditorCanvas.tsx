@@ -109,6 +109,10 @@ function PhotoFrameNode({
       width={pixelW}
       height={pixelH}
       rotation={frame.rotation || 0}
+      clipX={isCropMode ? undefined : 0}
+      clipY={isCropMode ? undefined : 0}
+      clipWidth={isCropMode ? undefined : pixelW}
+      clipHeight={isCropMode ? undefined : pixelH}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
       draggable={!isCropMode}
