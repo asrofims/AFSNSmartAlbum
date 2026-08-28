@@ -18,11 +18,13 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     sortBy,
     searchQuery,
     isImporting,
+    isCancelling,
     importProgress,
     loadPhotos,
     importFiles,
     importFolder,
     importPaths,
+    cancelImport,
     toggleFavorite,
     removePhoto,
     checkMissing,
@@ -114,6 +116,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   };
 
+  const showProgressBar = isImporting && importProgress && importProgress.total > 0;
+
   return (
     <section
       className={`${styles.filmstrip} ${!isOpen ? styles.collapsed : ''} ${isDragOver ? styles.dragOver : ''}`}
@@ -123,31 +127,39 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       onDrop={handleDrop}
       aria-label="Photo Library Filmstrip"
     >
-      {/* Real-time Import Progress Bar Banner */}
-      {isImporting && (
+      {/* Real-time Import Progress Bar Banner (Only shown when actual import processing is underway) */}
+      {showProgressBar && (
         <div className={styles.progressBarContainer}>
           <div className={styles.progressTopRow}>
             <div className={styles.progressInfo}>
               <div className={styles.spinner} />
               <span className={styles.progressTitle}>
-                {importProgress && importProgress.total > 0
-                  ? `Importing ${importProgress.current} of ${importProgress.total} photos...`
-                  : 'Preparing photo import...'}
+                Importing {importProgress.current} of {importProgress.total} photos...
               </span>
             </div>
-            <span className={styles.progressPercent}>
-              {importProgress ? `${importProgress.percent}%` : '0%'}
-            </span>
+
+            <div className={styles.progressRightControls}>
+              <span className={styles.progressPercent}>{importProgress.percent}%</span>
+              <button
+                type="button"
+                className={styles.cancelImportBtn}
+                onClick={cancelImport}
+                disabled={isCancelling}
+                title="Safely cancel photo import"
+              >
+                {isCancelling ? 'Cancelling...' : '✕ Cancel'}
+              </button>
+            </div>
           </div>
 
           <div className={styles.progressBarTrack}>
             <div
               className={styles.progressBarFill}
-              style={{ width: `${importProgress ? Math.max(5, importProgress.percent) : 10}%` }}
+              style={{ width: `${Math.max(4, importProgress.percent)}%` }}
             />
           </div>
 
-          {importProgress?.currentFile && (
+          {importProgress.currentFile && (
             <span className={styles.progressFileName}>
               {importProgress.currentFile}
             </span>
@@ -237,7 +249,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 disabled={isImporting}
                 title="Import individual image files (multi-select)"
               >
-                {isImporting ? 'Importing...' : '+ Import Files'}
+                + Import Files
               </Button>
 
               <Button
@@ -247,7 +259,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 disabled={isImporting}
                 title="Import entire folder of photos"
               >
-                {isImporting ? 'Importing...' : '+ Import Folder'}
+                + Import Folder
               </Button>
             </>
           )}

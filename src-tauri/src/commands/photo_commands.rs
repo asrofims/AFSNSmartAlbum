@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -7,6 +7,11 @@ use uuid::Uuid;
 
 use crate::db::{Database, PhotoRow};
 use crate::photo_engine::{is_supported_image, process_photo, scan_directory};
+
+#[derive(Clone, Default)]
+pub struct ImportState {
+    pub cancel_flag: Arc<AtomicBool>,
+}
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +26,12 @@ fn get_cache_dir(app: &AppHandle) -> PathBuf {
     app.path()
         .app_cache_dir()
         .unwrap_or_else(|_| std::env::temp_dir().join("afsn_cache"))
+}
+
+#[tauri::command]
+pub fn cancel_photo_import(state: State<'_, ImportState>) {
+    log::info!("User requested cancellation of photo import");
+    state.cancel_flag.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]
@@ -43,7 +54,7 @@ pub async fn select_and_import_files(
 
     match files {
         Some(paths) => import_paths_internal(app, project_id, paths).await,
-        None => Ok(Vec::new()), // User cancelled
+        None => Ok(Vec::new()), // User cancelled dialog
     }
 }
 
@@ -68,7 +79,7 @@ pub async fn select_and_import_folder(
                 .map_err(|e| e.to_string())?;
             import_paths_internal(app, project_id, paths).await
         }
-        None => Ok(Vec::new()), // User cancelled
+        None => Ok(Vec::new()), // User cancelled dialog
     }
 }
 
@@ -105,6 +116,10 @@ async fn import_paths_internal(
         return Ok(Vec::new());
     }
 
+    let import_state = app.state::<ImportState>();
+    import_state.cancel_flag.store(false, Ordering::SeqCst);
+    let cancel_flag = import_state.cancel_flag.clone();
+
     let db = app.state::<Database>();
 
     // Filter out duplicates that already exist in this project
@@ -128,19 +143,20 @@ async fn import_paths_internal(
     let cache_dir = get_cache_dir(&app);
     let counter = Arc::new(AtomicUsize::new(0));
 
-    // Emit initial progress notification
+    // Emit initial progress notification only when there are files to process
     let _ = app.emit(
         "photo-import-progress",
         ImportProgressPayload {
             current: 0,
             total,
-            current_file: "Starting multi-core processing...".to_string(),
+            current_file: "Preparing photos...".to_string(),
             percent: 0,
         },
     );
 
     let project_id_clone = project_id.clone();
     let app_for_thread = app.clone();
+    let cancel_for_thread = cancel_flag.clone();
 
     // Run parallel decoding & thumbnail generation on Rayon thread pool
     let imported_rows: Vec<PhotoRow> = tauri::async_runtime::spawn_blocking(move || {
@@ -148,6 +164,11 @@ async fn import_paths_internal(
         let rows: Vec<PhotoRow> = to_import
             .into_par_iter()
             .filter_map(|path| {
+                // Check if user cancelled import
+                if cancel_for_thread.load(Ordering::Relaxed) {
+                    return None;
+                }
+
                 let photo_id = Uuid::new_v4().to_string();
                 let file_name = path
                     .file_name()
@@ -157,6 +178,11 @@ async fn import_paths_internal(
 
                 match process_photo(&path, &cache_dir, &photo_id) {
                     Ok(processed) => {
+                        // Check again before database write
+                        if cancel_for_thread.load(Ordering::Relaxed) {
+                            return None;
+                        }
+
                         let row = PhotoRow {
                             id: photo_id,
                             project_id: project_id_clone.clone(),
@@ -222,8 +248,21 @@ async fn import_paths_internal(
     .await
     .map_err(|e| e.to_string())?;
 
-    log::info!("Imported {} new photos into project {}", imported_rows.len(), project_id);
-    let _ = app.emit("photo-import-complete", serde_json::json!({ "total": total, "imported": imported_rows.len() }));
+    let is_cancelled = cancel_flag.load(Ordering::Relaxed);
+    log::info!(
+        "Import complete: {} photos added (cancelled: {})",
+        imported_rows.len(),
+        is_cancelled
+    );
+
+    let _ = app.emit(
+        "photo-import-complete",
+        serde_json::json!({
+            "total": total,
+            "imported": imported_rows.len(),
+            "cancelled": is_cancelled
+        }),
+    );
 
     // Re-query database using the managed state
     let db_final = app.state::<Database>();

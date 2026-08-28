@@ -39,8 +39,9 @@ pub fn run() {
             let database = Database::init(db_path)
                 .expect("Failed to initialize database");
 
-            // Make database available as managed state
+            // Make database and import state available as managed state
             app.manage(database);
+            app.manage(commands::photo_commands::ImportState::default());
 
             log::info!("AFSNSmartAlbum started successfully");
             Ok(())
@@ -61,6 +62,7 @@ pub fn run() {
             commands::photo_commands::remove_photo,
             commands::photo_commands::check_missing_photos,
             commands::photo_commands::relink_folder,
+            commands::photo_commands::cancel_photo_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
