@@ -271,28 +271,43 @@ export function calculateSnapping(
   let snappedY = dragged.y;
   const snapLines: SnapLine[] = [];
 
-  const halfSpreadW = spreadWidth / 2;
-  const leftCenterGutter = halfSpreadW - gutterWidth / 2;
-  const rightCenterGutter = halfSpreadW + gutterWidth / 2;
+  const singlePageW = (spreadWidth - gutterWidth) / 2;
+  const leftPageCenter = singlePageW / 2;
+  const spineLeft = singlePageW;
+  const spineCenter = spreadWidth / 2;
+  const spineRight = singlePageW + gutterWidth;
+  const rightPageCenter = spineRight + singlePageW / 2;
 
-  // Key vertical reference points on spread
+  // Key vertical reference points on spread (Page Centers and Spines are Fixed physical targets)
   const vTargets = [
-    { pos: 0, label: 'Left Edge' },
-    { pos: safeArea, label: 'Safe Margin Left' },
-    { pos: leftCenterGutter, label: 'Center Fold Left' },
-    { pos: halfSpreadW, label: 'Center Spine' },
-    { pos: rightCenterGutter, label: 'Center Fold Right' },
-    { pos: spreadWidth - safeArea, label: 'Safe Margin Right' },
-    { pos: spreadWidth, label: 'Right Edge' },
+    { pos: 0, label: 'Left Outer Edge' },
+    { pos: leftPageCenter, label: 'Left Page Center' },
+    { pos: spineLeft, label: 'Left Page Inner Edge' },
+    { pos: spineCenter, label: 'Center Spine' },
+    { pos: spineRight, label: 'Right Page Inner Edge' },
+    { pos: rightPageCenter, label: 'Right Page Center' },
+    { pos: spreadWidth, label: 'Right Outer Edge' },
+    ...(safeArea > 0
+      ? [
+          { pos: safeArea, label: 'Safe Margin Left' },
+          { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
+          { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
+          { pos: spreadWidth - safeArea, label: 'Safe Margin Right' },
+        ]
+      : []),
   ];
 
   // Key horizontal reference points on spread
   const hTargets = [
     { pos: 0, label: 'Top Edge' },
-    { pos: safeArea, label: 'Safe Margin Top' },
     { pos: spreadHeight / 2, label: 'Center Horizontal' },
-    { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' },
     { pos: spreadHeight, label: 'Bottom Edge' },
+    ...(safeArea > 0
+      ? [
+          { pos: safeArea, label: 'Safe Margin Top' },
+          { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' },
+        ]
+      : []),
   ];
 
   // Add points from other frames

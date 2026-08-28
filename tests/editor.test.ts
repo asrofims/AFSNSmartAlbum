@@ -38,6 +38,18 @@ const draggedNearCenter: RectBounds = { x: 250 - 1.2, y: 50, width: 100, height:
 const snapCenter = calculateSnapping(draggedNearCenter, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, 3.0);
 console.assert(snapCenter.snappedX === 250, `Should snap center to 300 (x=250), got ${snapCenter.snappedX}`);
 
+// Dragged near Left Page Center (Page 1 Center = 148.5mm, frame width = 100mm, x = 99mm -> centerX = 149mm)
+const draggedNearLeftCenter: RectBounds = { x: 99, y: 50, width: 100, height: 80 };
+const snapLeftCenter = calculateSnapping(draggedNearLeftCenter, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, 3.0);
+console.assert(snapLeftCenter.snappedX === 98.5, `Should snap center to 148.5 (x=98.5), got ${snapLeftCenter.snappedX}`);
+console.assert(snapLeftCenter.snapLines[0].label === 'Left Page Center', `Snap line should be Left Page Center, got ${snapLeftCenter.snapLines[0].label}`);
+
+// Dragged near Right Page Center (Page 2 Center = 451.5mm, frame width = 100mm, x = 402mm -> centerX = 452mm)
+const draggedNearRightCenter: RectBounds = { x: 402, y: 50, width: 100, height: 80 };
+const snapRightCenter = calculateSnapping(draggedNearRightCenter, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, 3.0);
+console.assert(snapRightCenter.snappedX === 401.5, `Should snap center to 451.5 (x=401.5), got ${snapRightCenter.snappedX}`);
+console.assert(snapRightCenter.snapLines[0].label === 'Right Page Center', `Snap line should be Right Page Center, got ${snapRightCenter.snapLines[0].label}`);
+
 // 2. Test Snapping to Other Neighboring Frames
 const frameA: RectBounds = { x: 50, y: 50, width: 120, height: 90 };
 const draggedNearFrameA: RectBounds = { x: 50.8, y: 160, width: 120, height: 90 }; // x=50.8 near x=50
