@@ -162,6 +162,8 @@ function PhotoFrameNode({
     }
   });
 
+  const isDraggingRef = useRef(false);
+
   return (
     <Group
       id={frame.id}
@@ -176,9 +178,24 @@ function PhotoFrameNode({
       draggable={!isCropMode}
       onMouseDown={(e) => {
         e.cancelBubble = true;
+        // Ignore right-clicks on mouse down
+        if ('button' in e.evt && e.evt.button === 2) {
+          return;
+        }
         if (!isCropMode) {
+          if (e.evt?.shiftKey) {
+            onSelect(e);
+          } else if (!isSelected) {
+            onSelect(e);
+          }
+        }
+      }}
+      onClick={(e) => {
+        e.cancelBubble = true;
+        if (!isCropMode && !isDraggingRef.current && isSelected && !e.evt?.shiftKey) {
           onSelect(e);
         }
+        isDraggingRef.current = false;
       }}
       onTap={(e) => {
         e.cancelBubble = true;
@@ -201,12 +218,18 @@ function PhotoFrameNode({
         }
       }}
       onDragStart={(e) => {
+        isDraggingRef.current = true;
         if (!isCropMode) {
           onDragStart?.(e);
         }
       }}
       onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
+      onDragEnd={(e) => {
+        setTimeout(() => {
+          isDraggingRef.current = false;
+        }, 50);
+        onDragEnd(e);
+      }}
       onTransform={() => {
         const node = shapeRef.current;
         if (!node) return;
@@ -806,6 +829,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     if (activeTool === 'pan' || editingCropFrameId) return;
 
+    // Ignore right clicks so right clicking never cancels selection or triggers marquee
+    if ('button' in e.evt && e.evt.button === 2) return;
+
     const isBackground =
       e.target === e.target.getStage() ||
       e.target.name() === 'background-sheet' ||
@@ -1173,6 +1199,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         }
       }}
       onMouseDown={(e) => {
+        if (e.button === 2) return;
         const target = e.target as HTMLElement;
         if (
           target === containerRef.current ||
@@ -1184,6 +1211,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         }
       }}
       onClick={(e) => {
+        if (e.button === 2) return;
         const target = e.target as HTMLElement;
         if (
           target === containerRef.current ||
