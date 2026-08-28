@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useAlbumStore } from '../../stores/albumStore';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions } from '../../domain/units';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
+import { SpreadCanvas } from '../album/SpreadCanvas';
+import { PageNavigator } from '../album/PageNavigator';
+import { AlbumStructurePanel } from '../album/AlbumStructurePanel';
 import styles from './WorkspaceLayout.module.css';
 
 export function WorkspaceLayout() {
@@ -19,36 +23,24 @@ export function WorkspaceLayout() {
   const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
-  // Request 3: Collapsible Right Properties & Bottom Filmstrip
+  // Collapsible Right Properties & Bottom Filmstrip
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
   const [isFilmstripOpen, setIsFilmstripOpen] = useState(true);
-  const [showGuides, setShowGuides] = useState(true);
 
   useTauriInfo();
 
-  // Dimensions of the open album spread
-  // Spread width = 2 * canvasWidth (Left Page + Right Page)
+  // Initialize album structure on project load
+  useEffect(() => {
+    if (currentProject) {
+      const album = useAlbumStore.getState().currentAlbum;
+      if (!album || album.projectId !== currentProject.id) {
+        useAlbumStore.getState().initializeAlbum(currentProject);
+      }
+    }
+  }, [currentProject]);
+
   const spreadW = currentProject ? currentProject.canvasWidth * 2 : 16;
   const spreadH = currentProject ? currentProject.canvasHeight : 8;
-
-  // Viewport calculation for spread representation
-  // Expand view area now that filmstrip is at the bottom and right panel is collapsible
-  const maxW = isPropertiesOpen ? 820 : 1080;
-  const maxH = isFilmstripOpen ? 460 : 580;
-  const aspect = spreadW / spreadH;
-  let viewW = maxW;
-  let viewH = Math.round(maxW / aspect);
-  if (viewH > maxH) {
-    viewH = maxH;
-    viewW = Math.round(maxH * aspect);
-  }
-
-  // Dynamic Safe Margin Calculation for canvas guide display
-  const singlePageW = viewW / 2;
-  const marginRatio = currentProject && currentProject.canvasWidth > 0
-    ? (currentProject.marginValue || 10) / (currentProject.canvasWidth * (currentProject.canvasUnit === 'inch' ? 25.4 : currentProject.canvasUnit === 'cm' ? 10 : 1))
-    : 0.05;
-  const dynamicMarginPx = Math.max(6, Math.min(36, Math.round(singlePageW * marginRatio)));
 
   return (
     <div className={styles.workspace}>
@@ -98,101 +90,84 @@ export function WorkspaceLayout() {
               <div className={styles.toolbarSeparator} />
 
               {/* Editor Tool Switcher */}
-              <button
-                type="button"
-                className={`${styles.toolButton} ${activeTool === 'select' ? styles.toolButtonActive : ''}`}
-                onClick={() => setActiveTool('select')}
-                title="Selection Tool (V)"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
-                  <path d="m13 13 6 6"/>
-                </svg>
-                Select
-              </button>
-
-              <button
-                type="button"
-                className={`${styles.toolButton} ${activeTool === 'pan' ? styles.toolButtonActive : ''}`}
-                onClick={() => setActiveTool('pan')}
-                title="Hand / Pan Tool (H)"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
-                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
-                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
-                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
-                </svg>
-                Pan
-              </button>
+              <div className={styles.toolGroup}>
+                <button
+                  type="button"
+                  className={`${styles.toolButton} ${activeTool === 'select' ? styles.toolActive : ''}`}
+                  onClick={() => setActiveTool('select')}
+                  title="Selection Tool (V)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m3 3 7 18 3-7 7-3L3 3z"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.toolButton} ${activeTool === 'pan' ? styles.toolActive : ''}`}
+                  onClick={() => setActiveTool('pan')}
+                  title="Pan Tool (H)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
+                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
+                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
+                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+                  </svg>
+                </button>
+              </div>
 
               <div className={styles.toolbarSeparator} />
 
-              {/* Safe Margin Guide Toggle */}
-              <button
-                type="button"
-                className={`${styles.toolButton} ${showGuides ? styles.toolButtonActive : ''}`}
-                onClick={() => setShowGuides((g) => !g)}
-                title="Toggle Safe Margin Guides"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"/>
-                </svg>
-                Guides
-              </button>
+              {/* Zoom Controls */}
+              <div className={styles.zoomControls}>
+                <button
+                  type="button"
+                  className={styles.toolButton}
+                  onClick={() => setZoomLevel((z) => Math.max(25, z - 15))}
+                  title="Zoom Out"
+                >
+                  -
+                </button>
+                <span className={styles.zoomLevelText}>{zoomLevel}%</span>
+                <button
+                  type="button"
+                  className={styles.toolButton}
+                  onClick={() => setZoomLevel((z) => Math.min(250, z + 15))}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolButton}
+                  onClick={() => setZoomLevel(100)}
+                  title="Fit to Screen / Reset Zoom"
+                  style={{ fontSize: '10px', padding: '0 6px' }}
+                >
+                  Fit
+                </button>
+              </div>
             </>
           )}
         </div>
 
-        {/* Right Section: View & Help Actions */}
+        {/* Right Section: View Toggles & About */}
         <div className={styles.toolbarSection}>
           {currentProject && (
             <>
+              {/* Properties Panel Toggle Button */}
               <Button
-                variant="ghost"
+                variant={isPropertiesOpen ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setZoomLevel((z) => Math.max(25, z - 10))}
-                title="Zoom Out"
-              >
-                −
-              </Button>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', minWidth: '36px', textAlign: 'center' }}>
-                {zoomLevel}%
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setZoomLevel((z) => Math.min(200, z + 10))}
-                title="Zoom In"
-              >
-                +
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setZoomLevel(100)}
-                title="Reset Zoom to 100%"
-              >
-                Fit
-              </Button>
-
-              <div className={styles.toolbarSeparator} />
-
-              {/* Properties Panel Toggle (Request 3) */}
-              <button
-                type="button"
-                className={`${styles.toolButton} ${isPropertiesOpen ? styles.toolButtonActive : ''}`}
-                onClick={() => setIsPropertiesOpen((o) => !o)}
-                title="Toggle Properties Panel"
+                onClick={() => setIsPropertiesOpen((v) => !v)}
+                title={isPropertiesOpen ? 'Hide Properties Panel' : 'Show Properties Panel'}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect width="18" height="18" x="3" y="3" rx="2"/>
                   <path d="M15 3v18"/>
                 </svg>
-                Properties
-              </button>
-
-              <div className={styles.toolbarSeparator} />
+                <span>Properties</span>
+              </Button>
             </>
           )}
 
@@ -212,65 +187,19 @@ export function WorkspaceLayout() {
         </div>
       </header>
 
-      {/* Center Canvas Area (Expanded, maximized workspace) */}
+      {/* Center Canvas Area (Spread Visualizer) */}
       <main className={styles.canvas}>
         {!currentProject ? (
           <WelcomeScreen />
         ) : (
-          <div className={styles.spreadViewport}>
-            {/* Album Spread Sheet */}
-            <div
-              className={styles.spreadContainer}
-              style={{
-                width: `${viewW}px`,
-                height: `${viewH}px`,
-                backgroundColor: currentProject.backgroundColor,
-                transform: `scale(${zoomLevel / 100})`,
-              }}
-            >
-              {/* Left Page */}
-              <div className={styles.leftPage}>
-                {showGuides && (currentProject.marginEnabled !== false) && (
-                  <div
-                    className={styles.pageGuide}
-                    style={{ inset: `${dynamicMarginPx}px` }}
-                    title={`Safe Margin: ${currentProject.marginValue || 10} ${currentProject.marginUnit || 'mm'}`}
-                  />
-                )}
-              </div>
-
-              {/* Center Gutter / Spine Fold Line */}
-              <div className={styles.centerGutterLine} title="Center Fold / Spine" />
-
-              {/* Right Page */}
-              <div className={styles.rightPage}>
-                {showGuides && (currentProject.marginEnabled !== false) && (
-                  <div
-                    className={styles.pageGuide}
-                    style={{ inset: `${dynamicMarginPx}px` }}
-                    title={`Safe Margin: ${currentProject.marginValue || 10} ${currentProject.marginUnit || 'mm'}`}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Spread Navigation Bar */}
-            <div className={styles.spreadNavBar}>
-              <Button variant="ghost" size="sm" disabled title="Previous spread">
-                ◀ Prev
-              </Button>
-              <span className={styles.spreadNavText}>
-                Spread 1 of 1
-              </span>
-              <Button variant="ghost" size="sm" disabled title="Next spread">
-                Next ▶
-              </Button>
-            </div>
-          </div>
+          <SpreadCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
         )}
       </main>
 
-      {/* Right Panel: Collapsible Properties */}
+      {/* Page & Spread Navigation Bar */}
+      {currentProject && <PageNavigator />}
+
+      {/* Right Panel: Collapsible Properties & Album Structure */}
       {isPropertiesOpen && (
         <aside className={styles.rightPanel}>
           <div style={{
@@ -282,7 +211,7 @@ export function WorkspaceLayout() {
             background: 'var(--color-surface)',
           }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.05em' }}>
-              PROPERTIES
+              PROPERTIES & STRUCTURE
             </span>
             <button
               type="button"
@@ -307,6 +236,9 @@ export function WorkspaceLayout() {
             </div>
           ) : (
             <div className={styles.propertyList}>
+              {/* Phase 3: Album & Spread Structure Controller */}
+              <AlbumStructurePanel />
+
               {/* Project Overview */}
               <div className={styles.propSection}>
                 <div className={styles.propTitle}>Album Project</div>
@@ -343,26 +275,7 @@ export function WorkspaceLayout() {
                 </div>
               </div>
 
-              {/* Safe Margin (Request 5) */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Safe Margin (Batas Aman)</div>
-                <div className={styles.propRow}>
-                  <span>Margin Tepi</span>
-                  <span className={styles.propValue}>
-                    {currentProject.marginEnabled !== false
-                      ? `${currentProject.marginValue || 10} ${currentProject.marginUnit || 'mm'}`
-                      : 'Disabled'}
-                  </span>
-                </div>
-                <div className={styles.propRow}>
-                  <span>Guide Lines</span>
-                  <span className={styles.propValue}>
-                    {showGuides ? 'Visible' : 'Hidden'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Photo Spacing & Border (Request 4: default disabled) */}
+              {/* Photo Spacing & Border */}
               <div className={styles.propSection}>
                 <div className={styles.propTitle}>Photo Styling</div>
                 <div className={styles.propRow}>
@@ -391,25 +304,6 @@ export function WorkspaceLayout() {
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Background */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Spread Background</div>
-                <div className={styles.propRow}>
-                  <span>Type</span>
-                  <span className={styles.propValue}>{currentProject.backgroundType}</span>
-                </div>
-                <div className={styles.propRow}>
-                  <span>Color</span>
-                  <span className={styles.propValue}>
-                    {currentProject.backgroundColor}
-                    <span
-                      className={styles.colorSwatchSmall}
-                      style={{ backgroundColor: currentProject.backgroundColor }}
-                    />
-                  </span>
-                </div>
               </div>
             </div>
           )}

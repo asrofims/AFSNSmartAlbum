@@ -36,13 +36,13 @@
 - [x] Relink
 
 ## Phase 3 — Album Structure
-- [ ] Cover
-- [ ] Page
-- [ ] Spread
-- [ ] Gutter
-- [ ] Bleed
-- [ ] Safe area
-- [ ] Page navigation
+- [x] Cover
+- [x] Page
+- [x] Spread
+- [x] Gutter
+- [x] Bleed
+- [x] Safe area
+- [x] Page navigation
 
 ## Phase 4 — Editor
 - [ ] Canvas

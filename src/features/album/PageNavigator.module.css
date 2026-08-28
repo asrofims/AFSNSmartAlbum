@@ -1,0 +1,283 @@
+.navigatorContainer {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  z-index: 25;
+  user-select: none;
+}
+
+.navigationBar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  gap: var(--space-2);
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--color-border-subtle);
+}
+
+.centerControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.navBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.navBtn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+}
+
+.navBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.navBtnActive {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+}
+
+.addSpreadBtn {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: var(--color-accent);
+}
+
+.addSpreadBtn:hover {
+  background-color: var(--color-accent) !important;
+  color: #ffffff !important;
+}
+
+.spreadSelect {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  padding: 0 8px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+  min-width: 200px;
+  transition: border-color var(--transition-fast);
+}
+
+.spreadSelect:focus {
+  border-color: var(--color-accent);
+}
+
+.drawerIcon {
+  font-size: 13px;
+}
+
+/* Spread Thumbnail Drawer */
+.drawer {
+  background-color: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 170px;
+  animation: slideUp 0.15s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawerTitle {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drawerCloseBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.drawerCloseBtn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.drawerList {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.thumbnailCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  width: 140px;
+}
+
+.thumbnailCard:hover {
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cardActive {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.miniSpread {
+  width: 100%;
+  height: 52px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 1px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.miniCover {
+  background-color: #1e293b;
+}
+
+.miniLeftPage {
+  flex: 1;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.miniGutter {
+  width: 2px;
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.miniRightPage {
+  flex: 1;
+}
+
+.cardInfoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.cardIndexText {
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+}
+
+.cardNameText {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 75px;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cardActionBtn {
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  padding: 1px 3px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
+}
+
+.cardActionBtn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.cardActionBtnDanger:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.drawerAddBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100px;
+  height: 90px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.drawerAddBtn:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.drawerAddIcon {
+  font-size: 18px;
+}
