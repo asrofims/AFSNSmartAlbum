@@ -129,7 +129,7 @@ export function FolderTabs() {
           return (
             <div
               key={folder.id}
-              className={`${styles.tabWrapper} ${isDragOver ? styles.dragOver : ''} ${isActive ? styles.wrapperActive : ''}`}
+              className={`${styles.tabWrapper} ${isDragOver ? styles.dragOver : ''} ${isActive ? styles.wrapperActive : ''} ${isMenuOpen ? styles.wrapperMenuOpen : ''}`}
               onDragOver={(e) => handleDragOver(e, folder.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, folder.id)}
@@ -151,7 +151,7 @@ export function FolderTabs() {
                 <span className={styles.tabCount}>{folder.photoCount}</span>
               </button>
 
-              {/* Ellipsis Options Menu Button */}
+              {/* 3-Dot Options Menu Button with clear SVG icon */}
               <button
                 type="button"
                 className={`${styles.menuTriggerBtn} ${isMenuOpen ? styles.menuTriggerActive : ''}`}
@@ -160,8 +160,13 @@ export function FolderTabs() {
                   setMenuOpenFolderId(isMenuOpen ? null : folder.id);
                 }}
                 title="Folder options (Rename / Delete)"
+                aria-label="Folder options"
               >
-                ⋮
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2.2"/>
+                  <circle cx="12" cy="12" r="2.2"/>
+                  <circle cx="12" cy="19" r="2.2"/>
+                </svg>
               </button>
 
               {/* Dropdown Menu */}

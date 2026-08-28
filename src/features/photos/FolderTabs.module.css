@@ -1,7 +1,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 900;
   background: transparent;
 }
 
@@ -9,14 +9,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow-x: auto;
   max-width: 520px;
-  scrollbar-width: none;
   padding: 2px 0;
-}
-
-.container::-webkit-scrollbar {
-  display: none;
+  position: relative;
+  overflow: visible;
 }
 
 .tabWrapper {
@@ -24,7 +20,7 @@
   display: flex;
   align-items: center;
   border-radius: var(--radius-md);
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--color-border-subtle);
   transition: all var(--transition-fast);
 }
@@ -39,6 +35,10 @@
   border-color: var(--color-accent) !important;
 }
 
+.wrapperMenuOpen {
+  z-index: 950 !important;
+}
+
 .tabWrapper.dragOver {
   background-color: rgba(59, 130, 246, 0.3) !important;
   border-color: var(--color-accent) !important;
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 6px;
   height: 28px;
-  padding: 0 8px 0 10px;
+  padding: 0 6px 0 10px;
   background: transparent;
   border: none;
   color: var(--color-text-secondary);
@@ -99,26 +99,26 @@
 }
 
 .menuTriggerBtn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
+  width: 22px;
   height: 28px;
   background: transparent;
   border: none;
-  color: var(--color-text-muted);
-  font-size: 14px;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0 6px 0 2px;
   border-top-right-radius: var(--radius-md);
   border-bottom-right-radius: var(--radius-md);
   transition: color var(--transition-fast), background-color var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .menuTriggerBtn:hover,
 .menuTriggerActive {
-  color: var(--color-text-primary);
-  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .dropdownMenu {
@@ -128,11 +128,11 @@
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7), 0 4px 10px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
   display: flex;
   flex-direction: column;
-  min-width: 145px;
+  min-width: 150px;
   padding: 4px 0;
   animation: popIn 0.12s ease-out;
 }
@@ -184,6 +184,7 @@
   cursor: pointer;
   white-space: nowrap;
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .addFolderBtn:hover {
