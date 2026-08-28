@@ -2,6 +2,7 @@ import { Project } from '../src/domain/project';
 import {
   createInitialAlbum,
   createInteriorSpread,
+  duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
 } from '../src/domain/album';
@@ -87,4 +88,49 @@ console.assert(inchAlbum.coverSpread.leftPage?.unit === 'inch', 'Inch album page
 console.assert(inchAlbum.coverSpread.gutterWidth === 0.25, `Inch spine should be 0.25 inch, got ${inchAlbum.coverSpread.gutterWidth}`);
 console.assert(inchAlbum.coverSpread.bleed === 0.125, `Inch bleed should be 0.125 inch, got ${inchAlbum.coverSpread.bleed}`);
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model)!');
+// 7. Test Duplicating Spread with Elements & Content
+const spreadWithElements = recalculated.spreads[0];
+spreadWithElements.elements = [
+  {
+    id: 'frame-orig-1',
+    type: 'photo',
+    photoId: 'photo-100',
+    filePath: 'C:/photos/img1.jpg',
+    fileName: 'img1.jpg',
+    x: 20,
+    y: 30,
+    width: 120,
+    height: 80,
+    rotation: 0,
+    zIndex: 1,
+    photoAspect: 1.5,
+    cropX: 0.1,
+    cropY: -0.05,
+    cropScale: 1.2,
+    borderEnabled: true,
+    borderWidth: 2,
+    borderColor: '#FF0000',
+  } as any,
+];
+
+const duplicateResult = duplicateAlbumSpread(recalculated, mockProject, spreadWithElements.id);
+console.assert(duplicateResult !== null, 'duplicateAlbumSpread should succeed');
+if (duplicateResult) {
+  const { updatedAlbum, newSpreadId, newSpreadIndex } = duplicateResult;
+  console.assert(updatedAlbum.totalSpreads === 4, `Total spreads should now be 4, got ${updatedAlbum.totalSpreads}`);
+  console.assert(newSpreadIndex === 1, `Duplicated spread should be inserted at index 1, got ${newSpreadIndex}`);
+
+  const dupSpread = updatedAlbum.spreads[newSpreadIndex];
+  console.assert(dupSpread.id === newSpreadId, 'Duplicated spread ID should match');
+  console.assert(dupSpread.elements.length === 1, `Duplicated spread should have 1 element, got ${dupSpread.elements.length}`);
+  console.assert(dupSpread.elements[0].id !== 'frame-orig-1', 'Duplicated frame should have new unique ID');
+  console.assert(dupSpread.elements[0].photoId === 'photo-100', 'Duplicated frame should retain photoId');
+  console.assert(dupSpread.elements[0].x === 20, 'Duplicated frame should retain exact X');
+  console.assert(dupSpread.elements[0].y === 30, 'Duplicated frame should retain exact Y');
+  console.assert(dupSpread.elements[0].width === 120, 'Duplicated frame should retain exact width');
+  console.assert(dupSpread.elements[0].height === 80, 'Duplicated frame should retain exact height');
+  console.assert(dupSpread.elements[0].cropScale === 1.2, 'Duplicated frame should retain crop scale');
+  console.assert(dupSpread.elements[0].borderColor === '#FF0000', 'Duplicated frame should retain border color');
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model & spread duplication)!');

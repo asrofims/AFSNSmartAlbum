@@ -431,6 +431,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     showBleedGuide,
     showSafeAreaGuide,
     initializeAlbum,
+    duplicateSpread,
+    addSpread,
   } = useAlbumStore();
 
   const {
@@ -449,9 +451,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
+    duplicateSelectedFrames,
     bringToFront,
     sendToBack,
     rotateFrame90,
+    resetToOriginalRatio,
     alignSelectedFrames,
     distributeSelectedFrames,
     applyFixedGapToSelected,
@@ -483,12 +487,37 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     startY: number;
   } | null>(null);
 
-  // Context Menu State
+  // Context Menu State & Click Location Tracking
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     x: number;
     y: number;
   }>({ isOpen: false, x: 0, y: 0 });
+  const contextMenuPhysicalPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const openContextMenuAt = (clientX: number, clientY: number) => {
+    if (stageRef.current) {
+      const stageBox = stageRef.current.container().getBoundingClientRect();
+      const relativeX = (clientX - stageBox.left) / scaleFactor;
+      const relativeY = (clientY - stageBox.top) / scaleFactor;
+      if (
+        relativeX >= 0 &&
+        relativeY >= 0 &&
+        relativeX <= totalSpreadPhysicalW &&
+        relativeY <= totalSpreadPhysicalH
+      ) {
+        contextMenuPhysicalPosRef.current = {
+          x: Math.round(relativeX * 10) / 10,
+          y: Math.round(relativeY * 10) / 10,
+        };
+      } else {
+        contextMenuPhysicalPosRef.current = null;
+      }
+    } else {
+      contextMenuPhysicalPosRef.current = null;
+    }
+    setContextMenu({ isOpen: true, x: clientX, y: clientY });
+  };
 
   // Multi-frame synchronized dragging positions
   const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -575,14 +604,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         } else {
           clearSelection();
         }
-      } else if (e.ctrlKey && e.key === 'c') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           copySelectedFrames(activeSpread.id);
         }
-      } else if (e.ctrlKey && e.key === 'v') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
         pasteFrames(activeSpread.id);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        if (selectedFrameIds.length > 0) {
+          e.preventDefault();
+          duplicateSelectedFrames(activeSpread.id);
+        }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (editingCropFrameId) {
           const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
@@ -915,16 +949,42 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const getContextMenuItems = (): ContextMenuItem[] => {
     if (!activeSpread) return [];
     const count = selectedFrameIds.length;
+    const hasClipboard =
+      useEditorStore.getState().clipboardFrames.length > 0 ||
+      usePhotoStore.getState().clipboardPhotoIds.length > 0;
+
+    const targetPos = contextMenuPhysicalPosRef.current;
 
     if (count === 0) {
       return [
         {
           id: 'paste',
           label: 'Paste Photo',
-          icon: '📋',
+          icon: '📥',
           shortcut: 'Ctrl+V',
-          disabled: useEditorStore.getState().clipboardFrames.length === 0,
-          onClick: () => pasteFrames(activeSpread.id),
+          disabled: !hasClipboard,
+          onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
+        },
+        { divider: true, id: 'div-spread', label: '' },
+        {
+          id: 'duplicate-spread',
+          label: 'Duplicate Spread',
+          icon: '📋',
+          onClick: () => {
+            if (currentProject) {
+              duplicateSpread(activeSpread.id, currentProject);
+            }
+          },
+        },
+        {
+          id: 'add-spread',
+          label: 'Add New Spread',
+          icon: '➕',
+          onClick: () => {
+            if (currentProject) {
+              addSpread(currentProject);
+            }
+          },
         },
       ];
     }
@@ -950,8 +1010,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         label: 'Paste Photo',
         icon: '📥',
         shortcut: 'Ctrl+V',
-        disabled: useEditorStore.getState().clipboardFrames.length === 0,
-        onClick: () => pasteFrames(activeSpread.id),
+        disabled: !hasClipboard,
+        onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
+      },
+      {
+        id: 'duplicate',
+        label: count > 1 ? `Duplicate ${count} Photos` : 'Duplicate Photo',
+        icon: '⧉',
+        shortcut: 'Ctrl+D',
+        onClick: () => duplicateSelectedFrames(activeSpread.id),
       },
       { divider: true, id: 'div-order', label: '' },
       {
@@ -976,6 +1043,22 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         icon: '🔄',
         onClick: () => {
           selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
+        },
+      },
+      {
+        id: 'reset-ratio',
+        label: '↺ Reset Aspect Ratio',
+        icon: '⇱',
+        onClick: () => {
+          selectedFrameIds.forEach((id) => resetToOriginalRatio(activeSpread.id, id));
+        },
+      },
+      {
+        id: 'reset-crop',
+        label: '↺ Reset Crop & Center',
+        icon: '🎯',
+        onClick: () => {
+          selectedFrameIds.forEach((id) => resetCrop(activeSpread.id, id));
         },
       },
     ];
@@ -1098,7 +1181,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       onDrop={handleDrop}
       onContextMenu={(e) => {
         e.preventDefault();
-        setContextMenu({ isOpen: true, x: e.clientX, y: e.clientY });
+        openContextMenuAt(e.clientX, e.clientY);
       }}
       onWheel={(e) => {
         if (e.ctrlKey || e.metaKey) {
@@ -1162,6 +1245,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           onTouchStart={handleStageMouseDown}
           onTouchMove={handleStageMouseMove}
           onTouchEnd={handleStageMouseUp}
+          onContextMenu={(e) => {
+            e.evt.preventDefault();
+            openContextMenuAt(e.evt.clientX, e.evt.clientY);
+          }}
         >
           {/* Layer 1: Background & Page Sheet */}
           <Layer>
@@ -1337,7 +1424,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     });
                   }}
                   onContextMenu={(e) => {
-                    setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
+                    openContextMenuAt(e.evt.clientX, e.evt.clientY);
                   }}
                   onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
                   onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
@@ -1359,7 +1446,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 onContextMenu={(e) => {
                   e.evt.preventDefault();
                   e.cancelBubble = true;
-                  setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
+                  openContextMenuAt(e.evt.clientX, e.evt.clientY);
                 }}
                 onDragStart={(e) => {
                   primaryDragStartPosRef.current = { x: e.target.x(), y: e.target.y() };

@@ -252,8 +252,66 @@ export function recalculateAlbumPageNumbers(album: Album): Album {
 }
 
 /**
+ * Duplicates a spread, creating fresh unique IDs for all elements while preserving
+ * exact positions, dimensions, rotation, crops, borders, and spread styling.
+ */
+export function duplicateAlbumSpread(
+  album: Album,
+  project: Project,
+  spreadId: string
+): { updatedAlbum: Album; newSpreadId: string; newSpreadIndex: number } | null {
+  const targetIdx = album.spreads.findIndex((s) => s.id === spreadId);
+  if (targetIdx === -1) return null;
+
+  const original = album.spreads[targetIdx];
+  if (!original) return null;
+
+  const newSpreadNumber = album.spreads.length + 1;
+  const duplicated = createInteriorSpread(album, project, newSpreadNumber);
+
+  duplicated.backgroundColor = original.backgroundColor;
+  duplicated.gutterWidth = original.gutterWidth;
+  duplicated.gutterUnit = original.gutterUnit;
+  duplicated.bleed = original.bleed;
+  duplicated.safeArea = original.safeArea;
+
+  // Deep clone all layout elements with fresh unique IDs
+  duplicated.elements = (original.elements || []).map((elem, idx) => ({
+    ...elem,
+    id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+  }));
+
+  if (original.leftPage && duplicated.leftPage) {
+    duplicated.leftPage.backgroundColor = original.leftPage.backgroundColor;
+    duplicated.leftPage.backgroundType = original.leftPage.backgroundType;
+  }
+  if (original.rightPage && duplicated.rightPage) {
+    duplicated.rightPage.backgroundColor = original.rightPage.backgroundColor;
+    duplicated.rightPage.backgroundType = original.rightPage.backgroundType;
+  }
+
+  const updatedSpreads = [
+    ...album.spreads.slice(0, targetIdx + 1),
+    duplicated,
+    ...album.spreads.slice(targetIdx + 1),
+  ];
+
+  const updatedAlbum = recalculateAlbumPageNumbers({
+    ...album,
+    spreads: updatedSpreads,
+  });
+
+  return {
+    updatedAlbum,
+    newSpreadId: duplicated.id,
+    newSpreadIndex: targetIdx + 1,
+  };
+}
+
+/**
  * Returns all album spreads in sequential order.
  */
 export function getAllAlbumSpreads(album: Album): Spread[] {
   return album.spreads;
 }
+

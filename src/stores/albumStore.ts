@@ -5,6 +5,7 @@ import {
   Spread,
   createInitialAlbum,
   createInteriorSpread,
+  duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
 } from '../domain/album';
@@ -181,33 +182,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const { currentAlbum } = get();
     if (!currentAlbum) return;
 
-    const targetIdx = currentAlbum.spreads.findIndex((s) => s.id === spreadId);
-    if (targetIdx === -1) return;
-
-    const original = currentAlbum.spreads[targetIdx];
-    if (!original) return;
-    const newSpreadNumber = currentAlbum.spreads.length + 1;
-    const duplicated = createInteriorSpread(currentAlbum, project, newSpreadNumber);
-    duplicated.backgroundColor = original.backgroundColor;
-    duplicated.gutterWidth = original.gutterWidth;
-    duplicated.bleed = original.bleed;
-    duplicated.safeArea = original.safeArea;
-
-    const updatedSpreads = [
-      ...currentAlbum.spreads.slice(0, targetIdx + 1),
-      duplicated,
-      ...currentAlbum.spreads.slice(targetIdx + 1),
-    ];
-
-    const updatedAlbum = recalculateAlbumPageNumbers({
-      ...currentAlbum,
-      spreads: updatedSpreads,
-    });
+    const result = duplicateAlbumSpread(currentAlbum, project, spreadId);
+    if (!result) return;
 
     set({
-      currentAlbum: updatedAlbum,
-      activeSpreadId: duplicated.id,
-      activeSpreadIndex: targetIdx + 1,
+      currentAlbum: result.updatedAlbum,
+      activeSpreadId: result.newSpreadId,
+      activeSpreadIndex: result.newSpreadIndex,
       selectedPageId: null,
     });
   },

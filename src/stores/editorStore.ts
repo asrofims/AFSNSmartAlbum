@@ -13,6 +13,7 @@ import {
 import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
+import { usePhotoStore } from './photoStore';
 
 export interface EditorState {
   selectedFrameIds: string[];
@@ -47,7 +48,8 @@ export interface EditorState {
   ) => void;
   deleteSelectedFrames: (spreadId: string) => void;
   copySelectedFrames: (spreadId: string) => void;
-  pasteFrames: (spreadId: string) => void;
+  pasteFrames: (spreadId: string, targetPos?: { x: number; y: number }) => void;
+  duplicateSelectedFrames: (spreadId: string) => void;
   bringToFront: (spreadId: string, frameId: string) => void;
   sendToBack: (spreadId: string, frameId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
@@ -321,44 +323,88 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ clipboardFrames: toCopy });
   },
 
-  pasteFrames: (spreadId) => {
+  pasteFrames: (spreadId, targetPos) => {
     const { clipboardFrames } = get();
     const { currentAlbum } = useAlbumStore.getState();
-    if (!currentAlbum || clipboardFrames.length === 0) return;
+    const currentProject = useProjectStore.getState().currentProject;
+    if (!currentAlbum) return;
 
-    const pasted = clipboardFrames.map((f, idx) => ({
-      ...f,
-      id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
-      x: f.x + 10, // Offset pasted frames slightly
-      y: f.y + 10,
-    }));
+    // 1. If we have copied frames in editor clipboard
+    if (clipboardFrames.length > 0) {
+      const unit = currentProject?.canvasUnit || 'mm';
+      const defaultOffset = unit === 'inch' ? 0.25 : unit === 'cm' ? 0.5 : unit === 'px' ? 20 : 5;
 
-    if (currentAlbum.coverSpread.id === spreadId) {
-      const existing = currentAlbum.coverSpread.elements || [];
-      const updatedCover = {
-        ...currentAlbum.coverSpread,
-        elements: [...existing, ...pasted],
-      };
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
-      });
-    } else {
-      const updatedSpreads = currentAlbum.spreads.map((spread) => {
-        if (spread.id === spreadId) {
-          const existing = spread.elements || [];
-          return {
-            ...spread,
-            elements: [...existing, ...pasted],
-          };
-        }
-        return spread;
-      });
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
-      });
+      let pasted: PhotoFrameElement[];
+
+      if (targetPos) {
+        const minX = Math.min(...clipboardFrames.map((f) => f.x));
+        const minY = Math.min(...clipboardFrames.map((f) => f.y));
+        const deltaX = targetPos.x - minX;
+        const deltaY = targetPos.y - minY;
+
+        pasted = clipboardFrames.map((f, idx) => ({
+          ...f,
+          id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+          x: Math.max(0, Number((f.x + deltaX).toFixed(1))),
+          y: Math.max(0, Number((f.y + deltaY).toFixed(1))),
+        }));
+      } else {
+        pasted = clipboardFrames.map((f, idx) => ({
+          ...f,
+          id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+          x: Math.max(0, Number((f.x + defaultOffset).toFixed(1))),
+          y: Math.max(0, Number((f.y + defaultOffset).toFixed(1))),
+        }));
+      }
+
+      if (currentAlbum.coverSpread.id === spreadId) {
+        const existing = currentAlbum.coverSpread.elements || [];
+        const updatedCover = {
+          ...currentAlbum.coverSpread,
+          elements: [
+            ...existing,
+            ...pasted.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+          ],
+        };
+        useAlbumStore.setState({
+          currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        });
+      } else {
+        const updatedSpreads = currentAlbum.spreads.map((spread) => {
+          if (spread.id === spreadId) {
+            const existing = spread.elements || [];
+            return {
+              ...spread,
+              elements: [
+                ...existing,
+                ...pasted.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+              ],
+            };
+          }
+          return spread;
+        });
+        useAlbumStore.setState({
+          currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        });
+      }
+
+      set({ selectedFrameIds: pasted.map((p) => p.id) });
+      return;
     }
 
-    set({ selectedFrameIds: pasted.map((p) => p.id) });
+    // 2. If no frames in editor clipboard, check photo library clipboard
+    const { clipboardPhotoIds, photos } = usePhotoStore.getState();
+    if (clipboardPhotoIds.length > 0) {
+      const selectedPhotos = photos.filter((p) => clipboardPhotoIds.includes(p.id));
+      for (const p of selectedPhotos) {
+        get().addPhotoToSpread(spreadId, p, targetPos);
+      }
+    }
+  },
+
+  duplicateSelectedFrames: (spreadId) => {
+    get().copySelectedFrames(spreadId);
+    get().pasteFrames(spreadId);
   },
 
   bringToFront: (spreadId, frameId) => {

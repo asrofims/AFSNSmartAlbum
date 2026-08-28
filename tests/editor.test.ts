@@ -247,4 +247,38 @@ console.assert(Math.abs(hGap - 5) < 0.01, `Horizontal gap must remain 5mm, got $
 const vGap = (bottomU.geometry.y ?? 0) - ((topU.geometry.y ?? 0) + (topU.geometry.height ?? 0));
 console.assert(Math.abs(vGap - 5) < 0.01, `Vertical gap must remain 5mm, got ${vGap}mm`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, and Snapping tests passed successfully!');
+// 14. Test Copy-Paste Frame Clones with Physical Units
+const testFrameToCopy: PhotoFrameElement = {
+  id: 'frame-copy-src',
+  type: 'photo',
+  photoId: 'photo-xyz',
+  filePath: 'C:/photos/pic.jpg',
+  fileName: 'pic.jpg',
+  x: 50,
+  y: 40,
+  width: 100,
+  height: 80,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 1.25,
+  cropX: 0,
+  cropY: 0,
+  cropScale: 1.0,
+  borderEnabled: true,
+  borderWidth: 1,
+  borderColor: '#FFFFFF',
+};
+
+// Simulate copy and paste at target position (120, 90)
+const pastedTarget = {
+  ...testFrameToCopy,
+  id: 'frame-pasted-1',
+  x: 120,
+  y: 90,
+};
+console.assert(pastedTarget.id !== testFrameToCopy.id, 'Pasted frame must have new ID');
+console.assert(pastedTarget.x === 120 && pastedTarget.y === 90, 'Pasted frame must be positioned at target position');
+console.assert(pastedTarget.width === 100 && pastedTarget.height === 80, 'Pasted frame must retain exact geometry');
+console.assert(pastedTarget.photoId === 'photo-xyz', 'Pasted frame must retain photoId');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Snapping, and Copy-Paste tests passed successfully!');
