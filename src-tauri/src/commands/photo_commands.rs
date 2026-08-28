@@ -123,6 +123,7 @@ async fn import_paths_internal(
     let cancel_flag = import_state.cancel_flag.clone();
 
     let db = app.state::<Database>();
+    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
 
     let mut to_import: Vec<PathBuf> = Vec::new();
     for p in paths {
@@ -277,6 +278,7 @@ pub fn get_project_photos(
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<Vec<PhotoRow>, String> {
+    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
     db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
 
@@ -386,6 +388,7 @@ pub fn create_photo_folder(
 ) -> Result<PhotoFolderRow, String> {
     let folder_id = Uuid::new_v4().to_string();
     log::info!("Creating photo folder '{}' (id: {}) for project {}", name, folder_id, project_id);
+    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
     db.create_folder(&folder_id, &project_id, &name).map_err(|e| e.to_string())
 }
 
@@ -394,6 +397,7 @@ pub fn get_photo_folders(
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<Vec<PhotoFolderRow>, String> {
+    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
     db.get_folders_for_project(&project_id).map_err(|e| e.to_string())
 }
 

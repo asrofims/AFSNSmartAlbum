@@ -335,6 +335,38 @@ impl Database {
 
     // --- Project Operations ---
 
+    pub fn ensure_project_exists(&self, id: &str, name: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        let exists: bool = conn.query_row(
+            "SELECT 1 FROM projects WHERE id = ?1",
+            [id],
+            |_| Ok(true),
+        ).unwrap_or(false);
+
+        if !exists {
+            log::warn!("Project {} not found in SQLite DB; creating entry to satisfy foreign keys", id);
+            conn.execute(
+                "INSERT OR IGNORE INTO projects (
+                    id, name, canvas_width, canvas_height, unit, dpi,
+                    spacing_value, spacing_unit,
+                    margin_enabled, margin_value, margin_unit,
+                    border_enabled, border_width_value, border_width_unit, border_color,
+                    background_type, background_color,
+                    created_at, updated_at, last_opened_at
+                ) VALUES (
+                    ?1, ?2, 200.0, 200.0, 'mm', 300,
+                    2.0, 'mm',
+                    1, 10.0, 'mm',
+                    0, 0.0, 'mm', '#000000',
+                    'solid', '#FFFFFF',
+                    datetime('now'), datetime('now'), datetime('now')
+                )",
+                rusqlite::params![id, name],
+            )?;
+        }
+        Ok(())
+    }
+
     pub fn create_project(
         &self,
         id: &str,
