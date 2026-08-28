@@ -11,6 +11,10 @@ import {
   RectBounds,
   resizeCropFromHandle,
   zoomCropAtPoint,
+  intersectRect,
+  alignFrames,
+  distributeFrames,
+  matchFrameDimensions,
 } from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
@@ -140,4 +144,44 @@ const resizingFrame: RectBounds = { x: 200, y: 150, width: 121.2, height: 80 };
 const resizeSnap = calculateResizeSnapping(resizingFrame, spreadWidth, spreadHeight, safeArea, gutterWidth, [{ x: 50, y: 50, width: 120, height: 90 }], 3.0, 'mm');
 console.assert(resizeSnap.snappedBounds.width === 120, `Should snap width to match 120mm, got ${resizeSnap.snappedBounds.width}`);
 
-console.log('✓ All Editor domain, Equal Spacing, and Smart Snapping unit tests passed successfully!');
+// 7. Test Marquee Intersect Math
+const marqueeBox: RectBounds = { x: 100, y: 100, width: 150, height: 100 };
+const intersectingFrame: RectBounds = { x: 150, y: 120, width: 80, height: 60 };
+const outsideFrame: RectBounds = { x: 300, y: 120, width: 80, height: 60 };
+console.assert(intersectRect(marqueeBox, intersectingFrame) === true, 'Frame inside marquee should intersect');
+console.assert(intersectRect(marqueeBox, outsideFrame) === false, 'Frame outside marquee should not intersect');
+
+// 8. Test Multiple Frame Batch Alignment Math
+const frame1: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'f1', x: 20, y: 30, width: 100, height: 80 };
+const frame2: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'f2', x: 150, y: 60, width: 120, height: 100 };
+const frame3: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'f3', x: 300, y: 40, width: 80, height: 60 };
+
+// Align Left (minX = 20)
+const alignLeftUpdates = alignFrames([frame1, frame2, frame3], 'left');
+console.assert(alignLeftUpdates.every((u) => u.geometry.x === 20), 'All frames should align left to x=20');
+
+// Align Top (minY = 30)
+const alignTopUpdates = alignFrames([frame1, frame2, frame3], 'top');
+console.assert(alignTopUpdates.every((u) => u.geometry.y === 30), 'All frames should align top to y=30');
+
+// Align Right (maxX = 300 + 80 = 380)
+const alignRightUpdates = alignFrames([frame1, frame2, frame3], 'right');
+console.assert(alignRightUpdates.find((u) => u.id === 'f1')?.geometry.x === 280, 'f1 should align right to x=280');
+console.assert(alignRightUpdates.find((u) => u.id === 'f2')?.geometry.x === 260, 'f2 should align right to x=260');
+console.assert(alignRightUpdates.find((u) => u.id === 'f3')?.geometry.x === 300, 'f3 should align right to x=300');
+
+// 9. Test Distribute Frames Equidistant Math
+// Total span: f1 (x=0, w=100) to f3 (x=300, w=100) -> total span = 400. Total width = 300 -> available gap = 100 -> gap per item = 50.
+const dFrame1: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'd1', x: 0, y: 50, width: 100, height: 100 };
+const dFrame2: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'd2', x: 120, y: 50, width: 100, height: 100 };
+const dFrame3: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 'd3', x: 300, y: 50, width: 100, height: 100 };
+const distH = distributeFrames([dFrame1, dFrame2, dFrame3], 'horizontal');
+console.assert(distH[0].geometry.x === 0, 'First frame stays at x=0');
+console.assert(distH[1].geometry.x === 150, `Second frame distributed to x=150, got ${distH[1].geometry.x}`);
+console.assert(distH[2].geometry.x === 300, 'Third frame stays at x=300');
+
+// 10. Test Match Dimensions Math
+const matchW = matchFrameDimensions([frame1, frame2, frame3], 'width');
+console.assert(matchW.every((u) => u.geometry.width === 100), 'All frames should match width of first frame (100mm)');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, and Snapping tests passed successfully!');

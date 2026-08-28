@@ -11,3 +11,6 @@ export { UnitInput } from './UnitInput';
 export { Select } from './Select';
 export { ColorPicker } from './ColorPicker';
 export { ConfirmDialog } from './ConfirmDialog';
+export { Switch } from './Switch';
+export { ContextMenu } from './ContextMenu';
+export type { ContextMenuItem, ContextMenuProps } from './ContextMenu';

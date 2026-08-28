@@ -819,3 +819,125 @@ export function calculateResizeSnapping(
     gapGuides,
   };
 }
+
+/**
+ * Checks if two bounding boxes intersect.
+ */
+export function intersectRect(r1: RectBounds, r2: RectBounds): boolean {
+  return !(
+    r2.x > r1.x + r1.width ||
+    r2.x + r2.width < r1.x ||
+    r2.y > r1.y + r1.height ||
+    r2.y + r2.height < r1.y
+  );
+}
+
+/**
+ * Calculates alignment updates for multiple selected frames.
+ */
+export function alignFrames(
+  frames: PhotoFrameElement[],
+  alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (frames.length < 2) return [];
+
+  const minX = Math.min(...frames.map((f) => f.x));
+  const maxX = Math.max(...frames.map((f) => f.x + f.width));
+  const minY = Math.min(...frames.map((f) => f.y));
+  const maxY = Math.max(...frames.map((f) => f.y + f.height));
+  const centerX = (minX + maxX) / 2;
+  const middleY = (minY + maxY) / 2;
+
+  return frames.map((f) => {
+    switch (alignment) {
+      case 'left':
+        return { id: f.id, geometry: { x: roundToTenth(minX) } };
+      case 'center':
+        return { id: f.id, geometry: { x: roundToTenth(centerX - f.width / 2) } };
+      case 'right':
+        return { id: f.id, geometry: { x: roundToTenth(maxX - f.width) } };
+      case 'top':
+        return { id: f.id, geometry: { y: roundToTenth(minY) } };
+      case 'middle':
+        return { id: f.id, geometry: { y: roundToTenth(middleY - f.height / 2) } };
+      case 'bottom':
+        return { id: f.id, geometry: { y: roundToTenth(maxY - f.height) } };
+    }
+  });
+}
+
+/**
+ * Calculates equidistant distribution updates for multiple selected frames.
+ */
+export function distributeFrames(
+  frames: PhotoFrameElement[],
+  direction: 'horizontal' | 'vertical'
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (frames.length < 3) return [];
+
+  if (direction === 'horizontal') {
+    const sorted = [...frames].sort((a, b) => a.x - b.x);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) return [];
+
+    const totalSpan = (last.x + last.width) - first.x;
+    const totalFramesW = sorted.reduce((sum, f) => sum + f.width, 0);
+    const availableGap = totalSpan - totalFramesW;
+    const gapPerItem = Math.max(0, availableGap / (sorted.length - 1));
+
+    let currentX = first.x;
+    return sorted.map((f) => {
+      const update = { id: f.id, geometry: { x: roundToTenth(currentX) } };
+      currentX += f.width + gapPerItem;
+      return update;
+    });
+  } else {
+    const sorted = [...frames].sort((a, b) => a.y - b.y);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) return [];
+
+    const totalSpan = (last.y + last.height) - first.y;
+    const totalFramesH = sorted.reduce((sum, f) => sum + f.height, 0);
+    const availableGap = totalSpan - totalFramesH;
+    const gapPerItem = Math.max(0, availableGap / (sorted.length - 1));
+
+    let currentY = first.y;
+    return sorted.map((f) => {
+      const update = { id: f.id, geometry: { y: roundToTenth(currentY) } };
+      currentY += f.height + gapPerItem;
+      return update;
+    });
+  }
+}
+
+/**
+ * Matches width, height, or both across multiple frames.
+ */
+export function matchFrameDimensions(
+  frames: PhotoFrameElement[],
+  dimension: 'width' | 'height' | 'both',
+  sourceFrameId?: string
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (frames.length < 2) return [];
+
+  const source = sourceFrameId
+    ? frames.find((f) => f.id === sourceFrameId) || frames[0]
+    : frames[0];
+  if (!source) return [];
+
+  const targetW = roundToTenth(source.width);
+  const targetH = roundToTenth(source.height);
+
+  return frames.map((f) => {
+    const geometry: Partial<PhotoFrameElement> = {};
+    if (dimension === 'width' || dimension === 'both') {
+      geometry.width = targetW;
+    }
+    if (dimension === 'height' || dimension === 'both') {
+      geometry.height = targetH;
+    }
+    return { id: f.id, geometry };
+  });
+}

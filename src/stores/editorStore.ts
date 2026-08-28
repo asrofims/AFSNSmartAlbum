@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import { clampCropTransform, GapGuide, getPhotoAspect, PhotoFrameElement, SnapLine } from '../domain/editor';
+import {
+  alignFrames,
+  clampCropTransform,
+  distributeFrames,
+  GapGuide,
+  getPhotoAspect,
+  matchFrameDimensions,
+  PhotoFrameElement,
+  SnapLine,
+} from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
@@ -41,6 +50,20 @@ export interface EditorState {
   bringToFront: (spreadId: string, frameId: string) => void;
   sendToBack: (spreadId: string, frameId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
+
+  // Batch Alignment & Distribution
+  alignSelectedFrames: (
+    spreadId: string,
+    alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
+  ) => void;
+  distributeSelectedFrames: (
+    spreadId: string,
+    direction: 'horizontal' | 'vertical'
+  ) => void;
+  matchSelectedDimensions: (
+    spreadId: string,
+    dimension: 'width' | 'height' | 'both'
+  ) => void;
 
   // Crop Mode & Ratio Reset
   enterCropMode: (frameId: string) => void;
@@ -419,6 +442,57 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newRotation = (frame.rotation + delta + 360) % 360;
     updateFrameGeometry(spreadId, frameId, { rotation: newRotation });
+  },
+
+  alignSelectedFrames: (spreadId, alignment) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || selectedFrameIds.length < 2) return;
+
+    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    if (!spread) return;
+
+    const selectedFrames = (spread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const updates = alignFrames(selectedFrames, alignment);
+    if (updates.length > 0) {
+      batchUpdateFrames(spreadId, updates);
+    }
+  },
+
+  distributeSelectedFrames: (spreadId, direction) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || selectedFrameIds.length < 3) return;
+
+    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    if (!spread) return;
+
+    const selectedFrames = (spread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const updates = distributeFrames(selectedFrames, direction);
+    if (updates.length > 0) {
+      batchUpdateFrames(spreadId, updates);
+    }
+  },
+
+  matchSelectedDimensions: (spreadId, dimension) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || selectedFrameIds.length < 2) return;
+
+    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    if (!spread) return;
+
+    const selectedFrames = (spread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const updates = matchFrameDimensions(selectedFrames, dimension);
+    if (updates.length > 0) {
+      batchUpdateFrames(spreadId, updates);
+    }
   },
 
   enterCropMode: (frameId: string) => {

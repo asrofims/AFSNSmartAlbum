@@ -14,10 +14,12 @@ import {
   calculateImageOffset,
   getPhotoAspect,
   clamp,
+  intersectRect,
 } from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { convertUnit } from '../../domain/units';
 import { Photo } from '../../domain/photo';
+import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
 interface KonvaEditorCanvasProps {
@@ -29,12 +31,15 @@ interface KonvaEditorCanvasProps {
 // Single Photo Frame Component rendered with Konva
 function PhotoFrameNode({
   frame,
+  isSelected,
   isMuted,
   isCropMode,
   scaleFactor,
   onSelect,
+  onDragStart,
   onDragMove,
   onDragEnd,
+  onContextMenu,
   onFrameChange,
   onCropChange,
   onDoubleClick,
@@ -49,8 +54,10 @@ function PhotoFrameNode({
   scaleFactor: number;
   unit: string;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
+  onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
@@ -183,9 +190,19 @@ function PhotoFrameNode({
         e.cancelBubble = true;
         onDoubleClick();
       }}
+      onContextMenu={(e) => {
+        e.evt.preventDefault();
+        e.cancelBubble = true;
+        if (!isCropMode) {
+          if (!isSelected) {
+            onSelect(e);
+          }
+          onContextMenu?.(e);
+        }
+      }}
       onDragStart={(e) => {
         if (!isCropMode) {
-          onSelect(e);
+          onDragStart?.(e);
         }
       }}
       onDragMove={onDragMove}
@@ -372,6 +389,20 @@ function PhotoFrameNode({
         );
       })()}
 
+      {/* Multiple Selection Visual Highlight Outline */}
+      {isSelected && !isCropMode && (
+        <Rect
+          x={0}
+          y={0}
+          width={pixelW}
+          height={pixelH}
+          stroke="#3b82f6"
+          strokeWidth={2}
+          dash={[6, 3]}
+          listening={false}
+        />
+      )}
+
       {/* Crop Mode Grid & Indicator Overlay */}
       {isCropMode && (
         <Group listening={false}>
@@ -439,13 +470,21 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     activeGapGuides,
     snapEnabled,
     selectFrame,
+    selectFrames,
     clearSelection,
     addPhotoToSpread,
     updateFrameGeometry,
+    batchUpdateFrames,
     updateCrop,
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
+    bringToFront,
+    sendToBack,
+    rotateFrame90,
+    alignSelectedFrames,
+    distributeSelectedFrames,
+    matchSelectedDimensions,
     enterCropMode,
     exitCropMode,
     resetCrop,
@@ -460,6 +499,28 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
+
+  // Marquee Selection State
+  const [selectionRect, setSelectionRect] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    visible: boolean;
+    startX: number;
+    startY: number;
+  } | null>(null);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+  }>({ isOpen: false, x: 0, y: 0 });
+
+  // Multi-frame synchronized dragging positions
+  const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const primaryDragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Auto-initialize album if project is loaded but album state is null
   useEffect(() => {
@@ -741,6 +802,356 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     }
   };
 
+  // Marquee stage pointer events
+  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    if (activeTool === 'pan' || editingCropFrameId) return;
+
+    const isBackground =
+      e.target === e.target.getStage() ||
+      e.target.name() === 'background-sheet' ||
+      e.target.name() === 'canvas-bg';
+
+    if (isBackground) {
+      const pos = e.target.getStage()?.getPointerPosition();
+      if (pos) {
+        setSelectionRect({
+          x: pos.x,
+          y: pos.y,
+          width: 0,
+          height: 0,
+          visible: true,
+          startX: pos.x,
+          startY: pos.y,
+        });
+
+        if (!e.evt?.shiftKey) {
+          clearSelection();
+        }
+        exitCropMode();
+      }
+    }
+  };
+
+  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    if (!selectionRect || !selectionRect.visible || activeTool === 'pan') return;
+
+    const stage = e.target.getStage();
+    if (!stage) return;
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+
+    const x1 = selectionRect.startX;
+    const y1 = selectionRect.startY;
+    const x2 = pos.x;
+    const y2 = pos.y;
+
+    const rectX = Math.min(x1, x2);
+    const rectY = Math.min(y1, y2);
+    const rectW = Math.abs(x2 - x1);
+    const rectH = Math.abs(y2 - y1);
+
+    setSelectionRect({
+      x: rectX,
+      y: rectY,
+      width: rectW,
+      height: rectH,
+      visible: true,
+      startX: x1,
+      startY: y1,
+    });
+
+    if (rectW > 4 || rectH > 4) {
+      const marqueePhysical = {
+        x: rectX / scaleFactor,
+        y: rectY / scaleFactor,
+        width: rectW / scaleFactor,
+        height: rectH / scaleFactor,
+      };
+
+      const matchedIds = (activeSpread.elements || [])
+        .filter((f) =>
+          intersectRect(marqueePhysical, {
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+          })
+        )
+        .map((f) => f.id);
+
+      selectFrames(matchedIds);
+    }
+  };
+
+  const handleStageMouseUp = () => {
+    if (selectionRect) {
+      setSelectionRect(null);
+    }
+  };
+
+  // Synchronized multi-frame drag handlers
+  const handleFrameDragStart = (frameId: string, e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!selectedFrameIds.includes(frameId)) {
+      selectFrame(frameId, Boolean(e.evt?.shiftKey));
+      return;
+    }
+
+    if (selectedFrameIds.length > 1) {
+      primaryDragStartPosRef.current = { x: e.target.x(), y: e.target.y() };
+      const startMap = new Map<string, { x: number; y: number }>();
+      selectedFrameIds.forEach((id) => {
+        const node = stageRef.current?.findOne(`#${id}`);
+        if (node) {
+          startMap.set(id, { x: node.x(), y: node.y() });
+        }
+      });
+      dragStartPositionsRef.current = startMap;
+    }
+  };
+
+  const handleFrameDragMove = (frame: PhotoFrameElement, e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
+      clearSnapLines();
+    } else {
+      const physicalX = e.target.x() / scaleFactor;
+      const physicalY = e.target.y() / scaleFactor;
+      const otherRects = (activeSpread.elements || [])
+        .filter((f) => !selectedFrameIds.includes(f.id))
+        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+      const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+
+      const snapRes = calculateSnapping(
+        { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
+        totalSpreadPhysicalW,
+        totalSpreadPhysicalH,
+        activeSpread.safeArea,
+        gutterPhysicalW,
+        otherRects,
+        thresholdUnits,
+        unit
+      );
+
+      if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+        e.target.x(snapRes.snappedX * scaleFactor);
+        e.target.y(snapRes.snappedY * scaleFactor);
+        setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+      } else {
+        clearSnapLines();
+      }
+    }
+
+    // Move all other selected frame nodes synchronously
+    if (selectedFrameIds.length > 1 && primaryDragStartPosRef.current) {
+      const dx = e.target.x() - primaryDragStartPosRef.current.x;
+      const dy = e.target.y() - primaryDragStartPosRef.current.y;
+
+      selectedFrameIds.forEach((id) => {
+        if (id !== frame.id) {
+          const initPos = dragStartPositionsRef.current.get(id);
+          const node = stageRef.current?.findOne(`#${id}`);
+          if (initPos && node) {
+            node.x(initPos.x + dx);
+            node.y(initPos.y + dy);
+          }
+        }
+      });
+    }
+  };
+
+  const handleFrameDragEnd = (frame: PhotoFrameElement, e: Konva.KonvaEventObject<DragEvent>) => {
+    clearSnapLines();
+
+    if (selectedFrameIds.length > 1 && primaryDragStartPosRef.current) {
+      const deltaPhysicalX = (e.target.x() - primaryDragStartPosRef.current.x) / scaleFactor;
+      const deltaPhysicalY = (e.target.y() - primaryDragStartPosRef.current.y) / scaleFactor;
+
+      const updates = selectedFrameIds.map((id) => {
+        const f = (activeSpread.elements || []).find((el) => el.id === id);
+        return {
+          id,
+          geometry: {
+            x: Math.round(((f?.x || 0) + deltaPhysicalX) * 10) / 10,
+            y: Math.round(((f?.y || 0) + deltaPhysicalY) * 10) / 10,
+          },
+        };
+      });
+
+      batchUpdateFrames(activeSpread.id, updates);
+      primaryDragStartPosRef.current = null;
+      dragStartPositionsRef.current.clear();
+    } else {
+      updateFrameGeometry(activeSpread.id, frame.id, {
+        x: Math.round((e.target.x() / scaleFactor) * 10) / 10,
+        y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
+      });
+    }
+  };
+
+  // Context Menu Items builder
+  const getContextMenuItems = (): ContextMenuItem[] => {
+    if (!activeSpread) return [];
+    const count = selectedFrameIds.length;
+
+    if (count === 0) {
+      return [
+        {
+          id: 'paste',
+          label: 'Tempel Foto (Paste)',
+          icon: '📋',
+          shortcut: 'Ctrl+V',
+          disabled: useEditorStore.getState().clipboardFrames.length === 0,
+          onClick: () => pasteFrames(activeSpread.id),
+        },
+      ];
+    }
+
+    const items: ContextMenuItem[] = [
+      {
+        id: 'delete',
+        label: count > 1 ? `Hapus ${count} Foto Terpilih` : 'Hapus Foto',
+        icon: '🗑️',
+        shortcut: 'Del',
+        danger: true,
+        onClick: () => deleteSelectedFrames(activeSpread.id),
+      },
+      {
+        id: 'copy',
+        label: count > 1 ? `Salin ${count} Foto` : 'Salin Foto',
+        icon: '📋',
+        shortcut: 'Ctrl+C',
+        onClick: () => copySelectedFrames(activeSpread.id),
+      },
+      {
+        id: 'paste',
+        label: 'Tempel Foto',
+        icon: '📥',
+        shortcut: 'Ctrl+V',
+        disabled: useEditorStore.getState().clipboardFrames.length === 0,
+        onClick: () => pasteFrames(activeSpread.id),
+      },
+      { divider: true, id: 'div-order', label: '' },
+      {
+        id: 'bring-to-front',
+        label: 'Bawa ke Paling Depan',
+        icon: '🔼',
+        onClick: () => {
+          selectedFrameIds.forEach((id) => bringToFront(activeSpread.id, id));
+        },
+      },
+      {
+        id: 'send-to-back',
+        label: 'Kirim ke Paling Belakang',
+        icon: '🔽',
+        onClick: () => {
+          selectedFrameIds.forEach((id) => sendToBack(activeSpread.id, id));
+        },
+      },
+      {
+        id: 'rotate-cw',
+        label: 'Putar 90° Searah Jarum Jam',
+        icon: '🔄',
+        onClick: () => {
+          selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
+        },
+      },
+    ];
+
+    if (count >= 2) {
+      items.push(
+        { divider: true, id: 'div-align', label: '' },
+        { header: true, id: 'hdr-align', label: 'PENYELARASAN (ALIGN)' },
+        {
+          id: 'align-left',
+          label: 'Rata Kiri (Align Left)',
+          icon: '⇤',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'left'),
+        },
+        {
+          id: 'align-center',
+          label: 'Rata Tengah Horizontal (Center)',
+          icon: '↔',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'center'),
+        },
+        {
+          id: 'align-right',
+          label: 'Rata Kanan (Align Right)',
+          icon: '⇥',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'right'),
+        },
+        {
+          id: 'align-top',
+          label: 'Rata Atas (Align Top)',
+          icon: '⤒',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'top'),
+        },
+        {
+          id: 'align-middle',
+          label: 'Rata Tengah Vertikal (Middle)',
+          icon: '↕',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'middle'),
+        },
+        {
+          id: 'align-bottom',
+          label: 'Rata Bawah (Align Bottom)',
+          icon: '⤓',
+          onClick: () => alignSelectedFrames(activeSpread.id, 'bottom'),
+        },
+        { divider: true, id: 'div-size', label: '' },
+        { header: true, id: 'hdr-size', label: 'SAMAKAN UKURAN (MATCH SIZE)' },
+        {
+          id: 'match-width',
+          label: 'Samakan Lebar (Match Width)',
+          icon: '⬌',
+          onClick: () => matchSelectedDimensions(activeSpread.id, 'width'),
+        },
+        {
+          id: 'match-height',
+          label: 'Samakan Tinggi (Match Height)',
+          icon: '⬍',
+          onClick: () => matchSelectedDimensions(activeSpread.id, 'height'),
+        },
+        {
+          id: 'match-both',
+          label: 'Samakan Ukuran Penuh (Both)',
+          icon: '⬚',
+          onClick: () => matchSelectedDimensions(activeSpread.id, 'both'),
+        }
+      );
+    }
+
+    if (count >= 3) {
+      items.push(
+        { divider: true, id: 'div-distribute', label: '' },
+        { header: true, id: 'hdr-distribute', label: 'DISTRIBUSI JARAK RATA' },
+        {
+          id: 'distribute-h',
+          label: 'Bagi Jarak Rata Horizontal',
+          icon: '⇿',
+          onClick: () => distributeSelectedFrames(activeSpread.id, 'horizontal'),
+        },
+        {
+          id: 'distribute-v',
+          label: 'Bagi Jarak Rata Vertikal',
+          icon: '⇳',
+          onClick: () => distributeSelectedFrames(activeSpread.id, 'vertical'),
+        }
+      );
+    }
+
+    items.push(
+      { divider: true, id: 'div-clear', label: '' },
+      {
+        id: 'clear-sel',
+        label: 'Batalkan Pilihan',
+        icon: '✕',
+        onClick: () => clearSelection(),
+      }
+    );
+
+    return items;
+  };
+
   return (
     <div
       ref={containerRef}
@@ -748,6 +1159,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setContextMenu({ isOpen: true, x: e.clientX, y: e.clientY });
+      }}
       onWheel={(e) => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
@@ -802,13 +1217,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           ref={stageRef}
           width={screenSpreadW}
           height={screenSpreadH}
-          onMouseDown={(e) => {
-            // Deselect when clicking on empty stage or background sheet
-            if (e.target === e.target.getStage() || e.target.name() === 'background-sheet') {
-              clearSelection();
-              exitCropMode();
-            }
-          }}
+          onMouseDown={handleStageMouseDown}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onTouchStart={handleStageMouseDown}
+          onTouchMove={handleStageMouseMove}
+          onTouchEnd={handleStageMouseUp}
         >
           {/* Layer 1: Background & Page Sheet */}
           <Layer>
@@ -823,18 +1237,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               shadowColor="rgba(0,0,0,0.6)"
               shadowBlur={16}
               shadowOffset={{ x: 0, y: 8 }}
-              onClick={() => {
-                clearSelection();
-                exitCropMode();
-              }}
-              onMouseDown={() => {
-                clearSelection();
-                exitCropMode();
-              }}
-              onTap={() => {
-                clearSelection();
-                exitCropMode();
-              }}
             />
 
             {/* Center Gutter / Spine Fold Guide */}
@@ -956,44 +1358,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       selectFrame(frame.id);
                     }
                   }}
-                  onDragMove={(e) => {
-                    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
-                      clearSnapLines();
-                      return;
-                    }
-                    const physicalX = e.target.x() / scaleFactor;
-                    const physicalY = e.target.y() / scaleFactor;
-                    const otherRects = (activeSpread.elements || [])
-                      .filter((f) => f.id !== frame.id)
-                      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-
-                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
-
-                    const snapRes = calculateSnapping(
-                      { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
-                      totalSpreadPhysicalW,
-                      totalSpreadPhysicalH,
-                      activeSpread.safeArea,
-                      gutterPhysicalW,
-                      otherRects,
-                      thresholdUnits,
-                      unit
-                    );
-
-                    if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
-                      e.target.x(snapRes.snappedX * scaleFactor);
-                      e.target.y(snapRes.snappedY * scaleFactor);
-                      setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-                    } else {
-                      clearSnapLines();
-                    }
-                  }}
-                  onDragEnd={(e) => {
-                    clearSnapLines();
-                    updateFrameGeometry(activeSpread.id, frame.id, {
-                      x: Math.round((e.target.x() / scaleFactor) * 10) / 10,
-                      y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
-                    });
+                  onDragStart={(e) => handleFrameDragStart(frame.id, e)}
+                  onDragMove={(e) => handleFrameDragMove(frame, e)}
+                  onDragEnd={(e) => handleFrameDragEnd(frame, e)}
+                  onContextMenu={(e) => {
+                    setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
                   }}
                   onTransformSnap={(x, y, w, h) => {
                     if (!snapEnabled) return null;
@@ -1102,6 +1471,21 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 clearSnapLines();
               }}
             />
+
+            {/* Rubber-band Marquee Selection Box */}
+            {selectionRect && selectionRect.visible && (
+              <Rect
+                x={selectionRect.x}
+                y={selectionRect.y}
+                width={selectionRect.width}
+                height={selectionRect.height}
+                fill="rgba(59, 130, 246, 0.18)"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                dash={[5, 3]}
+                listening={false}
+              />
+            )}
 
             {/* Magnetic Snap Lines overlay */}
             {activeSnapLines.map((line, idx) => (
@@ -1240,6 +1624,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           <span>+ Drop Photo to Place on {activeSpread.name}</span>
         </div>
       )}
+
+      {/* Desktop Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={getContextMenuItems()}
+        onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0 })}
+      />
     </div>
   );
 }
