@@ -62,18 +62,24 @@ function PhotoFrameNode({
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
 
-  // Window Masking Model:
-  // The Image Layer has its own fixed width and height (imageWidth, imageHeight).
-  // When frame window width/height changes, the image behind it stays untouched and stationary!
-  const imgPhysicalW = frame.imageWidth || frame.originalWidth || frame.width;
-  const imgPhysicalH = frame.imageHeight || frame.originalHeight || frame.height;
-  const currentScale = frame.cropScale || 1.0;
+  // Normal Mode vs Crop Mode:
+  // In Normal Mode (without custom crop), image fills frame 100% cleanly:
+  const hasCustomCrop = (frame.cropScale && frame.cropScale !== 1.0) || frame.cropX || frame.cropY;
+  
+  let renderImgW = pixelW;
+  let renderImgH = pixelH;
+  let offsetX = 0;
+  let offsetY = 0;
 
-  const renderImgW = imgPhysicalW * scaleFactor * currentScale;
-  const renderImgH = imgPhysicalH * scaleFactor * currentScale;
-
-  const offsetX = (frame.cropX || 0) * scaleFactor;
-  const offsetY = (frame.cropY || 0) * scaleFactor;
+  if (isCropMode || hasCustomCrop) {
+    const imgPhysicalW = frame.imageWidth || frame.originalWidth || frame.width;
+    const imgPhysicalH = frame.imageHeight || frame.originalHeight || frame.height;
+    const currentScale = frame.cropScale || 1.0;
+    renderImgW = imgPhysicalW * scaleFactor * currentScale;
+    renderImgH = imgPhysicalH * scaleFactor * currentScale;
+    offsetX = (frame.cropX || 0) * scaleFactor;
+    offsetY = (frame.cropY || 0) * scaleFactor;
+  }
 
   return (
     <Group
@@ -787,21 +793,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             <Transformer
               ref={trRef}
               rotateEnabled={!editingCropFrameId}
-              keepRatio={editingCropFrameId ? true : false}
-              enabledAnchors={
-                editingCropFrameId
-                  ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
-                  : [
-                      'top-left',
-                      'top-center',
-                      'top-right',
-                      'middle-right',
-                      'bottom-right',
-                      'bottom-center',
-                      'bottom-left',
-                      'middle-left',
-                    ]
-              }
+              keepRatio={true}
+              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
