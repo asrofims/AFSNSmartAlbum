@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { NumberInput } from '../../components/ui/NumberInput';
+import { Switch } from '../../components/ui/Switch';
 import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
+import { useEditorStore } from '../../stores/editorStore';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions } from '../../domain/units';
@@ -31,6 +33,11 @@ export function WorkspaceLayout() {
   const updateGutterWidth = useAlbumStore((s) => s.updateGutterWidth);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
+
+  const selectedFrameIds = useEditorStore((s) => s.selectedFrameIds);
+  const updateFrameGeometry = useEditorStore((s) => s.updateFrameGeometry);
+  const snapEnabled = useEditorStore((s) => s.snapEnabled);
+  const toggleSnap = useEditorStore((s) => s.toggleSnap);
 
   const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -375,11 +382,125 @@ export function WorkspaceLayout() {
                     </div>
                   </div>
                 </div>
+
+                {/* Smart Snapping Switch */}
+                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Magnet Snapping (🧲)</span>
+                  <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
+                </div>
               </div>
 
-              {/* Photo Spacing & Border */}
+              {/* Selected Photo Frame Properties */}
+              {(() => {
+                const selectedFrame = (activeSpread?.elements || []).find((f) => f.id === selectedFrameIds[0]);
+                const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
+
+                if (!selectedFrame || !activeSpread) return null;
+
+                return (
+                  <div
+                    className={styles.propSection}
+                    style={{
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '10px',
+                      backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                    }}
+                  >
+                    <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>Selected Photo Frame</span>
+                    </div>
+
+                    {/* Frame Border Switch */}
+                    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Frame Border</span>
+                      <Switch
+                        checked={selectedFrame.borderEnabled}
+                        onChange={(chk) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderEnabled: chk })}
+                        size="sm"
+                      />
+                    </div>
+
+                    {selectedFrame.borderEnabled && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '2px', marginBottom: '8px' }}>
+                        {/* Border Width */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Border Width</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
+                            <NumberInput
+                              value={selectedFrame.borderWidth || 1}
+                              onChange={(val) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderWidth: val })}
+                              min={0.1}
+                              max={50}
+                              step={0.5}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>mm</span>
+                          </div>
+                        </div>
+
+                        {/* Border Color */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Border Color</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <input
+                                type="color"
+                                value={selectedFrame.borderColor || '#FFFFFF'}
+                                onChange={(e) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderColor: e.target.value })}
+                                style={{ width: '22px', height: '22px', padding: 0, border: 'none', borderRadius: '3px', cursor: 'pointer', backgroundColor: 'transparent' }}
+                              />
+                              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-text-primary)' }}>
+                                {selectedFrame.borderColor || '#FFFFFF'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick Palette */}
+                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                            {paletteColors.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderColor: color })}
+                                style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '3px',
+                                  backgroundColor: color,
+                                  border: (selectedFrame.borderColor || '#FFFFFF').toUpperCase() === color.toUpperCase() ? '2px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.2)',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                }}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Frame Dimensions & Rotation */}
+                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Size:</span>
+                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{selectedFrame.width} × {selectedFrame.height} {currentProject.canvasUnit}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Position:</span>
+                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>X: {selectedFrame.x}, Y: {selectedFrame.y}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Rotation:</span>
+                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{selectedFrame.rotation || 0}°</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Photo Spacing & Project Default Border */}
               <div className={styles.propSection}>
-                <div className={styles.propTitle}>Photo Styling</div>
+                <div className={styles.propTitle}>Project Default Styling</div>
                 <div className={styles.propRow}>
                   <span>Photo Spacing</span>
                   <span className={styles.propValue}>
@@ -387,7 +508,7 @@ export function WorkspaceLayout() {
                   </span>
                 </div>
                 <div className={styles.propRow}>
-                  <span>Photo Border</span>
+                  <span>Default Border</span>
                   <span className={styles.propValue}>
                     {currentProject.borderEnabled
                       ? `${currentProject.borderWidth} ${currentProject.borderUnit}`

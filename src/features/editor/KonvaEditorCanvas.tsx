@@ -73,15 +73,17 @@ function PhotoFrameNode({
   let offsetX = 0;
   let offsetY = 0;
 
+  const currentScale = frame.cropScale || 1.0;
+
   if (imgAspect > frameAspect) {
     // Image is wider than frame
-    renderImgH = pixelH * (frame.cropScale || 1.0);
+    renderImgH = pixelH * currentScale;
     renderImgW = renderImgH * imgAspect;
     offsetX = (pixelW - renderImgW) / 2 + (frame.cropX || 0) * scaleFactor;
     offsetY = (frame.cropY || 0) * scaleFactor;
   } else {
     // Image is taller than frame
-    renderImgW = pixelW * (frame.cropScale || 1.0);
+    renderImgW = pixelW * currentScale;
     renderImgH = renderImgW / imgAspect;
     offsetX = (frame.cropX || 0) * scaleFactor;
     offsetY = (pixelH - renderImgH) / 2 + (frame.cropY || 0) * scaleFactor;
@@ -105,7 +107,10 @@ function PhotoFrameNode({
         e.cancelBubble = true;
         onSelect(e);
       }}
-      onDblClick={onDoubleClick}
+      onDblClick={(e) => {
+        e.cancelBubble = true;
+        onDoubleClick();
+      }}
       onDragStart={(e) => {
         onSelect(e);
       }}
@@ -148,11 +153,30 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             draggable={isCropMode}
+            onWheel={(e) => {
+              if (isCropMode) {
+                e.evt.preventDefault();
+                e.cancelBubble = true;
+                const scaleDelta = e.evt.deltaY < 0 ? 0.1 : -0.1;
+                const newScale = Math.max(1.0, Math.min(3.5, (frame.cropScale || 1.0) + scaleDelta));
+                onChange({ cropScale: Math.round(newScale * 10) / 10 });
+              }
+            }}
+            onDragMove={(e) => {
+              if (isCropMode) {
+                e.cancelBubble = true;
+              }
+            }}
             onDragEnd={(e) => {
               if (isCropMode) {
+                e.cancelBubble = true;
+                const defaultOffsetX = (pixelW - renderImgW) / 2;
+                const defaultOffsetY = (pixelH - renderImgH) / 2;
+                const deltaX = (e.target.x() - defaultOffsetX) / scaleFactor;
+                const deltaY = (e.target.y() - defaultOffsetY) / scaleFactor;
                 onChange({
-                  cropX: (e.target.x() - (pixelW - renderImgW) / 2) / scaleFactor,
-                  cropY: (e.target.y() - (pixelH - renderImgH) / 2) / scaleFactor,
+                  cropX: Math.round(deltaX * 10) / 10,
+                  cropY: Math.round(deltaY * 10) / 10,
                 });
               }
             }}
@@ -177,16 +201,22 @@ function PhotoFrameNode({
         />
       )}
 
-      {/* Crop Mode Indicator Overlay */}
+      {/* Crop Mode Grid & Indicator Overlay */}
       {isCropMode && (
-        <Rect
-          width={pixelW}
-          height={pixelH}
-          stroke="#3b82f6"
-          strokeWidth={2}
-          dash={[6, 4]}
-          listening={false}
-        />
+        <Group listening={false}>
+          <Rect
+            width={pixelW}
+            height={pixelH}
+            stroke="#3b82f6"
+            strokeWidth={2}
+            dash={[6, 4]}
+          />
+          {/* Rule of Thirds Lines */}
+          <Line points={[pixelW / 3, 0, pixelW / 3, pixelH]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+        </Group>
       )}
     </Group>
   );
@@ -445,9 +475,24 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (
+          target === containerRef.current ||
+          target.classList?.contains(styles.canvasContainer ?? '') ||
+          target.classList?.contains(styles.stageWrapper ?? '')
+        ) {
+          clearSelection();
+          exitCropMode();
+        }
+      }}
       onClick={(e) => {
-        // Clear selection if clicking empty canvas container
-        if (e.target === containerRef.current) {
+        const target = e.target as HTMLElement;
+        if (
+          target === containerRef.current ||
+          target.classList?.contains(styles.canvasContainer ?? '') ||
+          target.classList?.contains(styles.stageWrapper ?? '')
+        ) {
           clearSelection();
           exitCropMode();
         }
@@ -476,8 +521,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
           width={screenSpreadW}
           height={screenSpreadH}
           onMouseDown={(e) => {
-            // Deselect when clicking on empty stage
-            if (e.target === e.target.getStage()) {
+            // Deselect when clicking on empty stage or background sheet
+            if (e.target === e.target.getStage() || e.target.name() === 'background-sheet') {
               clearSelection();
               exitCropMode();
             }
@@ -487,6 +532,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
           <Layer>
             {/* Spread Sheet Board */}
             <Rect
+              name="background-sheet"
               x={0}
               y={0}
               width={screenSpreadW}
@@ -495,6 +541,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
               shadowColor="rgba(0,0,0,0.6)"
               shadowBlur={16}
               shadowOffset={{ x: 0, y: 8 }}
+              onClick={() => {
+                clearSelection();
+                exitCropMode();
+              }}
+              onMouseDown={() => {
+                clearSelection();
+                exitCropMode();
+              }}
+              onTap={() => {
+                clearSelection();
+                exitCropMode();
+              }}
             />
 
             {/* Left & Right Page Dividers */}
@@ -518,14 +576,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
                   points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
                   stroke="rgba(255,255,255,0.4)"
                   strokeWidth={1}
-                  dash={[6, 4]}
+                  dash={[4, 4]}
                 />
                 {gutterPixelW > 0 && (
                   <Line
                     points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
                     stroke="rgba(255,255,255,0.4)"
                     strokeWidth={1}
-                    dash={[6, 4]}
+                    dash={[4, 4]}
                   />
                 )}
               </Group>
@@ -581,12 +639,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
                     }
                   }}
                   onDragMove={(e) => {
-                    if (!snapEnabled) return;
+                    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
+                      clearSnapLines();
+                      return;
+                    }
                     const physicalX = e.target.x() / scaleFactor;
                     const physicalY = e.target.y() / scaleFactor;
                     const otherRects = (activeSpread.elements || [])
                       .filter((f) => f.id !== frame.id)
                       .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
 
                     const snapRes = calculateSnapping(
                       { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
@@ -594,12 +657,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
                       totalSpreadPhysicalH,
                       activeSpread.safeArea,
                       gutterPhysicalW,
-                      otherRects
+                      otherRects,
+                      thresholdUnits
                     );
 
-                    e.target.x(snapRes.snappedX * scaleFactor);
-                    e.target.y(snapRes.snappedY * scaleFactor);
-                    setSnapLines(snapRes.snapLines);
+                    if (snapRes.snapLines.length > 0) {
+                      e.target.x(snapRes.snappedX * scaleFactor);
+                      e.target.y(snapRes.snappedY * scaleFactor);
+                      setSnapLines(snapRes.snapLines);
+                    } else {
+                      clearSnapLines();
+                    }
                   }}
                   onDragEnd={(e) => {
                     clearSnapLines();

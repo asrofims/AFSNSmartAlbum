@@ -48,8 +48,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     selectPhoto,
     selectAll,
     clearSelection,
-    copySelectedPhotos,
-    pastePhotosToActiveFolder,
     batchDeleteSelected,
     batchToggleFavoritesSelected,
     addPhotosToFolder,
@@ -118,27 +116,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        selectAll(sortedPhotos);
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         clearSelection();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        copySelectedPhotos();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        e.preventDefault();
-        pastePhotosToActiveFolder(currentProject.id);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedPhotoIds.length > 0) {
-          e.preventDefault();
-          const count = selectedPhotoIds.length;
-          setPhotoToDelete({
-            ids: selectedPhotoIds,
-            name: count > 1 ? `${count} photos` : 'selected photo',
-          });
-        }
       } else if (e.key === 'Escape') {
         clearSelection();
         setContextMenuState((s) => ({ ...s, isOpen: false }));
@@ -148,7 +128,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, sortedPhotos, selectedPhotoIds, selectAll, copySelectedPhotos, pastePhotosToActiveFolder, clearSelection]);
+  }, [currentProject, clearSelection]);
 
   if (!currentProject) return null;
 
