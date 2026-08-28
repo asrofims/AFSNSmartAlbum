@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { Button } from '../../components/ui/Button';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -301,7 +302,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 >
                   {/* Thumbnail Image */}
                   <div className={styles.thumbnailWrapper}>
-                    {photo.thumbnailBase64 ? (
+                    {photo.thumbnailPath ? (
+                      <img
+                        src={convertFileSrc(photo.thumbnailPath)}
+                        alt={photo.fileName}
+                        className={styles.thumbnailImg}
+                        loading="lazy"
+                      />
+                    ) : photo.thumbnailBase64 ? (
                       <img
                         src={photo.thumbnailBase64}
                         alt={photo.fileName}
