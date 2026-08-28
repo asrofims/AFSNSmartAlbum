@@ -832,37 +832,72 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               }}
             />
 
-            {/* Left & Right Page Dividers */}
-            <Line
-              points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-              stroke="rgba(0,0,0,0.12)"
-              strokeWidth={1}
-            />
-            {gutterPixelW > 0 && (
-              <Line
-                points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
-                stroke="rgba(0,0,0,0.12)"
-                strokeWidth={1}
-              />
-            )}
-
             {/* Center Gutter / Spine Fold Guide */}
             {showGutterGuide && (
-              <Group>
-                <Line
-                  points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth={1}
-                  dash={[4, 4]}
-                />
-                {gutterPixelW > 0 && (
-                  <Line
-                    points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
-                    stroke="rgba(255,255,255,0.4)"
-                    strokeWidth={1}
-                    dash={[4, 4]}
-                  />
+              <Group listening={false}>
+                {gutterPixelW > 0 ? (
+                  <>
+                    {/* Shaded Gutter Zone */}
+                    <Rect
+                      x={leftPagePixelW}
+                      y={0}
+                      width={gutterPixelW}
+                      height={screenSpreadH}
+                      fill="rgba(100, 116, 139, 0.12)"
+                    />
+                    {/* Left & Right Gutter Crease Lines */}
+                    <Line
+                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
+                      stroke="#475569"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                    />
+                    <Line
+                      points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
+                      stroke="#475569"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {/* Subtle Shadow on Left of Crease */}
+                    <Line
+                      points={[leftPagePixelW - 1, 0, leftPagePixelW - 1, screenSpreadH]}
+                      stroke="rgba(0, 0, 0, 0.15)"
+                      strokeWidth={2}
+                    />
+                    {/* Distinct Center Crease Dashed Line */}
+                    <Line
+                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
+                      stroke="#475569"
+                      strokeWidth={1.5}
+                      dash={[6, 3]}
+                    />
+                  </>
                 )}
+
+                {/* Top Notch Marker */}
+                <Line
+                  points={[
+                    leftPagePixelW + gutterPixelW / 2 - 6, 0,
+                    leftPagePixelW + gutterPixelW / 2 + 6, 0,
+                    leftPagePixelW + gutterPixelW / 2, 8,
+                  ]}
+                  closed
+                  fill="#334155"
+                />
+
+                {/* Bottom Notch Marker */}
+                <Line
+                  points={[
+                    leftPagePixelW + gutterPixelW / 2 - 6, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2 + 6, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2, screenSpreadH - 8,
+                  ]}
+                  closed
+                  fill="#334155"
+                />
               </Group>
             )}
 

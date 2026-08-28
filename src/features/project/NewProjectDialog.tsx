@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { NumberInput } from '../../components/ui/NumberInput';
 import { Select } from '../../components/ui/Select';
 import { ColorPicker } from '../../components/ui/ColorPicker';
+import { Switch } from '../../components/ui/Switch';
 import { useProjectStore } from '../../stores/projectStore';
 import { Unit, UNIT_OPTIONS, convertUnit, formatDimensions, toPixels } from '../../domain/units';
 import { ALBUM_PRESETS, CUSTOM_PRESET_ID, findMatchingPreset, getPresetById } from '../../domain/presets';
@@ -375,15 +376,14 @@ export function NewProjectDialog() {
             {/* Safe Margin / Batas Tepi (Request 5) */}
             <div className={styles.section}>
               <div className={styles.sectionTitle}>Safe Margin (Batas Tepi Aman)</div>
-              <label className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  className={styles.checkbox}
+              <div style={{ padding: '2px 0 6px 0' }}>
+                <Switch
                   checked={marginEnabled}
-                  onChange={(e) => setMarginEnabled(e.target.checked)}
+                  onChange={setMarginEnabled}
+                  label="Enable safe margin guides"
+                  size="sm"
                 />
-                <span className={styles.checkboxLabel}>Enable safe margin guides</span>
-              </label>
+              </div>
 
               {marginEnabled && (
                 <div className={styles.row}>
@@ -437,15 +437,14 @@ export function NewProjectDialog() {
             {/* Photo Border (Request 4: Default Nonaktif) */}
             <div className={styles.section}>
               <div className={styles.sectionTitle}>Photo Border</div>
-              <label className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  className={styles.checkbox}
+              <div style={{ padding: '2px 0 6px 0' }}>
+                <Switch
                   checked={borderEnabled}
-                  onChange={(e) => setBorderEnabled(e.target.checked)}
+                  onChange={setBorderEnabled}
+                  label="Enable photo border"
+                  size="sm"
                 />
-                <span className={styles.checkboxLabel}>Enable photo border</span>
-              </label>
+              </div>
 
               {borderEnabled && (
                 <div className={styles.row}>

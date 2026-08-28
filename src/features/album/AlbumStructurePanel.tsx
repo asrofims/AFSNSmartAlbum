@@ -3,6 +3,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { formatDimensions } from '../../domain/units';
 import { NumberInput } from '../../components/ui/NumberInput';
+import { Switch } from '../../components/ui/Switch';
 import styles from './AlbumStructurePanel.module.css';
 
 export function AlbumStructurePanel() {
@@ -82,37 +83,34 @@ export function AlbumStructurePanel() {
 
         <div className={styles.guideToggles}>
           {/* Gutter Guide */}
-          <label className={styles.toggleRow}>
-            <input
-              type="checkbox"
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleText}>Center Gutter Crease</span>
+            <Switch
               checked={showGutterGuide}
               onChange={() => toggleGuide('gutter')}
-              className={styles.checkbox}
+              size="sm"
             />
-            <span className={styles.toggleText}>Center Gutter Crease</span>
-          </label>
+          </div>
 
           {/* Bleed Guide */}
-          <label className={styles.toggleRow}>
-            <input
-              type="checkbox"
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleText}>Bleed Cut Boundary (Red)</span>
+            <Switch
               checked={showBleedGuide}
               onChange={() => toggleGuide('bleed')}
-              className={styles.checkbox}
+              size="sm"
             />
-            <span className={styles.toggleText}>Bleed Cut Boundary (Red)</span>
-          </label>
+          </div>
 
           {/* Safe Area Guide */}
-          <label className={styles.toggleRow}>
-            <input
-              type="checkbox"
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleText}>Safe Area Margin (Blue)</span>
+            <Switch
               checked={showSafeAreaGuide}
               onChange={() => toggleGuide('safeArea')}
-              className={styles.checkbox}
+              size="sm"
             />
-            <span className={styles.toggleText}>Safe Area Margin (Blue)</span>
-          </label>
+          </div>
         </div>
       </div>
 
