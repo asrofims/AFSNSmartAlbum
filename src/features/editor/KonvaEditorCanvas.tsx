@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Stage, Layer, Rect, Line, Group, Image as KonvaImage, Transformer } from 'react-konva';
+import { useRef, useState, useEffect } from 'react';
+import { Stage, Layer, Rect, Line, Group, Image as KonvaImage, Transformer, Text as KonvaText } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
@@ -28,6 +28,7 @@ function PhotoFrameNode({
   onDragEnd,
   onChange,
   onDoubleClick,
+  unit,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
@@ -41,6 +42,7 @@ function PhotoFrameNode({
   onDoubleClick: () => void;
 }) {
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
+  const [liveDimensions, setLiveDimensions] = useState<{ w: number; h: number } | null>(null);
   const shapeRef = useRef<Konva.Group>(null);
 
   // Load preview or thumbnail image
@@ -117,8 +119,21 @@ function PhotoFrameNode({
       }}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onTransform={() => {
+        const node = shapeRef.current;
+        if (!node) return;
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        const liveW = Math.max(1, (node.width() * scaleX) / scaleFactor);
+        const liveH = Math.max(1, (node.height() * scaleY) / scaleFactor);
+        setLiveDimensions({
+          w: Math.round(liveW * 10) / 10,
+          h: Math.round(liveH * 10) / 10,
+        });
+      }}
       onTransformEnd={() => {
         const node = shapeRef.current;
+        setLiveDimensions(null);
         if (!node) return;
 
         const scaleX = node.scaleX();
@@ -242,6 +257,34 @@ function PhotoFrameNode({
           <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
         </Group>
       )}
+
+      {/* Real-time Dynamic Dimension Badge during crop/resize */}
+      {liveDimensions && (
+        <Group y={-26} x={Math.max(0, (pixelW - 110) / 2)} listening={false}>
+          <Rect
+            x={0}
+            y={0}
+            width={110}
+            height={20}
+            fill="rgba(15, 23, 42, 0.94)"
+            cornerRadius={4}
+            stroke="#3b82f6"
+            strokeWidth={1}
+            shadowColor="rgba(0,0,0,0.6)"
+            shadowBlur={8}
+          />
+          <KonvaText
+            text={`${liveDimensions.w} × ${liveDimensions.h} ${unit}`}
+            fill="#38bdf8"
+            fontSize={11}
+            fontStyle="bold"
+            fontFamily="sans-serif"
+            padding={4}
+            width={110}
+            align="center"
+          />
+        </Group>
+      )}
     </Group>
   );
 }
@@ -322,9 +365,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         .filter(Boolean) as Konva.Node[];
 
       trRef.current.nodes(selectedNodes);
+      trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     } else {
       trRef.current.nodes([]);
+      trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     }
   }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements]);
