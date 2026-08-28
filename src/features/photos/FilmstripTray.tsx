@@ -139,6 +139,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       } else if (e.key === 'Escape') {
         clearSelection();
         setContextMenuState((s) => ({ ...s, isOpen: false }));
+        setIsImportMenuOpen(false);
       }
     };
 
