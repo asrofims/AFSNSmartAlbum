@@ -221,8 +221,22 @@ function PhotoFrameNode({
 
         const scaleX = Math.abs(node.scaleX());
         const scaleY = Math.abs(node.scaleY());
-        const newW = Math.max(5, (node.width() * scaleX) / scaleFactor);
-        const newH = Math.max(5, (node.height() * scaleY) / scaleFactor);
+        let rawW = (node.width() * scaleX) / scaleFactor;
+        let rawH = (node.height() * scaleY) / scaleFactor;
+
+        // Maintain exact aspect ratio even when hitting minimum dimension limits
+        const minDim = 5; // Minimum 5mm
+        if (rawW < minDim || rawH < minDim) {
+          const origRatio = frame.width > 0 && frame.height > 0 ? frame.width / frame.height : 1;
+          if (rawW < minDim) {
+            rawW = minDim;
+            rawH = minDim / origRatio;
+          }
+          if (rawH < minDim) {
+            rawH = minDim;
+            rawW = minDim * origRatio;
+          }
+        }
 
         // Reset scale and update geometry
         node.scaleX(1);
@@ -231,8 +245,8 @@ function PhotoFrameNode({
         onFrameChange({
           x: Math.round((node.x() / scaleFactor) * 10) / 10,
           y: Math.round((node.y() / scaleFactor) * 10) / 10,
-          width: Math.round(newW * 10) / 10,
-          height: Math.round(newH * 10) / 10,
+          width: Math.round(rawW * 10) / 10,
+          height: Math.round(rawH * 10) / 10,
           rotation: Math.round(node.rotation()),
         });
       }}
