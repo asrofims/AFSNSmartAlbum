@@ -10,3 +10,4 @@ export { NumberInput } from './NumberInput';
 export { UnitInput } from './UnitInput';
 export { Select } from './Select';
 export { ColorPicker } from './ColorPicker';
+export { ConfirmDialog } from './ConfirmDialog';

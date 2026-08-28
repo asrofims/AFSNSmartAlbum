@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Button } from '../../components/ui/Button';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { filterPhotos, sortPhotos, formatFileSize, PhotoSortBy, Photo } from '../../domain/photo';
 import { FolderTabs } from './FolderTabs';
 import { BatchActionBar } from './BatchActionBar';
 import { FolderDialog } from './FolderDialog';
+import { PhotoContextMenu } from './PhotoContextMenu';
 import styles from './FilmstripTray.module.css';
 
 interface FilmstripTrayProps {
@@ -22,6 +24,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     folderPhotoIds,
     activeFolderId,
     selectedPhotoIds,
+    lastSelectedPhotoId,
     filter,
     sortBy,
     searchQuery,
@@ -44,6 +47,10 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     copySelectedPhotos,
     pastePhotosToActiveFolder,
     batchDeleteSelected,
+    batchToggleFavoritesSelected,
+    addPhotosToFolder,
+    movePhotosToFolder,
+    removePhotosFromFolder,
     setFilter,
     setSortBy,
     setSearchQuery,
@@ -53,6 +60,18 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
+
+  // Context Menu State
+  const [contextMenuState, setContextMenuState] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    photo: Photo | null;
+  }>({ isOpen: false, x: 0, y: 0, photo: null });
+
+  // Single / Target Photo Deletion Confirm State
+  const [photoToDelete, setPhotoToDelete] = useState<{ ids: string[]; name: string } | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
@@ -84,7 +103,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const filtered = filterPhotos(currentPhotoPool, filter, searchQuery);
   const sortedPhotos = sortPhotos(filtered, sortBy);
 
-  // Global Keyboard Shortcuts for Filmstrip
+  // Global Keyboard Shortcuts for Lightroom-style photo interaction
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!currentProject) return;
@@ -96,6 +115,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         selectAll(sortedPhotos);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        clearSelection();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         copySelectedPhotos();
@@ -105,18 +127,21 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedPhotoIds.length > 0) {
           e.preventDefault();
-          if (window.confirm(`Delete ${selectedPhotoIds.length} selected photos?`)) {
-            batchDeleteSelected(currentProject.id);
-          }
+          const count = selectedPhotoIds.length;
+          setPhotoToDelete({
+            ids: selectedPhotoIds,
+            name: count > 1 ? `${count} photos` : 'selected photo',
+          });
         }
       } else if (e.key === 'Escape') {
         clearSelection();
+        setContextMenuState((s) => ({ ...s, isOpen: false }));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, sortedPhotos, selectedPhotoIds, selectAll, copySelectedPhotos, pastePhotosToActiveFolder, batchDeleteSelected, clearSelection]);
+  }, [currentProject, sortedPhotos, selectedPhotoIds, selectAll, copySelectedPhotos, pastePhotosToActiveFolder, clearSelection]);
 
   if (!currentProject) return null;
 
@@ -174,7 +199,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   };
 
-  // Internal Card Click Handler
+  // Internal Card Click Handler (Lightroom Style)
   const handleCardClick = (e: React.MouseEvent, photo: Photo) => {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
@@ -186,12 +211,48 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   };
 
+  // Card Context Menu (Right Click)
+  const handleCardContextMenu = (e: React.MouseEvent, photo: Photo) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // If right-clicked photo is not in current multi-selection, make it the single selection
+    if (!selectedPhotoIds.includes(photo.id)) {
+      selectPhoto(photo.id, 'single', sortedPhotos);
+    }
+
+    setContextMenuState({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      photo,
+    });
+  };
+
   // Card Drag Handler for Folder Organization
   const handleCardDragStart = (e: React.DragEvent, photo: Photo) => {
     if (!selectedPhotoIds.includes(photo.id)) {
       selectPhoto(photo.id, 'single', sortedPhotos);
     }
     e.dataTransfer.setData('application/json', JSON.stringify(selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id]));
+  };
+
+  // Execute Photo Deletion after ConfirmDialog
+  const handleConfirmPhotoDelete = async () => {
+    if (!photoToDelete) return;
+    setIsDeletingPhoto(true);
+    try {
+      if (photoToDelete.ids.length === 1 && photoToDelete.ids[0]) {
+        await removePhoto(photoToDelete.ids[0]);
+      } else {
+        await batchDeleteSelected(currentProject.id);
+      }
+      setPhotoToDelete(null);
+    } catch (err) {
+      console.error('Delete photo error:', err);
+    } finally {
+      setIsDeletingPhoto(false);
+    }
   };
 
   const showProgressBar = isImporting && importProgress && importProgress.total > 0;
@@ -209,8 +270,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       onDrop={handleDrop}
       aria-label="Photo Library Filmstrip"
     >
-      {/* Batch Action Bar (Visible when photos are selected) */}
-      {selectedPhotoIds.length > 0 && <BatchActionBar />}
+      {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
+      <BatchActionBar />
 
       {/* Real-time Import Progress Bar Banner */}
       {showProgressBar && (
@@ -388,15 +449,17 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
             <div className={styles.photoList}>
               {sortedPhotos.map((photo) => {
                 const isSelected = selectedPhotoIds.includes(photo.id);
+                const isActive = lastSelectedPhotoId === photo.id;
 
                 return (
                   <div
                     key={photo.id}
-                    className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${photo.isMissing ? styles.cardMissing : ''}`}
+                    className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''} ${photo.isMissing ? styles.cardMissing : ''}`}
                     onClick={(e) => handleCardClick(e, photo)}
+                    onContextMenu={(e) => handleCardContextMenu(e, photo)}
                     draggable={true}
                     onDragStart={(e) => handleCardDragStart(e, photo)}
-                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nPath: ${photo.filePath}`}
+                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nPath: ${photo.filePath}\nRight-click for options`}
                   >
                     {/* Thumbnail Image */}
                     <div className={styles.thumbnailWrapper}>
@@ -427,7 +490,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         </div>
                       )}
 
-                      {/* Selection Checkbox Overlay */}
+                      {/* Selection Checkbox Overlay (Lightroom style check toggle) */}
                       <button
                         type="button"
                         className={`${styles.selectCheckbox} ${isSelected ? styles.checkboxChecked : ''}`}
@@ -435,7 +498,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                           e.stopPropagation();
                           selectPhoto(photo.id, 'toggle', sortedPhotos);
                         }}
-                        title={isSelected ? 'Deselect photo' : 'Select photo'}
+                        title={isSelected ? 'Deselect photo' : 'Select photo for batch actions'}
                       >
                         {isSelected ? '✓' : ''}
                       </button>
@@ -459,7 +522,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         className={styles.deletePhotoBtn}
                         onClick={(e) => {
                           e.stopPropagation();
-                          removePhoto(photo.id);
+                          setPhotoToDelete({ ids: [photo.id], name: photo.fileName });
                         }}
                         title="Remove photo from library"
                       >
@@ -504,6 +567,45 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
       {/* Folder Create/Rename Modal Dialog */}
       <FolderDialog />
+
+      {/* Lightroom-style Right Click Context Menu */}
+      {contextMenuState.isOpen && contextMenuState.photo && (
+        <PhotoContextMenu
+          isOpen={contextMenuState.isOpen}
+          x={contextMenuState.x}
+          y={contextMenuState.y}
+          targetPhoto={contextMenuState.photo}
+          selectedPhotos={photos.filter((p) => selectedPhotoIds.includes(p.id))}
+          folders={folders}
+          activeFolderId={activeFolderId}
+          onClose={() => setContextMenuState((s) => ({ ...s, isOpen: false }))}
+          onToggleFavorite={toggleFavorite}
+          onBatchToggleFavorite={batchToggleFavoritesSelected}
+          onAddToFolder={(fId, pIds) => addPhotosToFolder(currentProject.id, fId, pIds)}
+          onMoveToFolder={(fromId, toId, pIds) => movePhotosToFolder(currentProject.id, fromId, toId, pIds)}
+          onRemoveFromFolder={(fId, pIds) => removePhotosFromFolder(currentProject.id, fId, pIds)}
+          onRequestDelete={(ids, name) => setPhotoToDelete({ ids, name })}
+          onSelectAll={() => selectAll(sortedPhotos)}
+        />
+      )}
+
+      {/* Modern Confirm Dialog for Photo Deletion */}
+      <ConfirmDialog
+        isOpen={photoToDelete !== null}
+        title={photoToDelete && photoToDelete.ids.length > 1 ? `Delete ${photoToDelete.ids.length} Photos?` : 'Delete Photo from Library?'}
+        message={
+          photoToDelete && photoToDelete.ids.length > 1
+            ? `Are you sure you want to delete ${photoToDelete.ids.length} selected photos from the project library?`
+            : `Are you sure you want to delete "${photoToDelete?.name}" from the project library?`
+        }
+        detail="The photo will be removed from your album project. The original image file on your hard drive will remain completely safe."
+        confirmText={photoToDelete && photoToDelete.ids.length > 1 ? `Delete ${photoToDelete.ids.length} Photos` : 'Delete Photo'}
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeletingPhoto}
+        onConfirm={handleConfirmPhotoDelete}
+        onCancel={() => setPhotoToDelete(null)}
+      />
     </section>
   );
 }
