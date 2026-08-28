@@ -19,6 +19,7 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
     showGutterGuide,
     showBleedGuide,
     showSafeAreaGuide,
+    isSpreadDrawerOpen,
     selectPage,
   } = useAlbumStore();
 
@@ -197,13 +198,15 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
         </div>
       </div>
 
-      {/* Floating Canvas Footer Info Badge */}
-      <div className={styles.spreadInfoBadge}>
-        <span className={styles.spreadNameText}>{activeSpread.name}</span>
-        <span className={styles.spreadDimText}>
-          {formatDimensions(singlePageW, singlePageH, unit)} per page (Spread: {formatDimensions(totalSpreadPhysicalW, totalSpreadPhysicalH, unit)})
-        </span>
-      </div>
+      {/* Floating Canvas Footer Info Badge (hides when spread thumbnail drawer is open) */}
+      {!isSpreadDrawerOpen && (
+        <div className={styles.spreadInfoBadge}>
+          <span className={styles.spreadNameText}>{activeSpread.name}</span>
+          <span className={styles.spreadDimText}>
+            {formatDimensions(singlePageW, singlePageH, unit)} per page (Spread: {formatDimensions(totalSpreadPhysicalW, totalSpreadPhysicalH, unit)})
+          </span>
+        </div>
+      )}
     </div>
   );
 }

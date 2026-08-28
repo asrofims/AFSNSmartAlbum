@@ -20,6 +20,9 @@ export interface AlbumState {
   showBleedGuide: boolean;
   showSafeAreaGuide: boolean;
 
+  // Spread Drawer Open State
+  isSpreadDrawerOpen: boolean;
+
   // Actions
   initializeAlbum: (project: Project) => void;
   setActiveSpread: (spreadId: string) => void;
@@ -34,6 +37,8 @@ export interface AlbumState {
   updateSafeArea: (safeArea: number) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
   selectPage: (pageId: string | null) => void;
+  setSpreadDrawerOpen: (isOpen: boolean) => void;
+  toggleSpreadDrawer: () => void;
 }
 
 export const useAlbumStore = create<AlbumState>((set, get) => ({
@@ -45,6 +50,10 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   showGutterGuide: true,
   showBleedGuide: true,
   showSafeAreaGuide: true,
+  isSpreadDrawerOpen: false,
+
+  setSpreadDrawerOpen: (isOpen: boolean) => set({ isSpreadDrawerOpen: isOpen }),
+  toggleSpreadDrawer: () => set((s) => ({ isSpreadDrawerOpen: !s.isSpreadDrawerOpen })),
 
   initializeAlbum: (project: Project) => {
     const album = createInitialAlbum(project);

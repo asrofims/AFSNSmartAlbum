@@ -11,15 +11,17 @@ export function PageNavigator() {
     currentAlbum,
     activeSpreadId,
     activeSpreadIndex,
+    isSpreadDrawerOpen,
     setActiveSpread,
     nextSpread,
     prevSpread,
     addSpread,
     deleteSpread,
     duplicateSpread,
+    setSpreadDrawerOpen,
+    toggleSpreadDrawer,
   } = useAlbumStore();
 
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [spreadToDelete, setSpreadToDelete] = useState<Spread | null>(null);
 
   // Keyboard navigation shortcuts
@@ -72,14 +74,14 @@ export function PageNavigator() {
   return (
     <div className={styles.navigatorContainer}>
       {/* Spread Thumbnail Drawer (Collapsible) */}
-      {isDrawerOpen && (
+      {isSpreadDrawerOpen && (
         <div className={styles.drawer}>
           <div className={styles.drawerHeader}>
             <span className={styles.drawerTitle}>Album Spreads ({allSpreads.length})</span>
             <button
               type="button"
               className={styles.drawerCloseBtn}
-              onClick={() => setIsDrawerOpen(false)}
+              onClick={() => setSpreadDrawerOpen(false)}
               title="Close Spread Drawer"
             >
               ✕
@@ -159,9 +161,9 @@ export function PageNavigator() {
         {/* Left: Thumbnail Drawer Toggle */}
         <button
           type="button"
-          className={`${styles.navBtn} ${isDrawerOpen ? styles.navBtnActive : ''}`}
-          onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-          title={isDrawerOpen ? 'Hide Spread Thumbnails' : 'Show All Spread Thumbnails'}
+          className={`${styles.navBtn} ${isSpreadDrawerOpen ? styles.navBtnActive : ''}`}
+          onClick={toggleSpreadDrawer}
+          title={isSpreadDrawerOpen ? 'Hide Spread Thumbnails' : 'Show All Spread Thumbnails'}
         >
           <span className={styles.drawerIcon}>⊞</span>
           <span>Spreads ({allSpreads.length})</span>
