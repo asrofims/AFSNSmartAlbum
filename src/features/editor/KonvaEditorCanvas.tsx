@@ -14,7 +14,7 @@ import {
   clamp,
 } from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { convertUnit, formatDimensions } from '../../domain/units';
+import { convertUnit } from '../../domain/units';
 import { Photo } from '../../domain/photo';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -396,7 +396,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     showGutterGuide,
     showBleedGuide,
     showSafeAreaGuide,
-    isSpreadDrawerOpen,
     initializeAlbum,
   } = useAlbumStore();
 
@@ -577,7 +576,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     );
   }
 
-  const isCover = activeSpread.type === 'cover';
   const unit = currentProject.canvasUnit;
 
   // Single page physical dimensions
@@ -1027,24 +1025,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           </div>
         )}
 
-        {/* Page Badges in Corners */}
-        <div className={`${styles.pageBadge} ${styles.leftBadge}`}>
-          {isCover ? 'Back Cover' : `Page ${activeSpread.leftPage?.pageNumber ?? 1}`}
-        </div>
-        <div className={`${styles.pageBadge} ${styles.rightBadge}`}>
-          {isCover ? 'Front Cover' : `Page ${activeSpread.rightPage?.pageNumber ?? 2}`}
-        </div>
       </div>
-
-      {/* Floating Canvas Footer Info Badge (hides when spread thumbnail drawer is open) */}
-      {!isSpreadDrawerOpen && (
-        <div className={styles.spreadInfoBadge}>
-          <span className={styles.spreadNameText}>{activeSpread.name}</span>
-          <span className={styles.spreadDimText}>
-            {formatDimensions(singlePageW, singlePageH, unit)} per page (Spread: {formatDimensions(totalSpreadPhysicalW, totalSpreadPhysicalH, unit)})
-          </span>
-        </div>
-      )}
 
       {/* Drag & Drop Prompt Overlay when dragging from tray */}
       {isDragOverCanvas && (
