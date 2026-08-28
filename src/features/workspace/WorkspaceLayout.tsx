@@ -10,7 +10,7 @@ import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { clampCropTransform, zoomCropAtPoint } from '../../domain/editor';
+import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
@@ -45,9 +45,15 @@ export function WorkspaceLayout() {
   const exitCropMode = useEditorStore((s) => s.exitCropMode);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
+  const alignSelectedFrames = useEditorStore((s) => s.alignSelectedFrames);
+  const distributeSelectedFrames = useEditorStore((s) => s.distributeSelectedFrames);
+  const applyFixedGapToSelected = useEditorStore((s) => s.applyFixedGapToSelected);
+  const matchSelectedDimensions = useEditorStore((s) => s.matchSelectedDimensions);
 
   const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
+  const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
 
   // Collapsible Right Properties & Bottom Filmstrip
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
@@ -401,12 +407,124 @@ export function WorkspaceLayout() {
                 </div>
               </div>
 
-              {/* Selected Photo Frame Properties */}
+              {/* Selected Photo Frame Properties / Multi-Selection Controls */}
               {(() => {
-                const selectedFrame = (activeSpread?.elements || []).find((f) => f.id === selectedFrameIds[0]);
                 const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
+                if (!activeSpread || selectedFrameIds.length === 0) return null;
 
-                if (!selectedFrame || !activeSpread) return null;
+                // MULTI-SELECTION MODE (>= 2 frames selected)
+                if (selectedFrameIds.length >= 2) {
+                  return (
+                    <div
+                      className={styles.propSection}
+                      style={{
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '10px',
+                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                      }}
+                    >
+                      <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Multi-Selection ({selectedFrameIds.length} Frames)</span>
+                      </div>
+
+                      {/* GAP Spacing Control */}
+                      <div style={{ marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+                          Jarak Antar Foto (Gap Spacing)
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={customGapValue}
+                              onChange={(val) => setCustomGapValue(Math.max(0, val))}
+                              min={0}
+                              max={200}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => applyFixedGapToSelected(activeSpread.id, 'horizontal', customGapValue)}
+                            title="Terapkan Jarak Celah Horizontal Seragam"
+                          >
+                            ⇿ Set Gap H
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => applyFixedGapToSelected(activeSpread.id, 'vertical', customGapValue)}
+                            title="Terapkan Jarak Celah Vertikal Seragam"
+                          >
+                            ⇳ Set Gap V
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Distribute Evenly (Bagi Jarak Sama Rata) */}
+                      {selectedFrameIds.length >= 3 && (
+                        <div style={{ marginBottom: '10px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                            Bagi Jarak Sama Rata (Distribute)
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className={styles.multiActionBtn}
+                              onClick={() => distributeSelectedFrames(activeSpread.id, 'horizontal')}
+                              title="Bagi Jarak Rata Horizontal"
+                            >
+                              ⇿ Bagi Rata H
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.multiActionBtn}
+                              onClick={() => distributeSelectedFrames(activeSpread.id, 'vertical')}
+                              title="Bagi Jarak Rata Vertikal"
+                            >
+                              ⇳ Bagi Rata V
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Alignments Grid */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                          Perataan (Align)
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left">⇤ Kiri</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal">⇥⇤ Tengah H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right">⇥ Kanan</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top">⤒ Atas</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical">⤓⤒ Tengah V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom">⤓ Bawah</button>
+                        </div>
+                      </div>
+
+                      {/* Match Size */}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                          Samakan Ukuran (Match Size)
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'width')} title="Match Width">⬌ Lebar</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'height')} title="Match Height">⬍ Tinggi</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both">⬚ Penuh</button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // SINGLE FRAME SELECTION MODE
+                const selectedFrame = (activeSpread?.elements || []).find((f) => f.id === selectedFrameIds[0]);
+                if (!selectedFrame) return null;
                 const isEditingCrop = editingCropFrameId === selectedFrame.id;
                 const cropTransform = clampCropTransform(selectedFrame);
 
@@ -577,19 +695,137 @@ export function WorkspaceLayout() {
                       </div>
                     )}
 
-                    {/* Frame Dimensions & Rotation */}
-                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Size:</span>
-                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{selectedFrame.width} × {selectedFrame.height} {currentProject.canvasUnit}</span>
+                    {/* Interactive Frame Dimensions & Position Inspector */}
+                    <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Dimensions & Transform</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsRatioLocked(!isRatioLocked)}
+                          className={styles.ratioLockButton}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: isRatioLocked ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                            border: isRatioLocked ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid var(--color-border)',
+                            color: isRatioLocked ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title={isRatioLocked ? 'Lock Aspect Ratio (Active)' : 'Unlock Aspect Ratio (Free)'}
+                        >
+                          <span>{isRatioLocked ? '🔗 Locked' : '🔓 Unlocked'}</span>
+                        </button>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Position:</span>
-                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>X: {selectedFrame.x}, Y: {selectedFrame.y}</span>
+
+                      {/* W & H Inputs in 2 columns */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Lebar (W)</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={selectedFrame.width}
+                              onChange={(newW) => {
+                                if (newW <= 0) return;
+                                const updates: Partial<PhotoFrameElement> = { width: newW };
+                                if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
+                                  const ratio = selectedFrame.width / selectedFrame.height;
+                                  updates.height = Number((newW / ratio).toFixed(1));
+                                }
+                                updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
+                              }}
+                              min={0.1}
+                              max={2000}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Tinggi (H)</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={selectedFrame.height}
+                              onChange={(newH) => {
+                                if (newH <= 0) return;
+                                const updates: Partial<PhotoFrameElement> = { height: newH };
+                                if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
+                                  const ratio = selectedFrame.width / selectedFrame.height;
+                                  updates.width = Number((newH * ratio).toFixed(1));
+                                }
+                                updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
+                              }}
+                              min={0.1}
+                              max={2000}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Rotation:</span>
-                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{selectedFrame.rotation || 0}°</span>
+
+                      {/* X & Y Position Inputs in 2 columns */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Posisi X</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={selectedFrame.x}
+                              onChange={(newX) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { x: newX })}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Posisi Y</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={selectedFrame.y}
+                              onChange={(newY) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { y: newY })}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rotation Input & Quick Reset */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Rotasi Sudut</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '130px' }}>
+                          <NumberInput
+                            value={selectedFrame.rotation || 0}
+                            onChange={(newRot) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: ((newRot % 360) + 360) % 360 })}
+                            min={-360}
+                            max={360}
+                            step={1}
+                          />
+                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
+                          <button
+                            type="button"
+                            onClick={() => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: 0 })}
+                            style={{
+                              padding: '2px 6px',
+                              fontSize: '9px',
+                              fontWeight: 600,
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'rgba(255,255,255,0.06)',
+                              border: '1px solid var(--color-border)',
+                              color: 'var(--color-text-secondary)',
+                              cursor: 'pointer',
+                            }}
+                            title="Reset rotation to 0°"
+                          >
+                            0°
+                          </button>
+                        </div>
                       </div>
 
                       {/* 1-Click Dual Entity Reset Actions */}

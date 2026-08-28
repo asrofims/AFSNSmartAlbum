@@ -322,6 +322,37 @@
 }
 
 .spreadNavText {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--weight-medium, 500);
   color: var(--color-text-primary);
+}
+
+.multiActionBtn {
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.multiActionBtn:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: var(--color-text-primary);
+}
+
+.ratioLockButton {
+  transition: all 0.15s ease;
+}
+
+.ratioLockButton:hover {
+  opacity: 0.85;
 }

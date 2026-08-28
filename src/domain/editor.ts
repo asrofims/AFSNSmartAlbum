@@ -944,7 +944,8 @@ export function alignFrames(
 }
 
 /**
- * Calculates equidistant distribution updates for multiple selected frames.
+ * Calculates equidistant gap distribution updates for multiple selected frames.
+ * Keeps the outermost bounds intact and distributes equal gaps between all frames.
  */
 export function distributeFrames(
   frames: PhotoFrameElement[],
@@ -953,37 +954,78 @@ export function distributeFrames(
   if (frames.length < 3) return [];
 
   if (direction === 'horizontal') {
-    const sorted = [...frames].sort((a, b) => a.x - b.x);
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    if (!first || !last) return [];
-
-    const totalSpan = (last.x + last.width) - first.x;
+    // Sort frames from left to right by their center position
+    const sorted = [...frames].sort((a, b) => (a.x + a.width / 2) - (b.x + b.width / 2));
+    const minX = Math.min(...sorted.map((f) => f.x));
+    const maxRight = Math.max(...sorted.map((f) => f.x + f.width));
     const totalFramesW = sorted.reduce((sum, f) => sum + f.width, 0);
-    const availableGap = totalSpan - totalFramesW;
-    const gapPerItem = Math.max(0, availableGap / (sorted.length - 1));
+    const availableGap = (maxRight - minX) - totalFramesW;
+    const gapPerItem = availableGap / (sorted.length - 1);
 
-    let currentX = first.x;
+    let currentX = minX;
+    return sorted.map((f, i) => {
+      if (i === 0) {
+        currentX = minX + f.width + gapPerItem;
+        return { id: f.id, geometry: { x: roundToTenth(minX) } };
+      }
+      if (i === sorted.length - 1) {
+        return { id: f.id, geometry: { x: roundToTenth(maxRight - f.width) } };
+      }
+      const newX = currentX;
+      currentX += f.width + gapPerItem;
+      return { id: f.id, geometry: { x: roundToTenth(newX) } };
+    });
+  } else {
+    // Sort frames from top to bottom by their center position
+    const sorted = [...frames].sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
+    const minY = Math.min(...sorted.map((f) => f.y));
+    const maxBottom = Math.max(...sorted.map((f) => f.y + f.height));
+    const totalFramesH = sorted.reduce((sum, f) => sum + f.height, 0);
+    const availableGap = (maxBottom - minY) - totalFramesH;
+    const gapPerItem = availableGap / (sorted.length - 1);
+
+    let currentY = minY;
+    return sorted.map((f, i) => {
+      if (i === 0) {
+        currentY = minY + f.height + gapPerItem;
+        return { id: f.id, geometry: { y: roundToTenth(minY) } };
+      }
+      if (i === sorted.length - 1) {
+        return { id: f.id, geometry: { y: roundToTenth(maxBottom - f.height) } };
+      }
+      const newY = currentY;
+      currentY += f.height + gapPerItem;
+      return { id: f.id, geometry: { y: roundToTenth(newY) } };
+    });
+  }
+}
+
+/**
+ * Applies a fixed custom gap spacing between multiple frames starting from the first frame's position.
+ */
+export function applyFixedGap(
+  frames: PhotoFrameElement[],
+  direction: 'horizontal' | 'vertical',
+  gap: number
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (frames.length < 2) return [];
+
+  if (direction === 'horizontal') {
+    const sorted = [...frames].sort((a, b) => (a.x + a.width / 2) - (b.x + b.width / 2));
+    if (!sorted[0]) return [];
+    let currentX = sorted[0].x;
     return sorted.map((f) => {
       const update = { id: f.id, geometry: { x: roundToTenth(currentX) } };
-      currentX += f.width + gapPerItem;
+      currentX += f.width + gap;
       return update;
     });
   } else {
-    const sorted = [...frames].sort((a, b) => a.y - b.y);
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    if (!first || !last) return [];
-
-    const totalSpan = (last.y + last.height) - first.y;
-    const totalFramesH = sorted.reduce((sum, f) => sum + f.height, 0);
-    const availableGap = totalSpan - totalFramesH;
-    const gapPerItem = Math.max(0, availableGap / (sorted.length - 1));
-
-    let currentY = first.y;
+    const sorted = [...frames].sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
+    if (!sorted[0]) return [];
+    let currentY = sorted[0].y;
     return sorted.map((f) => {
       const update = { id: f.id, geometry: { y: roundToTenth(currentY) } };
-      currentY += f.height + gapPerItem;
+      currentY += f.height + gap;
       return update;
     });
   }

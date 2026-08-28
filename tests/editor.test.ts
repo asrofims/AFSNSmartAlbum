@@ -14,6 +14,7 @@ import {
   intersectRect,
   alignFrames,
   distributeFrames,
+  applyFixedGap,
   matchFrameDimensions,
 } from '../src/domain/editor';
 
@@ -180,7 +181,13 @@ console.assert(distH[0].geometry.x === 0, 'First frame stays at x=0');
 console.assert(distH[1].geometry.x === 150, `Second frame distributed to x=150, got ${distH[1].geometry.x}`);
 console.assert(distH[2].geometry.x === 300, 'Third frame stays at x=300');
 
-// 10. Test Match Dimensions Math
+// 10. Test Apply Fixed Gap Math
+const fixedGapUpdates = applyFixedGap([dFrame1, dFrame2, dFrame3], 'horizontal', 10);
+console.assert(fixedGapUpdates[0].geometry.x === 0, 'First frame stays at x=0');
+console.assert(fixedGapUpdates[1].geometry.x === 110, `Second frame positioned at x=110, got ${fixedGapUpdates[1].geometry.x}`);
+console.assert(fixedGapUpdates[2].geometry.x === 220, `Third frame positioned at x=220, got ${fixedGapUpdates[2].geometry.x}`);
+
+// 11. Test Match Dimensions Math
 const matchW = matchFrameDimensions([frame1, frame2, frame3], 'width');
 console.assert(matchW.every((u) => u.geometry.width === 100), 'All frames should match width of first frame (100mm)');
 

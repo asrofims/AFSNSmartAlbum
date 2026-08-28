@@ -445,6 +445,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     rotateFrame90,
     alignSelectedFrames,
     distributeSelectedFrames,
+    applyFixedGapToSelected,
     matchSelectedDimensions,
     enterCropMode,
     exitCropMode,
@@ -1029,6 +1030,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           label: 'Samakan Ukuran Penuh (Both)',
           icon: '⬚',
           onClick: () => matchSelectedDimensions(activeSpread.id, 'both'),
+        },
+        { divider: true, id: 'div-gap', label: '' },
+        { header: true, id: 'hdr-gap', label: 'JARAK CELAH (GAP SPACING)' },
+        {
+          id: 'gap-h',
+          label: `Set Celah (${currentProject.spacingValue} ${currentProject.spacingUnit}) Horizontal`,
+          icon: '⇿',
+          onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', currentProject.spacingValue),
+        },
+        {
+          id: 'gap-v',
+          label: `Set Celah (${currentProject.spacingValue} ${currentProject.spacingUnit}) Vertikal`,
+          icon: '⇳',
+          onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', currentProject.spacingValue),
         }
       );
     }

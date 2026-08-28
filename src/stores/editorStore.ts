@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   alignFrames,
+  applyFixedGap,
   clampCropTransform,
   distributeFrames,
   GapGuide,
@@ -59,6 +60,11 @@ export interface EditorState {
   distributeSelectedFrames: (
     spreadId: string,
     direction: 'horizontal' | 'vertical'
+  ) => void;
+  applyFixedGapToSelected: (
+    spreadId: string,
+    direction: 'horizontal' | 'vertical',
+    gap: number
   ) => void;
   matchSelectedDimensions: (
     spreadId: string,
@@ -449,7 +455,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length < 2) return;
 
-    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    const spread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
@@ -466,7 +475,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length < 3) return;
 
-    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    const spread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
@@ -478,12 +490,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  applyFixedGapToSelected: (spreadId, direction, gap) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || selectedFrameIds.length < 2) return;
+
+    const spread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+    if (!spread) return;
+
+    const selectedFrames = (spread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const updates = applyFixedGap(selectedFrames, direction, gap);
+    if (updates.length > 0) {
+      batchUpdateFrames(spreadId, updates);
+    }
+  },
+
   matchSelectedDimensions: (spreadId, dimension) => {
     const { selectedFrameIds, batchUpdateFrames } = get();
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length < 2) return;
 
-    const spread = currentAlbum.spreads.find((s) => s.id === spreadId);
+    const spread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
