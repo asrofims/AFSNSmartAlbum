@@ -417,7 +417,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   exitCropMode: () => {
-    set({ editingCropFrameId: null });
+    set({ editingCropFrameId: null, selectedFrameIds: [] });
   },
 
   updateCrop: (spreadId, frameId, crop) => {

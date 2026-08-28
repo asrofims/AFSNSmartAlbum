@@ -140,6 +140,29 @@ function PhotoFrameNode({
         });
       }}
     >
+      {/* Ghost Reveal: Semi-transparent uncropped original image outside the frame */}
+      {isCropMode && imageObj && (
+        <Group listening={false}>
+          <KonvaImage
+            image={imageObj}
+            x={offsetX}
+            y={offsetY}
+            width={renderImgW}
+            height={renderImgH}
+            opacity={0.35}
+          />
+          <Rect
+            x={offsetX}
+            y={offsetY}
+            width={renderImgW}
+            height={renderImgH}
+            stroke="rgba(59, 130, 246, 0.45)"
+            strokeWidth={1}
+            dash={[4, 4]}
+          />
+        </Group>
+      )}
+
       {/* Background clipping rect */}
       <Group
         clipFunc={(ctx) => {
@@ -317,6 +340,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           deleteSelectedFrames(activeSpread.id);
+        }
+      } else if (e.key === 'Enter') {
+        if (editingCropFrameId) {
+          e.preventDefault();
+          exitCropMode();
         }
       } else if (e.key === 'Escape') {
         clearSelection();
@@ -693,15 +721,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               );
             })}
 
-            {/* Konva Multi-Handle Transformer */}
+            {/* Konva Multi-Handle Transformer with Dynamic 8-Anchor Trimming & Scaling */}
             <Transformer
               ref={trRef}
               rotateEnabled={true}
-              keepRatio={true}
+              enabledAnchors={[
+                'top-left',
+                'top-center',
+                'top-right',
+                'middle-right',
+                'bottom-right',
+                'bottom-center',
+                'bottom-left',
+                'middle-left',
+              ]}
               anchorSize={8}
-              anchorFill="#3b82f6"
-              anchorStroke="#ffffff"
-              anchorStrokeWidth={1}
+              anchorCornerRadius={2}
+              anchorFill="#ffffff"
+              anchorStroke="#3b82f6"
+              anchorStrokeWidth={1.5}
               borderStroke="#3b82f6"
               borderStrokeWidth={1.5}
               borderDash={[4, 3]}
