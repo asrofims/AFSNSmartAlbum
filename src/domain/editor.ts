@@ -946,6 +946,7 @@ export function alignFrames(
 /**
  * Calculates equidistant gap distribution updates for multiple selected frames.
  * Keeps the outermost bounds intact and distributes equal gaps between all frames.
+ * Supports large, normal, and micro-thin gaps without floating-point accumulation drift.
  */
 export function distributeFrames(
   frames: PhotoFrameElement[],
@@ -954,48 +955,38 @@ export function distributeFrames(
   if (frames.length < 3) return [];
 
   if (direction === 'horizontal') {
-    // Sort frames from left to right by their center position
-    const sorted = [...frames].sort((a, b) => (a.x + a.width / 2) - (b.x + b.width / 2));
-    const minX = Math.min(...sorted.map((f) => f.x));
+    // Sort frames strictly from left to right
+    const sorted = [...frames].sort((a, b) => a.x - b.x || a.y - b.y);
+    if (!sorted[0]) return [];
+    const minX = sorted[0].x;
     const maxRight = Math.max(...sorted.map((f) => f.x + f.width));
     const totalFramesW = sorted.reduce((sum, f) => sum + f.width, 0);
-    const availableGap = (maxRight - minX) - totalFramesW;
+    const totalSpan = maxRight - minX;
+    const availableGap = Math.max(0, totalSpan - totalFramesW);
     const gapPerItem = availableGap / (sorted.length - 1);
 
-    let currentX = minX;
+    let cumulativeWidth = 0;
     return sorted.map((f, i) => {
-      if (i === 0) {
-        currentX = minX + f.width + gapPerItem;
-        return { id: f.id, geometry: { x: roundToTenth(minX) } };
-      }
-      if (i === sorted.length - 1) {
-        return { id: f.id, geometry: { x: roundToTenth(maxRight - f.width) } };
-      }
-      const newX = currentX;
-      currentX += f.width + gapPerItem;
-      return { id: f.id, geometry: { x: roundToTenth(newX) } };
+      const targetX = minX + cumulativeWidth + i * gapPerItem;
+      cumulativeWidth += f.width;
+      return { id: f.id, geometry: { x: roundToTenth(targetX) } };
     });
   } else {
-    // Sort frames from top to bottom by their center position
-    const sorted = [...frames].sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
-    const minY = Math.min(...sorted.map((f) => f.y));
+    // Sort frames strictly from top to bottom
+    const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
+    if (!sorted[0]) return [];
+    const minY = sorted[0].y;
     const maxBottom = Math.max(...sorted.map((f) => f.y + f.height));
     const totalFramesH = sorted.reduce((sum, f) => sum + f.height, 0);
-    const availableGap = (maxBottom - minY) - totalFramesH;
+    const totalSpan = maxBottom - minY;
+    const availableGap = Math.max(0, totalSpan - totalFramesH);
     const gapPerItem = availableGap / (sorted.length - 1);
 
-    let currentY = minY;
+    let cumulativeHeight = 0;
     return sorted.map((f, i) => {
-      if (i === 0) {
-        currentY = minY + f.height + gapPerItem;
-        return { id: f.id, geometry: { y: roundToTenth(minY) } };
-      }
-      if (i === sorted.length - 1) {
-        return { id: f.id, geometry: { y: roundToTenth(maxBottom - f.height) } };
-      }
-      const newY = currentY;
-      currentY += f.height + gapPerItem;
-      return { id: f.id, geometry: { y: roundToTenth(newY) } };
+      const targetY = minY + cumulativeHeight + i * gapPerItem;
+      cumulativeHeight += f.height;
+      return { id: f.id, geometry: { y: roundToTenth(targetY) } };
     });
   }
 }

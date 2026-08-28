@@ -181,6 +181,15 @@ console.assert(distH[0].geometry.x === 0, 'First frame stays at x=0');
 console.assert(distH[1].geometry.x === 150, `Second frame distributed to x=150, got ${distH[1].geometry.x}`);
 console.assert(distH[2].geometry.x === 300, 'Third frame stays at x=300');
 
+// 9b. Test Distribute Frames with Very Thin / Micro Gap (1.2mm total gap -> 0.6mm gap each)
+const thinFrame1: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 't1', x: 0, y: 50, width: 50, height: 50 };
+const thinFrame2: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 't2', x: 50.2, y: 50, width: 50, height: 50 };
+const thinFrame3: PhotoFrameElement = { ...squareFrameWithWidePhoto, id: 't3', x: 101.2, y: 50, width: 50, height: 50 };
+const distThin = distributeFrames([thinFrame1, thinFrame2, thinFrame3], 'horizontal');
+console.assert(distThin[0].geometry.x === 0, 'First frame stays at x=0');
+console.assert(distThin[1].geometry.x === 50.6, `Second frame distributed with exact 0.6mm gap to x=50.6, got ${distThin[1].geometry.x}`);
+console.assert(distThin[2].geometry.x === 101.2, 'Third frame stays at x=101.2');
+
 // 10. Test Apply Fixed Gap Math
 const fixedGapUpdates = applyFixedGap([dFrame1, dFrame2, dFrame3], 'horizontal', 10);
 console.assert(fixedGapUpdates[0].geometry.x === 0, 'First frame stays at x=0');
