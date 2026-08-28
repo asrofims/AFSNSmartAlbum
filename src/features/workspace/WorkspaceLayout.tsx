@@ -10,7 +10,6 @@ import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { SpreadCanvas } from '../album/SpreadCanvas';
 import { PageNavigator } from '../album/PageNavigator';
-import { AlbumStructurePanel } from '../album/AlbumStructurePanel';
 import styles from './WorkspaceLayout.module.css';
 
 export function WorkspaceLayout() {
@@ -211,7 +210,7 @@ export function WorkspaceLayout() {
             background: 'var(--color-surface)',
           }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.05em' }}>
-              PROPERTIES & STRUCTURE
+              PROJECT PROPERTIES
             </span>
             <button
               type="button"
@@ -236,9 +235,6 @@ export function WorkspaceLayout() {
             </div>
           ) : (
             <div className={styles.propertyList}>
-              {/* Phase 3: Album & Spread Structure Controller */}
-              <AlbumStructurePanel />
-
               {/* Project Overview */}
               <div className={styles.propSection}>
                 <div className={styles.propTitle}>Album Project</div>

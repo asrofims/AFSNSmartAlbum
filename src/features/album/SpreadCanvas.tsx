@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { convertUnit, formatDimensions } from '../../domain/units';
@@ -23,6 +23,24 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
   } = useAlbumStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
+
+  // Dynamically observe container dimensions for responsive full-width layout
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setContainerSize({
+          width: Math.max(400, entry.contentRect.width),
+          height: Math.max(300, entry.contentRect.height),
+        });
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   if (!currentProject || !currentAlbum) return null;
 
@@ -50,24 +68,31 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
   const safeAreaInMm = convertUnit(activeSpread.safeArea, unit, 'mm');
   const pageWInMm = convertUnit(singlePageW, unit, 'mm');
 
-  // Screen view calculation
-  const baseViewportW = 780;
+  // Dynamic responsive canvas scaling (Fills ~88% of container workspace)
+  const maxAvailableW = Math.max(300, containerSize.width - 60);
+  const maxAvailableH = Math.max(200, containerSize.height - 60);
   const aspect = totalSpreadPhysicalW / totalSpreadPhysicalH;
-  const baseViewportH = Math.round(baseViewportW / aspect);
+
+  let baseW = maxAvailableW;
+  let baseH = Math.round(baseW / aspect);
+  if (baseH > maxAvailableH) {
+    baseH = maxAvailableH;
+    baseW = Math.round(baseH * aspect);
+  }
 
   // Zoom scale factor
-  const scale = (zoomLevel / 100);
-  const screenSpreadW = Math.round(baseViewportW * scale);
-  const screenSpreadH = Math.round(baseViewportH * scale);
+  const scale = zoomLevel / 100;
+  const screenSpreadW = Math.round(baseW * scale);
+  const screenSpreadH = Math.round(baseH * scale);
 
-  // Calculate pixel proportions
+  // Calculate pixel proportions for facing pages
   const leftPagePixelW = Math.round((singlePageW / totalSpreadPhysicalW) * screenSpreadW);
   const rightPagePixelW = leftPagePixelW;
   const gutterPixelW = screenSpreadW - leftPagePixelW - rightPagePixelW;
 
-  // Calculate bleed & safe area in pixels relative to page size
-  const bleedPixel = Math.max(2, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
-  const safeAreaPixel = Math.max(6, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
+  // Exact bleed & safe area in pixels (no artificial min clamping, allowing 0.5 cm to be thinner to edge)
+  const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
+  const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
 
   return (
     <div
@@ -118,7 +143,7 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
                   top: `${safeAreaPixel}px`,
                   bottom: `${safeAreaPixel}px`,
                   left: `${safeAreaPixel}px`,
-                  right: `${Math.max(safeAreaPixel, gutterPixelW / 2 + 4)}px`,
+                  right: `${Math.max(safeAreaPixel, gutterPixelW / 2 + 2)}px`,
                 }}
                 title={`Safe Area Margin: ${activeSpread.safeArea} ${unit}`}
               />
@@ -126,7 +151,7 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
 
             {/* Page Number Badge */}
             <div className={`${styles.pageBadge} ${styles.leftBadge}`}>
-              {isCover ? 'Back Cover' : `Page ${activeSpread.leftPage?.pageNumber || 2}`}
+              {isCover ? 'Back Cover' : `Page ${activeSpread.leftPage?.pageNumber ?? 1}`}
             </div>
           </div>
 
@@ -158,7 +183,7 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
                   top: `${safeAreaPixel}px`,
                   bottom: `${safeAreaPixel}px`,
                   right: `${safeAreaPixel}px`,
-                  left: `${Math.max(safeAreaPixel, gutterPixelW / 2 + 4)}px`,
+                  left: `${Math.max(safeAreaPixel, gutterPixelW / 2 + 2)}px`,
                 }}
                 title={`Safe Area Margin: ${activeSpread.safeArea} ${unit}`}
               />
@@ -166,7 +191,7 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
 
             {/* Page Number Badge */}
             <div className={`${styles.pageBadge} ${styles.rightBadge}`}>
-              {isCover ? 'Front Cover' : `Page ${activeSpread.rightPage?.pageNumber || 3}`}
+              {isCover ? 'Front Cover' : `Page ${activeSpread.rightPage?.pageNumber ?? 2}`}
             </div>
           </div>
         </div>

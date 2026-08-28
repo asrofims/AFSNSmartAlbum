@@ -95,10 +95,10 @@ export function createInitialAlbum(project: Project): Album {
     backgroundColor: project.backgroundColor || '#1e293b',
   };
 
-  // 2. Initial Interior Spread (Spread 1: Page 2 & Page 3)
-  const page2: Page = {
-    id: `${albumId}-page-2`,
-    pageNumber: 2,
+  // 2. Initial Interior Spread (Spread 1: Page 1 & Page 2)
+  const page1: Page = {
+    id: `${albumId}-page-1`,
+    pageNumber: 1,
     type: 'left',
     width: pageW,
     height: pageH,
@@ -109,9 +109,9 @@ export function createInitialAlbum(project: Project): Album {
     backgroundType: 'solid',
   };
 
-  const page3: Page = {
-    id: `${albumId}-page-3`,
-    pageNumber: 3,
+  const page2: Page = {
+    id: `${albumId}-page-2`,
+    pageNumber: 2,
     type: 'right',
     width: pageW,
     height: pageH,
@@ -126,9 +126,9 @@ export function createInitialAlbum(project: Project): Album {
     id: `${albumId}-spread-1`,
     spreadIndex: 1,
     type: 'interior',
-    name: 'Spread 1 (Pages 2-3)',
-    leftPage: page2,
-    rightPage: page3,
+    name: 'Spread 1 (Pages 1-2)',
+    leftPage: page1,
+    rightPage: page2,
     gutterWidth: 0,
     gutterUnit: unit,
     bleed: bleedVal,
@@ -142,12 +142,15 @@ export function createInitialAlbum(project: Project): Album {
     coverSpread,
     spreads: [spread1],
     totalSpreads: 2, // Cover + Spread 1
-    totalPages: 4,   // Back Cover, Front Cover, Page 2, Page 3
+    totalPages: 2,   // 2 interior pages (Pages 1-2)
   };
 }
 
 /**
  * Creates a new interior spread with 2 facing pages.
+ * Formula for Spread N:
+ * Left Page = (N - 1) * 2 + 1
+ * Right Page = (N - 1) * 2 + 2
  */
 export function createInteriorSpread(
   album: Album,
@@ -160,7 +163,7 @@ export function createInteriorSpread(
   const marginVal = project.marginValue || 10;
   const bleedVal = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
 
-  const leftPageNum = spreadNumber * 2;
+  const leftPageNum = (spreadNumber - 1) * 2 + 1;
   const rightPageNum = leftPageNum + 1;
   const spreadId = `${album.id}-spread-${Date.now()}`;
 
@@ -206,12 +209,12 @@ export function createInteriorSpread(
 }
 
 /**
- * Recalculates page numbers and names for all interior spreads in sequential order.
+ * Recalculates page numbers and names for all interior spreads in sequential order (1-2, 3-4, 5-6).
  */
 export function recalculateAlbumPageNumbers(album: Album): Album {
   const updatedSpreads = album.spreads.map((spread, idx) => {
     const spreadNum = idx + 1;
-    const leftNum = spreadNum * 2;
+    const leftNum = (spreadNum - 1) * 2 + 1;
     const rightNum = leftNum + 1;
 
     const leftPage: Page | null = spread.leftPage
@@ -231,7 +234,7 @@ export function recalculateAlbumPageNumbers(album: Album): Album {
     };
   });
 
-  const totalPages = 2 + updatedSpreads.length * 2;
+  const totalPages = updatedSpreads.length * 2;
   const totalSpreads = 1 + updatedSpreads.length;
 
   return {

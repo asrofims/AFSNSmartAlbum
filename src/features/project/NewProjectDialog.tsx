@@ -392,9 +392,9 @@ export function NewProjectDialog() {
                       label="Margin Tepi"
                       value={marginValue}
                       onChange={setMarginValue}
-                      min={0}
+                      min={0.1}
                       max={100}
-                      step={0.5}
+                      step={marginUnit === 'inch' ? 0.05 : marginUnit === 'cm' ? 0.1 : 0.5}
                     />
                   </div>
                   <div style={{ width: '90px' }}>
