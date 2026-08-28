@@ -1383,16 +1383,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               visible={!editingCropFrameId}
               rotateEnabled
               keepRatio={true}
-              enabledAnchors={[
-                'top-left',
-                'top-center',
-                'top-right',
-                'middle-right',
-                'bottom-right',
-                'bottom-center',
-                'bottom-left',
-                'middle-left',
-              ]}
+              enabledAnchors={
+                selectedFrameIds.length > 1
+                  ? ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+                  : [
+                      'top-left',
+                      'top-center',
+                      'top-right',
+                      'middle-right',
+                      'bottom-right',
+                      'bottom-center',
+                      'bottom-left',
+                      'middle-left',
+                    ]
+              }
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
@@ -1401,35 +1405,31 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               borderStroke={editingCropFrameId ? '#f59e0b' : '#3b82f6'}
               borderStrokeWidth={1.5}
               borderDash={editingCropFrameId ? [5, 3] : [4, 3]}
+              onTransformStart={() => {
+                const tr = trRef.current;
+                if (!tr) return;
+                const anchor = tr.getActiveAnchor();
+                const isCorner =
+                  !anchor ||
+                  anchor === 'top-left' ||
+                  anchor === 'top-right' ||
+                  anchor === 'bottom-left' ||
+                  anchor === 'bottom-right';
+                tr.keepRatio(isCorner || selectedFrameIds.length > 1);
+              }}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits
                 if (newBox.width < 15 || newBox.height < 15) {
                   return oldBox;
                 }
-
-                const anchor = trRef.current?.getActiveAnchor();
-
-                // Side handles: 1D free stretch (width only or height only)
-                if (anchor === 'middle-right' || anchor === 'middle-left') {
-                  return {
-                    ...newBox,
-                    y: oldBox.y,
-                    height: oldBox.height,
-                  };
-                }
-                if (anchor === 'top-center' || anchor === 'bottom-center') {
-                  return {
-                    ...newBox,
-                    x: oldBox.x,
-                    width: oldBox.width,
-                  };
-                }
-
-                // Corner / diagonal handles: Konva keepRatio={true} locks exact aspect ratio
                 return newBox;
               }}
               onTransformEnd={() => {
                 clearSnapLines();
+                if (trRef.current) {
+                  trRef.current.keepRatio(true);
+                  trRef.current.update();
+                }
               }}
             />
 
