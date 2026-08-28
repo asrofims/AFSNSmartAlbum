@@ -9,10 +9,17 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  max-width: 520px;
+  flex: 1;
+  min-width: 0;
   padding: 2px 0;
   position: relative;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+}
+
+.container::-webkit-scrollbar {
+  display: none;
 }
 
 .tabWrapper {

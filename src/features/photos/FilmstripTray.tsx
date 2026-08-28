@@ -315,7 +315,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
       {/* Top Header Bar */}
       <div className={styles.header}>
-        {/* Left: Title, Counts, Filters, and Folder Collections */}
+        {/* Left: Title, Counts, and Folder Collections */}
         <div className={styles.leftHeader}>
           <span className={styles.title}>PHOTOS</span>
           <span className={styles.countBadge}>{totalCount}</span>
@@ -325,9 +325,15 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
               {/* Folder Collections Tabs */}
               <div className={styles.divider} />
               <FolderTabs />
-              <div className={styles.divider} />
+            </>
+          )}
+        </div>
 
-              {/* Status Filters */}
+        {/* Right: Status Filters (Fixed Right), Search, Sort, Missing Alert, Import Buttons, Toggle */}
+        <div className={styles.rightHeader}>
+          {isOpen && (
+            <>
+              {/* Status Filters (Fixed in Right Section) */}
               <div className={styles.filtersGroup}>
                 <button
                   type="button"
@@ -358,14 +364,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   ★ ({favCount})
                 </button>
               </div>
-            </>
-          )}
-        </div>
 
-        {/* Right: Search, Sort, Missing Alert, Import Buttons, Toggle */}
-        <div className={styles.rightHeader}>
-          {isOpen && (
-            <>
+              <div className={styles.divider} />
+
               {missingCount > 0 && (
                 <button
                   type="button"

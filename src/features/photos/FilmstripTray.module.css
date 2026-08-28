@@ -132,6 +132,7 @@
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+  flex: 1;
   position: relative;
   overflow: visible;
 }
@@ -141,6 +142,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.06em;
   color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .divider {
@@ -155,11 +157,11 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: var(--space-2);
   background-color: var(--color-bg-primary);
   padding: 2px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
 }
 
 .filterBtn {
@@ -173,6 +175,7 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .filterBtn:hover {
@@ -189,6 +192,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .missingAlertBtn {
