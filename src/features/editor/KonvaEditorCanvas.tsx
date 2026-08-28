@@ -9,8 +9,6 @@ import { usePhotoStore } from '../../stores/photoStore';
 import {
   PhotoFrameElement,
   calculateSnapping,
-  calculateResizeSnapping,
-  ResizeSnapResult,
   calculateImageOffset,
   getPhotoAspect,
   clamp,
@@ -44,9 +42,6 @@ function PhotoFrameNode({
   onFrameChange,
   onCropChange,
   onDoubleClick,
-  onTransformSnap,
-  clearSnapLines,
-  unit,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
@@ -54,7 +49,6 @@ function PhotoFrameNode({
   isCropMode: boolean;
   isMultiSelectActive?: boolean;
   scaleFactor: number;
-  unit: string;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -63,11 +57,8 @@ function PhotoFrameNode({
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
-  onTransformSnap?: (x: number, y: number, w: number, h: number) => ResizeSnapResult | null;
-  clearSnapLines?: () => void;
 }) {
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
-  const [liveDimensions, setLiveDimensions] = useState<{ w: number; h: number } | null>(null);
   const shapeRef = useRef<Konva.Group>(null);
 
   // Load preview or thumbnail image
@@ -122,47 +113,6 @@ function PhotoFrameNode({
       stage.container().style.cursor = cursor;
     }
   };
-
-  const assignCustomClientRect = (node: Konva.Group | null) => {
-    if (!node) return;
-    node.getClientRect = (config?: { skipTransform?: boolean; relativeTo?: Konva.Container }) => {
-      const skipTransform = config?.skipTransform;
-      const w = frame.width * scaleFactor;
-      const h = frame.height * scaleFactor;
-
-      if (skipTransform) {
-        return { x: 0, y: 0, width: w, height: h };
-      }
-
-      const transform = node.getTransform();
-      const p1 = transform.point({ x: 0, y: 0 });
-      const p2 = transform.point({ x: w, y: 0 });
-      const p3 = transform.point({ x: w, y: h });
-      const p4 = transform.point({ x: 0, y: h });
-
-      const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
-      const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
-      const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
-      const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
-
-      return {
-        x: node.x() + minX,
-        y: node.y() + minY,
-        width: maxX - minX,
-        height: maxY - minY,
-      };
-    };
-  };
-
-  if (shapeRef.current) {
-    assignCustomClientRect(shapeRef.current);
-  }
-
-  useEffect(() => {
-    if (shapeRef.current) {
-      assignCustomClientRect(shapeRef.current);
-    }
-  });
 
   const isDraggingRef = useRef(false);
 
@@ -232,51 +182,16 @@ function PhotoFrameNode({
         }, 50);
         onDragEnd(e);
       }}
-      onTransform={() => {
-        const node = shapeRef.current;
-        if (!node) return;
-        const scaleX = Math.abs(node.scaleX());
-        const scaleY = Math.abs(node.scaleY());
-        let rawW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        let rawH = Math.max(2, (node.height() * scaleY) / scaleFactor);
-        const physicalX = node.x() / scaleFactor;
-        const physicalY = node.y() / scaleFactor;
-
-        if (onTransformSnap && !isMultiSelectActive) {
-          const snapRes = onTransformSnap(physicalX, physicalY, rawW, rawH);
-          if (snapRes) {
-            rawW = snapRes.snappedBounds.width;
-            rawH = snapRes.snappedBounds.height;
-          }
-        }
-
-        setLiveDimensions({
-          w: Math.round(rawW * 10) / 10,
-          h: Math.round(rawH * 10) / 10,
-        });
-      }}
       onTransformEnd={() => {
         const node = shapeRef.current;
-        setLiveDimensions(null);
-        clearSnapLines?.();
         if (!node) return;
 
         const scaleX = Math.abs(node.scaleX());
         const scaleY = Math.abs(node.scaleY());
-        let newW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        let newH = Math.max(2, (node.height() * scaleY) / scaleFactor);
-        const physicalX = node.x() / scaleFactor;
-        const physicalY = node.y() / scaleFactor;
+        const newW = Math.max(5, (node.width() * scaleX) / scaleFactor);
+        const newH = Math.max(5, (node.height() * scaleY) / scaleFactor);
 
-        if (onTransformSnap && !isMultiSelectActive) {
-          const snapRes = onTransformSnap(physicalX, physicalY, newW, newH);
-          if (snapRes) {
-            newW = snapRes.snappedBounds.width;
-            newH = snapRes.snappedBounds.height;
-          }
-        }
-
-        // Reset node scale and update width/height
+        // Reset scale and update geometry
         node.scaleX(1);
         node.scaleY(1);
 
@@ -446,33 +361,6 @@ function PhotoFrameNode({
         </Group>
       )}
 
-      {/* Real-time Dynamic Dimension Badge during resize */}
-      {liveDimensions && (
-        <Group y={-26} x={Math.max(0, (pixelW - 110) / 2)} listening={false}>
-          <Rect
-            x={0}
-            y={0}
-            width={110}
-            height={20}
-            fill="rgba(15, 23, 42, 0.94)"
-            cornerRadius={4}
-            stroke="#3b82f6"
-            strokeWidth={1}
-            shadowColor="rgba(0,0,0,0.6)"
-            shadowBlur={8}
-          />
-          <KonvaText
-            text={`${liveDimensions.w} × ${liveDimensions.h} ${unit}`}
-            fill="#38bdf8"
-            fontSize={11}
-            fontStyle="bold"
-            fontFamily="sans-serif"
-            padding={4}
-            width={110}
-            align="center"
-          />
-        </Group>
-      )}
     </Group>
   );
 }
@@ -1316,7 +1204,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   isCropMode={isCrop}
                   isMultiSelectActive={isMultiSelected}
                   scaleFactor={scaleFactor}
-                  unit={unit}
                   onSelect={(e) => {
                     if (e) {
                       e.cancelBubble = true;
@@ -1367,32 +1254,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   onContextMenu={(e) => {
                     setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
                   }}
-                  onTransformSnap={(x, y, w, h) => {
-                    if (!snapEnabled) return null;
-                    const otherRects = (activeSpread.elements || [])
-                      .filter((f) => f.id !== frame.id)
-                      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
-
-                    const res = calculateResizeSnapping(
-                      { x, y, width: w, height: h },
-                      totalSpreadPhysicalW,
-                      totalSpreadPhysicalH,
-                      activeSpread.safeArea,
-                      gutterPhysicalW,
-                      otherRects,
-                      thresholdUnits,
-                      unit
-                    );
-
-                    if (res.snapLines.length > 0 || res.gapGuides.length > 0) {
-                      setSnapLines(res.snapLines, res.gapGuides);
-                    } else {
-                      clearSnapLines();
-                    }
-                    return res;
-                  }}
-                  clearSnapLines={clearSnapLines}
                   onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
                   onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
                   onDoubleClick={() => enterCropMode(frame.id)}
@@ -1521,22 +1382,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               ref={trRef}
               visible={!editingCropFrameId}
               rotateEnabled
-              keepRatio={selectedFrameIds.length > 1}
-              shiftBehavior="inverted"
-              enabledAnchors={
-                selectedFrameIds.length > 1
-                  ? ['top-left', 'top-right', 'bottom-right', 'bottom-left']
-                  : [
-                      'top-left',
-                      'top-center',
-                      'top-right',
-                      'middle-right',
-                      'bottom-right',
-                      'bottom-center',
-                      'bottom-left',
-                      'middle-left',
-                    ]
-              }
+              keepRatio={true}
+              enabledAnchors={[
+                'top-left',
+                'top-center',
+                'top-right',
+                'middle-right',
+                'bottom-right',
+                'bottom-center',
+                'bottom-left',
+                'middle-left',
+              ]}
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
@@ -1551,44 +1407,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   return oldBox;
                 }
 
-                if (snapEnabled && selectedFrameIds.length === 1) {
-                  const selectedId = selectedFrameIds[0];
-                  const otherRects = (activeSpread.elements || [])
-                    .filter((f) => f.id !== selectedId)
-                    .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-                  const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+                const anchor = trRef.current?.getActiveAnchor();
 
-                  const physicalX = newBox.x / scaleFactor;
-                  const physicalY = newBox.y / scaleFactor;
-                  const physicalW = newBox.width / scaleFactor;
-                  const physicalH = newBox.height / scaleFactor;
-
-                  const snapRes = calculateResizeSnapping(
-                    { x: physicalX, y: physicalY, width: physicalW, height: physicalH },
-                    totalSpreadPhysicalW,
-                    totalSpreadPhysicalH,
-                    activeSpread.safeArea,
-                    gutterPhysicalW,
-                    otherRects,
-                    thresholdUnits,
-                    unit
-                  );
-
-                  if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
-                    setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-                  } else {
-                    clearSnapLines();
-                  }
-
+                // Side handles: 1D free stretch (width only or height only)
+                if (anchor === 'middle-right' || anchor === 'middle-left') {
                   return {
                     ...newBox,
-                    x: snapRes.snappedBounds.x * scaleFactor,
-                    y: snapRes.snappedBounds.y * scaleFactor,
-                    width: snapRes.snappedBounds.width * scaleFactor,
-                    height: snapRes.snappedBounds.height * scaleFactor,
+                    y: oldBox.y,
+                    height: oldBox.height,
+                  };
+                }
+                if (anchor === 'top-center' || anchor === 'bottom-center') {
+                  return {
+                    ...newBox,
+                    x: oldBox.x,
+                    width: oldBox.width,
                   };
                 }
 
+                // Corner / diagonal handles: Konva keepRatio={true} locks exact aspect ratio
                 return newBox;
               }}
               onTransformEnd={() => {
