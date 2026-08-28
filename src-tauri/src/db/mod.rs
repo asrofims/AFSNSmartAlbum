@@ -11,23 +11,22 @@ pub struct ProjectRow {
     pub name: String,
     pub canvas_width: f64,
     pub canvas_height: f64,
-    pub unit: String,
-    pub dpi: i32,
+    pub canvas_unit: String,
+    pub canvas_dpi: i32,
     pub spacing_value: f64,
     pub spacing_unit: String,
     pub margin_enabled: bool,
     pub margin_value: f64,
     pub margin_unit: String,
     pub border_enabled: bool,
-    pub border_width_value: f64,
-    pub border_width_unit: String,
+    pub border_width: f64,
+    pub border_unit: String,
     pub border_color: String,
     pub background_type: String,
     pub background_color: String,
-    pub background_image_path: Option<String>,
+    pub file_path: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub last_opened_at: Option<String>,
 }
 
 /// Represents a photo record from SQLite.
@@ -176,23 +175,21 @@ impl Database {
                 name TEXT NOT NULL,
                 canvas_width REAL NOT NULL,
                 canvas_height REAL NOT NULL,
-                unit TEXT NOT NULL,
-                dpi INTEGER NOT NULL,
+                canvas_unit TEXT NOT NULL,
+                canvas_dpi INTEGER NOT NULL,
                 spacing_value REAL NOT NULL,
                 spacing_unit TEXT NOT NULL,
                 border_enabled INTEGER NOT NULL DEFAULT 0,
-                border_width_value REAL NOT NULL DEFAULT 0.0,
-                border_width_unit TEXT NOT NULL DEFAULT 'mm',
+                border_width REAL NOT NULL DEFAULT 0.0,
+                border_unit TEXT NOT NULL DEFAULT 'mm',
                 border_color TEXT NOT NULL DEFAULT '#000000',
                 background_type TEXT NOT NULL DEFAULT 'solid',
                 background_color TEXT NOT NULL DEFAULT '#FFFFFF',
-                background_image_path TEXT,
+                file_path TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                last_opened_at TEXT
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE INDEX IF NOT EXISTS idx_projects_last_opened ON projects(last_opened_at DESC);
             CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
 
             INSERT INTO schema_version (version) VALUES (2);
@@ -347,19 +344,19 @@ impl Database {
             log::warn!("Project {} not found in SQLite DB; creating entry to satisfy foreign keys", id);
             conn.execute(
                 "INSERT OR IGNORE INTO projects (
-                    id, name, canvas_width, canvas_height, unit, dpi,
+                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
-                    border_enabled, border_width_value, border_width_unit, border_color,
+                    border_enabled, border_width, border_unit, border_color,
                     background_type, background_color,
-                    created_at, updated_at, last_opened_at
+                    created_at, updated_at
                 ) VALUES (
                     ?1, ?2, 200.0, 200.0, 'mm', 300,
                     2.0, 'mm',
                     1, 10.0, 'mm',
                     0, 0.0, 'mm', '#000000',
                     'solid', '#FFFFFF',
-                    datetime('now'), datetime('now'), datetime('now')
+                    datetime('now'), datetime('now')
                 )",
                 rusqlite::params![id, name],
             )?;
@@ -373,16 +370,16 @@ impl Database {
         name: &str,
         canvas_width: f64,
         canvas_height: f64,
-        unit: &str,
-        dpi: i32,
+        canvas_unit: &str,
+        canvas_dpi: i32,
         spacing_value: f64,
         spacing_unit: &str,
         margin_enabled: bool,
         margin_value: f64,
         margin_unit: &str,
         border_enabled: bool,
-        border_width_value: f64,
-        border_width_unit: &str,
+        border_width: f64,
+        border_unit: &str,
         border_color: &str,
         background_type: &str,
         background_color: &str,
@@ -390,25 +387,25 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO projects (
-                id, name, canvas_width, canvas_height, unit, dpi,
+                id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                 spacing_value, spacing_unit,
                 margin_enabled, margin_value, margin_unit,
-                border_enabled, border_width_value, border_width_unit, border_color,
+                border_enabled, border_width, border_unit, border_color,
                 background_type, background_color,
-                created_at, updated_at, last_opened_at
+                created_at, updated_at
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6,
                 ?7, ?8,
                 ?9, ?10, ?11,
                 ?12, ?13, ?14, ?15,
                 ?16, ?17,
-                datetime('now'), datetime('now'), datetime('now')
+                datetime('now'), datetime('now')
             )",
             rusqlite::params![
-                id, name, canvas_width, canvas_height, unit, dpi,
+                id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                 spacing_value, spacing_unit,
                 margin_enabled as i32, margin_value, margin_unit,
-                border_enabled as i32, border_width_value, border_width_unit, border_color,
+                border_enabled as i32, border_width, border_unit, border_color,
                 background_type, background_color,
             ],
         )?;
@@ -418,12 +415,12 @@ impl Database {
     pub fn get_project(&self, id: &str) -> SqliteResult<Option<ProjectRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, canvas_width, canvas_height, unit, dpi,
+            "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
-                    border_enabled, border_width_value, border_width_unit, border_color,
-                    background_type, background_color, background_image_path,
-                    created_at, updated_at, last_opened_at
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, file_path,
+                    created_at, updated_at
              FROM projects WHERE id = ?1",
         )?;
 
@@ -436,23 +433,22 @@ impl Database {
                 name: row.get(1)?,
                 canvas_width: row.get(2)?,
                 canvas_height: row.get(3)?,
-                unit: row.get(4)?,
-                dpi: row.get(5)?,
+                canvas_unit: row.get(4)?,
+                canvas_dpi: row.get(5)?,
                 spacing_value: row.get(6)?,
                 spacing_unit: row.get(7)?,
                 margin_enabled: margin_enabled_int != 0,
                 margin_value: row.get(9)?,
                 margin_unit: row.get(10)?,
                 border_enabled: border_enabled_int != 0,
-                border_width_value: row.get(12)?,
-                border_width_unit: row.get(13)?,
+                border_width: row.get(12)?,
+                border_unit: row.get(13)?,
                 border_color: row.get(14)?,
                 background_type: row.get(15)?,
                 background_color: row.get(16)?,
-                background_image_path: row.get(17)?,
+                file_path: row.get(17)?,
                 created_at: row.get(18)?,
                 updated_at: row.get(19)?,
-                last_opened_at: row.get(20)?,
             }))
         } else {
             Ok(None)
@@ -462,14 +458,14 @@ impl Database {
     pub fn list_recent_projects(&self, limit: i32) -> SqliteResult<Vec<ProjectRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, canvas_width, canvas_height, unit, dpi,
+            "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
-                    border_enabled, border_width_value, border_width_unit, border_color,
-                    background_type, background_color, background_image_path,
-                    created_at, updated_at, last_opened_at
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, file_path,
+                    created_at, updated_at
              FROM projects
-             ORDER BY COALESCE(last_opened_at, updated_at) DESC
+             ORDER BY updated_at DESC
              LIMIT ?1",
         )?;
 
@@ -481,23 +477,22 @@ impl Database {
                 name: row.get(1)?,
                 canvas_width: row.get(2)?,
                 canvas_height: row.get(3)?,
-                unit: row.get(4)?,
-                dpi: row.get(5)?,
+                canvas_unit: row.get(4)?,
+                canvas_dpi: row.get(5)?,
                 spacing_value: row.get(6)?,
                 spacing_unit: row.get(7)?,
                 margin_enabled: margin_enabled_int != 0,
                 margin_value: row.get(9)?,
                 margin_unit: row.get(10)?,
                 border_enabled: border_enabled_int != 0,
-                border_width_value: row.get(12)?,
-                border_width_unit: row.get(13)?,
+                border_width: row.get(12)?,
+                border_unit: row.get(13)?,
                 border_color: row.get(14)?,
                 background_type: row.get(15)?,
                 background_color: row.get(16)?,
-                background_image_path: row.get(17)?,
+                file_path: row.get(17)?,
                 created_at: row.get(18)?,
                 updated_at: row.get(19)?,
-                last_opened_at: row.get(20)?,
             })
         })?;
 
@@ -882,6 +877,27 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_inspect_actual_db() {
+        if let Ok(app_data_str) = std::env::var("APPDATA") {
+            let app_data = PathBuf::from(app_data_str).join("com.afsn.smartalbum").join("afsn_smart_album.db");
+            if app_data.exists() {
+                let conn = rusqlite::Connection::open(&app_data).unwrap();
+                let mut stmt = conn.prepare("PRAGMA table_info(projects)").unwrap();
+                let cols = stmt.query_map([], |row| {
+                    let name: String = row.get(1)?;
+                    let col_type: String = row.get(2)?;
+                    Ok(format!("{}: {}", name, col_type))
+                }).unwrap();
+                println!("=== ACTUAL DB PRAGMA table_info(projects) ===");
+                for c in cols {
+                    println!("COL: {}", c.unwrap());
+                }
+                println!("=============================================");
+            }
+        }
+    }
 
     #[test]
     fn test_project_crud() {
