@@ -242,7 +242,7 @@ function PhotoFrameNode({
         const physicalX = node.x() / scaleFactor;
         const physicalY = node.y() / scaleFactor;
 
-        if (onTransformSnap) {
+        if (onTransformSnap && !isMultiSelectActive) {
           const snapRes = onTransformSnap(physicalX, physicalY, rawW, rawH);
           if (snapRes) {
             rawW = snapRes.snappedBounds.width;
@@ -268,7 +268,7 @@ function PhotoFrameNode({
         const physicalX = node.x() / scaleFactor;
         const physicalY = node.y() / scaleFactor;
 
-        if (onTransformSnap) {
+        if (onTransformSnap && !isMultiSelectActive) {
           const snapRes = onTransformSnap(physicalX, physicalY, newW, newH);
           if (snapRes) {
             newW = snapRes.snappedBounds.width;
@@ -1521,17 +1521,22 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               ref={trRef}
               visible={!editingCropFrameId}
               rotateEnabled
-              keepRatio={false}
-              enabledAnchors={[
-                'top-left',
-                'top-center',
-                'top-right',
-                'middle-right',
-                'bottom-right',
-                'bottom-center',
-                'bottom-left',
-                'middle-left',
-              ]}
+              keepRatio={selectedFrameIds.length > 1}
+              shiftBehavior="inverted"
+              enabledAnchors={
+                selectedFrameIds.length > 1
+                  ? ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+                  : [
+                      'top-left',
+                      'top-center',
+                      'top-right',
+                      'middle-right',
+                      'bottom-right',
+                      'bottom-center',
+                      'bottom-left',
+                      'middle-left',
+                    ]
+              }
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
