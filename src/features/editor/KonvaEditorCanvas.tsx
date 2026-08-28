@@ -63,7 +63,15 @@ function PhotoFrameNode({
     const img = new window.Image();
     img.crossOrigin = 'Anonymous';
     img.src = convertFileSrc(imgPath);
-    img.onload = () => setImageObj(img);
+    img.onload = () => {
+      setImageObj(img);
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        const aspect = Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000;
+        if (!frame.photoAspect || Math.abs(frame.photoAspect - aspect) > 0.01) {
+          onFrameChange({ photoAspect: aspect });
+        }
+      }
+    };
   }, [frame.previewPath, frame.thumbnailPath, frame.filePath]);
 
   // Convert physical geometry (mm/cm) to screen pixels (px)
@@ -72,8 +80,8 @@ function PhotoFrameNode({
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
 
-  // Real natural photo aspect ratio
-  const naturalAspect = imageObj && imageObj.naturalWidth && imageObj.naturalHeight
+  // Real natural photo aspect ratio from loaded image
+  const naturalAspect = (imageObj && imageObj.naturalWidth > 0 && imageObj.naturalHeight > 0)
     ? imageObj.naturalWidth / imageObj.naturalHeight
     : getPhotoAspect(frame);
 
@@ -83,7 +91,7 @@ function PhotoFrameNode({
       frame.width,
       frame.height,
       naturalAspect,
-      frame.cropScale || 1.0,
+      Math.max(1.0, frame.cropScale || 1.0),
       frame.cropX || 0,
       frame.cropY || 0
     );
@@ -100,6 +108,47 @@ function PhotoFrameNode({
     }
   };
 
+  const assignCustomClientRect = (node: Konva.Group | null) => {
+    if (!node) return;
+    node.getClientRect = (config?: { skipTransform?: boolean; relativeTo?: Konva.Container }) => {
+      const skipTransform = config?.skipTransform;
+      const w = frame.width * scaleFactor;
+      const h = frame.height * scaleFactor;
+
+      if (skipTransform) {
+        return { x: 0, y: 0, width: w, height: h };
+      }
+
+      const transform = node.getTransform();
+      const p1 = transform.point({ x: 0, y: 0 });
+      const p2 = transform.point({ x: w, y: 0 });
+      const p3 = transform.point({ x: w, y: h });
+      const p4 = transform.point({ x: 0, y: h });
+
+      const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
+      const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
+      const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
+      const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+
+      return {
+        x: node.x() + minX,
+        y: node.y() + minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    };
+  };
+
+  if (shapeRef.current) {
+    assignCustomClientRect(shapeRef.current);
+  }
+
+  useEffect(() => {
+    if (shapeRef.current) {
+      assignCustomClientRect(shapeRef.current);
+    }
+  });
+
   return (
     <Group
       id={frame.id}
@@ -109,10 +158,6 @@ function PhotoFrameNode({
       width={pixelW}
       height={pixelH}
       rotation={frame.rotation || 0}
-      clipX={isCropMode ? undefined : 0}
-      clipY={isCropMode ? undefined : 0}
-      clipWidth={isCropMode ? undefined : pixelW}
-      clipHeight={isCropMode ? undefined : pixelH}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
       draggable={!isCropMode}
@@ -424,6 +469,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         .filter(Boolean) as Konva.Node[];
 
       trRef.current.nodes(selectedNodes);
+      trRef.current.update();
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     } else {
@@ -431,7 +477,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements]);
+  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
