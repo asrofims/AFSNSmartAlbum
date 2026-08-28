@@ -175,24 +175,24 @@
 }
 
 .addFolderBtn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  height: 28px;
-  padding: 0 10px;
-  background-color: rgba(255, 255, 255, 0.03);
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  white-space: nowrap;
   transition: all var(--transition-fast);
   flex-shrink: 0;
 }
 
 .addFolderBtn:hover {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: rgba(59, 130, 246, 0.15);
   border-color: var(--color-accent);
   color: var(--color-accent);
+  transform: scale(1.05);
 }

@@ -329,43 +329,42 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           )}
         </div>
 
-        {/* Right: Status Filters (Fixed Right), Search, Sort, Missing Alert, Import Buttons, Toggle */}
+        {/* Right: Status Filters Dropdown, Sort, Search, Missing Alert, Import Buttons, Toggle */}
         <div className={styles.rightHeader}>
           {isOpen && (
             <>
-              {/* Status Filters (Fixed in Right Section) */}
-              <div className={styles.filtersGroup}>
-                <button
-                  type="button"
-                  className={`${styles.filterBtn} ${filter === 'all' ? styles.active : ''}`}
-                  onClick={() => setFilter('all')}
-                >
-                  All ({totalCount})
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.filterBtn} ${filter === 'unused' ? styles.active : ''}`}
-                  onClick={() => setFilter('unused')}
-                >
-                  Unused ({unusedCount})
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.filterBtn} ${filter === 'used' ? styles.active : ''}`}
-                  onClick={() => setFilter('used')}
-                >
-                  Used ({usedCount})
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.filterBtn} ${filter === 'favorites' ? styles.active : ''}`}
-                  onClick={() => setFilter('favorites')}
-                >
-                  ★ ({favCount})
-                </button>
-              </div>
+              {/* Status Filters Dropdown */}
+              <select
+                className={styles.filterSelect}
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as any)}
+                title="Filter photos by status"
+              >
+                <option value="all">Filter: All ({totalCount})</option>
+                <option value="unused">Filter: Unused ({unusedCount})</option>
+                <option value="used">Filter: Used ({usedCount})</option>
+                <option value="favorites">Filter: Favorites ({favCount})</option>
+              </select>
 
-              <div className={styles.divider} />
+              {/* Sort Dropdown */}
+              <select
+                className={styles.sortSelect}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as PhotoSortBy)}
+                title="Sort photos by"
+              >
+                <option value="name">Sort: Name</option>
+                <option value="date">Sort: Date</option>
+                <option value="size">Sort: Size</option>
+              </select>
+
+              <input
+                type="text"
+                placeholder="Search photos..."
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
 
               {missingCount > 0 && (
                 <button
@@ -377,25 +376,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   ⚠️ {missingCount} Missing (Relink)
                 </button>
               )}
-
-              <input
-                type="text"
-                placeholder="Search photos..."
-                className={styles.searchInput}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-
-              <select
-                className={styles.sortSelect}
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as PhotoSortBy)}
-                title="Sort photos by"
-              >
-                <option value="name">Sort: Name</option>
-                <option value="date">Sort: Date</option>
-                <option value="size">Sort: Size</option>
-              </select>
 
               <Button
                 variant="secondary"

@@ -153,39 +153,30 @@
   flex-shrink: 0;
 }
 
-.filtersGroup {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+.filterSelect,
+.sortSelect {
   background-color: var(--color-bg-primary);
-  padding: 2px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-subtle);
-  flex-shrink: 0;
-}
-
-.filterBtn {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 11px;
-  font-weight: var(--font-weight-medium);
   padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  outline: none;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-  flex-shrink: 0;
+  height: 28px;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 
-.filterBtn:hover {
+.filterSelect:hover,
+.sortSelect:hover {
+  border-color: var(--color-border-hover);
   color: var(--color-text-primary);
 }
 
-.filterBtn.active {
-  background-color: var(--color-surface);
-  color: var(--color-accent);
-  box-shadow: var(--shadow-sm);
+.filterSelect:focus,
+.sortSelect:focus {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 .rightHeader {
@@ -221,6 +212,7 @@
   padding: 3px 8px;
   border-radius: var(--radius-md);
   width: 120px;
+  height: 28px;
   outline: none;
   transition: border-color var(--transition-fast), width var(--transition-fast);
 }
@@ -228,17 +220,6 @@
 .searchInput:focus {
   border-color: var(--color-accent);
   width: 160px;
-}
-
-.sortSelect {
-  background-color: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  padding: 3px 6px;
-  border-radius: var(--radius-md);
-  outline: none;
-  cursor: pointer;
 }
 
 .toggleBtn {
