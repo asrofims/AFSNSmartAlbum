@@ -1522,6 +1522,60 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   multiTransformInitialStateRef.current = null;
                 }
               }}
+              onTransform={() => {
+                if (selectedFrameIds.length <= 1 || !multiTransformInitialStateRef.current || !activeSpread) {
+                  return;
+                }
+
+                const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
+                const selectedNodes = selectedFrameIds
+                  .map((id) => stageRef.current?.findOne(`#${id}`))
+                  .filter(Boolean) as Konva.Node[];
+
+                if (selectedNodes.length === 0) return;
+
+                // Compute current live transformed pixel bounds across all nodes
+                const pixelBoxes = selectedNodes.map((n) => {
+                  const sx = Math.abs(n.scaleX());
+                  const sy = Math.abs(n.scaleY());
+                  return {
+                    x: n.x(),
+                    y: n.y(),
+                    width: n.width() * sx,
+                    height: n.height() * sy,
+                  };
+                });
+
+                const minPxX = Math.min(...pixelBoxes.map((b) => b.x));
+                const minPxY = Math.min(...pixelBoxes.map((b) => b.y));
+                const maxPxX = Math.max(...pixelBoxes.map((b) => b.x + b.width));
+                const maxPxY = Math.max(...pixelBoxes.map((b) => b.y + b.height));
+
+                const currentGroupBounds: RectBounds = {
+                  x: minPxX / scaleFactor,
+                  y: minPxY / scaleFactor,
+                  width: (maxPxX - minPxX) / scaleFactor,
+                  height: (maxPxY - minPxY) / scaleFactor,
+                };
+
+                // Real-time calculation with strictly preserved gaps and aspect ratio
+                const updates = calculateMultiFrameResize(initialFrames, initialBounds, currentGroupBounds);
+
+                updates.forEach((u) => {
+                  const node = stageRef.current?.findOne(`#${u.id}`) as Konva.Group | undefined;
+                  const initialFrame = initialFrames.find((f) => f.id === u.id);
+                  if (!node || !u.geometry || !initialFrame) return;
+
+                  if (u.geometry.x !== undefined) node.x(u.geometry.x * scaleFactor);
+                  if (u.geometry.y !== undefined) node.y(u.geometry.y * scaleFactor);
+
+                  if (u.geometry.width !== undefined && initialFrame.width > 0) {
+                    const liveScale = u.geometry.width / initialFrame.width;
+                    node.scaleX(liveScale);
+                    node.scaleY(liveScale);
+                  }
+                });
+              }}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits (allow tiny micro sizes down to 4px)
                 if (newBox.width < 4 || newBox.height < 4) {
