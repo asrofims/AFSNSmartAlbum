@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { PhotoFolder } from '../../domain/photo';
@@ -20,6 +20,12 @@ export function FolderTabs() {
 
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [menuOpenFolderId, setMenuOpenFolderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setMenuOpenFolderId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   if (!currentProject) return null;
 
@@ -68,7 +74,8 @@ export function FolderTabs() {
       <button
         type="button"
         className={`${styles.tab} ${activeFolderId === null ? styles.tabActive : ''}`}
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           setActiveFolder(null);
           setMenuOpenFolderId(null);
         }}
@@ -96,7 +103,8 @@ export function FolderTabs() {
             <button
               type="button"
               className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setActiveFolder(folder.id);
                 setMenuOpenFolderId(null);
               }}
@@ -122,7 +130,7 @@ export function FolderTabs() {
 
             {/* Dropdown Menu */}
             {isMenuOpen && (
-              <div className={styles.dropdownMenu}>
+              <div className={styles.dropdownMenu} onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   className={styles.menuItem}
@@ -147,7 +155,10 @@ export function FolderTabs() {
       <button
         type="button"
         className={styles.addFolderBtn}
-        onClick={openCreateFolderDialog}
+        onClick={(e) => {
+          e.stopPropagation();
+          openCreateFolderDialog();
+        }}
         title="Create a new photo folder / collection"
       >
         <span>+ Folder</span>

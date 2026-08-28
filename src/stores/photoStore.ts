@@ -104,8 +104,15 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const unlistenItem = await listen<Photo>('photo-imported', (event) => {
         const item = event.payload;
         set((s) => {
-          if (s.photos.some((p) => p.id === item.id)) return s;
-          return { photos: [...s.photos, item] };
+          const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
+          const nextFolderPhotoIds = { ...s.folderPhotoIds };
+          if (s.activeFolderId) {
+            const currentFolderIds = nextFolderPhotoIds[s.activeFolderId] || [];
+            if (!currentFolderIds.includes(item.id)) {
+              nextFolderPhotoIds[s.activeFolderId] = [...currentFolderIds, item.id];
+            }
+          }
+          return { photos: nextPhotos, folderPhotoIds: nextFolderPhotoIds };
         });
       });
 
@@ -129,7 +136,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const { invoke } = await import('@tauri-apps/api/core');
       const photos = await invoke<Photo[]>('get_project_photos', { projectId });
       set({ photos: photos || [], error: null });
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.warn('[AFSN] loadPhotos fallback or error:', err);
     }
@@ -139,12 +146,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set({ error: null, isCancelling: false });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || undefined;
+      const folderId = get().activeFolderId || null;
       const updatedPhotos = await invoke<Photo[]>('select_and_import_files', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
       }
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] select_and_import_files error:', err);
       set({ error: String(err) });
@@ -157,12 +164,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set({ error: null, isCancelling: false });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || undefined;
+      const folderId = get().activeFolderId || null;
       const updatedPhotos = await invoke<Photo[]>('select_and_import_folder', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
       }
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] select_and_import_folder error:', err);
       set({ error: String(err) });
@@ -176,12 +183,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set({ error: null, isCancelling: false });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || undefined;
+      const folderId = get().activeFolderId || null;
       const updatedPhotos = await invoke<Photo[]>('import_file_paths', { projectId, paths, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
       }
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] import_file_paths error:', err);
       set({ error: String(err) });
@@ -314,10 +321,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('batch_delete_photos', { photoIds: selectedPhotoIds });
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] batch_delete_photos error:', err);
-      get().loadPhotos(projectId);
+      await get().loadPhotos(projectId);
     }
   },
 
@@ -373,13 +380,15 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
           folderPhotoIds: { ...s.folderPhotoIds, [newFolder.id]: [] },
           activeFolderId: newFolder.id,
           isFolderDialogOpen: false,
+          folderDialogTarget: null,
         }));
+        await get().loadFolders(projectId);
         return newFolder;
       }
       return null;
     } catch (err) {
       console.error('[AFSN] create_photo_folder error:', err);
-      return null;
+      throw err;
     }
   },
 
@@ -393,9 +402,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         isFolderDialogOpen: false,
         folderDialogTarget: null,
       }));
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] rename_photo_folder error:', err);
+      throw err;
     }
   },
 
@@ -412,7 +422,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
           activeFolderId: s.activeFolderId === folderId ? null : s.activeFolderId,
         };
       });
-      get().loadFolders(projectId);
+      await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] delete_photo_folder error:', err);
     }

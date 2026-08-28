@@ -18,6 +18,7 @@ export function FolderDialog() {
 
   const [folderName, setFolderName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isFolderDialogOpen) {
@@ -27,6 +28,7 @@ export function FolderDialog() {
         setFolderName('');
       }
       setError(null);
+      setIsSubmitting(false);
     }
   }, [isFolderDialogOpen, folderDialogMode, folderDialogTarget]);
 
@@ -34,16 +36,25 @@ export function FolderDialog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const trimmed = folderName.trim();
     if (!trimmed) {
       setError('Folder name cannot be empty');
       return;
     }
 
-    if (folderDialogMode === 'create') {
-      await createFolder(currentProject.id, trimmed);
-    } else if (folderDialogMode === 'rename' && folderDialogTarget) {
-      await renameFolder(currentProject.id, folderDialogTarget.id, trimmed);
+    setIsSubmitting(true);
+    try {
+      if (folderDialogMode === 'create') {
+        await createFolder(currentProject.id, trimmed);
+      } else if (folderDialogMode === 'rename' && folderDialogTarget) {
+        await renameFolder(currentProject.id, folderDialogTarget.id, trimmed);
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -69,17 +80,22 @@ export function FolderDialog() {
               setFolderName(e.target.value);
               if (error) setError(null);
             }}
+            disabled={isSubmitting}
             autoFocus
           />
         </label>
         {error && <span className={styles.errorText}>{error}</span>}
 
         <div className={styles.footerBtns}>
-          <Button variant="ghost" onClick={closeFolderDialog}>
+          <Button type="button" variant="ghost" onClick={closeFolderDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit}>
-            {folderDialogMode === 'create' ? 'Create Folder' : 'Save Changes'}
+          <Button type="submit" variant="primary" disabled={isSubmitting || !folderName.trim()}>
+            {isSubmitting
+              ? 'Saving...'
+              : folderDialogMode === 'create'
+              ? 'Create Folder'
+              : 'Save Changes'}
           </Button>
         </div>
       </form>

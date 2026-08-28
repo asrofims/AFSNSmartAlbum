@@ -243,10 +243,14 @@ async fn import_paths_internal(
     .await
     .map_err(|e| e.to_string())?;
 
+    let db_final = app.state::<Database>();
+
     // If a folder_id was specified, link all imported photos to that folder
     if let Some(fid) = folder_id {
         let imported_ids: Vec<String> = imported_rows.iter().map(|p| p.id.clone()).collect();
-        let _ = db.add_photos_to_folder(&fid, &imported_ids);
+        if !imported_ids.is_empty() {
+            let _ = db_final.add_photos_to_folder(&fid, &imported_ids);
+        }
     }
 
     let is_cancelled = cancel_flag.load(Ordering::Relaxed);
@@ -265,7 +269,6 @@ async fn import_paths_internal(
         }),
     );
 
-    let db_final = app.state::<Database>();
     db_final.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
 
@@ -382,6 +385,7 @@ pub fn create_photo_folder(
     name: String,
 ) -> Result<PhotoFolderRow, String> {
     let folder_id = Uuid::new_v4().to_string();
+    log::info!("Creating photo folder '{}' (id: {}) for project {}", name, folder_id, project_id);
     db.create_folder(&folder_id, &project_id, &name).map_err(|e| e.to_string())
 }
 
