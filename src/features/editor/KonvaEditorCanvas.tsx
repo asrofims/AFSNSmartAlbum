@@ -356,16 +356,21 @@ function PhotoFrameNode({
         )}
       </Group>
 
-      {/* Frame Border */}
-      {frame.borderEnabled && (
-        <Rect
-          width={pixelW}
-          height={pixelH}
-          stroke={frame.borderColor || '#FFFFFF'}
-          strokeWidth={Math.max(1, (frame.borderWidth || 1) * (scaleFactor / 10))}
-          listening={false}
-        />
-      )}
+      {/* Frame Border (Inside Stroke to maintain exact outer bounds for snapping) */}
+      {frame.borderEnabled && (() => {
+        const strokePx = Math.max(1, (frame.borderWidth || 1) * (scaleFactor / 10));
+        return (
+          <Rect
+            x={strokePx / 2}
+            y={strokePx / 2}
+            width={Math.max(0, pixelW - strokePx)}
+            height={Math.max(0, pixelH - strokePx)}
+            stroke={frame.borderColor || '#FFFFFF'}
+            strokeWidth={strokePx}
+            listening={false}
+          />
+        );
+      })()}
 
       {/* Crop Mode Grid & Indicator Overlay */}
       {isCropMode && (
