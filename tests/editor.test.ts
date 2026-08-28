@@ -2,6 +2,7 @@ import {
   calculateCoverDimensions,
   calculateImageOffset,
   calculateSnapping,
+  calculateResizeSnapping,
   clampCropTransform,
   getCenteredCrop,
   getCoverImageSize,
@@ -120,4 +121,23 @@ console.assert(offsetAtZoom2.height === 200, `Height at 2x zoom should be 200, g
 console.assert(offsetAtZoom2.offsetX === -100, `OffsetX at 2x zoom center should be -100, got ${offsetAtZoom2.offsetX}`);
 console.assert(offsetAtZoom2.offsetY === -50, `OffsetY at 2x zoom center should be -50, got ${offsetAtZoom2.offsetY}`);
 
-console.log('✓ All Editor domain and Smart Snapping unit tests passed successfully!');
+// 5. Test Equal Horizontal Spacing Snapping
+// Frame Left: x=50, w=100 (right=150)
+// Frame Right: x=350, w=100
+// Dragged Frame: w=100, placed near middle (e.g. x=201, leftGap=51, rightGap=49) -> total span=200 -> equal gap = (200 - 100)/2 = 50 -> snappedX = 200
+const frameL: RectBounds = { x: 50, y: 50, width: 100, height: 100 };
+const frameR: RectBounds = { x: 350, y: 50, width: 100, height: 100 };
+const draggedBetween: RectBounds = { x: 202, y: 50, width: 100, height: 100 };
+const snapEqual = calculateSnapping(draggedBetween, spreadWidth, spreadHeight, safeArea, gutterWidth, [frameL, frameR], 3.0, 'mm');
+console.assert(snapEqual.snappedX === 200, `Should snap to equidistant x=200, got ${snapEqual.snappedX}`);
+console.assert(snapEqual.gapGuides.length === 2, `Should generate 2 gap guides for equal spacing, got ${snapEqual.gapGuides.length}`);
+console.assert(snapEqual.gapGuides[0].distance === 50, `Gap distance should be 50mm, got ${snapEqual.gapGuides[0].distance}`);
+
+// 6. Test Resize Snapping (Match Width of Neighbor Frame)
+// Frame A: width=120
+// Frame B (resizing): width=121.2 -> should snap to 120
+const resizingFrame: RectBounds = { x: 200, y: 150, width: 121.2, height: 80 };
+const resizeSnap = calculateResizeSnapping(resizingFrame, spreadWidth, spreadHeight, safeArea, gutterWidth, [{ x: 50, y: 50, width: 120, height: 90 }], 3.0, 'mm');
+console.assert(resizeSnap.snappedBounds.width === 120, `Should snap width to match 120mm, got ${resizeSnap.snappedBounds.width}`);
+
+console.log('✓ All Editor domain, Equal Spacing, and Smart Snapping unit tests passed successfully!');

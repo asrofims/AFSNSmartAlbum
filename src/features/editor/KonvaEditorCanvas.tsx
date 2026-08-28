@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { Stage, Layer, Rect, Line, Group, Image as KonvaImage, Transformer, Text as KonvaText } from 'react-konva';
+import { Stage, Layer, Rect, Line, Group, Image as KonvaImage, Transformer, Text as KonvaText, Label, Tag } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
@@ -9,6 +9,8 @@ import { usePhotoStore } from '../../stores/photoStore';
 import {
   PhotoFrameElement,
   calculateSnapping,
+  calculateResizeSnapping,
+  ResizeSnapResult,
   calculateImageOffset,
   getPhotoAspect,
   clamp,
@@ -36,6 +38,8 @@ function PhotoFrameNode({
   onFrameChange,
   onCropChange,
   onDoubleClick,
+  onTransformSnap,
+  clearSnapLines,
   unit,
 }: {
   frame: PhotoFrameElement;
@@ -50,6 +54,8 @@ function PhotoFrameNode({
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
+  onTransformSnap?: (x: number, y: number, w: number, h: number) => ResizeSnapResult | null;
+  clearSnapLines?: () => void;
 }) {
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
   const [liveDimensions, setLiveDimensions] = useState<{ w: number; h: number } | null>(null);
@@ -189,22 +195,44 @@ function PhotoFrameNode({
         if (!node) return;
         const scaleX = Math.abs(node.scaleX());
         const scaleY = Math.abs(node.scaleY());
-        const liveW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        const liveH = Math.max(2, (node.height() * scaleY) / scaleFactor);
+        let rawW = Math.max(2, (node.width() * scaleX) / scaleFactor);
+        let rawH = Math.max(2, (node.height() * scaleY) / scaleFactor);
+        const physicalX = node.x() / scaleFactor;
+        const physicalY = node.y() / scaleFactor;
+
+        if (onTransformSnap) {
+          const snapRes = onTransformSnap(physicalX, physicalY, rawW, rawH);
+          if (snapRes) {
+            rawW = snapRes.snappedBounds.width;
+            rawH = snapRes.snappedBounds.height;
+          }
+        }
+
         setLiveDimensions({
-          w: Math.round(liveW * 10) / 10,
-          h: Math.round(liveH * 10) / 10,
+          w: Math.round(rawW * 10) / 10,
+          h: Math.round(rawH * 10) / 10,
         });
       }}
       onTransformEnd={() => {
         const node = shapeRef.current;
         setLiveDimensions(null);
+        clearSnapLines?.();
         if (!node) return;
 
         const scaleX = Math.abs(node.scaleX());
         const scaleY = Math.abs(node.scaleY());
-        const newW = Math.max(2, (node.width() * scaleX) / scaleFactor);
-        const newH = Math.max(2, (node.height() * scaleY) / scaleFactor);
+        let newW = Math.max(2, (node.width() * scaleX) / scaleFactor);
+        let newH = Math.max(2, (node.height() * scaleY) / scaleFactor);
+        const physicalX = node.x() / scaleFactor;
+        const physicalY = node.y() / scaleFactor;
+
+        if (onTransformSnap) {
+          const snapRes = onTransformSnap(physicalX, physicalY, newW, newH);
+          if (snapRes) {
+            newW = snapRes.snappedBounds.width;
+            newH = snapRes.snappedBounds.height;
+          }
+        }
 
         // Reset node scale and update width/height
         node.scaleX(1);
@@ -403,6 +431,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     selectedFrameIds,
     editingCropFrameId,
     activeSnapLines,
+    activeGapGuides,
     snapEnabled,
     selectFrame,
     clearSelection,
@@ -907,13 +936,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       activeSpread.safeArea,
                       gutterPhysicalW,
                       otherRects,
-                      thresholdUnits
+                      thresholdUnits,
+                      unit
                     );
 
-                    if (snapRes.snapLines.length > 0) {
+                    if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                       e.target.x(snapRes.snappedX * scaleFactor);
                       e.target.y(snapRes.snappedY * scaleFactor);
-                      setSnapLines(snapRes.snapLines);
+                      setSnapLines(snapRes.snapLines, snapRes.gapGuides);
                     } else {
                       clearSnapLines();
                     }
@@ -925,6 +955,32 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
                     });
                   }}
+                  onTransformSnap={(x, y, w, h) => {
+                    if (!snapEnabled) return null;
+                    const otherRects = (activeSpread.elements || [])
+                      .filter((f) => f.id !== frame.id)
+                      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+
+                    const res = calculateResizeSnapping(
+                      { x, y, width: w, height: h },
+                      totalSpreadPhysicalW,
+                      totalSpreadPhysicalH,
+                      activeSpread.safeArea,
+                      gutterPhysicalW,
+                      otherRects,
+                      thresholdUnits,
+                      unit
+                    );
+
+                    if (res.snapLines.length > 0 || res.gapGuides.length > 0) {
+                      setSnapLines(res.snapLines, res.gapGuides);
+                    } else {
+                      clearSnapLines();
+                    }
+                    return res;
+                  }}
+                  clearSnapLines={clearSnapLines}
                   onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
                   onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
                   onDoubleClick={() => enterCropMode(frame.id)}
@@ -968,7 +1024,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             {/* Magnetic Snap Lines overlay */}
             {activeSnapLines.map((line, idx) => (
               <Line
-                key={idx}
+                key={`snap-${idx}`}
                 points={
                   line.type === 'vertical'
                     ? [line.position * scaleFactor, 0, line.position * scaleFactor, screenSpreadH]
@@ -980,6 +1036,75 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 listening={false}
               />
             ))}
+
+            {/* Gap Guides & Equal Distance Indicators */}
+            {activeGapGuides.map((gap, idx) => {
+              const isHoriz = gap.type === 'horizontal';
+              const startPx = gap.start * scaleFactor;
+              const endPx = gap.end * scaleFactor;
+              const crossPx = gap.crossPos * scaleFactor;
+              const midPx = (startPx + endPx) / 2;
+              const tickSize = 5;
+
+              return (
+                <Group key={`gap-${idx}`} listening={false}>
+                  {/* Main Dimension Line */}
+                  <Line
+                    points={
+                      isHoriz
+                        ? [startPx, crossPx, endPx, crossPx]
+                        : [crossPx, startPx, crossPx, endPx]
+                    }
+                    stroke="#06b6d4"
+                    strokeWidth={1.5}
+                  />
+                  {/* Start Tick */}
+                  <Line
+                    points={
+                      isHoriz
+                        ? [startPx, crossPx - tickSize, startPx, crossPx + tickSize]
+                        : [crossPx - tickSize, startPx, crossPx + tickSize, startPx]
+                    }
+                    stroke="#06b6d4"
+                    strokeWidth={1.5}
+                  />
+                  {/* End Tick */}
+                  <Line
+                    points={
+                      isHoriz
+                        ? [endPx, crossPx - tickSize, endPx, crossPx + tickSize]
+                        : [crossPx - tickSize, endPx, crossPx + tickSize, endPx]
+                    }
+                    stroke="#06b6d4"
+                    strokeWidth={1.5}
+                  />
+                  {/* Distance Pill Badge */}
+                  <Group
+                    x={isHoriz ? midPx : crossPx}
+                    y={isHoriz ? crossPx : midPx}
+                  >
+                    <Label offsetX={26} offsetY={9}>
+                      <Tag
+                        fill="#082f49"
+                        stroke="#06b6d4"
+                        strokeWidth={1}
+                        cornerRadius={3}
+                        shadowColor="rgba(0,0,0,0.5)"
+                        shadowBlur={4}
+                      />
+                      <KonvaText
+                        text={gap.label}
+                        fontSize={10}
+                        fontStyle="bold"
+                        fill="#38bdf8"
+                        padding={3}
+                        fontFamily="sans-serif"
+                      />
+                    </Label>
+                  </Group>
+                </Group>
+              );
+            })}
           </Layer>
         </Stage>
 

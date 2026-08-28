@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { clampCropTransform, getPhotoAspect, PhotoFrameElement, SnapLine } from '../domain/editor';
+import { clampCropTransform, GapGuide, getPhotoAspect, PhotoFrameElement, SnapLine } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
@@ -8,6 +8,7 @@ export interface EditorState {
   selectedFrameIds: string[];
   editingCropFrameId: string | null;
   activeSnapLines: SnapLine[];
+  activeGapGuides: GapGuide[];
   clipboardFrames: PhotoFrameElement[];
   snapEnabled: boolean;
   isDragging: boolean;
@@ -53,7 +54,7 @@ export interface EditorState {
   ) => void;
 
   // Snapping & Guides
-  setSnapLines: (lines: SnapLine[]) => void;
+  setSnapLines: (lines: SnapLine[], gaps?: GapGuide[]) => void;
   clearSnapLines: () => void;
   toggleSnap: () => void;
   setDragging: (isDragging: boolean) => void;
@@ -65,6 +66,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedFrameIds: [],
   editingCropFrameId: null,
   activeSnapLines: [],
+  activeGapGuides: [],
   clipboardFrames: [],
   snapEnabled: true,
   isDragging: false,
@@ -480,12 +482,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().updateFrameGeometry(spreadId, frameId, nextCrop);
   },
 
-  setSnapLines: (lines: SnapLine[]) => {
-    set({ activeSnapLines: lines });
+  setSnapLines: (lines: SnapLine[], gaps?: GapGuide[]) => {
+    set({ activeSnapLines: lines, activeGapGuides: gaps || [] });
   },
 
   clearSnapLines: () => {
-    set({ activeSnapLines: [] });
+    set({ activeSnapLines: [], activeGapGuides: [] });
   },
 
   toggleSnap: () => {

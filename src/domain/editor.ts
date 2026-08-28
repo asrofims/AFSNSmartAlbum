@@ -255,8 +255,23 @@ export function resizeCropFromHandle(
   return clampCropTransform(frame);
 }
 
+export interface GapGuide {
+  type: 'horizontal' | 'vertical';
+  start: number; // Physical start coordinate along primary axis (e.g. x1)
+  end: number;   // Physical end coordinate along primary axis (e.g. x2)
+  crossPos: number; // Physical coordinate on perpendicular axis
+  distance: number; // Physical distance (e.g. 10.0)
+  label: string; // Formatted label (e.g. "10.0 mm")
+}
+
+export interface ResizeSnapResult {
+  snappedBounds: RectBounds;
+  snapLines: SnapLine[];
+  gapGuides: GapGuide[];
+}
+
 /**
- * Calculates smart magnetic snapping lines and adjustments for a dragged or resized frame.
+ * Calculates smart magnetic snapping lines, equal distance gaps, and adjustments for a dragged frame.
  */
 export function calculateSnapping(
   dragged: RectBounds,
@@ -265,11 +280,13 @@ export function calculateSnapping(
   safeArea: number,
   gutterWidth: number,
   otherFrames: RectBounds[],
-  threshold: number = 3.0 // snap distance in physical units (e.g. 3mm)
-): { snappedX: number; snappedY: number; snapLines: SnapLine[] } {
+  threshold: number = 3.0, // snap distance in physical units (e.g. 3mm)
+  unit: string = 'mm'
+): { snappedX: number; snappedY: number; snapLines: SnapLine[]; gapGuides: GapGuide[] } {
   let snappedX = dragged.x;
   let snappedY = dragged.y;
   const snapLines: SnapLine[] = [];
+  const gapGuides: GapGuide[] = [];
 
   const singlePageW = (spreadWidth - gutterWidth) / 2;
   const leftPageCenter = singlePageW / 2;
@@ -440,5 +457,273 @@ export function calculateSnapping(
     snapLines.push(bestHLine);
   }
 
-  return { snappedX, snappedY, snapLines };
+  // --- EQUAL SPACING & GAP DETECTION ---
+  // 1. Horizontal Gaps (frames aligned in a row / overlapping Y)
+  const yOverlapFrames = otherFrames.filter((f) => {
+    const overlapY = Math.min(dragged.y + dragged.height, f.y + f.height) - Math.max(dragged.y, f.y);
+    return overlapY > 10;
+  });
+
+  const leftFrames = yOverlapFrames.filter((f) => f.x + f.width <= dragged.x + threshold).sort((a, b) => (b.x + b.width) - (a.x + a.width));
+  const rightFrames = yOverlapFrames.filter((f) => f.x >= dragged.x + dragged.width - threshold).sort((a, b) => a.x - b.x);
+
+  const leftNeighbor = leftFrames[0];
+  const rightNeighbor = rightFrames[0];
+
+  if (leftNeighbor && rightNeighbor) {
+    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
+    const rightGap = rightNeighbor.x - (dragged.x + dragged.width);
+
+    if (leftGap > 0 && rightGap > 0 && Math.abs(leftGap - rightGap) <= threshold * 2) {
+      // Snap to equidistant midpoint
+      const totalSpan = rightNeighbor.x - (leftNeighbor.x + leftNeighbor.width) - dragged.width;
+      const equalGap = Math.max(0, totalSpan / 2);
+      snappedX = roundToTenth(leftNeighbor.x + leftNeighbor.width + equalGap);
+
+      const crossY = Math.min(dragged.y + dragged.height / 2, Math.min(leftNeighbor.y + leftNeighbor.height / 2, rightNeighbor.y + rightNeighbor.height / 2));
+      gapGuides.push(
+        {
+          type: 'horizontal',
+          start: leftNeighbor.x + leftNeighbor.width,
+          end: snappedX,
+          crossPos: crossY,
+          distance: roundToTenth(equalGap),
+          label: `${roundToTenth(equalGap)} ${unit}`,
+        },
+        {
+          type: 'horizontal',
+          start: snappedX + dragged.width,
+          end: rightNeighbor.x,
+          crossPos: crossY,
+          distance: roundToTenth(equalGap),
+          label: `${roundToTenth(equalGap)} ${unit}`,
+        }
+      );
+    } else if (leftGap > 0 && leftGap <= 40) {
+      const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
+      gapGuides.push({
+        type: 'horizontal',
+        start: leftNeighbor.x + leftNeighbor.width,
+        end: snappedX,
+        crossPos: crossY,
+        distance: roundToTenth(leftGap),
+        label: `${roundToTenth(leftGap)} ${unit}`,
+      });
+    }
+  } else if (leftNeighbor) {
+    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
+    if (leftGap > 0 && leftGap <= 40) {
+      const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
+      gapGuides.push({
+        type: 'horizontal',
+        start: leftNeighbor.x + leftNeighbor.width,
+        end: snappedX,
+        crossPos: crossY,
+        distance: roundToTenth(leftGap),
+        label: `${roundToTenth(leftGap)} ${unit}`,
+      });
+    }
+  }
+
+  // 2. Vertical Gaps (frames aligned in a column / overlapping X)
+  const xOverlapFrames = otherFrames.filter((f) => {
+    const overlapX = Math.min(dragged.x + dragged.width, f.x + f.width) - Math.max(dragged.x, f.x);
+    return overlapX > 10;
+  });
+
+  const topFrames = xOverlapFrames.filter((f) => f.y + f.height <= dragged.y + threshold).sort((a, b) => (b.y + b.height) - (a.y + a.height));
+  const bottomFrames = xOverlapFrames.filter((f) => f.y >= dragged.y + dragged.height - threshold).sort((a, b) => a.y - b.y);
+
+  const topNeighbor = topFrames[0];
+  const bottomNeighbor = bottomFrames[0];
+
+  if (topNeighbor && bottomNeighbor) {
+    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
+    const bottomGap = bottomNeighbor.y - (dragged.y + dragged.height);
+
+    if (topGap > 0 && bottomGap > 0 && Math.abs(topGap - bottomGap) <= threshold * 2) {
+      const totalSpan = bottomNeighbor.y - (topNeighbor.y + topNeighbor.height) - dragged.height;
+      const equalGap = Math.max(0, totalSpan / 2);
+      snappedY = roundToTenth(topNeighbor.y + topNeighbor.height + equalGap);
+
+      const crossX = Math.min(dragged.x + dragged.width / 2, Math.min(topNeighbor.x + topNeighbor.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2));
+      gapGuides.push(
+        {
+          type: 'vertical',
+          start: topNeighbor.y + topNeighbor.height,
+          end: snappedY,
+          crossPos: crossX,
+          distance: roundToTenth(equalGap),
+          label: `${roundToTenth(equalGap)} ${unit}`,
+        },
+        {
+          type: 'vertical',
+          start: snappedY + dragged.height,
+          end: bottomNeighbor.y,
+          crossPos: crossX,
+          distance: roundToTenth(equalGap),
+          label: `${roundToTenth(equalGap)} ${unit}`,
+        }
+      );
+    } else if (topGap > 0 && topGap <= 40) {
+      const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
+      gapGuides.push({
+        type: 'vertical',
+        start: topNeighbor.y + topNeighbor.height,
+        end: snappedY,
+        crossPos: crossX,
+        distance: roundToTenth(topGap),
+        label: `${roundToTenth(topGap)} ${unit}`,
+      });
+    }
+  } else if (topNeighbor) {
+    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
+    if (topGap > 0 && topGap <= 40) {
+      const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
+      gapGuides.push({
+        type: 'vertical',
+        start: topNeighbor.y + topNeighbor.height,
+        end: snappedY,
+        crossPos: crossX,
+        distance: roundToTenth(topGap),
+        label: `${roundToTenth(topGap)} ${unit}`,
+      });
+    }
+  }
+
+  return { snappedX, snappedY, snapLines, gapGuides };
+}
+
+/**
+ * Calculates smart resize snapping to match neighbor frame dimensions, alignment lines, and spread targets.
+ */
+export function calculateResizeSnapping(
+  current: RectBounds,
+  spreadWidth: number,
+  spreadHeight: number,
+  safeArea: number,
+  gutterWidth: number,
+  otherFrames: RectBounds[],
+  threshold: number = 3.0,
+  unit: string = 'mm'
+): ResizeSnapResult {
+  let { x, y, width, height } = current;
+  const snapLines: SnapLine[] = [];
+  const gapGuides: GapGuide[] = [];
+
+  const singlePageW = (spreadWidth - gutterWidth) / 2;
+  const leftPageCenter = singlePageW / 2;
+  const spineLeft = singlePageW;
+  const spineCenter = spreadWidth / 2;
+  const spineRight = singlePageW + gutterWidth;
+  const rightPageCenter = spineRight + singlePageW / 2;
+
+  const vTargets = [
+    { pos: 0, label: 'Left Outer Edge' },
+    { pos: leftPageCenter, label: 'Left Page Center' },
+    { pos: spineLeft, label: 'Left Page Inner Edge' },
+    { pos: spineCenter, label: 'Center Spine' },
+    { pos: spineRight, label: 'Right Page Inner Edge' },
+    { pos: rightPageCenter, label: 'Right Page Center' },
+    { pos: spreadWidth, label: 'Right Outer Edge' },
+    ...(safeArea > 0
+      ? [
+          { pos: safeArea, label: 'Safe Margin Left' },
+          { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
+          { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
+          { pos: spreadWidth - safeArea, label: 'Safe Margin Right' },
+        ]
+      : []),
+  ];
+
+  const hTargets = [
+    { pos: 0, label: 'Top Edge' },
+    { pos: spreadHeight / 2, label: 'Center Horizontal' },
+    { pos: spreadHeight, label: 'Bottom Edge' },
+    ...(safeArea > 0
+      ? [
+          { pos: safeArea, label: 'Safe Margin Top' },
+          { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' },
+        ]
+      : []),
+  ];
+
+  for (const other of otherFrames) {
+    vTargets.push(
+      { pos: other.x, label: 'Align Left' },
+      { pos: other.x + other.width / 2, label: 'Align Center X' },
+      { pos: other.x + other.width, label: 'Align Right' }
+    );
+    hTargets.push(
+      { pos: other.y, label: 'Align Top' },
+      { pos: other.y + other.height / 2, label: 'Align Center Y' },
+      { pos: other.y + other.height, label: 'Align Bottom' }
+    );
+
+    // Dimension matching (Width / Height)
+    if (Math.abs(width - other.width) <= threshold) {
+      width = other.width;
+      snapLines.push({
+        type: 'vertical',
+        position: x + width,
+        start: Math.min(y, other.y),
+        end: Math.max(y + height, other.y + other.height),
+        label: `Match Width (${roundToTenth(width)} ${unit})`,
+      });
+    }
+
+    if (Math.abs(height - other.height) <= threshold) {
+      height = other.height;
+      snapLines.push({
+        type: 'horizontal',
+        position: y + height,
+        start: Math.min(x, other.x),
+        end: Math.max(x + width, other.x + other.width),
+        label: `Match Height (${roundToTenth(height)} ${unit})`,
+      });
+    }
+  }
+
+  // Right Edge Snapping
+  const currentRight = x + width;
+  for (const target of vTargets) {
+    if (Math.abs(currentRight - target.pos) <= threshold) {
+      width = Math.max(5, target.pos - x);
+      snapLines.push({
+        type: 'vertical',
+        position: target.pos,
+        start: 0,
+        end: spreadHeight,
+        label: target.label,
+      });
+      break;
+    }
+  }
+
+  // Bottom Edge Snapping
+  const currentBottom = y + height;
+  for (const target of hTargets) {
+    if (Math.abs(currentBottom - target.pos) <= threshold) {
+      height = Math.max(5, target.pos - y);
+      snapLines.push({
+        type: 'horizontal',
+        position: target.pos,
+        start: 0,
+        end: spreadWidth,
+        label: target.label,
+      });
+      break;
+    }
+  }
+
+  return {
+    snappedBounds: {
+      x: roundToTenth(x),
+      y: roundToTenth(y),
+      width: roundToTenth(width),
+      height: roundToTenth(height),
+    },
+    snapLines,
+    gapGuides,
+  };
 }
