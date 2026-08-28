@@ -32,57 +32,75 @@ export function FrameToolbar() {
   const isCrop = editingCropFrameId === frame.id;
 
   return (
-    <div className={styles.toolbarContainer}>
-      {/* Crop / Finish Crop Mode */}
+    <div className={styles.verticalDockContainer}>
+      {/* Crop / Done (Icon only) */}
       <button
         type="button"
         className={`${styles.toolBtn} ${isCrop ? styles.toolBtnActive : ''}`}
         onClick={() => (isCrop ? exitCropMode() : enterCropMode(frame.id))}
-        title={isCrop ? 'Finish Crop Mode (Esc)' : 'Crop & Zoom Image inside Frame (Double Click)'}
+        title={isCrop ? 'Finish Crop Mode (Esc)' : 'Crop Image (Double Click)'}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 2v14a2 2 0 0 0 2 2h14" />
           <path d="M18 22V8a2 2 0 0 0-2-2H2" />
         </svg>
-        <span>{isCrop ? 'Done' : 'Crop'}</span>
       </button>
 
-      {/* When in Crop Mode: Show Zoom Slider & Reset */}
+      {/* When in Crop Mode: Zoom in, Zoom out, Reset */}
       {isCrop && (
         <>
-          <div className={styles.cropZoomControl}>
-            <span className={styles.zoomLabel}>Zoom:</span>
-            <input
-              type="range"
-              min="1.0"
-              max="3.5"
-              step="0.05"
-              value={frame.cropScale || 1.0}
-              onChange={(e) =>
-                updateFrameGeometry(activeSpread.id, frame.id, {
-                  cropScale: parseFloat(e.target.value),
-                })
-              }
-              className={styles.cropSlider}
-              title="Zoom inside frame (or scroll mouse wheel on image)"
-            />
-            <span className={styles.zoomValText}>{(frame.cropScale || 1.0).toFixed(1)}×</span>
-            <button
-              type="button"
-              className={styles.toolBtnSmall}
-              onClick={() =>
-                updateFrameGeometry(activeSpread.id, frame.id, {
-                  cropX: 0,
-                  cropY: 0,
-                  cropScale: 1.0,
-                })
-              }
-              title="Reset Crop & Position"
-            >
-              Reset
-            </button>
-          </div>
-          <div className={styles.divider} />
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() =>
+              updateFrameGeometry(activeSpread.id, frame.id, {
+                cropScale: Math.min(3.5, (frame.cropScale || 1.0) + 0.15),
+              })
+            }
+            title="Zoom In Inside Frame"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() =>
+              updateFrameGeometry(activeSpread.id, frame.id, {
+                cropScale: Math.max(1.0, (frame.cropScale || 1.0) - 0.15),
+              })
+            }
+            title="Zoom Out Inside Frame"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() =>
+              updateFrameGeometry(activeSpread.id, frame.id, {
+                cropX: 0,
+                cropY: 0,
+                cropScale: 1.0,
+              })
+            }
+            title="Reset Crop Position & Scale"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+          </button>
         </>
       )}
 
@@ -90,27 +108,27 @@ export function FrameToolbar() {
         <>
           <div className={styles.divider} />
 
-          {/* Rotate CCW */}
+          {/* Rotate CCW (Icon only) */}
           <button
             type="button"
             className={styles.toolBtn}
             onClick={() => rotateFrame90(activeSpread.id, frame.id, 'ccw')}
             title="Rotate Left 90°"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
               <path d="M3 3v5h5" />
             </svg>
           </button>
 
-          {/* Rotate CW */}
+          {/* Rotate CW (Icon only) */}
           <button
             type="button"
             className={styles.toolBtn}
             onClick={() => rotateFrame90(activeSpread.id, frame.id, 'cw')}
             title="Rotate Right 90°"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.6L21 8" />
               <path d="M21 3v5h-5" />
             </svg>
@@ -118,7 +136,7 @@ export function FrameToolbar() {
 
           <div className={styles.divider} />
 
-          {/* Border Toggle with Color Swatch */}
+          {/* Border Toggle (Icon only, no text, no dot) */}
           <button
             type="button"
             className={`${styles.toolBtn} ${frame.borderEnabled ? styles.toolBtnActive : ''}`}
@@ -129,29 +147,27 @@ export function FrameToolbar() {
             }
             title={frame.borderEnabled ? 'Disable Frame Border' : 'Enable Frame Border'}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect width="18" height="18" x="3" y="3" rx="2" />
             </svg>
-            <span>Border</span>
-            {frame.borderEnabled && (
-              <span
-                className={styles.colorDot}
-                style={{ backgroundColor: frame.borderColor || '#FFFFFF' }}
-              />
-            )}
           </button>
 
           <div className={styles.divider} />
 
-          {/* Magnet Snapping Toggle */}
+          {/* Magnet Snapping Toggle (Icon only) */}
           <button
             type="button"
             className={`${styles.toolBtn} ${snapEnabled ? styles.toolBtnActive : ''}`}
             onClick={toggleSnap}
-            title={snapEnabled ? 'Magnet Snapping: ON (Hold Alt while dragging to bypass)' : 'Magnet Snapping: OFF'}
+            title={snapEnabled ? 'Magnet Snapping: ON (Hold Alt to bypass)' : 'Magnet Snapping: OFF'}
           >
-            <span style={{ fontSize: '11px' }}>🧲</span>
-            <span>{snapEnabled ? 'Snap: On' : 'Snap: Off'}</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3v6a6 6 0 0 0 12 0V3" />
+              <line x1="6" y1="3" x2="6" y2="7" />
+              <line x1="18" y1="3" x2="18" y2="7" />
+              <line x1="4" y1="7" x2="8" y2="7" />
+              <line x1="16" y1="7" x2="20" y2="7" />
+            </svg>
           </button>
 
           <div className={styles.divider} />
@@ -163,7 +179,7 @@ export function FrameToolbar() {
             onClick={() => bringToFront(activeSpread.id, frame.id)}
             title="Bring to Front"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="12 2 2 7 12 12 22 7 12 2" />
               <polyline points="2 17 12 22 22 17" />
               <polyline points="2 12 12 17 22 12" />
@@ -177,7 +193,7 @@ export function FrameToolbar() {
             onClick={() => sendToBack(activeSpread.id, frame.id)}
             title="Send to Back"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 12 17 2 12" />
               <polyline points="22 7 12 12 2 7" />
             </svg>
@@ -190,14 +206,13 @@ export function FrameToolbar() {
             type="button"
             className={`${styles.toolBtn} ${styles.toolBtnDanger}`}
             onClick={() => deleteSelectedFrames(activeSpread.id)}
-            title="Remove Photo Frame from Canvas (Delete / Backspace)"
+            title="Remove Photo Frame from Canvas (Delete)"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18" />
               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
             </svg>
-            <span>Delete</span>
           </button>
         </>
       )}

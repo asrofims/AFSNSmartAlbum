@@ -15,6 +15,7 @@ import styles from './KonvaEditorCanvas.module.css';
 interface KonvaEditorCanvasProps {
   zoomLevel: number;
   activeTool: 'select' | 'pan';
+  onZoomChange?: (updater: (prev: number) => number) => void;
 }
 
 // Single Photo Frame Component rendered with Konva
@@ -222,7 +223,7 @@ function PhotoFrameNode({
   );
 }
 
-export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasProps) {
+export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: KonvaEditorCanvasProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     currentAlbum,
@@ -270,6 +271,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
   // ResizeObserver for responsive full-width container scaling
   useEffect(() => {
     if (!containerRef.current) return;
+    const targetElem = containerRef.current.parentElement || containerRef.current;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
@@ -280,7 +282,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
       }
     });
 
-    observer.observe(containerRef.current);
+    observer.observe(targetElem);
     return () => observer.disconnect();
   }, []);
 
@@ -475,6 +477,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onWheel={(e) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (onZoomChange) {
+            const delta = e.deltaY < 0 ? 10 : -10;
+            onZoomChange((z) => Math.max(25, Math.min(300, z + delta)));
+          }
+        }
+      }}
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (

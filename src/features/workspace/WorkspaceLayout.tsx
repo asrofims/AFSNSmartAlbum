@@ -216,7 +216,11 @@ export function WorkspaceLayout() {
             <WelcomeScreen />
           ) : (
             <>
-              <KonvaEditorCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
+              <KonvaEditorCanvas
+                zoomLevel={zoomLevel}
+                activeTool={activeTool}
+                onZoomChange={setZoomLevel}
+              />
               <FrameToolbar />
             </>
           )}
