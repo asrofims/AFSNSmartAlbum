@@ -116,6 +116,39 @@ function PhotoFrameNode({
 
   const isDraggingRef = useRef(false);
 
+  useEffect(() => {
+    const node = shapeRef.current;
+    if (!node) return;
+
+    node.getClientRect = function (config?: { skipTransform?: boolean; relativeTo?: Konva.Container }) {
+      const skipTransform = config?.skipTransform;
+      const w = this.width();
+      const h = this.height();
+
+      if (skipTransform) {
+        return { x: 0, y: 0, width: w, height: h };
+      }
+
+      const transform = this.getTransform();
+      const p1 = transform.point({ x: 0, y: 0 });
+      const p2 = transform.point({ x: w, y: 0 });
+      const p3 = transform.point({ x: w, y: h });
+      const p4 = transform.point({ x: 0, y: h });
+
+      const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
+      const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
+      const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
+      const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    };
+  });
+
   return (
     <Group
       id={frame.id}
@@ -330,7 +363,7 @@ function PhotoFrameNode({
       })()}
 
       {/* Multiple Selection Visual Highlight Outline */}
-      {isSelected && !isCropMode && (
+      {isSelected && isMultiSelectActive && !isCropMode && (
         <Rect
           x={0}
           y={0}
