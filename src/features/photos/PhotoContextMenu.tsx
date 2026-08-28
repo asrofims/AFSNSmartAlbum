@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Photo, PhotoFolder, formatFileSize } from '../../domain/photo';
 import styles from './PhotoContextMenu.module.css';
 
@@ -76,7 +77,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
   const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
   const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
 
-  return (
+  return createPortal(
     <div
       ref={menuRef}
       className={styles.contextMenu}
@@ -224,6 +225,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
         <span className={styles.menuIcon}>🗑</span>
         <span>{isMulti ? `Delete ${count} Photos` : 'Delete Photo'}</span>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };

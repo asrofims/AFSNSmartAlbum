@@ -191,6 +191,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
     showBleedGuide,
     showSafeAreaGuide,
     isSpreadDrawerOpen,
+    initializeAlbum,
   } = useAlbumStore();
 
   const {
@@ -219,6 +220,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
 
+  // Auto-initialize album if project is loaded but album state is null
+  useEffect(() => {
+    if (currentProject && (!currentAlbum || currentAlbum.projectId !== currentProject.id)) {
+      initializeAlbum(currentProject);
+    }
+  }, [currentProject, currentAlbum, initializeAlbum]);
+
   // ResizeObserver for responsive full-width container scaling
   useEffect(() => {
     if (!containerRef.current) return;
@@ -236,55 +244,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
     return () => observer.disconnect();
   }, []);
 
-  if (!currentProject || !currentAlbum) return null;
-
-  const allSpreads = getAllAlbumSpreads(currentAlbum);
+  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
-  if (!activeSpread) return null;
-
-  const isCover = activeSpread.type === 'cover';
-  const unit = currentProject.canvasUnit;
-
-  // Single page physical dimensions
-  const singlePageW = currentProject.canvasWidth;
-  const singlePageH = currentProject.canvasHeight;
-  const gutterPhysicalW = activeSpread.gutterWidth || 0;
-
-  // Total spread physical dimensions
-  const totalSpreadPhysicalW = singlePageW * 2 + gutterPhysicalW;
-  const totalSpreadPhysicalH = singlePageH;
-
-  // Physical bleed and safe area in mm
-  const bleedInMm = convertUnit(activeSpread.bleed, unit, 'mm');
-  const safeAreaInMm = convertUnit(activeSpread.safeArea, unit, 'mm');
-  const pageWInMm = convertUnit(singlePageW, unit, 'mm');
-
-  // Dynamic responsive canvas scaling (Fills ~88% of container workspace)
-  const maxAvailableW = Math.max(300, containerSize.width - 60);
-  const maxAvailableH = Math.max(200, containerSize.height - 60);
-  const aspect = totalSpreadPhysicalW / totalSpreadPhysicalH;
-
-  let baseW = maxAvailableW;
-  let baseH = Math.round(baseW / aspect);
-  if (baseH > maxAvailableH) {
-    baseH = maxAvailableH;
-    baseW = Math.round(baseH * aspect);
-  }
-
-  // Zoom scale factor
-  const zoomScale = zoomLevel / 100;
-  const screenSpreadW = Math.round(baseW * zoomScale);
-  const screenSpreadH = Math.round(baseH * zoomScale);
-
-  // Conversion factor: multiply physical units (mm/cm/inch) by this to get screen pixels
-  const scaleFactor = screenSpreadW / totalSpreadPhysicalW;
-
-  const leftPagePixelW = Math.round((singlePageW / totalSpreadPhysicalW) * screenSpreadW);
-  const rightPagePixelW = leftPagePixelW;
-  const gutterPixelW = screenSpreadW - leftPagePixelW - rightPagePixelW;
-
-  const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
-  const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
 
   // Sync Konva Transformer to selected node(s)
   useEffect(() => {
@@ -301,13 +262,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
       trRef.current.nodes([]);
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedFrameIds, editingCropFrameId, activeSpread.elements]);
+  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (!activeSpread) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedFrameIds.length > 0) {
@@ -344,7 +306,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     selectedFrameIds,
-    activeSpread.id,
+    activeSpread?.id,
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
@@ -352,6 +314,60 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
     exitCropMode,
     nudgeSelected,
   ]);
+
+  if (!currentProject || !currentAlbum || !activeSpread) {
+    return (
+      <div ref={containerRef} className={styles.canvasContainer}>
+        <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+          Loading album workspace...
+        </div>
+      </div>
+    );
+  }
+
+  const isCover = activeSpread.type === 'cover';
+  const unit = currentProject.canvasUnit;
+
+  // Single page physical dimensions
+  const singlePageW = currentProject.canvasWidth;
+  const singlePageH = currentProject.canvasHeight;
+  const gutterPhysicalW = activeSpread.gutterWidth || 0;
+
+  // Total spread physical dimensions
+  const totalSpreadPhysicalW = singlePageW * 2 + gutterPhysicalW;
+  const totalSpreadPhysicalH = singlePageH;
+
+  // Physical bleed and safe area in mm
+  const bleedInMm = convertUnit(activeSpread.bleed ?? 3, unit, 'mm');
+  const safeAreaInMm = convertUnit(activeSpread.safeArea ?? 10, unit, 'mm');
+  const pageWInMm = convertUnit(singlePageW, unit, 'mm');
+
+  // Dynamic responsive canvas scaling (Fills ~88% of container workspace)
+  const maxAvailableW = Math.max(300, containerSize.width - 60);
+  const maxAvailableH = Math.max(200, containerSize.height - 60);
+  const aspect = totalSpreadPhysicalW / Math.max(1, totalSpreadPhysicalH);
+
+  let baseW = maxAvailableW;
+  let baseH = Math.round(baseW / aspect);
+  if (baseH > maxAvailableH) {
+    baseH = maxAvailableH;
+    baseW = Math.round(baseH * aspect);
+  }
+
+  // Zoom scale factor
+  const zoomScale = zoomLevel / 100;
+  const screenSpreadW = Math.round(baseW * zoomScale);
+  const screenSpreadH = Math.round(baseH * zoomScale);
+
+  // Conversion factor: multiply physical units (mm/cm/inch) by this to get screen pixels
+  const scaleFactor = screenSpreadW / totalSpreadPhysicalW;
+
+  const leftPagePixelW = Math.round((singlePageW / totalSpreadPhysicalW) * screenSpreadW);
+  const rightPagePixelW = leftPagePixelW;
+  const gutterPixelW = screenSpreadW - leftPagePixelW - rightPagePixelW;
+
+  const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
+  const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
 
   // Handle Drag & Drop photo from filmstrip tray onto canvas
   const handleDragOver = (e: React.DragEvent) => {
