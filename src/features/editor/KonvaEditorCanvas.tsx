@@ -171,9 +171,9 @@ function PhotoFrameNode({
             y={offsetY}
             width={renderImgW}
             height={renderImgH}
-            stroke="rgba(59, 130, 246, 0.45)"
-            strokeWidth={1}
-            dash={[4, 4]}
+            stroke="rgba(245, 158, 11, 0.85)"
+            strokeWidth={1.5}
+            dash={[5, 4]}
           />
         </Group>
       )}

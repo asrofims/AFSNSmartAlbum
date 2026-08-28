@@ -36,6 +36,8 @@ export function WorkspaceLayout() {
 
   const selectedFrameIds = useEditorStore((s) => s.selectedFrameIds);
   const updateFrameGeometry = useEditorStore((s) => s.updateFrameGeometry);
+  const resetToOriginalRatio = useEditorStore((s) => s.resetToOriginalRatio);
+  const resetCrop = useEditorStore((s) => s.resetCrop);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
 
@@ -496,6 +498,46 @@ export function WorkspaceLayout() {
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rotation:</span>
                         <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{selectedFrame.rotation || 0}°</span>
+                      </div>
+
+                      {/* 1-Click Dual Entity Reset Actions */}
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => resetToOriginalRatio(activeSpread.id, selectedFrame.id)}
+                          style={{
+                            flex: 1,
+                            padding: '4px 6px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                          }}
+                          title="Restore original photo aspect ratio (3:2 / 4:3)"
+                        >
+                          ↺ Reset Ratio
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => resetCrop(activeSpread.id, selectedFrame.id)}
+                          style={{
+                            flex: 1,
+                            padding: '4px 6px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                          }}
+                          title="Center photo and reset zoom to 1.0x"
+                        >
+                          ↺ Reset Crop
+                        </button>
                       </div>
                     </div>
                   </div>

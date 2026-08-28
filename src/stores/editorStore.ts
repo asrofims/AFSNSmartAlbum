@@ -41,9 +41,11 @@ export interface EditorState {
   sendToBack: (spreadId: string, frameId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
 
-  // Crop Mode
+  // Crop Mode & Ratio Reset
   enterCropMode: (frameId: string) => void;
   exitCropMode: () => void;
+  resetToOriginalRatio: (spreadId: string, frameId: string) => void;
+  resetCrop: (spreadId: string, frameId: string) => void;
   updateCrop: (
     spreadId: string,
     frameId: string,
@@ -125,6 +127,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       height: Math.round(frameH * 10) / 10,
       rotation: 0,
       zIndex: 1,
+      photoAspect: photoAspect,
+      originalWidth: Math.round(frameW * 10) / 10,
+      originalHeight: Math.round(frameH * 10) / 10,
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,
@@ -418,6 +423,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   exitCropMode: () => {
     set({ editingCropFrameId: null, selectedFrameIds: [] });
+  },
+
+  resetToOriginalRatio: (spreadId, frameId) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    const activeSpread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
+    if (!frame) return;
+
+    const aspect = frame.photoAspect || (frame.width / Math.max(1, frame.height));
+    const newHeight = Math.round((frame.width / aspect) * 10) / 10;
+
+    const { updateFrameGeometry } = get();
+    updateFrameGeometry(spreadId, frameId, {
+      height: newHeight,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
+    });
+  },
+
+  resetCrop: (spreadId, frameId) => {
+    const { updateFrameGeometry } = get();
+    updateFrameGeometry(spreadId, frameId, {
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
+    });
   },
 
   updateCrop: (spreadId, frameId, crop) => {

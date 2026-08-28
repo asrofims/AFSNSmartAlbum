@@ -15,6 +15,11 @@ export interface PhotoFrameElement {
   rotation: number; // 0 - 360 degrees
   zIndex: number;
 
+  // Original photo metadata for Aspect Ratio restoration
+  photoAspect?: number; // width / height of original master photo
+  originalWidth?: number;
+  originalHeight?: number;
+
   // Internal Crop inside frame
   cropX: number; // offset in px/ratio
   cropY: number;
