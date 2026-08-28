@@ -890,17 +890,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               ref={trRef}
               visible={!editingCropFrameId}
               rotateEnabled
-              keepRatio={false}
-              enabledAnchors={[
-                'top-left',
-                'top-center',
-                'top-right',
-                'middle-right',
-                'bottom-right',
-                'bottom-center',
-                'bottom-left',
-                'middle-left',
-              ]}
+              keepRatio={true}
+              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
