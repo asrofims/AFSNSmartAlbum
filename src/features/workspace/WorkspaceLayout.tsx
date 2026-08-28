@@ -320,11 +320,11 @@ export function WorkspaceLayout() {
               {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
               <div className={styles.propSection}>
                 <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Aturan Celah Foto (Photo Spacing)</span>
+                  <span>Photo Spacing</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Celah Default (Project Gap)</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Default Gap</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '120px' }}>
                       <NumberInput
                         value={currentProject.spacingValue}
@@ -371,9 +371,9 @@ export function WorkspaceLayout() {
                           const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
                           applyFixedGapToSelected(activeSpread.id, 'horizontal', gapInMm);
                         }}
-                        title={`Terapkan celah default (${currentProject.spacingValue} ${currentProject.spacingUnit}) secara Horizontal`}
+                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) horizontally`}
                       >
-                        ⇿ Terapkan Gap H
+                        ⇿ Apply Gap H
                       </button>
                       <button
                         type="button"
@@ -383,18 +383,18 @@ export function WorkspaceLayout() {
                           const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
                           applyFixedGapToSelected(activeSpread.id, 'vertical', gapInMm);
                         }}
-                        title={`Terapkan celah default (${currentProject.spacingValue} ${currentProject.spacingUnit}) secara Vertikal`}
+                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) vertically`}
                       >
-                        ⇳ Terapkan Gap V
+                        ⇳ Apply Gap V
                       </button>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Safe Margins & Guides Section (Interactive inputs for Batas Aman) */}
+              {/* Safe Margins & Guides Section */}
               <div className={styles.propSection}>
-                <div className={styles.propTitle}>Batas Aman & Panduan (Margins & Guides)</div>
+                <div className={styles.propTitle}>Margins & Guides</div>
 
                 {/* Guide Toggles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
@@ -405,7 +405,7 @@ export function WorkspaceLayout() {
                       onChange={() => toggleGuide('safeArea')}
                       style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                     />
-                    <span>Tampilkan Batas Aman (Blue)</span>
+                    <span>Safe Zone Margin (Blue)</span>
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
@@ -415,7 +415,7 @@ export function WorkspaceLayout() {
                       onChange={() => toggleGuide('bleed')}
                       style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                     />
-                    <span>Tampilkan Batas Potong Bleed (Red)</span>
+                    <span>Bleed Cut Line (Red)</span>
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
@@ -425,14 +425,14 @@ export function WorkspaceLayout() {
                       onChange={() => toggleGuide('gutter')}
                       style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                     />
-                    <span>Tampilkan Lipatan Tengah (Gutter Crease)</span>
+                    <span>Center Gutter Crease</span>
                   </label>
                 </div>
 
-                {/* Input Nilai Batas Aman */}
+                {/* Safe Margins & Spine Inputs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Margin Tepi (Safe Area)</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
                       <NumberInput
                         value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
@@ -446,7 +446,7 @@ export function WorkspaceLayout() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Batas Potong (Bleed)</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Bleed Allowance</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
                       <NumberInput
                         value={activeSpread?.bleed ?? 3}
@@ -461,7 +461,7 @@ export function WorkspaceLayout() {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {activeSpread?.type === 'cover' ? 'Tebal Punggung (Spine)' : 'Lipatan Tengah (Gutter)'}
+                      {activeSpread?.type === 'cover' ? 'Spine Width' : 'Gutter Width'}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
                       <NumberInput
@@ -478,7 +478,7 @@ export function WorkspaceLayout() {
 
                 {/* Smart Snapping Switch */}
                 <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Magnet Snapping (🧲)</span>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
                   <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
                 </div>
               </div>
@@ -507,7 +507,7 @@ export function WorkspaceLayout() {
                       {/* GAP Spacing Control */}
                       <div style={{ marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)' }}>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
-                          Jarak Antar Foto (Gap Spacing)
+                          Gap Spacing
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -526,7 +526,7 @@ export function WorkspaceLayout() {
                             type="button"
                             className={styles.multiActionBtn}
                             onClick={() => applyFixedGapToSelected(activeSpread.id, 'horizontal', customGapValue)}
-                            title="Terapkan Jarak Celah Horizontal Seragam"
+                            title="Set uniform horizontal gap spacing"
                           >
                             ⇿ Set Gap H
                           </button>
@@ -534,35 +534,35 @@ export function WorkspaceLayout() {
                             type="button"
                             className={styles.multiActionBtn}
                             onClick={() => applyFixedGapToSelected(activeSpread.id, 'vertical', customGapValue)}
-                            title="Terapkan Jarak Celah Vertikal Seragam"
+                            title="Set uniform vertical gap spacing"
                           >
                             ⇳ Set Gap V
                           </button>
                         </div>
                       </div>
 
-                      {/* Distribute Evenly (Bagi Jarak Sama Rata) */}
+                      {/* Distribute Evenly */}
                       {selectedFrameIds.length >= 3 && (
                         <div style={{ marginBottom: '10px' }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                            Bagi Jarak Sama Rata (Distribute)
+                            Distribute Spacing
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                             <button
                               type="button"
                               className={styles.multiActionBtn}
                               onClick={() => distributeSelectedFrames(activeSpread.id, 'horizontal')}
-                              title="Bagi Jarak Rata Horizontal"
+                              title="Distribute Horizontal Spacing Evenly"
                             >
-                              ⇿ Bagi Rata H
+                              ⇿ Distribute H
                             </button>
                             <button
                               type="button"
                               className={styles.multiActionBtn}
                               onClick={() => distributeSelectedFrames(activeSpread.id, 'vertical')}
-                              title="Bagi Jarak Rata Vertikal"
+                              title="Distribute Vertical Spacing Evenly"
                             >
-                              ⇳ Bagi Rata V
+                              ⇳ Distribute V
                             </button>
                           </div>
                         </div>
@@ -571,27 +571,27 @@ export function WorkspaceLayout() {
                       {/* Alignments Grid */}
                       <div style={{ marginBottom: '10px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                          Perataan (Align)
+                          Alignment
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left">⇤ Kiri</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal">⇥⇤ Tengah H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right">⇥ Kanan</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top">⤒ Atas</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical">⤓⤒ Tengah V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom">⤓ Bawah</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom">⤓ Bottom</button>
                         </div>
                       </div>
 
                       {/* Match Size */}
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                          Samakan Ukuran (Match Size)
+                          Match Size
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'width')} title="Match Width">⬌ Lebar</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'height')} title="Match Height">⬍ Tinggi</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both">⬚ Penuh</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'width')} title="Match Width">⬌ Width</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'height')} title="Match Height">⬍ Height</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both">⬚ Both</button>
                         </div>
                       </div>
                     </div>
@@ -801,7 +801,7 @@ export function WorkspaceLayout() {
                       {/* W & H Inputs in 2 columns */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <div>
-                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Lebar (W)</div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Width (W)</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={selectedFrame.width}
@@ -823,7 +823,7 @@ export function WorkspaceLayout() {
                         </div>
 
                         <div>
-                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Tinggi (H)</div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Height (H)</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={selectedFrame.height}
@@ -848,7 +848,7 @@ export function WorkspaceLayout() {
                       {/* X & Y Position Inputs in 2 columns */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <div>
-                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Posisi X</div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Position X</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={selectedFrame.x}
@@ -860,7 +860,7 @@ export function WorkspaceLayout() {
                         </div>
 
                         <div>
-                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Posisi Y</div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Position Y</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={selectedFrame.y}
@@ -874,7 +874,7 @@ export function WorkspaceLayout() {
 
                       {/* Rotation Input & Quick Reset */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Rotasi Sudut</div>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Rotation Angle</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '130px' }}>
                           <NumberInput
                             value={selectedFrame.rotation || 0}
@@ -948,15 +948,9 @@ export function WorkspaceLayout() {
                 );
               })()}
 
-              {/* Photo Spacing & Project Default Border */}
+              {/* Project Default Border */}
               <div className={styles.propSection}>
-                <div className={styles.propTitle}>Project Default Styling</div>
-                <div className={styles.propRow}>
-                  <span>Photo Spacing</span>
-                  <span className={styles.propValue}>
-                    {currentProject.spacingValue} {currentProject.spacingUnit}
-                  </span>
-                </div>
+                <div className={styles.propTitle}>Project Default Border</div>
                 <div className={styles.propRow}>
                   <span>Default Border</span>
                   <span className={styles.propValue}>

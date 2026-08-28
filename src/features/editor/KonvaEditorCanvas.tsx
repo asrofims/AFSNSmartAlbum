@@ -920,7 +920,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       return [
         {
           id: 'paste',
-          label: 'Tempel Foto (Paste)',
+          label: 'Paste Photo',
           icon: '📋',
           shortcut: 'Ctrl+V',
           disabled: useEditorStore.getState().clipboardFrames.length === 0,
@@ -932,7 +932,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     const items: ContextMenuItem[] = [
       {
         id: 'delete',
-        label: count > 1 ? `Hapus ${count} Foto Terpilih` : 'Hapus Foto',
+        label: count > 1 ? `Delete ${count} Selected Photos` : 'Delete Photo',
         icon: '🗑️',
         shortcut: 'Del',
         danger: true,
@@ -940,14 +940,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       },
       {
         id: 'copy',
-        label: count > 1 ? `Salin ${count} Foto` : 'Salin Foto',
+        label: count > 1 ? `Copy ${count} Photos` : 'Copy Photo',
         icon: '📋',
         shortcut: 'Ctrl+C',
         onClick: () => copySelectedFrames(activeSpread.id),
       },
       {
         id: 'paste',
-        label: 'Tempel Foto',
+        label: 'Paste Photo',
         icon: '📥',
         shortcut: 'Ctrl+V',
         disabled: useEditorStore.getState().clipboardFrames.length === 0,
@@ -956,7 +956,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       { divider: true, id: 'div-order', label: '' },
       {
         id: 'bring-to-front',
-        label: 'Bawa ke Paling Depan',
+        label: 'Bring to Front',
         icon: '🔼',
         onClick: () => {
           selectedFrameIds.forEach((id) => bringToFront(activeSpread.id, id));
@@ -964,7 +964,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       },
       {
         id: 'send-to-back',
-        label: 'Kirim ke Paling Belakang',
+        label: 'Send to Back',
         icon: '🔽',
         onClick: () => {
           selectedFrameIds.forEach((id) => sendToBack(activeSpread.id, id));
@@ -972,7 +972,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       },
       {
         id: 'rotate-cw',
-        label: 'Putar 90° Searah Jarum Jam',
+        label: 'Rotate 90° Clockwise',
         icon: '🔄',
         onClick: () => {
           selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
@@ -983,74 +983,74 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     if (count >= 2) {
       items.push(
         { divider: true, id: 'div-align', label: '' },
-        { header: true, id: 'hdr-align', label: 'PENYELARASAN (ALIGN)' },
+        { header: true, id: 'hdr-align', label: 'ALIGNMENT' },
         {
           id: 'align-left',
-          label: 'Rata Kiri (Align Left)',
+          label: 'Align Left',
           icon: '⇤',
           onClick: () => alignSelectedFrames(activeSpread.id, 'left'),
         },
         {
           id: 'align-center',
-          label: 'Rata Tengah Horizontal (Center)',
+          label: 'Align Center Horizontal',
           icon: '↔',
           onClick: () => alignSelectedFrames(activeSpread.id, 'center'),
         },
         {
           id: 'align-right',
-          label: 'Rata Kanan (Align Right)',
+          label: 'Align Right',
           icon: '⇥',
           onClick: () => alignSelectedFrames(activeSpread.id, 'right'),
         },
         {
           id: 'align-top',
-          label: 'Rata Atas (Align Top)',
+          label: 'Align Top',
           icon: '⤒',
           onClick: () => alignSelectedFrames(activeSpread.id, 'top'),
         },
         {
           id: 'align-middle',
-          label: 'Rata Tengah Vertikal (Middle)',
+          label: 'Align Center Vertical',
           icon: '↕',
           onClick: () => alignSelectedFrames(activeSpread.id, 'middle'),
         },
         {
           id: 'align-bottom',
-          label: 'Rata Bawah (Align Bottom)',
+          label: 'Align Bottom',
           icon: '⤓',
           onClick: () => alignSelectedFrames(activeSpread.id, 'bottom'),
         },
         { divider: true, id: 'div-size', label: '' },
-        { header: true, id: 'hdr-size', label: 'SAMAKAN UKURAN (MATCH SIZE)' },
+        { header: true, id: 'hdr-size', label: 'MATCH SIZE' },
         {
           id: 'match-width',
-          label: 'Samakan Lebar (Match Width)',
+          label: 'Match Width',
           icon: '⬌',
           onClick: () => matchSelectedDimensions(activeSpread.id, 'width'),
         },
         {
           id: 'match-height',
-          label: 'Samakan Tinggi (Match Height)',
+          label: 'Match Height',
           icon: '⬍',
           onClick: () => matchSelectedDimensions(activeSpread.id, 'height'),
         },
         {
           id: 'match-both',
-          label: 'Samakan Ukuran Penuh (Both)',
+          label: 'Match Both (Full Size)',
           icon: '⬚',
           onClick: () => matchSelectedDimensions(activeSpread.id, 'both'),
         },
         { divider: true, id: 'div-gap', label: '' },
-        { header: true, id: 'hdr-gap', label: 'JARAK CELAH (GAP SPACING)' },
+        { header: true, id: 'hdr-gap', label: 'GAP SPACING' },
         {
           id: 'gap-h',
-          label: `Set Celah (${currentProject.spacingValue} ${currentProject.spacingUnit}) Horizontal`,
+          label: `Set Horizontal Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
           icon: '⇿',
           onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', currentProject.spacingValue),
         },
         {
           id: 'gap-v',
-          label: `Set Celah (${currentProject.spacingValue} ${currentProject.spacingUnit}) Vertikal`,
+          label: `Set Vertical Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
           icon: '⇳',
           onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', currentProject.spacingValue),
         }
@@ -1060,16 +1060,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     if (count >= 3) {
       items.push(
         { divider: true, id: 'div-distribute', label: '' },
-        { header: true, id: 'hdr-distribute', label: 'DISTRIBUSI JARAK RATA' },
+        { header: true, id: 'hdr-distribute', label: 'DISTRIBUTE SPACING' },
         {
           id: 'distribute-h',
-          label: 'Bagi Jarak Rata Horizontal',
+          label: 'Distribute Horizontally',
           icon: '⇿',
           onClick: () => distributeSelectedFrames(activeSpread.id, 'horizontal'),
         },
         {
           id: 'distribute-v',
-          label: 'Bagi Jarak Rata Vertikal',
+          label: 'Distribute Vertically',
           icon: '⇳',
           onClick: () => distributeSelectedFrames(activeSpread.id, 'vertical'),
         }
@@ -1080,7 +1080,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       { divider: true, id: 'div-clear', label: '' },
       {
         id: 'clear-sel',
-        label: 'Batalkan Pilihan',
+        label: 'Deselect All',
         icon: '✕',
         onClick: () => clearSelection(),
       }
@@ -1761,7 +1761,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               onClick={exitCropMode}
               title="Done (Enter / Esc)"
             >
-              ✓ Selesai
+              ✓ Done
             </button>
           </div>
         )}

@@ -373,9 +373,9 @@ export function NewProjectDialog() {
               </div>
             </div>
 
-            {/* Safe Margin / Batas Tepi (Request 5) */}
+            {/* Safe Margin */}
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Safe Margin (Batas Tepi Aman)</div>
+              <div className={styles.sectionTitle}>Safe Zone Margins</div>
               <div style={{ padding: '2px 0 6px 0' }}>
                 <Switch
                   checked={marginEnabled}
@@ -389,7 +389,7 @@ export function NewProjectDialog() {
                 <div className={styles.row}>
                   <div className={styles.flex1}>
                     <NumberInput
-                      label="Margin Tepi"
+                      label="Safe Margin"
                       value={marginValue}
                       onChange={setMarginValue}
                       min={0.1}

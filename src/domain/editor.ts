@@ -731,7 +731,7 @@ export function calculateResizeSnapping(
         position: y,
         start: Math.min(x, o.x),
         end: Math.max(x + width, o.x + o.width),
-        label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
+        label: `Match Height (${roundToTenth(height)} ${unit})`,
       });
     } else {
       height = targetH;
@@ -746,7 +746,7 @@ export function calculateResizeSnapping(
         position: y + height,
         start: Math.min(x, o.x),
         end: Math.max(x + width, o.x + o.width),
-        label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
+        label: `Match Height (${roundToTenth(height)} ${unit})`,
       });
     }
   }
@@ -770,7 +770,7 @@ export function calculateResizeSnapping(
         position: x,
         start: Math.min(y, o.y),
         end: Math.max(y + height, o.y + o.height),
-        label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
+        label: `Match Width (${roundToTenth(width)} ${unit})`,
       });
     } else {
       width = targetW;
@@ -785,7 +785,7 @@ export function calculateResizeSnapping(
         position: x + width,
         start: Math.min(y, o.y),
         end: Math.max(y + height, o.y + o.height),
-        label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
+        label: `Match Width (${roundToTenth(width)} ${unit})`,
       });
     }
   }

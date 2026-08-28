@@ -74,7 +74,7 @@ export function FolderDialog() {
           <input
             type="text"
             className={styles.input}
-            placeholder="e.g. Akad Nikah, Resepsi, Prewedding, Family"
+            placeholder="e.g. Ceremony, Reception, Portraits, Highlights"
             value={folderName}
             onChange={(e) => {
               setFolderName(e.target.value);
