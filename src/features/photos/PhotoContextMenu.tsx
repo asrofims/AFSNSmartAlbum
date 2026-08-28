@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Photo, PhotoFolder, formatFileSize } from '../../domain/photo';
+import { useAlbumStore } from '../../stores/albumStore';
+import { useEditorStore } from '../../stores/editorStore';
+import { getAllAlbumSpreads } from '../../domain/album';
 import styles from './PhotoContextMenu.module.css';
 
 export interface PhotoContextMenuProps {
@@ -92,6 +95,32 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
           {targetPhoto.width}×{targetPhoto.height} • {formatFileSize(targetPhoto.fileSize)}
         </span>
       </div>
+
+      <div className={styles.divider} />
+
+      {/* Place on Canvas */}
+      <button
+        type="button"
+        className={styles.menuItem}
+        style={{ color: 'var(--color-accent)', fontWeight: 600 }}
+        onClick={() => {
+          onClose();
+          const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
+          if (currentAlbum) {
+            const allSpreads = getAllAlbumSpreads(currentAlbum);
+            const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
+            if (activeSpread) {
+              const toPlace = isMulti ? selectedPhotos : [targetPhoto];
+              for (const p of toPlace) {
+                useEditorStore.getState().addPhotoToSpread(activeSpread.id, p);
+              }
+            }
+          }
+        }}
+      >
+        <span className={styles.menuIcon}>🖼️</span>
+        <span>{isMulti ? `Place ${count} Photos on Spread` : 'Place on Spread Canvas'}</span>
+      </button>
 
       <div className={styles.divider} />
 

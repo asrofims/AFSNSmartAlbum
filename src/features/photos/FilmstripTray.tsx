@@ -5,6 +5,9 @@ import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useAlbumStore } from '../../stores/albumStore';
+import { useEditorStore } from '../../stores/editorStore';
+import { getAllAlbumSpreads } from '../../domain/album';
 import { filterPhotos, sortPhotos, formatFileSize, PhotoSortBy, Photo } from '../../domain/photo';
 import { FolderTabs } from './FolderTabs';
 import { BatchActionBar } from './BatchActionBar';
@@ -451,19 +454,30 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                     key={photo.id}
                     className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''} ${photo.isMissing ? styles.cardMissing : ''}`}
                     onClick={(e) => handleCardClick(e, photo)}
+                    onDoubleClick={() => {
+                      const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
+                      if (currentAlbum) {
+                        const allSpreads = getAllAlbumSpreads(currentAlbum);
+                        const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
+                        if (activeSpread) {
+                          useEditorStore.getState().addPhotoToSpread(activeSpread.id, photo);
+                        }
+                      }
+                    }}
                     onContextMenu={(e) => handleCardContextMenu(e, photo)}
                     draggable={true}
                     onDragStart={(e) => handleCardDragStart(e, photo)}
-                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nPath: ${photo.filePath}\nRight-click for options`}
+                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click or drag to place on canvas\nRight-click for options`}
                   >
                     {/* Thumbnail Image */}
-                    <div className={styles.thumbnailWrapper}>
+                    <div className={styles.thumbnailWrapper} draggable={false}>
                       {photo.thumbnailPath ? (
                         <img
                           src={convertFileSrc(photo.thumbnailPath)}
                           alt={photo.fileName}
                           className={styles.thumbnailImg}
                           loading="lazy"
+                          draggable={false}
                         />
                       ) : photo.thumbnailBase64 ? (
                         <img
@@ -471,9 +485,10 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                           alt={photo.fileName}
                           className={styles.thumbnailImg}
                           loading="lazy"
+                          draggable={false}
                         />
                       ) : (
-                        <div className={styles.thumbnailPlaceholder}>
+                        <div className={styles.thumbnailPlaceholder} draggable={false}>
                           <span>{photo.format.toUpperCase()}</span>
                         </div>
                       )}

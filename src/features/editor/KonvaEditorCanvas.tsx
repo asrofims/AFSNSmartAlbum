@@ -5,6 +5,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { usePhotoStore } from '../../stores/photoStore';
 import { PhotoFrameElement, calculateSnapping } from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { convertUnit, formatDimensions } from '../../domain/units';
@@ -32,7 +33,7 @@ function PhotoFrameNode({
   isCropMode: boolean;
   scaleFactor: number;
   unit: string;
-  onSelect: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
+  onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onChange: (newAttrs: Partial<PhotoFrameElement>) => void;
@@ -96,9 +97,18 @@ function PhotoFrameNode({
       height={pixelH}
       rotation={frame.rotation || 0}
       draggable={!isCropMode}
-      onClick={onSelect}
-      onTap={onSelect}
+      onMouseDown={(e) => {
+        e.cancelBubble = true;
+        onSelect(e);
+      }}
+      onTap={(e) => {
+        e.cancelBubble = true;
+        onSelect(e);
+      }}
       onDblClick={onDoubleClick}
+      onDragStart={(e) => {
+        onSelect(e);
+      }}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={() => {
@@ -382,27 +392,49 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOverCanvas(false);
 
+    let photo: Photo | null = null;
     try {
       const rawData = e.dataTransfer.getData('application/json');
-      if (!rawData) return;
-      const photo: Photo = JSON.parse(rawData);
-
-      if (stageRef.current && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const dropClientX = e.clientX - rect.left - (containerSize.width - screenSpreadW) / 2;
-        const dropClientY = e.clientY - rect.top - (containerSize.height - screenSpreadH) / 2;
-
-        const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropClientX / scaleFactor));
-        const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropClientY / scaleFactor));
-
-        addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
-      } else {
-        addPhotoToSpread(activeSpread.id, photo);
+      if (rawData) {
+        const parsed = JSON.parse(rawData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          photo = usePhotoStore.getState().photos.find((p) => p.id === parsed[0]) || null;
+        } else if (parsed && parsed.id) {
+          photo = parsed as Photo;
+        }
       }
-    } catch (err) {
-      console.error('[AFSN] Error parsing dropped photo:', err);
+    } catch {}
+
+    if (!photo) {
+      const textId = e.dataTransfer.getData('text/plain');
+      if (textId) {
+        photo = usePhotoStore.getState().photos.find((p) => p.id === textId) || null;
+      }
+    }
+
+    if (!photo) {
+      const selIds = usePhotoStore.getState().selectedPhotoIds;
+      if (selIds.length > 0) {
+        photo = usePhotoStore.getState().photos.find((p) => p.id === selIds[0]) || null;
+      }
+    }
+
+    if (!photo) return;
+
+    if (stageRef.current) {
+      const stageBox = stageRef.current.container().getBoundingClientRect();
+      const dropX = e.clientX - stageBox.left;
+      const dropY = e.clientY - stageBox.top;
+
+      const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropX / scaleFactor));
+      const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropY / scaleFactor));
+
+      addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
+    } else {
+      addPhotoToSpread(activeSpread.id, photo);
     }
   };
 
@@ -541,8 +573,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool }: KonvaEditorCanvasPr
                   scaleFactor={scaleFactor}
                   unit={unit}
                   onSelect={(e) => {
-                    e.cancelBubble = true;
-                    selectFrame(frame.id, e.evt.shiftKey);
+                    if (e) {
+                      e.cancelBubble = true;
+                      selectFrame(frame.id, Boolean(e.evt?.shiftKey));
+                    } else {
+                      selectFrame(frame.id);
+                    }
                   }}
                   onDragMove={(e) => {
                     if (!snapEnabled) return;
