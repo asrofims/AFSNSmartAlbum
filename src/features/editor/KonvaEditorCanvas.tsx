@@ -34,6 +34,7 @@ function PhotoFrameNode({
   isSelected,
   isMuted,
   isCropMode,
+  isMultiSelectActive,
   scaleFactor,
   onSelect,
   onDragStart,
@@ -51,6 +52,7 @@ function PhotoFrameNode({
   isSelected: boolean;
   isMuted: boolean;
   isCropMode: boolean;
+  isMultiSelectActive?: boolean;
   scaleFactor: number;
   unit: string;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
@@ -175,7 +177,7 @@ function PhotoFrameNode({
       rotation={frame.rotation || 0}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
-      draggable={!isCropMode}
+      draggable={!isCropMode && !isMultiSelectActive}
       onMouseDown={(e) => {
         e.cancelBubble = true;
         // Ignore right-clicks on mouse down
@@ -767,6 +769,40 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     });
   };
 
+  // Multi-selection bounding box computation
+  const selectedElements = (activeSpread.elements || []).filter((f) =>
+    selectedFrameIds.includes(f.id)
+  );
+  const isMultiSelected = selectedElements.length > 1;
+
+  let multiSelectBounds: {
+    minX: number;
+    minY: number;
+    width: number;
+    height: number;
+    pixelX: number;
+    pixelY: number;
+    pixelW: number;
+    pixelH: number;
+  } | null = null;
+
+  if (isMultiSelected && selectedElements.length > 0) {
+    const minX = Math.min(...selectedElements.map((f) => f.x));
+    const maxX = Math.max(...selectedElements.map((f) => f.x + f.width));
+    const minY = Math.min(...selectedElements.map((f) => f.y));
+    const maxY = Math.max(...selectedElements.map((f) => f.y + f.height));
+    multiSelectBounds = {
+      minX,
+      minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      pixelX: minX * scaleFactor,
+      pixelY: minY * scaleFactor,
+      pixelW: (maxX - minX) * scaleFactor,
+      pixelH: (maxY - minY) * scaleFactor,
+    };
+  }
+
   // Handle Drag & Drop photo from filmstrip tray onto canvas
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -913,128 +949,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const handleStageMouseUp = () => {
     if (selectionRect) {
       setSelectionRect(null);
-    }
-  };
-
-  // Synchronized multi-frame drag handlers with collective bounding box snapping
-  const handleFrameDragStart = (frameId: string, e: Konva.KonvaEventObject<DragEvent>) => {
-    if (!selectedFrameIds.includes(frameId)) {
-      selectFrame(frameId, Boolean(e.evt?.shiftKey));
-      return;
-    }
-
-    primaryDragStartPosRef.current = { x: e.target.x(), y: e.target.y() };
-    const startMap = new Map<string, { x: number; y: number }>();
-    selectedFrameIds.forEach((id) => {
-      const node = stageRef.current?.findOne(`#${id}`);
-      if (node) {
-        startMap.set(id, { x: node.x(), y: node.y() });
-      }
-    });
-    dragStartPositionsRef.current = startMap;
-
-    // Compute collective union bounding box of all selected frames
-    const selectedElements = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
-    if (selectedElements.length > 0) {
-      const minX = Math.min(...selectedElements.map((f) => f.x));
-      const maxX = Math.max(...selectedElements.map((f) => f.x + f.width));
-      const minY = Math.min(...selectedElements.map((f) => f.y));
-      const maxY = Math.max(...selectedElements.map((f) => f.y + f.height));
-      initialGroupBoundsRef.current = {
-        minX,
-        minY,
-        width: maxX - minX,
-        height: maxY - minY,
-      };
-    }
-  };
-
-  const handleFrameDragMove = (_frame: PhotoFrameElement, e: Konva.KonvaEventObject<DragEvent>) => {
-    if (!primaryDragStartPosRef.current || !initialGroupBoundsRef.current) return;
-
-    const rawDeltaX = (e.target.x() - primaryDragStartPosRef.current.x) / scaleFactor;
-    const rawDeltaY = (e.target.y() - primaryDragStartPosRef.current.y) / scaleFactor;
-
-    const group = initialGroupBoundsRef.current;
-    let finalDeltaX = rawDeltaX;
-    let finalDeltaY = rawDeltaY;
-
-    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
-      clearSnapLines();
-    } else {
-      const currentGroupX = group.minX + rawDeltaX;
-      const currentGroupY = group.minY + rawDeltaY;
-
-      const otherRects = (activeSpread.elements || [])
-        .filter((f) => !selectedFrameIds.includes(f.id))
-        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-
-      const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
-
-      const snapRes = calculateSnapping(
-        { x: currentGroupX, y: currentGroupY, width: group.width, height: group.height },
-        totalSpreadPhysicalW,
-        totalSpreadPhysicalH,
-        activeSpread.safeArea,
-        gutterPhysicalW,
-        otherRects,
-        thresholdUnits,
-        unit
-      );
-
-      finalDeltaX = snapRes.snappedX - group.minX;
-      finalDeltaY = snapRes.snappedY - group.minY;
-
-      if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
-        setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-      } else {
-        clearSnapLines();
-      }
-    }
-
-    const deltaPixelsX = finalDeltaX * scaleFactor;
-    const deltaPixelsY = finalDeltaY * scaleFactor;
-
-    // Apply synchronized position to all selected frames in group
-    selectedFrameIds.forEach((id) => {
-      const initPos = dragStartPositionsRef.current.get(id);
-      const node = stageRef.current?.findOne(`#${id}`);
-      if (initPos && node) {
-        node.x(initPos.x + deltaPixelsX);
-        node.y(initPos.y + deltaPixelsY);
-      }
-    });
-  };
-
-  const handleFrameDragEnd = (frame: PhotoFrameElement, e: Konva.KonvaEventObject<DragEvent>) => {
-    clearSnapLines();
-
-    if (primaryDragStartPosRef.current && initialGroupBoundsRef.current) {
-      const finalNode = stageRef.current?.findOne(`#${frame.id}`);
-      const initialNodePos = dragStartPositionsRef.current.get(frame.id) || primaryDragStartPosRef.current;
-      const finalDeltaPhysicalX = ((finalNode?.x() ?? e.target.x()) - initialNodePos.x) / scaleFactor;
-      const finalDeltaPhysicalY = ((finalNode?.y() ?? e.target.y()) - initialNodePos.y) / scaleFactor;
-
-      const updates = selectedFrameIds.map((id) => {
-        const f = (activeSpread.elements || []).find((el) => el.id === id);
-        return {
-          id,
-          geometry: {
-            x: Math.round(((f?.x || 0) + finalDeltaPhysicalX) * 10) / 10,
-            y: Math.round(((f?.y || 0) + finalDeltaPhysicalY) * 10) / 10,
-          },
-        };
-      });
-
-      batchUpdateFrames(activeSpread.id, updates);
-      primaryDragStartPosRef.current = null;
-      initialGroupBoundsRef.current = null;
-      dragStartPositionsRef.current.clear();
-    } else {
-      updateFrameGeometry(activeSpread.id, frame.id, {
-        x: Math.round((e.target.x() / scaleFactor) * 10) / 10,
-        y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
-      });
     }
   };
 
@@ -1400,6 +1314,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   isSelected={isSelected}
                   isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
                   isCropMode={isCrop}
+                  isMultiSelectActive={isMultiSelected}
                   scaleFactor={scaleFactor}
                   unit={unit}
                   onSelect={(e) => {
@@ -1410,9 +1325,45 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       selectFrame(frame.id);
                     }
                   }}
-                  onDragStart={(e) => handleFrameDragStart(frame.id, e)}
-                  onDragMove={(e) => handleFrameDragMove(frame, e)}
-                  onDragEnd={(e) => handleFrameDragEnd(frame, e)}
+                  onDragMove={(e) => {
+                    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
+                      clearSnapLines();
+                      return;
+                    }
+                    const physicalX = e.target.x() / scaleFactor;
+                    const physicalY = e.target.y() / scaleFactor;
+                    const otherRects = (activeSpread.elements || [])
+                      .filter((f) => f.id !== frame.id)
+                      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+
+                    const snapRes = calculateSnapping(
+                      { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
+                      totalSpreadPhysicalW,
+                      totalSpreadPhysicalH,
+                      activeSpread.safeArea,
+                      gutterPhysicalW,
+                      otherRects,
+                      thresholdUnits,
+                      unit
+                    );
+
+                    if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                      e.target.x(snapRes.snappedX * scaleFactor);
+                      e.target.y(snapRes.snappedY * scaleFactor);
+                      setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                    } else {
+                      clearSnapLines();
+                    }
+                  }}
+                  onDragEnd={(e) => {
+                    clearSnapLines();
+                    updateFrameGeometry(activeSpread.id, frame.id, {
+                      x: Math.round((e.target.x() / scaleFactor) * 10) / 10,
+                      y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
+                    });
+                  }}
                   onContextMenu={(e) => {
                     setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
                   }}
@@ -1448,6 +1399,122 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 />
               );
             })}
+
+            {/* Virtual Selection Drag Box for Smooth Multi-Frame Dragging & Snapping */}
+            {multiSelectBounds && !editingCropFrameId && (
+              <Rect
+                name="multi-selection-drag-box"
+                x={multiSelectBounds.pixelX}
+                y={multiSelectBounds.pixelY}
+                width={multiSelectBounds.pixelW}
+                height={multiSelectBounds.pixelH}
+                fill="rgba(59, 130, 246, 0.001)"
+                draggable={activeTool !== 'pan'}
+                onContextMenu={(e) => {
+                  e.evt.preventDefault();
+                  e.cancelBubble = true;
+                  setContextMenu({ isOpen: true, x: e.evt.clientX, y: e.evt.clientY });
+                }}
+                onDragStart={(e) => {
+                  primaryDragStartPosRef.current = { x: e.target.x(), y: e.target.y() };
+                  const startMap = new Map<string, { x: number; y: number }>();
+                  selectedFrameIds.forEach((id) => {
+                    const node = stageRef.current?.findOne(`#${id}`);
+                    if (node) {
+                      startMap.set(id, { x: node.x(), y: node.y() });
+                    }
+                  });
+                  dragStartPositionsRef.current = startMap;
+                  initialGroupBoundsRef.current = {
+                    minX: multiSelectBounds.minX,
+                    minY: multiSelectBounds.minY,
+                    width: multiSelectBounds.width,
+                    height: multiSelectBounds.height,
+                  };
+                }}
+                onDragMove={(e) => {
+                  if (!primaryDragStartPosRef.current || !initialGroupBoundsRef.current) return;
+
+                  const rawDeltaX = (e.target.x() - primaryDragStartPosRef.current.x) / scaleFactor;
+                  const rawDeltaY = (e.target.y() - primaryDragStartPosRef.current.y) / scaleFactor;
+
+                  const group = initialGroupBoundsRef.current;
+                  let finalDeltaX = rawDeltaX;
+                  let finalDeltaY = rawDeltaY;
+
+                  if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
+                    clearSnapLines();
+                  } else {
+                    const currentGroupX = group.minX + rawDeltaX;
+                    const currentGroupY = group.minY + rawDeltaY;
+
+                    const otherRects = (activeSpread.elements || [])
+                      .filter((f) => !selectedFrameIds.includes(f.id))
+                      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+
+                    const snapRes = calculateSnapping(
+                      { x: currentGroupX, y: currentGroupY, width: group.width, height: group.height },
+                      totalSpreadPhysicalW,
+                      totalSpreadPhysicalH,
+                      activeSpread.safeArea,
+                      gutterPhysicalW,
+                      otherRects,
+                      thresholdUnits,
+                      unit
+                    );
+
+                    finalDeltaX = snapRes.snappedX - group.minX;
+                    finalDeltaY = snapRes.snappedY - group.minY;
+
+                    if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                      e.target.x(primaryDragStartPosRef.current.x + finalDeltaX * scaleFactor);
+                      e.target.y(primaryDragStartPosRef.current.y + finalDeltaY * scaleFactor);
+                      setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                    } else {
+                      clearSnapLines();
+                    }
+                  }
+
+                  const deltaPixelsX = finalDeltaX * scaleFactor;
+                  const deltaPixelsY = finalDeltaY * scaleFactor;
+
+                  // Synchronously move all member photo nodes
+                  selectedFrameIds.forEach((id) => {
+                    const initPos = dragStartPositionsRef.current.get(id);
+                    const node = stageRef.current?.findOne(`#${id}`);
+                    if (initPos && node) {
+                      node.x(initPos.x + deltaPixelsX);
+                      node.y(initPos.y + deltaPixelsY);
+                    }
+                  });
+                }}
+                onDragEnd={(e) => {
+                  clearSnapLines();
+                  if (primaryDragStartPosRef.current && initialGroupBoundsRef.current) {
+                    const finalDeltaPhysicalX = (e.target.x() - primaryDragStartPosRef.current.x) / scaleFactor;
+                    const finalDeltaPhysicalY = (e.target.y() - primaryDragStartPosRef.current.y) / scaleFactor;
+
+                    const updates = selectedFrameIds.map((id) => {
+                      const f = (activeSpread.elements || []).find((el) => el.id === id);
+                      return {
+                        id,
+                        geometry: {
+                          x: Math.round(((f?.x || 0) + finalDeltaPhysicalX) * 10) / 10,
+                          y: Math.round(((f?.y || 0) + finalDeltaPhysicalY) * 10) / 10,
+                        },
+                      };
+                    });
+
+                    batchUpdateFrames(activeSpread.id, updates);
+                    primaryDragStartPosRef.current = null;
+                    initialGroupBoundsRef.current = null;
+                    dragStartPositionsRef.current.clear();
+                  }
+                }}
+              />
+            )}
 
             {/* Dynamic Contextual Transformer */}
             <Transformer
