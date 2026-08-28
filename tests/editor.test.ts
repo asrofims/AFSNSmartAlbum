@@ -219,4 +219,10 @@ console.assert(multiResizeUpdates[1].geometry.x === 135, `Frame B new x should b
 const preservedGap = (multiResizeUpdates[1].geometry.x ?? 0) - ((multiResizeUpdates[0].geometry.x ?? 0) + (multiResizeUpdates[0].geometry.width ?? 0));
 console.assert(preservedGap === 5, `Gap between frames must remain strictly 5mm after resize, got ${preservedGap}mm`);
 
+// Assert Aspect Ratio is 100% strictly preserved
+const ratioA = (multiResizeUpdates[0].geometry.width ?? 0) / (multiResizeUpdates[0].geometry.height ?? 0);
+console.assert(Math.abs(ratioA - (100 / 80)) < 0.001, `Frame A aspect ratio must remain exactly 1.25, got ${ratioA}`);
+const ratioB = (multiResizeUpdates[1].geometry.width ?? 0) / (multiResizeUpdates[1].geometry.height ?? 0);
+console.assert(Math.abs(ratioB - (100 / 80)) < 0.001, `Frame B aspect ratio must remain exactly 1.25, got ${ratioB}`);
+
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, and Snapping tests passed successfully!');

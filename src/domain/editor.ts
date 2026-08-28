@@ -1047,20 +1047,19 @@ export function calculateMultiFrameResize(
   if (initialFrames.length === 1) {
     const f = initialFrames[0];
     if (!f) return [];
-    const scaleX = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
-    const scaleY = initialGroupBounds.height > 0 ? newGroupBounds.height / initialGroupBounds.height : 1;
+    const uniformScale = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
     return [{
       id: f.id,
       geometry: {
         x: roundToHundredth(newGroupBounds.x),
         y: roundToHundredth(newGroupBounds.y),
-        width: roundToHundredth(Math.max(1, f.width * scaleX)),
-        height: roundToHundredth(Math.max(1, f.height * scaleY)),
+        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
+        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
       },
     }];
   }
 
-  // --- 1. Horizontal Column Clustering & Gap Preservation ---
+  // --- 1. Horizontal Column Clustering & Gap Analysis ---
   const sortedByX = [...initialFrames].sort((a, b) => a.x - b.x);
   const columnClusters: FrameBounds[][] = [];
   const colClusterTolerance = 2.0; // mm
@@ -1095,32 +1094,8 @@ export function calculateMultiFrameResize(
 
   const totalHorizontalGaps = horizontalGaps.reduce((sum, g) => sum + g, 0);
   const totalColsWidth = columnWidths.reduce((sum, w) => sum + w, 0);
-  const availableNewWidth = Math.max(1, newGroupBounds.width - totalHorizontalGaps);
-  const scaleX = totalColsWidth > 0 ? availableNewWidth / totalColsWidth : 1;
 
-  const newColPositions: number[] = [];
-  let curColX = newGroupBounds.x;
-  for (let i = 0; i < columnClusters.length; i++) {
-    newColPositions.push(curColX);
-    const newColW = (columnWidths[i] ?? 0) * scaleX;
-    const gap = horizontalGaps[i] ?? 0;
-    curColX += newColW + gap;
-  }
-
-  const frameXUpdates = new Map<string, { x: number; width: number }>();
-  columnClusters.forEach((col, colIdx) => {
-    const baseColX = newColPositions[colIdx] ?? newGroupBounds.x;
-    for (const f of col) {
-      const origColMinX = Math.min(...col.map((item) => item.x));
-      const internalOffset = (f.x - origColMinX) * scaleX;
-      frameXUpdates.set(f.id, {
-        x: roundToHundredth(baseColX + internalOffset),
-        width: roundToHundredth(Math.max(1, f.width * scaleX)),
-      });
-    }
-  });
-
-  // --- 2. Vertical Row Clustering & Gap Preservation ---
+  // --- 2. Vertical Row Clustering & Gap Analysis ---
   const sortedByY = [...initialFrames].sort((a, b) => a.y - b.y);
   const rowClusters: FrameBounds[][] = [];
   const rowClusterTolerance = 2.0; // mm
@@ -1155,27 +1130,81 @@ export function calculateMultiFrameResize(
 
   const totalVerticalGaps = verticalGaps.reduce((sum, g) => sum + g, 0);
   const totalRowsHeight = rowHeights.reduce((sum, h) => sum + h, 0);
-  const availableNewHeight = Math.max(1, newGroupBounds.height - totalVerticalGaps);
-  const scaleY = totalRowsHeight > 0 ? availableNewHeight / totalRowsHeight : 1;
 
+  // --- 3. UNIFORM ASPECT-RATIO PRESERVING SCALE FACTOR ---
+  // To strictly preserve the aspect ratio of each photo, we use a single uniform frame scale
+  const scaleXFromGroup = totalColsWidth > 0
+    ? Math.max(0.05, (newGroupBounds.width - totalHorizontalGaps) / totalColsWidth)
+    : 1;
+  const scaleYFromGroup = totalRowsHeight > 0
+    ? Math.max(0.05, (newGroupBounds.height - totalVerticalGaps) / totalRowsHeight)
+    : 1;
+
+  // Determine dominant change from initial bounds to pick uniform scaling factor
+  const rawRatioX = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
+  const rawRatioY = initialGroupBounds.height > 0 ? newGroupBounds.height / initialGroupBounds.height : 1;
+  const uniformScale = Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
+    ? scaleXFromGroup
+    : scaleYFromGroup;
+
+  // --- 4. Anchor-Directional Origin Alignment ---
+  const newTotalWidth = totalColsWidth * uniformScale + totalHorizontalGaps;
+  const newTotalHeight = totalRowsHeight * uniformScale + totalVerticalGaps;
+
+  // Check if left/top was the dragged anchor (position changed significantly)
+  const isLeftDragged = Math.abs(newGroupBounds.x - initialGroupBounds.x) > 0.01;
+  const isTopDragged = Math.abs(newGroupBounds.y - initialGroupBounds.y) > 0.01;
+
+  const originX = isLeftDragged
+    ? initialGroupBounds.x + initialGroupBounds.width - newTotalWidth
+    : initialGroupBounds.x;
+  const originY = isTopDragged
+    ? initialGroupBounds.y + initialGroupBounds.height - newTotalHeight
+    : initialGroupBounds.y;
+
+  // Calculate new column positions preserving horizontal gaps
+  const newColPositions: number[] = [];
+  let curColX = originX;
+  for (let i = 0; i < columnClusters.length; i++) {
+    newColPositions.push(curColX);
+    const newColW = (columnWidths[i] ?? 0) * uniformScale;
+    const gap = horizontalGaps[i] ?? 0;
+    curColX += newColW + gap;
+  }
+
+  // Calculate new row positions preserving vertical gaps
   const newRowPositions: number[] = [];
-  let curRowY = newGroupBounds.y;
+  let curRowY = originY;
   for (let i = 0; i < rowClusters.length; i++) {
     newRowPositions.push(curRowY);
-    const newRowH = (rowHeights[i] ?? 0) * scaleY;
+    const newRowH = (rowHeights[i] ?? 0) * uniformScale;
     const gap = verticalGaps[i] ?? 0;
     curRowY += newRowH + gap;
   }
 
+  // Map each frame to its new position and dimension
+  const frameXUpdates = new Map<string, { x: number; width: number }>();
+  columnClusters.forEach((col, colIdx) => {
+    const baseColX = newColPositions[colIdx] ?? originX;
+    for (const f of col) {
+      const origColMinX = Math.min(...col.map((item) => item.x));
+      const internalOffset = (f.x - origColMinX) * uniformScale;
+      frameXUpdates.set(f.id, {
+        x: roundToHundredth(baseColX + internalOffset),
+        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
+      });
+    }
+  });
+
   const frameYUpdates = new Map<string, { y: number; height: number }>();
   rowClusters.forEach((row, rowIdx) => {
-    const baseRowY = newRowPositions[rowIdx] ?? newGroupBounds.y;
+    const baseRowY = newRowPositions[rowIdx] ?? originY;
     for (const f of row) {
       const origRowMinY = Math.min(...row.map((item) => item.y));
-      const internalOffset = (f.y - origRowMinY) * scaleY;
+      const internalOffset = (f.y - origRowMinY) * uniformScale;
       frameYUpdates.set(f.id, {
         y: roundToHundredth(baseRowY + internalOffset),
-        height: roundToHundredth(Math.max(1, f.height * scaleY)),
+        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
       });
     }
   });
@@ -1188,8 +1217,8 @@ export function calculateMultiFrameResize(
       geometry: {
         x: xUpdate?.x ?? roundToHundredth(f.x),
         y: yUpdate?.y ?? roundToHundredth(f.y),
-        width: xUpdate?.width ?? roundToHundredth(f.width),
-        height: yUpdate?.height ?? roundToHundredth(f.height),
+        width: xUpdate?.width ?? roundToHundredth(f.width * uniformScale),
+        height: yUpdate?.height ?? roundToHundredth(f.height * uniformScale),
       },
     };
   });
