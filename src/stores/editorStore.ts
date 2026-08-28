@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { clampCropTransform, getCenteredCrop, getCoverImageSize, PhotoFrameElement, SnapLine } from '../domain/editor';
+import { clampCropTransform, getPhotoAspect, PhotoFrameElement, SnapLine } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
@@ -113,12 +113,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const posX = pos?.x !== undefined ? pos.x - frameW / 2 : (pageW - frameW) / 2;
     const posY = pos?.y !== undefined ? pos.y - frameH / 2 : (pageH - frameH) / 2;
 
-    const frameAspect = frameW / Math.max(1, frameH);
-    const imageH = photoAspect >= frameAspect ? frameH : frameW / photoAspect;
-    const imageW = photoAspect >= frameAspect ? imageH * photoAspect : frameW;
-    const cropX = (frameW - imageW) / 2;
-    const cropY = (frameH - imageH) / 2;
-
     const newFrame: PhotoFrameElement = {
       id: `frame-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       type: 'photo',
@@ -136,10 +130,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoAspect: photoAspect,
       originalWidth: Math.round(frameW * 10) / 10,
       originalHeight: Math.round(frameH * 10) / 10,
-      imageWidth: Math.round(imageW * 10) / 10,
-      imageHeight: Math.round(imageH * 10) / 10,
-      cropX: Math.round(cropX * 10) / 10,
-      cropY: Math.round(cropY * 10) / 10,
+      cropX: 0,
+      cropY: 0,
       cropScale: 1.0,
       cropRotation: 0,
       borderEnabled: currentProject.borderEnabled || false,
@@ -430,7 +422,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   exitCropMode: () => {
-    set({ editingCropFrameId: null });
+    const frameId = get().editingCropFrameId;
+    set({
+      editingCropFrameId: null,
+      selectedFrameIds: frameId ? [frameId] : get().selectedFrameIds,
+    });
   },
 
   resetToOriginalRatio: (spreadId, frameId) => {
@@ -445,31 +441,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
     if (!frame) return;
 
-    const aspect = frame.photoAspect || ((frame.imageWidth || frame.width) / Math.max(1, frame.imageHeight || frame.height));
+    const aspect = getPhotoAspect(frame);
     const newHeight = Math.round((frame.width / aspect) * 10) / 10;
 
-    const nextFrame = {
-      ...frame,
-      height: newHeight,
-      imageWidth: frame.width,
-      imageHeight: newHeight,
-      cropX: 0,
-      cropY: 0,
-      cropScale: 1.0,
-    };
-    const nextCrop = clampCropTransform(nextFrame, getCenteredCrop(nextFrame));
     const { updateFrameGeometry } = get();
     updateFrameGeometry(spreadId, frameId, {
       height: newHeight,
-      imageWidth: nextFrame.imageWidth,
-      imageHeight: nextFrame.imageHeight,
-      cropX: nextCrop.cropX,
-      cropY: nextCrop.cropY,
-      cropScale: nextCrop.cropScale,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
     });
   },
 
   resetCrop: (spreadId, frameId) => {
+    const { updateFrameGeometry } = get();
+    updateFrameGeometry(spreadId, frameId, {
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
+    });
+  },
+
+  updateCrop: (spreadId, frameId, crop) => {
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
@@ -481,22 +474,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
     if (!frame) return;
 
-    const imageSize = getCoverImageSize(frame);
-    const nextCrop = clampCropTransform(frame, getCenteredCrop(frame));
-
-    const { updateFrameGeometry } = get();
-    updateFrameGeometry(spreadId, frameId, {
-      imageWidth: imageSize.width,
-      imageHeight: imageSize.height,
-      cropX: nextCrop.cropX,
-      cropY: nextCrop.cropY,
-      cropScale: nextCrop.cropScale,
-    });
-  },
-
-  updateCrop: (spreadId, frameId, crop) => {
-    const { updateFrameGeometry } = get();
-    updateFrameGeometry(spreadId, frameId, crop);
+    const nextCrop = clampCropTransform(frame, crop);
+    get().updateFrameGeometry(spreadId, frameId, nextCrop);
   },
 
   setSnapLines: (lines: SnapLine[]) => {

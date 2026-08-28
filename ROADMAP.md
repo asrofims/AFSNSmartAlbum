@@ -50,6 +50,7 @@
 - [x] Move
 - [x] Resize
 - [x] Crop
+- [x] Professional crop interaction model
 - [x] Rotate
 - [x] Zoom
 - [x] Pan

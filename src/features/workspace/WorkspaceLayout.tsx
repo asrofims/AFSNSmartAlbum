@@ -10,6 +10,7 @@ import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
+import { clampCropTransform, zoomCropAtPoint } from '../../domain/editor';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
@@ -36,8 +37,12 @@ export function WorkspaceLayout() {
 
   const selectedFrameIds = useEditorStore((s) => s.selectedFrameIds);
   const updateFrameGeometry = useEditorStore((s) => s.updateFrameGeometry);
+  const updateCrop = useEditorStore((s) => s.updateCrop);
   const resetToOriginalRatio = useEditorStore((s) => s.resetToOriginalRatio);
   const resetCrop = useEditorStore((s) => s.resetCrop);
+  const editingCropFrameId = useEditorStore((s) => s.editingCropFrameId);
+  const enterCropMode = useEditorStore((s) => s.enterCropMode);
+  const exitCropMode = useEditorStore((s) => s.exitCropMode);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
 
@@ -402,6 +407,8 @@ export function WorkspaceLayout() {
                 const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
 
                 if (!selectedFrame || !activeSpread) return null;
+                const isEditingCrop = editingCropFrameId === selectedFrame.id;
+                const cropTransform = clampCropTransform(selectedFrame);
 
                 return (
                   <div
@@ -416,6 +423,91 @@ export function WorkspaceLayout() {
                     <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span>Selected Photo Frame</span>
                     </div>
+
+                    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isEditingCrop ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>
+                        Photo Crop
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (isEditingCrop ? exitCropMode() : enterCropMode(selectedFrame.id))}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: isEditingCrop ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                          border: isEditingCrop ? '1px solid rgba(245, 158, 11, 0.55)' : '1px solid var(--color-border)',
+                          color: isEditingCrop ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                        title={isEditingCrop ? 'Finish crop mode' : 'Edit photo crop'}
+                      >
+                        {isEditingCrop ? 'Done' : 'Edit'}
+                      </button>
+                    </div>
+
+                    {isEditingCrop && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(245, 158, 11, 0.28)', backgroundColor: 'rgba(245, 158, 11, 0.06)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                          <span>Zoom</span>
+                          <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{Math.round(cropTransform.cropScale * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={3.5}
+                          step={0.05}
+                          value={cropTransform.cropScale}
+                          onChange={(e) =>
+                            updateCrop(
+                              activeSpread.id,
+                              selectedFrame.id,
+                              zoomCropAtPoint(
+                                selectedFrame,
+                                { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
+                                Number(e.target.value)
+                              )
+                            )
+                          }
+                          style={{ width: '100%', accentColor: 'var(--color-warning)' }}
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => resetCrop(activeSpread.id, selectedFrame.id)}
+                            style={{
+                              padding: '4px 6px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                              border: '1px solid var(--color-border)',
+                              color: 'var(--color-text-secondary)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Reset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={exitCropMode}
+                            style={{
+                              padding: '4px 6px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                              border: '1px solid rgba(245, 158, 11, 0.55)',
+                              color: 'var(--color-warning)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Frame Border Switch */}
                     <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

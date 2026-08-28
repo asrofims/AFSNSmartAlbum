@@ -1,4 +1,16 @@
-import { calculateSnapping, PhotoFrameElement, RectBounds } from '../src/domain/editor';
+import {
+  calculateCoverDimensions,
+  calculateImageOffset,
+  calculateSnapping,
+  clampCropTransform,
+  getCenteredCrop,
+  getCoverImageSize,
+  moveCropBy,
+  PhotoFrameElement,
+  RectBounds,
+  resizeCropFromHandle,
+  zoomCropAtPoint,
+} from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
 
@@ -36,5 +48,64 @@ console.assert(snapNeighbor.snappedX === 50, `Should align left with neighboring
 const draggedNearTopSafe: RectBounds = { x: 100, y: 11.2, width: 100, height: 80 };
 const snapY = calculateSnapping(draggedNearTopSafe, spreadWidth, spreadHeight, safeArea, gutterWidth, [], 3.0);
 console.assert(snapY.snappedY === 10, `Should snap top to 10mm safe margin, got ${snapY.snappedY}`);
+
+// 4. Test crop cover math keeps photo bounds covering the frame
+const squareFrameWithWidePhoto: PhotoFrameElement = {
+  id: 'crop-test-frame',
+  type: 'photo',
+  photoId: 'photo-1',
+  filePath: 'sample.jpg',
+  previewPath: 'sample-preview.jpg',
+  thumbnailPath: 'sample-thumb.jpg',
+  fileName: 'sample.jpg',
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 100,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 1.5,
+  originalWidth: 150,
+  originalHeight: 100,
+  imageWidth: 150,
+  imageHeight: 100,
+  cropX: 200,
+  cropY: -200,
+  cropScale: 0.2,
+  cropRotation: 0,
+  borderEnabled: false,
+  borderWidth: 1,
+  borderColor: '#ffffff',
+  opacity: 1,
+};
+
+const coverSize = getCoverImageSize(squareFrameWithWidePhoto);
+console.assert(coverSize.width === 150, `Wide photo should cover square frame at 150mm width, got ${coverSize.width}`);
+console.assert(coverSize.height === 100, `Wide photo should cover square frame at 100mm height, got ${coverSize.height}`);
+
+const centeredCrop = getCenteredCrop();
+console.assert(centeredCrop.cropX === 0, `Centered crop should have normalized cropX of 0, got ${centeredCrop.cropX}`);
+console.assert(centeredCrop.cropY === 0, `Centered crop should have normalized cropY of 0, got ${centeredCrop.cropY}`);
+console.assert(centeredCrop.cropScale === 1.0, `Centered crop should have zoom of 1.0, got ${centeredCrop.cropScale}`);
+
+// Test Offset Math
+const offsetAtCenter = calculateImageOffset(100, 100, 1.5, 1.0, 0, 0);
+console.assert(offsetAtCenter.offsetX === -25, `Center offset for 150x100 photo in 100x100 frame should be -25, got ${offsetAtCenter.offsetX}`);
+console.assert(offsetAtCenter.offsetY === 0, `Center offset Y should be 0, got ${offsetAtCenter.offsetY}`);
+
+// Test Left Alignment (normPanX = -1.0)
+const offsetAtLeft = calculateImageOffset(100, 100, 1.5, 1.0, -1.0, 0);
+console.assert(offsetAtLeft.offsetX === -50, `Left offset should be -50, got ${offsetAtLeft.offsetX}`);
+
+// Test Right Alignment (normPanX = +1.0)
+const offsetAtRight = calculateImageOffset(100, 100, 1.5, 1.0, 1.0, 0);
+console.assert(offsetAtRight.offsetX === 0, `Right offset should be 0, got ${offsetAtRight.offsetX}`);
+
+// Test Zoom (cropScale = 2.0)
+const offsetAtZoom2 = calculateImageOffset(100, 100, 1.5, 2.0, 0, 0);
+console.assert(offsetAtZoom2.width === 300, `Width at 2x zoom should be 300, got ${offsetAtZoom2.width}`);
+console.assert(offsetAtZoom2.height === 200, `Height at 2x zoom should be 200, got ${offsetAtZoom2.height}`);
+console.assert(offsetAtZoom2.offsetX === -100, `OffsetX at 2x zoom center should be -100, got ${offsetAtZoom2.offsetX}`);
+console.assert(offsetAtZoom2.offsetY === -50, `OffsetY at 2x zoom center should be -50, got ${offsetAtZoom2.offsetY}`);
 
 console.log('✓ All Editor domain and Smart Snapping unit tests passed successfully!');

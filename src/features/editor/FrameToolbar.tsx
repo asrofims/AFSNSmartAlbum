@@ -1,7 +1,7 @@
 import { useEditorStore } from '../../stores/editorStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { clampCropTransform } from '../../domain/editor';
+import { zoomCropAtPoint } from '../../domain/editor';
 import styles from './FrameToolbar.module.css';
 
 export function FrameToolbar() {
@@ -20,6 +20,7 @@ export function FrameToolbar() {
     resetToOriginalRatio,
     resetCrop,
     updateFrameGeometry,
+    updateCrop,
   } = useEditorStore();
 
   if (!currentAlbum || selectedFrameIds.length === 0) return null;
@@ -34,10 +35,12 @@ export function FrameToolbar() {
 
   const isCrop = editingCropFrameId === frame.id;
   const updateCropZoom = (delta: number) => {
-    const nextCrop = clampCropTransform(frame, {
-      cropScale: (frame.cropScale || 1.0) + delta,
-    });
-    updateFrameGeometry(activeSpread.id, frame.id, nextCrop);
+    const nextCrop = zoomCropAtPoint(
+      frame,
+      { x: frame.width / 2, y: frame.height / 2 },
+      (frame.cropScale || 1.0) + delta
+    );
+    updateCrop(activeSpread.id, frame.id, nextCrop);
   };
 
   return (

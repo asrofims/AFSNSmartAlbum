@@ -6,7 +6,13 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { usePhotoStore } from '../../stores/photoStore';
-import { PhotoFrameElement, calculateSnapping, clampCropTransform, getCoverImageSize } from '../../domain/editor';
+import {
+  PhotoFrameElement,
+  calculateSnapping,
+  calculateImageOffset,
+  getPhotoAspect,
+  clamp,
+} from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { convertUnit, formatDimensions } from '../../domain/units';
 import { Photo } from '../../domain/photo';
@@ -21,24 +27,28 @@ interface KonvaEditorCanvasProps {
 // Single Photo Frame Component rendered with Konva
 function PhotoFrameNode({
   frame,
+  isMuted,
   isCropMode,
   scaleFactor,
   onSelect,
   onDragMove,
   onDragEnd,
-  onChange,
+  onFrameChange,
+  onCropChange,
   onDoubleClick,
   unit,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
+  isMuted: boolean;
   isCropMode: boolean;
   scaleFactor: number;
   unit: string;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onChange: (newAttrs: Partial<PhotoFrameElement>) => void;
+  onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
+  onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
 }) {
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
@@ -56,36 +66,34 @@ function PhotoFrameNode({
     img.onload = () => setImageObj(img);
   }, [frame.previewPath, frame.thumbnailPath, frame.filePath]);
 
-  // Convert physical geometry (mm) to screen pixels (px)
+  // Convert physical geometry (mm/cm) to screen pixels (px)
   const pixelX = frame.x * scaleFactor;
   const pixelY = frame.y * scaleFactor;
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
 
-  // Frame is the clipping window. Crop mode only moves/zooms the photo inside it.
-  const imageSize = getCoverImageSize(frame);
-  const cropTransform = clampCropTransform(frame);
-  const renderImgW = imageSize.width * scaleFactor * cropTransform.cropScale;
-  const renderImgH = imageSize.height * scaleFactor * cropTransform.cropScale;
-  const offsetX = cropTransform.cropX * scaleFactor;
-  const offsetY = cropTransform.cropY * scaleFactor;
+  // Real natural photo aspect ratio
+  const naturalAspect = imageObj && imageObj.naturalWidth && imageObj.naturalHeight
+    ? imageObj.naturalWidth / imageObj.naturalHeight
+    : getPhotoAspect(frame);
 
-  const updateCropTransform = (crop: Partial<typeof cropTransform>) => {
-    onChange(clampCropTransform(frame, crop));
-  };
+  // Calculate cover dimensions and clamped pixel offset inside frame
+  const { offsetX: baseOffsetPhysicalX, offsetY: baseOffsetPhysicalY, width: imgPhysicalW, height: imgPhysicalH } =
+    calculateImageOffset(
+      frame.width,
+      frame.height,
+      naturalAspect,
+      frame.cropScale || 1.0,
+      frame.cropX || 0,
+      frame.cropY || 0
+    );
 
-  const updateCenteredCropZoom = (nextScale: number) => {
-    const anchorX = frame.width / 2;
-    const anchorY = frame.height / 2;
-    const scaleRatio = nextScale / Math.max(0.1, cropTransform.cropScale);
-    updateCropTransform({
-      cropScale: nextScale,
-      cropX: anchorX - (anchorX - cropTransform.cropX) * scaleRatio,
-      cropY: anchorY - (anchorY - cropTransform.cropY) * scaleRatio,
-    });
-  };
+  const renderImgW = imgPhysicalW * scaleFactor;
+  const renderImgH = imgPhysicalH * scaleFactor;
+  const offsetX = baseOffsetPhysicalX * scaleFactor;
+  const offsetY = baseOffsetPhysicalY * scaleFactor;
 
-  const setCursor = (e: Konva.KonvaEventObject<MouseEvent>, cursor: string) => {
+  const setCursor = (e: Konva.KonvaEventObject<any>, cursor: string) => {
     const stage = e.target.getStage();
     if (stage) {
       stage.container().style.cursor = cursor;
@@ -101,21 +109,29 @@ function PhotoFrameNode({
       width={pixelW}
       height={pixelH}
       rotation={frame.rotation || 0}
+      opacity={isMuted ? 0.38 : 1}
+      listening={!isMuted}
       draggable={!isCropMode}
       onMouseDown={(e) => {
         e.cancelBubble = true;
-        onSelect(e);
+        if (!isCropMode) {
+          onSelect(e);
+        }
       }}
       onTap={(e) => {
         e.cancelBubble = true;
-        onSelect(e);
+        if (!isCropMode) {
+          onSelect(e);
+        }
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
         onDoubleClick();
       }}
       onDragStart={(e) => {
-        onSelect(e);
+        if (!isCropMode) {
+          onSelect(e);
+        }
       }}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
@@ -146,7 +162,7 @@ function PhotoFrameNode({
         const newW = Math.max(5, (node.width() * scaleX) / scaleFactor);
         const newH = Math.max(5, (node.height() * scaleY) / scaleFactor);
 
-        onChange({
+        onFrameChange({
           x: Math.round((node.x() / scaleFactor) * 10) / 10,
           y: Math.round((node.y() / scaleFactor) * 10) / 10,
           width: Math.round(newW * 10) / 10,
@@ -155,7 +171,7 @@ function PhotoFrameNode({
         });
       }}
     >
-      {/* Ghost Reveal: Semi-transparent uncropped original image outside the frame */}
+      {/* Ghost Reveal: Semi-transparent uncropped original image outside the frame in Crop Mode */}
       {isCropMode && imageObj && (
         <Group listening={false}>
           <KonvaImage
@@ -164,21 +180,21 @@ function PhotoFrameNode({
             y={offsetY}
             width={renderImgW}
             height={renderImgH}
-            opacity={0.28}
+            opacity={0.25}
           />
           <Rect
             x={offsetX}
             y={offsetY}
             width={renderImgW}
             height={renderImgH}
-            stroke="rgba(245, 158, 11, 0.9)"
+            stroke="rgba(245, 158, 11, 0.8)"
             strokeWidth={1.5}
-            dash={[5, 4]}
+            dash={[6, 4]}
           />
         </Group>
       )}
 
-      {/* Background clipping rect */}
+      {/* Clipped Photo Viewport */}
       <Group
         clipFunc={(ctx) => {
           ctx.rect(0, 0, pixelW, pixelH);
@@ -193,6 +209,11 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             draggable={isCropMode}
+            onMouseDown={(e) => {
+              if (isCropMode) {
+                e.cancelBubble = true;
+              }
+            }}
             onMouseEnter={(e) => {
               if (isCropMode) setCursor(e, 'move');
             }}
@@ -202,45 +223,50 @@ function PhotoFrameNode({
                 e.evt.preventDefault();
                 e.cancelBubble = true;
                 const scaleDelta = e.evt.deltaY < 0 ? 0.1 : -0.1;
-                updateCenteredCropZoom(cropTransform.cropScale + scaleDelta);
+                const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 10) / 10, 1.0, 3.5);
+                onCropChange({ cropScale: newScale });
               }
             }}
             onDragMove={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
-                const nextCrop = clampCropTransform(frame, {
-                  cropX: e.target.x() / scaleFactor,
-                  cropY: e.target.y() / scaleFactor,
-                  cropScale: cropTransform.cropScale,
-                });
-                e.target.x(nextCrop.cropX * scaleFactor);
-                e.target.y(nextCrop.cropY * scaleFactor);
+                const maxExcessX = Math.max(0, renderImgW - pixelW);
+                const maxExcessY = Math.max(0, renderImgH - pixelH);
+                
+                let targetX = -(maxExcessX / 2);
+                let targetY = -(maxExcessY / 2);
+                
+                if (maxExcessX > 0.5) {
+                  targetX = clamp(e.target.x(), -maxExcessX, 0);
+                }
+                if (maxExcessY > 0.5) {
+                  targetY = clamp(e.target.y(), -maxExcessY, 0);
+                }
+                e.target.x(targetX);
+                e.target.y(targetY);
               }
             }}
             onDragEnd={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
-                updateCropTransform({
-                  cropX: e.target.x() / scaleFactor,
-                  cropY: e.target.y() / scaleFactor,
-                  cropScale: cropTransform.cropScale,
-                });
-              }
-            }}
-            onTransformEnd={(e) => {
-              if (isCropMode) {
-                const node = e.target as Konva.Image;
-                const scaleX = node.scaleX();
-                const scaleY = node.scaleY();
-                node.scaleX(1);
-                node.scaleY(1);
-                const nextScale = cropTransform.cropScale * Math.max(scaleX, scaleY);
-                const newCropX = node.x() / scaleFactor;
-                const newCropY = node.y() / scaleFactor;
-                updateCropTransform({
-                  cropX: Math.round(newCropX * 10) / 10,
-                  cropY: Math.round(newCropY * 10) / 10,
-                  cropScale: nextScale,
+                const maxExcessX = Math.max(0, renderImgW - pixelW);
+                const maxExcessY = Math.max(0, renderImgH - pixelH);
+                
+                let normX = 0;
+                let normY = 0;
+                if (maxExcessX > 0.5) {
+                  const targetX = clamp(e.target.x(), -maxExcessX, 0);
+                  normX = (targetX + maxExcessX / 2) / (maxExcessX / 2);
+                }
+                if (maxExcessY > 0.5) {
+                  const targetY = clamp(e.target.y(), -maxExcessY, 0);
+                  normY = (targetY + maxExcessY / 2) / (maxExcessY / 2);
+                }
+                
+                onCropChange({
+                  cropX: Math.round(clamp(normX, -1, 1) * 1000) / 1000,
+                  cropY: Math.round(clamp(normY, -1, 1) * 1000) / 1000,
+                  cropScale: frame.cropScale || 1.0,
                 });
               }
             }}
@@ -276,14 +302,14 @@ function PhotoFrameNode({
             dash={[6, 4]}
           />
           {/* Rule of Thirds Lines */}
-          <Line points={[pixelW / 3, 0, pixelW / 3, pixelH]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Line points={[pixelW / 3, 0, pixelW / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
+          <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
+          <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
+          <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
         </Group>
       )}
 
-      {/* Real-time Dynamic Dimension Badge during crop/resize */}
+      {/* Real-time Dynamic Dimension Badge during resize */}
       {liveDimensions && (
         <Group y={-26} x={Math.max(0, (pixelW - 110) / 2)} listening={false}>
           <Rect
@@ -335,11 +361,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     clearSelection,
     addPhotoToSpread,
     updateFrameGeometry,
+    updateCrop,
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
     enterCropMode,
     exitCropMode,
+    resetCrop,
     setSnapLines,
     clearSnapLines,
     nudgeSelected,
@@ -385,15 +413,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     if (!trRef.current || !stageRef.current) return;
 
     if (editingCropFrameId) {
-      // In Crop Mode: Transformer attaches to the Photo Image behind the window!
-      const imgNode = stageRef.current.findOne(`#crop-img-${editingCropFrameId}`);
-      if (imgNode) {
-        trRef.current.nodes([imgNode]);
-        trRef.current.forceUpdate();
-        trRef.current.getLayer()?.batchDraw();
-      } else {
-        trRef.current.nodes([]);
-      }
+      trRef.current.nodes([]);
+      trRef.current.forceUpdate();
+      trRef.current.getLayer()?.batchDraw();
     } else if (selectedFrameIds.length > 0) {
       // In Normal Layout Mode: Transformer attaches to the Frame Window!
       const selectedNodes = selectedFrameIds
@@ -418,6 +440,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       if (!activeSpread) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (editingCropFrameId) {
+          e.preventDefault();
+          return;
+        }
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           deleteSelectedFrames(activeSpread.id);
@@ -428,8 +454,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           exitCropMode();
         }
       } else if (e.key === 'Escape') {
-        clearSelection();
-        exitCropMode();
+        if (editingCropFrameId) {
+          e.preventDefault();
+          exitCropMode();
+        } else {
+          clearSelection();
+        }
       } else if (e.ctrlKey && e.key === 'c') {
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
@@ -439,6 +469,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         e.preventDefault();
         pasteFrames(activeSpread.id);
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (editingCropFrameId) {
+          const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
+          if (cropFrame) {
+            e.preventDefault();
+            const step = e.shiftKey ? 0.05 : 0.01;
+            let dx = 0;
+            let dy = 0;
+            if (e.key === 'ArrowLeft') dx = -step;
+            if (e.key === 'ArrowRight') dx = step;
+            if (e.key === 'ArrowUp') dy = -step;
+            if (e.key === 'ArrowDown') dy = step;
+            updateCrop(activeSpread.id, cropFrame.id, {
+              cropX: clamp((cropFrame.cropX || 0) + dx, -1, 1),
+              cropY: clamp((cropFrame.cropY || 0) + dy, -1, 1),
+              cropScale: cropFrame.cropScale || 1.0,
+            });
+          }
+          return;
+        }
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           const step = e.shiftKey ? 5.0 : 1.0;
@@ -458,11 +507,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   }, [
     selectedFrameIds,
     activeSpread?.id,
+    editingCropFrameId,
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
     clearSelection,
     exitCropMode,
+    updateFrameGeometry,
+    updateCrop,
     nudgeSelected,
   ]);
 
@@ -519,6 +571,35 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
   const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
+  const activeCropFrame = editingCropFrameId
+    ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
+    : null;
+  const currentCropZoom = activeCropFrame?.cropScale || 1.0;
+  const cropHudWidth = 320;
+  const cropHudLeft = activeCropFrame
+    ? Math.max(
+        8,
+        Math.min(
+          screenSpreadW - cropHudWidth - 8,
+          activeCropFrame.x * scaleFactor + (activeCropFrame.width * scaleFactor - cropHudWidth) / 2
+        )
+      )
+    : 8;
+  const cropHudTop = activeCropFrame
+    ? Math.min(
+        screenSpreadH - 45,
+        Math.max(8, (activeCropFrame.y + activeCropFrame.height) * scaleFactor + 12)
+      )
+    : 8;
+  const updateActiveCropZoom = (nextZoom: number) => {
+    if (!activeCropFrame) return;
+    const clampedZoom = clamp(Math.round(nextZoom * 100) / 100, 1.0, 3.5);
+    updateCrop(activeSpread.id, activeCropFrame.id, {
+      cropScale: clampedZoom,
+      cropX: activeCropFrame.cropX || 0,
+      cropY: activeCropFrame.cropY || 0,
+    });
+  };
 
   // Handle Drag & Drop photo from filmstrip tray onto canvas
   const handleDragOver = (e: React.DragEvent) => {
@@ -582,7 +663,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   return (
     <div
       ref={containerRef}
-      className={`${styles.canvasContainer} ${activeTool === 'pan' ? styles.panningMode : ''} ${isDragOverCanvas ? styles.dragOverActive : ''}`}
+      className={`${styles.canvasContainer} ${activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''} ${isDragOverCanvas ? styles.dragOverActive : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -747,6 +828,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   key={frame.id}
                   frame={frame}
                   isSelected={isSelected}
+                  isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
                   isCropMode={isCrop}
                   scaleFactor={scaleFactor}
                   unit={unit}
@@ -796,7 +878,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       y: Math.round((e.target.y() / scaleFactor) * 10) / 10,
                     });
                   }}
-                  onChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                  onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                  onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
                   onDoubleClick={() => enterCropMode(frame.id)}
                 />
               );
@@ -805,22 +888,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             {/* Dynamic Contextual Transformer */}
             <Transformer
               ref={trRef}
-              rotateEnabled={!editingCropFrameId}
-              keepRatio={editingCropFrameId ? true : false}
-              enabledAnchors={
-                editingCropFrameId
-                  ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
-                  : [
-                      'top-left',
-                      'top-center',
-                      'top-right',
-                      'middle-right',
-                      'bottom-right',
-                      'bottom-center',
-                      'bottom-left',
-                      'middle-left',
-                    ]
-              }
+              visible={!editingCropFrameId}
+              rotateEnabled
+              keepRatio={false}
+              enabledAnchors={[
+                'top-left',
+                'top-center',
+                'top-right',
+                'middle-right',
+                'bottom-right',
+                'bottom-center',
+                'bottom-left',
+                'middle-left',
+              ]}
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
@@ -855,6 +935,48 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             ))}
           </Layer>
         </Stage>
+
+        {activeCropFrame && (
+          <div
+            className={styles.cropHud}
+            style={{
+              left: `${cropHudLeft}px`,
+              top: `${cropHudTop}px`,
+              width: `${cropHudWidth}px`,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className={styles.cropHudLabel}>Crop</span>
+            <input
+              type="range"
+              min="1.0"
+              max="3.5"
+              step="0.05"
+              value={currentCropZoom}
+              onChange={(e) => updateActiveCropZoom(parseFloat(e.target.value))}
+              className={styles.cropHudSlider}
+              title={`Zoom: ${Math.round(currentCropZoom * 100)}%`}
+            />
+            <span className={styles.cropHudZoom}>{Math.round(currentCropZoom * 100)}%</span>
+            <button
+              type="button"
+              className={styles.cropHudButton}
+              onClick={() => resetCrop(activeSpread.id, activeCropFrame.id)}
+              title="Reset position and zoom"
+            >
+              ↺ Reset
+            </button>
+            <button
+              type="button"
+              className={`${styles.cropHudButton} ${styles.cropHudDone}`}
+              onClick={exitCropMode}
+              title="Done (Enter / Esc)"
+            >
+              ✓ Selesai
+            </button>
+          </div>
+        )}
 
         {/* Page Badges in Corners */}
         <div className={`${styles.pageBadge} ${styles.leftBadge}`}>

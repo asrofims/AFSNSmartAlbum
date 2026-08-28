@@ -55,16 +55,23 @@ export interface RectBounds {
 export const MAX_CROP_SCALE = 3.5;
 
 export interface CropTransform {
-  cropX: number;
+  cropX: number; // Normalized pan offset: -1.0 (left/top) to +1.0 (right/bottom), 0.0 is center
   cropY: number;
-  cropScale: number;
+  cropScale: number; // Zoom level: 1.0 (100% cover fit) to 3.5 (350% zoom)
 }
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export type CropResizeHandle = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left';
 
 function roundToTenth(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -77,35 +84,99 @@ export function getPhotoAspect(frame: PhotoFrameElement): number {
     return frame.originalWidth / frame.originalHeight;
   }
 
-  if (frame.imageWidth && frame.imageHeight && frame.imageHeight > 0) {
-    return frame.imageWidth / frame.imageHeight;
+  return frame.width / Math.max(1, frame.height);
+}
+
+/**
+ * Calculates the exact rendered dimensions of a photo inside a frame using Cover Fit math.
+ */
+export function calculateCoverDimensions(
+  frameWidth: number,
+  frameHeight: number,
+  photoAspect: number,
+  cropScale: number = 1.0
+): { baseWidth: number; baseHeight: number; width: number; height: number; zoom: number } {
+  const safeFrameW = Math.max(0.1, frameWidth);
+  const safeFrameH = Math.max(0.1, frameHeight);
+  const frameAspect = safeFrameW / safeFrameH;
+  const safePhotoAspect = Math.max(0.01, photoAspect);
+
+  let baseW = safeFrameW;
+  let baseH = safeFrameH;
+
+  if (safePhotoAspect >= frameAspect) {
+    // Photo is wider than frame -> height matches frame, width expands
+    baseH = safeFrameH;
+    baseW = safeFrameH * safePhotoAspect;
+  } else {
+    // Photo is taller than frame -> width matches frame, height expands
+    baseW = safeFrameW;
+    baseH = safeFrameW / safePhotoAspect;
   }
 
-  return frame.width / Math.max(1, frame.height);
+  const zoom = clamp(cropScale, 1.0, MAX_CROP_SCALE);
+  return {
+    baseWidth: roundToTenth(baseW),
+    baseHeight: roundToTenth(baseH),
+    width: roundToTenth(baseW * zoom),
+    height: roundToTenth(baseH * zoom),
+    zoom,
+  };
+}
+
+/**
+ * Calculates rendered image offset inside frame using normalized focal pan coordinates (-1.0 to 1.0).
+ */
+export function calculateImageOffset(
+  frameWidth: number,
+  frameHeight: number,
+  photoAspect: number,
+  cropScale: number = 1.0,
+  normPanX: number = 0,
+  normPanY: number = 0
+): { offsetX: number; offsetY: number; width: number; height: number; normPanX: number; normPanY: number } {
+  const { width, height } = calculateCoverDimensions(frameWidth, frameHeight, photoAspect, cropScale);
+
+  const maxExcessX = Math.max(0, width - frameWidth);
+  const maxExcessY = Math.max(0, height - frameHeight);
+
+  // Normalize pan coordinates to [-1, 1]
+  const clampedNormX = clamp(Number.isFinite(normPanX) ? normPanX : 0, -1, 1);
+  const clampedNormY = clamp(Number.isFinite(normPanY) ? normPanY : 0, -1, 1);
+
+  // When normPan is 0, image is dead-center.
+  // When normPan is -1, image is aligned to left/top edge.
+  // When normPan is +1, image is aligned to right/bottom edge.
+  const offsetX = -(maxExcessX / 2) + (clampedNormX * (maxExcessX / 2));
+  const offsetY = -(maxExcessY / 2) + (clampedNormY * (maxExcessY / 2));
+
+  return {
+    offsetX: roundToTenth(offsetX),
+    offsetY: roundToTenth(offsetY),
+    width,
+    height,
+    normPanX: clampedNormX,
+    normPanY: clampedNormY,
+  };
 }
 
 export function getCoverImageSize(frame: PhotoFrameElement): { width: number; height: number } {
   const photoAspect = getPhotoAspect(frame);
-  const frameAspect = frame.width / Math.max(1, frame.height);
-
-  if (photoAspect >= frameAspect) {
-    return {
-      width: roundToTenth(frame.height * photoAspect),
-      height: roundToTenth(frame.height),
-    };
-  }
-
+  const cover = calculateCoverDimensions(frame.width, frame.height, photoAspect, 1.0);
   return {
-    width: roundToTenth(frame.width),
-    height: roundToTenth(frame.width / photoAspect),
+    width: cover.width,
+    height: cover.height,
   };
 }
 
-export function getCenteredCrop(frame: PhotoFrameElement): CropTransform {
-  const imageSize = getCoverImageSize(frame);
+export function getCropImageSize(frame: PhotoFrameElement): { width: number; height: number } {
+  return getCoverImageSize(frame);
+}
+
+export function getCenteredCrop(): CropTransform {
   return {
-    cropX: roundToTenth((frame.width - imageSize.width) / 2),
-    cropY: roundToTenth((frame.height - imageSize.height) / 2),
+    cropX: 0,
+    cropY: 0,
     cropScale: 1.0,
   };
 }
@@ -114,31 +185,74 @@ export function clampCropTransform(
   frame: PhotoFrameElement,
   crop: Partial<CropTransform> = {}
 ): CropTransform {
-  const imageSize = getCoverImageSize(frame);
-  const minScale = Math.max(frame.width / imageSize.width, frame.height / imageSize.height, 1);
-  const maxScale = Math.max(MAX_CROP_SCALE, minScale);
-  const cropScale = roundToTenth(clamp(crop.cropScale ?? frame.cropScale ?? 1.0, minScale, maxScale));
-
-  const renderedW = imageSize.width * cropScale;
-  const renderedH = imageSize.height * cropScale;
-
-  const requestedX = crop.cropX ?? frame.cropX ?? 0;
-  const requestedY = crop.cropY ?? frame.cropY ?? 0;
-
-  const cropX =
-    renderedW <= frame.width
-      ? (frame.width - renderedW) / 2
-      : clamp(requestedX, frame.width - renderedW, 0);
-  const cropY =
-    renderedH <= frame.height
-      ? (frame.height - renderedH) / 2
-      : clamp(requestedY, frame.height - renderedH, 0);
+  const zoom = clamp(crop.cropScale ?? frame.cropScale ?? 1.0, 1.0, MAX_CROP_SCALE);
+  const panX = clamp(crop.cropX ?? frame.cropX ?? 0, -1, 1);
+  const panY = clamp(crop.cropY ?? frame.cropY ?? 0, -1, 1);
 
   return {
-    cropX: roundToTenth(cropX),
-    cropY: roundToTenth(cropY),
-    cropScale,
+    cropX: Math.round(panX * 1000) / 1000,
+    cropY: Math.round(panY * 1000) / 1000,
+    cropScale: roundToTenth(zoom),
   };
+}
+
+export function moveCropBy(
+  frame: PhotoFrameElement,
+  deltaPxX: number,
+  deltaPxY: number,
+  scaleFactor: number
+): CropTransform {
+  const photoAspect = getPhotoAspect(frame);
+  const { width, height } = calculateCoverDimensions(frame.width, frame.height, photoAspect, frame.cropScale || 1.0);
+  const maxExcessX = Math.max(0, width - frame.width) * scaleFactor;
+  const maxExcessY = Math.max(0, height - frame.height) * scaleFactor;
+
+  let currentNormX = frame.cropX || 0;
+  let currentNormY = frame.cropY || 0;
+
+  // If previous crop was stored in physical mm, normalize it
+  if (Math.abs(currentNormX) > 1 && maxExcessX > 0) {
+    currentNormX = clamp((currentNormX * scaleFactor + maxExcessX / 2) / (maxExcessX / 2), -1, 1);
+  }
+  if (Math.abs(currentNormY) > 1 && maxExcessY > 0) {
+    currentNormY = clamp((currentNormY * scaleFactor + maxExcessY / 2) / (maxExcessY / 2), -1, 1);
+  }
+
+  let nextNormX = currentNormX;
+  let nextNormY = currentNormY;
+
+  if (maxExcessX > 0.5) {
+    nextNormX = clamp(currentNormX + (deltaPxX / (maxExcessX / 2)), -1, 1);
+  }
+  if (maxExcessY > 0.5) {
+    nextNormY = clamp(currentNormY + (deltaPxY / (maxExcessY / 2)), -1, 1);
+  }
+
+  return {
+    cropX: Math.round(nextNormX * 1000) / 1000,
+    cropY: Math.round(nextNormY * 1000) / 1000,
+    cropScale: frame.cropScale || 1.0,
+  };
+}
+
+export function zoomCropAtPoint(
+  frame: PhotoFrameElement,
+  _anchor: Point,
+  nextScale: number
+): CropTransform {
+  return clampCropTransform(frame, {
+    cropScale: nextScale,
+    cropX: frame.cropX || 0,
+    cropY: frame.cropY || 0,
+  });
+}
+
+export function resizeCropFromHandle(
+  frame: PhotoFrameElement,
+  _handle: CropResizeHandle,
+  _pointer: Point
+): CropTransform {
+  return clampCropTransform(frame);
 }
 
 /**
