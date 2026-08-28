@@ -578,7 +578,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
           if (cropFrame) {
             e.preventDefault();
-            const step = e.shiftKey ? 0.05 : 0.01;
+            const step = e.shiftKey ? 0.05 : e.altKey || e.ctrlKey ? 0.002 : 0.01;
             let dx = 0;
             let dy = 0;
             if (e.key === 'ArrowLeft') dx = -step;
@@ -595,7 +595,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         }
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
-          const step = e.shiftKey ? 5.0 : 1.0;
+          const canvasUnit = currentProject?.canvasUnit || 'mm';
+          // Fine-grained physical increments:
+          // - Default arrow: 0.5 mm (detailed & precise spacing)
+          // - Alt / Ctrl + arrow: 0.1 mm (ultra-fine micro-precision)
+          // - Shift + arrow: 2.0 mm (fast movement)
+          let stepInMm = 0.5;
+          if (e.shiftKey) {
+            stepInMm = 2.0;
+          } else if (e.altKey || e.ctrlKey) {
+            stepInMm = 0.1;
+          }
+          const step = convertUnit(stepInMm, 'mm', canvasUnit);
+
           let dx = 0;
           let dy = 0;
           if (e.key === 'ArrowLeft') dx = -step;
@@ -613,6 +625,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     selectedFrameIds,
     activeSpread?.id,
     editingCropFrameId,
+    currentProject?.canvasUnit,
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
