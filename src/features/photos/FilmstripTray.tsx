@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -58,6 +59,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   } = usePhotoStore();
 
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
   const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
 
@@ -169,6 +172,21 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       setIsDragOver(false);
       dragCounterRef.current = 0;
     }
+  };
+
+  const handleToggleImportMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isImportMenuOpen) {
+      setIsImportMenuOpen(false);
+      return;
+    }
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    setImportAnchor({
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
+    setIsImportMenuOpen(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -377,25 +395,18 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 </button>
               )}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => importFiles(currentProject.id)}
+              {/* Unified Import Options Dropdown Button */}
+              <button
+                type="button"
+                className={`${styles.importDropdownBtn} ${isImportMenuOpen ? styles.importDropdownBtnActive : ''}`}
+                onClick={handleToggleImportMenu}
                 disabled={isImporting}
                 title={activeFolderName ? `Import photos into ${activeFolderName}` : 'Import photos into project library'}
+                aria-label="Import options"
               >
-                + Import Files
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => importFolder(currentProject.id)}
-                disabled={isImporting}
-                title={activeFolderName ? `Import folder into ${activeFolderName}` : 'Import folder into project library'}
-              >
-                + Import Folder
-              </Button>
+                <span>+ Import</span>
+                <span className={styles.dropdownArrow}>▾</span>
+              </button>
             </>
           )}
 
@@ -561,6 +572,66 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
         onConfirm={handleConfirmPhotoDelete}
         onCancel={() => setPhotoToDelete(null)}
       />
+
+      {/* React Portal Import Options Dropdown Menu */}
+      {isImportMenuOpen && importAnchor && createPortal(
+        <>
+          <div
+            className={styles.backdrop}
+            onClick={() => setIsImportMenuOpen(false)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setIsImportMenuOpen(false);
+            }}
+          />
+          <div
+            className={styles.importDropdownMenu}
+            style={{
+              position: 'fixed',
+              top: `${importAnchor.top}px`,
+              right: `${importAnchor.right}px`,
+              zIndex: 99999,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {activeFolderName && (
+              <div className={styles.importTargetHeader}>
+                <span>Target: <strong>{activeFolderName}</strong></span>
+              </div>
+            )}
+            <button
+              type="button"
+              className={styles.importMenuItem}
+              onClick={() => {
+                setIsImportMenuOpen(false);
+                importFiles(currentProject.id);
+              }}
+            >
+              <span className={styles.importMenuIcon}>🖼️</span>
+              <div className={styles.importTextCol}>
+                <span className={styles.importMainTitle}>Import Photos / Files...</span>
+                <span className={styles.importSubTitle}>Select individual or multiple photo files</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className={styles.importMenuItem}
+              onClick={() => {
+                setIsImportMenuOpen(false);
+                importFolder(currentProject.id);
+              }}
+            >
+              <span className={styles.importMenuIcon}>📁</span>
+              <div className={styles.importTextCol}>
+                <span className={styles.importMainTitle}>Import Entire Folder...</span>
+                <span className={styles.importSubTitle}>Import all photos in a directory</span>
+              </div>
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
     </section>
   );
 }
