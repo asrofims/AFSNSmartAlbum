@@ -9,6 +9,7 @@ import { usePhotoStore } from '../../stores/photoStore';
 import {
   PhotoFrameElement,
   calculateSnapping,
+  calculateResizeSnapping,
   calculateImageOffset,
   getPhotoAspect,
   clamp,
@@ -1469,6 +1470,37 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 if (newBox.width < 4 || newBox.height < 4) {
                   return oldBox;
                 }
+
+                if (snapEnabled && selectedFrameIds.length === 1) {
+                  const selectedId = selectedFrameIds[0];
+                  const otherRects = (activeSpread.elements || [])
+                    .filter((f) => f.id !== selectedId)
+                    .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                  const thresholdUnits = Math.max(1.2, 6 / scaleFactor);
+
+                  const physicalX = newBox.x / scaleFactor;
+                  const physicalY = newBox.y / scaleFactor;
+                  const physicalW = newBox.width / scaleFactor;
+                  const physicalH = newBox.height / scaleFactor;
+
+                  const snapRes = calculateResizeSnapping(
+                    { x: physicalX, y: physicalY, width: physicalW, height: physicalH },
+                    totalSpreadPhysicalW,
+                    totalSpreadPhysicalH,
+                    activeSpread.safeArea,
+                    gutterPhysicalW,
+                    otherRects,
+                    thresholdUnits,
+                    unit
+                  );
+
+                  if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                    setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                  } else {
+                    clearSnapLines();
+                  }
+                }
+
                 return newBox;
               }}
               onTransformEnd={() => {
