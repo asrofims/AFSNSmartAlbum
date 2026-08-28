@@ -1,6 +1,7 @@
 import { useEditorStore } from '../../stores/editorStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { getAllAlbumSpreads } from '../../domain/album';
+import { clampCropTransform } from '../../domain/editor';
 import styles from './FrameToolbar.module.css';
 
 export function FrameToolbar() {
@@ -32,20 +33,32 @@ export function FrameToolbar() {
   if (!frame) return null;
 
   const isCrop = editingCropFrameId === frame.id;
+  const updateCropZoom = (delta: number) => {
+    const nextCrop = clampCropTransform(frame, {
+      cropScale: (frame.cropScale || 1.0) + delta,
+    });
+    updateFrameGeometry(activeSpread.id, frame.id, nextCrop);
+  };
 
   return (
     <div className={styles.verticalDockContainer}>
       {/* Crop / Done (Icon only) */}
       <button
         type="button"
-        className={`${styles.toolBtn} ${isCrop ? styles.toolBtnActive : ''}`}
+        className={`${styles.toolBtn} ${isCrop ? styles.toolBtnCropActive : ''}`}
         onClick={() => (isCrop ? exitCropMode() : enterCropMode(frame.id))}
         title={isCrop ? 'Finish Crop Mode (Esc)' : 'Crop Image (Double Click)'}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-          <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-        </svg>
+        {isCrop ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+          </svg>
+        )}
       </button>
 
       {/* When in Crop Mode: Zoom in, Zoom out, Reset */}
@@ -54,11 +67,7 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() =>
-              updateFrameGeometry(activeSpread.id, frame.id, {
-                cropScale: Math.min(3.5, (frame.cropScale || 1.0) + 0.15),
-              })
-            }
+            onClick={() => updateCropZoom(0.15)}
             title="Zoom In Inside Frame"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,11 +81,7 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() =>
-              updateFrameGeometry(activeSpread.id, frame.id, {
-                cropScale: Math.max(1.0, (frame.cropScale || 1.0) - 0.15),
-              })
-            }
+            onClick={() => updateCropZoom(-0.15)}
             title="Zoom Out Inside Frame"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

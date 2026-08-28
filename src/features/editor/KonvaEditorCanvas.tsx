@@ -6,7 +6,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { usePhotoStore } from '../../stores/photoStore';
-import { PhotoFrameElement, calculateSnapping } from '../../domain/editor';
+import { PhotoFrameElement, calculateSnapping, clampCropTransform, getCoverImageSize } from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { convertUnit, formatDimensions } from '../../domain/units';
 import { Photo } from '../../domain/photo';
@@ -62,24 +62,35 @@ function PhotoFrameNode({
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
 
-  // Normal Mode vs Crop Mode:
-  // In Normal Mode (without custom crop), image fills frame 100% cleanly:
-  const hasCustomCrop = (frame.cropScale && frame.cropScale !== 1.0) || frame.cropX || frame.cropY;
-  
-  let renderImgW = pixelW;
-  let renderImgH = pixelH;
-  let offsetX = 0;
-  let offsetY = 0;
+  // Frame is the clipping window. Crop mode only moves/zooms the photo inside it.
+  const imageSize = getCoverImageSize(frame);
+  const cropTransform = clampCropTransform(frame);
+  const renderImgW = imageSize.width * scaleFactor * cropTransform.cropScale;
+  const renderImgH = imageSize.height * scaleFactor * cropTransform.cropScale;
+  const offsetX = cropTransform.cropX * scaleFactor;
+  const offsetY = cropTransform.cropY * scaleFactor;
 
-  if (isCropMode || hasCustomCrop) {
-    const imgPhysicalW = frame.imageWidth || frame.originalWidth || frame.width;
-    const imgPhysicalH = frame.imageHeight || frame.originalHeight || frame.height;
-    const currentScale = frame.cropScale || 1.0;
-    renderImgW = imgPhysicalW * scaleFactor * currentScale;
-    renderImgH = imgPhysicalH * scaleFactor * currentScale;
-    offsetX = (frame.cropX || 0) * scaleFactor;
-    offsetY = (frame.cropY || 0) * scaleFactor;
-  }
+  const updateCropTransform = (crop: Partial<typeof cropTransform>) => {
+    onChange(clampCropTransform(frame, crop));
+  };
+
+  const updateCenteredCropZoom = (nextScale: number) => {
+    const anchorX = frame.width / 2;
+    const anchorY = frame.height / 2;
+    const scaleRatio = nextScale / Math.max(0.1, cropTransform.cropScale);
+    updateCropTransform({
+      cropScale: nextScale,
+      cropX: anchorX - (anchorX - cropTransform.cropX) * scaleRatio,
+      cropY: anchorY - (anchorY - cropTransform.cropY) * scaleRatio,
+    });
+  };
+
+  const setCursor = (e: Konva.KonvaEventObject<MouseEvent>, cursor: string) => {
+    const stage = e.target.getStage();
+    if (stage) {
+      stage.container().style.cursor = cursor;
+    }
+  };
 
   return (
     <Group
@@ -140,11 +151,6 @@ function PhotoFrameNode({
           y: Math.round((node.y() / scaleFactor) * 10) / 10,
           width: Math.round(newW * 10) / 10,
           height: Math.round(newH * 10) / 10,
-          imageWidth: Math.round(newW * 10) / 10,
-          imageHeight: Math.round(newH * 10) / 10,
-          cropX: 0,
-          cropY: 0,
-          cropScale: 1.0,
           rotation: Math.round(node.rotation()),
         });
       }}
@@ -158,14 +164,14 @@ function PhotoFrameNode({
             y={offsetY}
             width={renderImgW}
             height={renderImgH}
-            opacity={0.35}
+            opacity={0.28}
           />
           <Rect
             x={offsetX}
             y={offsetY}
             width={renderImgW}
             height={renderImgH}
-            stroke="rgba(245, 158, 11, 0.85)"
+            stroke="rgba(245, 158, 11, 0.9)"
             strokeWidth={1.5}
             dash={[5, 4]}
           />
@@ -187,28 +193,37 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             draggable={isCropMode}
+            onMouseEnter={(e) => {
+              if (isCropMode) setCursor(e, 'move');
+            }}
+            onMouseLeave={(e) => setCursor(e, 'default')}
             onWheel={(e) => {
               if (isCropMode) {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
                 const scaleDelta = e.evt.deltaY < 0 ? 0.1 : -0.1;
-                const newScale = Math.max(1.0, Math.min(3.5, (frame.cropScale || 1.0) + scaleDelta));
-                onChange({ cropScale: Math.round(newScale * 10) / 10 });
+                updateCenteredCropZoom(cropTransform.cropScale + scaleDelta);
               }
             }}
             onDragMove={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
+                const nextCrop = clampCropTransform(frame, {
+                  cropX: e.target.x() / scaleFactor,
+                  cropY: e.target.y() / scaleFactor,
+                  cropScale: cropTransform.cropScale,
+                });
+                e.target.x(nextCrop.cropX * scaleFactor);
+                e.target.y(nextCrop.cropY * scaleFactor);
               }
             }}
             onDragEnd={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
-                const newCropX = e.target.x() / scaleFactor;
-                const newCropY = e.target.y() / scaleFactor;
-                onChange({
-                  cropX: Math.round(newCropX * 10) / 10,
-                  cropY: Math.round(newCropY * 10) / 10,
+                updateCropTransform({
+                  cropX: e.target.x() / scaleFactor,
+                  cropY: e.target.y() / scaleFactor,
+                  cropScale: cropTransform.cropScale,
                 });
               }
             }}
@@ -219,15 +234,13 @@ function PhotoFrameNode({
                 const scaleY = node.scaleY();
                 node.scaleX(1);
                 node.scaleY(1);
-                const newImgW = (node.width() * scaleX) / scaleFactor;
-                const newImgH = (node.height() * scaleY) / scaleFactor;
+                const nextScale = cropTransform.cropScale * Math.max(scaleX, scaleY);
                 const newCropX = node.x() / scaleFactor;
                 const newCropY = node.y() / scaleFactor;
-                onChange({
-                  imageWidth: Math.round(newImgW * 10) / 10,
-                  imageHeight: Math.round(newImgH * 10) / 10,
+                updateCropTransform({
                   cropX: Math.round(newCropX * 10) / 10,
                   cropY: Math.round(newCropY * 10) / 10,
+                  cropScale: nextScale,
                 });
               }
             }}
@@ -258,7 +271,7 @@ function PhotoFrameNode({
           <Rect
             width={pixelW}
             height={pixelH}
-            stroke="#3b82f6"
+            stroke="#f59e0b"
             strokeWidth={2}
             dash={[6, 4]}
           />
@@ -793,8 +806,21 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             <Transformer
               ref={trRef}
               rotateEnabled={!editingCropFrameId}
-              keepRatio={true}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+              keepRatio={editingCropFrameId ? true : false}
+              enabledAnchors={
+                editingCropFrameId
+                  ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+                  : [
+                      'top-left',
+                      'top-center',
+                      'top-right',
+                      'middle-right',
+                      'bottom-right',
+                      'bottom-center',
+                      'bottom-left',
+                      'middle-left',
+                    ]
+              }
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"

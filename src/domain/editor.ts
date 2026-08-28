@@ -52,6 +52,95 @@ export interface RectBounds {
   height: number;
 }
 
+export const MAX_CROP_SCALE = 3.5;
+
+export interface CropTransform {
+  cropX: number;
+  cropY: number;
+  cropScale: number;
+}
+
+function roundToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function getPhotoAspect(frame: PhotoFrameElement): number {
+  if (frame.photoAspect && Number.isFinite(frame.photoAspect) && frame.photoAspect > 0) {
+    return frame.photoAspect;
+  }
+
+  if (frame.originalWidth && frame.originalHeight && frame.originalHeight > 0) {
+    return frame.originalWidth / frame.originalHeight;
+  }
+
+  if (frame.imageWidth && frame.imageHeight && frame.imageHeight > 0) {
+    return frame.imageWidth / frame.imageHeight;
+  }
+
+  return frame.width / Math.max(1, frame.height);
+}
+
+export function getCoverImageSize(frame: PhotoFrameElement): { width: number; height: number } {
+  const photoAspect = getPhotoAspect(frame);
+  const frameAspect = frame.width / Math.max(1, frame.height);
+
+  if (photoAspect >= frameAspect) {
+    return {
+      width: roundToTenth(frame.height * photoAspect),
+      height: roundToTenth(frame.height),
+    };
+  }
+
+  return {
+    width: roundToTenth(frame.width),
+    height: roundToTenth(frame.width / photoAspect),
+  };
+}
+
+export function getCenteredCrop(frame: PhotoFrameElement): CropTransform {
+  const imageSize = getCoverImageSize(frame);
+  return {
+    cropX: roundToTenth((frame.width - imageSize.width) / 2),
+    cropY: roundToTenth((frame.height - imageSize.height) / 2),
+    cropScale: 1.0,
+  };
+}
+
+export function clampCropTransform(
+  frame: PhotoFrameElement,
+  crop: Partial<CropTransform> = {}
+): CropTransform {
+  const imageSize = getCoverImageSize(frame);
+  const minScale = Math.max(frame.width / imageSize.width, frame.height / imageSize.height, 1);
+  const maxScale = Math.max(MAX_CROP_SCALE, minScale);
+  const cropScale = roundToTenth(clamp(crop.cropScale ?? frame.cropScale ?? 1.0, minScale, maxScale));
+
+  const renderedW = imageSize.width * cropScale;
+  const renderedH = imageSize.height * cropScale;
+
+  const requestedX = crop.cropX ?? frame.cropX ?? 0;
+  const requestedY = crop.cropY ?? frame.cropY ?? 0;
+
+  const cropX =
+    renderedW <= frame.width
+      ? (frame.width - renderedW) / 2
+      : clamp(requestedX, frame.width - renderedW, 0);
+  const cropY =
+    renderedH <= frame.height
+      ? (frame.height - renderedH) / 2
+      : clamp(requestedY, frame.height - renderedH, 0);
+
+  return {
+    cropX: roundToTenth(cropX),
+    cropY: roundToTenth(cropY),
+    cropScale,
+  };
+}
+
 /**
  * Calculates smart magnetic snapping lines and adjustments for a dragged or resized frame.
  */

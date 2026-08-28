@@ -49,6 +49,12 @@
   border-color: var(--color-accent) !important;
 }
 
+.toolBtnCropActive {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  color: var(--color-warning) !important;
+  border-color: var(--color-warning) !important;
+}
+
 .toolBtnDanger:hover {
   background-color: rgba(239, 68, 68, 0.2) !important;
   color: var(--color-danger) !important;
