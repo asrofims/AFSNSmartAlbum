@@ -17,6 +17,16 @@ export interface Photo {
   updatedAt: string;
 }
 
+export interface PhotoFolder {
+  id: string;
+  projectId: string;
+  name: string;
+  sortOrder: number;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ImportProgress {
   current: number;
   total: number;
@@ -67,4 +77,31 @@ export function sortPhotos(photos: Photo[], sortBy: PhotoSortBy): Photo[] {
     }
     return 0;
   });
+}
+
+/**
+ * Calculates a range selection from lastSelectedId to targetId in the given photo list.
+ */
+export function getRangeSelection(
+  photos: Photo[],
+  lastSelectedId: string | null,
+  targetId: string,
+  currentSelectedIds: string[]
+): string[] {
+  if (!lastSelectedId || lastSelectedId === targetId) {
+    return Array.from(new Set([...currentSelectedIds, targetId]));
+  }
+
+  const fromIndex = photos.findIndex((p) => p.id === lastSelectedId);
+  const toIndex = photos.findIndex((p) => p.id === targetId);
+
+  if (fromIndex === -1 || toIndex === -1) {
+    return Array.from(new Set([...currentSelectedIds, targetId]));
+  }
+
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+  const rangeIds = photos.slice(start, end + 1).map((p) => p.id);
+
+  return Array.from(new Set([...currentSelectedIds, ...rangeIds]));
 }

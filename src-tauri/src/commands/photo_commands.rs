@@ -5,7 +5,7 @@ use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
-use crate::db::{Database, PhotoRow};
+use crate::db::{Database, PhotoFolderRow, PhotoRow};
 use crate::photo_engine::{is_supported_image, process_photo, scan_directory};
 
 #[derive(Clone, Default)]
@@ -38,8 +38,8 @@ pub fn cancel_photo_import(state: State<'_, ImportState>) {
 pub async fn select_and_import_files(
     app: AppHandle,
     project_id: String,
+    folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
-    // Open native file dialog on blocking pool so the UI thread doesn't freeze
     let files: Option<Vec<PathBuf>> = tauri::async_runtime::spawn_blocking(|| {
         rfd::FileDialog::new()
             .set_title("Select Photos to Import")
@@ -53,8 +53,8 @@ pub async fn select_and_import_files(
     .map_err(|e| e.to_string())?;
 
     match files {
-        Some(paths) => import_paths_internal(app, project_id, paths).await,
-        None => Ok(Vec::new()), // User cancelled dialog
+        Some(paths) => import_paths_internal(app, project_id, paths, folder_id).await,
+        None => Ok(Vec::new()),
     }
 }
 
@@ -62,8 +62,8 @@ pub async fn select_and_import_files(
 pub async fn select_and_import_folder(
     app: AppHandle,
     project_id: String,
+    folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
-    // Open native folder dialog on blocking pool
     let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(|| {
         rfd::FileDialog::new()
             .set_title("Select Folder to Import Photos")
@@ -77,9 +77,9 @@ pub async fn select_and_import_folder(
             let paths: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&dir_path))
                 .await
                 .map_err(|e| e.to_string())?;
-            import_paths_internal(app, project_id, paths).await
+            import_paths_internal(app, project_id, paths, folder_id).await
         }
-        None => Ok(Vec::new()), // User cancelled dialog
+        None => Ok(Vec::new()),
     }
 }
 
@@ -88,6 +88,7 @@ pub async fn import_file_paths(
     app: AppHandle,
     project_id: String,
     paths: Vec<String>,
+    folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
     let path_bufs: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || {
         let mut result = Vec::new();
@@ -104,13 +105,14 @@ pub async fn import_file_paths(
     .await
     .map_err(|e| e.to_string())?;
 
-    import_paths_internal(app, project_id, path_bufs).await
+    import_paths_internal(app, project_id, path_bufs, folder_id).await
 }
 
 async fn import_paths_internal(
     app: AppHandle,
     project_id: String,
     paths: Vec<PathBuf>,
+    folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
     if paths.is_empty() {
         return Ok(Vec::new());
@@ -122,7 +124,6 @@ async fn import_paths_internal(
 
     let db = app.state::<Database>();
 
-    // Filter out duplicates that already exist in this project
     let mut to_import: Vec<PathBuf> = Vec::new();
     for p in paths {
         let path_str = p.to_string_lossy().to_string();
@@ -143,7 +144,6 @@ async fn import_paths_internal(
     let cache_dir = get_cache_dir(&app);
     let counter = Arc::new(AtomicUsize::new(0));
 
-    // Emit initial progress notification only when there are files to process
     let _ = app.emit(
         "photo-import-progress",
         ImportProgressPayload {
@@ -158,13 +158,11 @@ async fn import_paths_internal(
     let app_for_thread = app.clone();
     let cancel_for_thread = cancel_flag.clone();
 
-    // Run parallel decoding & thumbnail generation on Rayon thread pool
     let imported_rows: Vec<PhotoRow> = tauri::async_runtime::spawn_blocking(move || {
         let db_thread = app_for_thread.state::<Database>();
         let rows: Vec<PhotoRow> = to_import
             .into_par_iter()
             .filter_map(|path| {
-                // Check if user cancelled import
                 if cancel_for_thread.load(Ordering::Relaxed) {
                     return None;
                 }
@@ -178,7 +176,6 @@ async fn import_paths_internal(
 
                 match process_photo(&path, &cache_dir, &photo_id) {
                     Ok(processed) => {
-                        // Check again before database write
                         if cancel_for_thread.load(Ordering::Relaxed) {
                             return None;
                         }
@@ -202,7 +199,6 @@ async fn import_paths_internal(
                             updated_at: chrono_now(),
                         };
 
-                        // Insert into SQLite database
                         if let Err(e) = db_thread.add_photo(&row) {
                             log::error!("Failed to save photo to DB: {}", e);
                             None
@@ -210,7 +206,6 @@ async fn import_paths_internal(
                             let curr = counter.fetch_add(1, Ordering::SeqCst) + 1;
                             let percent = ((curr as f64 / total as f64) * 100.0).min(100.0) as u8;
 
-                            // Emit real-time single item and overall progress
                             let _ = app_for_thread.emit("photo-imported", &row);
                             let _ = app_for_thread.emit(
                                 "photo-import-progress",
@@ -248,6 +243,12 @@ async fn import_paths_internal(
     .await
     .map_err(|e| e.to_string())?;
 
+    // If a folder_id was specified, link all imported photos to that folder
+    if let Some(fid) = folder_id {
+        let imported_ids: Vec<String> = imported_rows.iter().map(|p| p.id.clone()).collect();
+        let _ = db.add_photos_to_folder(&fid, &imported_ids);
+    }
+
     let is_cancelled = cancel_flag.load(Ordering::Relaxed);
     log::info!(
         "Import complete: {} photos added (cancelled: {})",
@@ -264,7 +265,6 @@ async fn import_paths_internal(
         }),
     );
 
-    // Re-query database using the managed state
     let db_final = app.state::<Database>();
     db_final.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
@@ -352,6 +352,98 @@ pub async fn relink_folder(
     }
 
     db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+}
+
+// --- Batch Operations Commands ---
+
+#[tauri::command]
+pub fn batch_delete_photos(
+    db: State<'_, Database>,
+    photo_ids: Vec<String>,
+) -> Result<(), String> {
+    db.batch_delete_photos(&photo_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn batch_toggle_favorites(
+    db: State<'_, Database>,
+    photo_ids: Vec<String>,
+    is_favorite: bool,
+) -> Result<(), String> {
+    db.batch_toggle_favorites(&photo_ids, is_favorite).map_err(|e| e.to_string())
+}
+
+// --- Photo Folder Commands ---
+
+#[tauri::command]
+pub fn create_photo_folder(
+    db: State<'_, Database>,
+    project_id: String,
+    name: String,
+) -> Result<PhotoFolderRow, String> {
+    let folder_id = Uuid::new_v4().to_string();
+    db.create_folder(&folder_id, &project_id, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_photo_folders(
+    db: State<'_, Database>,
+    project_id: String,
+) -> Result<Vec<PhotoFolderRow>, String> {
+    db.get_folders_for_project(&project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rename_photo_folder(
+    db: State<'_, Database>,
+    folder_id: String,
+    name: String,
+) -> Result<(), String> {
+    db.rename_folder(&folder_id, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_photo_folder(
+    db: State<'_, Database>,
+    folder_id: String,
+) -> Result<(), String> {
+    db.delete_folder(&folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn add_photos_to_folder(
+    db: State<'_, Database>,
+    folder_id: String,
+    photo_ids: Vec<String>,
+) -> Result<(), String> {
+    db.add_photos_to_folder(&folder_id, &photo_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_photos_from_folder(
+    db: State<'_, Database>,
+    folder_id: String,
+    photo_ids: Vec<String>,
+) -> Result<(), String> {
+    db.remove_photos_from_folder(&folder_id, &photo_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn move_photos_between_folders(
+    db: State<'_, Database>,
+    from_folder_id: String,
+    to_folder_id: String,
+    photo_ids: Vec<String>,
+) -> Result<(), String> {
+    db.move_photos_between_folders(&from_folder_id, &to_folder_id, &photo_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_photos_for_folder(
+    db: State<'_, Database>,
+    folder_id: String,
+) -> Result<Vec<PhotoRow>, String> {
+    db.get_photos_for_folder(&folder_id).map_err(|e| e.to_string())
 }
 
 fn chrono_now() -> String {

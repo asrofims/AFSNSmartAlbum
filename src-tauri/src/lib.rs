@@ -63,6 +63,16 @@ pub fn run() {
             commands::photo_commands::check_missing_photos,
             commands::photo_commands::relink_folder,
             commands::photo_commands::cancel_photo_import,
+            commands::photo_commands::batch_delete_photos,
+            commands::photo_commands::batch_toggle_favorites,
+            commands::photo_commands::create_photo_folder,
+            commands::photo_commands::get_photo_folders,
+            commands::photo_commands::rename_photo_folder,
+            commands::photo_commands::delete_photo_folder,
+            commands::photo_commands::add_photos_to_folder,
+            commands::photo_commands::remove_photos_from_folder,
+            commands::photo_commands::move_photos_between_folders,
+            commands::photo_commands::get_photos_for_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

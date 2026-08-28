@@ -1,0 +1,178 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid var(--color-accent);
+  padding: 5px var(--space-3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: slideDown 0.15s ease-out;
+  z-index: 30;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.leftInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.countBadge {
+  background-color: var(--color-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  padding: 1px 7px;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.deselectBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.deselectBtn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 25px;
+  padding: 0 9px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.actionBtn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.activeFav {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+  background-color: rgba(245, 158, 11, 0.15);
+}
+
+.deleteBtn {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.deleteBtn:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.dropdownContainer {
+  position: relative;
+}
+
+.dropdownMenu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 6px 0;
+}
+
+.menuHeader {
+  display: flex;
+  align-items: center;
+  padding: 0 6px 4px 6px;
+  gap: 4px;
+}
+
+.modeToggle {
+  flex: 1;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.modeActive {
+  background-color: var(--color-accent);
+  color: #ffffff;
+  border-color: var(--color-accent);
+}
+
+.menuDivider {
+  height: 1px;
+  background-color: var(--color-border-subtle);
+  margin: 4px 0;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.menuItem:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.menuItemDanger {
+  color: #f87171;
+}
+
+.menuItemDanger:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}

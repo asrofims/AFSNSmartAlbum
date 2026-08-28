@@ -3,7 +3,10 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { Button } from '../../components/ui/Button';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { filterPhotos, sortPhotos, formatFileSize, PhotoSortBy } from '../../domain/photo';
+import { filterPhotos, sortPhotos, formatFileSize, PhotoSortBy, Photo } from '../../domain/photo';
+import { FolderTabs } from './FolderTabs';
+import { BatchActionBar } from './BatchActionBar';
+import { FolderDialog } from './FolderDialog';
 import styles from './FilmstripTray.module.css';
 
 interface FilmstripTrayProps {
@@ -15,6 +18,10 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     photos,
+    folders,
+    folderPhotoIds,
+    activeFolderId,
+    selectedPhotoIds,
     filter,
     sortBy,
     searchQuery,
@@ -22,6 +29,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     isCancelling,
     importProgress,
     loadPhotos,
+    loadFolders,
     importFiles,
     importFolder,
     importPaths,
@@ -30,6 +38,12 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     removePhoto,
     checkMissing,
     setupListeners,
+    selectPhoto,
+    selectAll,
+    clearSelection,
+    copySelectedPhotos,
+    pastePhotosToActiveFolder,
+    batchDeleteSelected,
     setFilter,
     setSortBy,
     setSearchQuery,
@@ -38,6 +52,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
+  const filmstripRef = useRef<HTMLElement>(null);
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
@@ -50,31 +65,73 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     };
   }, [setupListeners]);
 
-  // Load photos and check missing status when project changes
+  // Load photos and folders when project changes
   useEffect(() => {
     if (currentProject) {
       loadPhotos(currentProject.id);
+      loadFolders(currentProject.id);
       checkMissing(currentProject.id);
     }
-  }, [currentProject?.id, loadPhotos, checkMissing]);
+  }, [currentProject?.id, loadPhotos, loadFolders, checkMissing]);
+
+  // Determine current photo pool based on active folder
+  const currentPhotoPool = React.useMemo(() => {
+    if (!activeFolderId) return photos;
+    const allowedIds = folderPhotoIds[activeFolderId] || [];
+    return photos.filter((p) => allowedIds.includes(p.id));
+  }, [photos, activeFolderId, folderPhotoIds]);
+
+  const filtered = filterPhotos(currentPhotoPool, filter, searchQuery);
+  const sortedPhotos = sortPhotos(filtered, sortBy);
+
+  // Global Keyboard Shortcuts for Filmstrip
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!currentProject) return;
+
+      // Ignore if typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        selectAll(sortedPhotos);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        copySelectedPhotos();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        pastePhotosToActiveFolder(currentProject.id);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedPhotoIds.length > 0) {
+          e.preventDefault();
+          if (window.confirm(`Delete ${selectedPhotoIds.length} selected photos?`)) {
+            batchDeleteSelected(currentProject.id);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        clearSelection();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentProject, sortedPhotos, selectedPhotoIds, selectAll, copySelectedPhotos, pastePhotosToActiveFolder, batchDeleteSelected, clearSelection]);
 
   if (!currentProject) return null;
 
-  const totalCount = photos.length;
-  const unusedCount = photos.filter((p) => p.usedCount === 0).length;
-  const usedCount = photos.filter((p) => p.usedCount > 0).length;
-  const favCount = photos.filter((p) => p.isFavorite).length;
-  const missingCount = photos.filter((p) => p.isMissing).length;
+  const totalCount = currentPhotoPool.length;
+  const unusedCount = currentPhotoPool.filter((p) => p.usedCount === 0).length;
+  const usedCount = currentPhotoPool.filter((p) => p.usedCount > 0).length;
+  const favCount = currentPhotoPool.filter((p) => p.isFavorite).length;
+  const missingCount = currentPhotoPool.filter((p) => p.isMissing).length;
 
-  const filtered = filterPhotos(photos, filter, searchQuery);
-  const sortedPhotos = sortPhotos(filtered, sortBy);
-
-  // Drag & Drop handlers
+  // External Drag & Drop handlers (Importing files/folders from Windows Explorer)
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current += 1;
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0 && e.dataTransfer.types.includes('Files')) {
       setIsDragOver(true);
     }
   };
@@ -117,10 +174,34 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   };
 
+  // Internal Card Click Handler
+  const handleCardClick = (e: React.MouseEvent, photo: Photo) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      selectPhoto(photo.id, 'toggle', sortedPhotos);
+    } else if (e.shiftKey) {
+      selectPhoto(photo.id, 'range', sortedPhotos);
+    } else {
+      selectPhoto(photo.id, 'single', sortedPhotos);
+    }
+  };
+
+  // Card Drag Handler for Folder Organization
+  const handleCardDragStart = (e: React.DragEvent, photo: Photo) => {
+    if (!selectedPhotoIds.includes(photo.id)) {
+      selectPhoto(photo.id, 'single', sortedPhotos);
+    }
+    e.dataTransfer.setData('application/json', JSON.stringify(selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id]));
+  };
+
   const showProgressBar = isImporting && importProgress && importProgress.total > 0;
+  const activeFolderName = activeFolderId
+    ? folders.find((f) => f.id === activeFolderId)?.name || 'Folder'
+    : null;
 
   return (
     <section
+      ref={filmstripRef}
       className={`${styles.filmstrip} ${!isOpen ? styles.collapsed : ''} ${isDragOver ? styles.dragOver : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -128,14 +209,17 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       onDrop={handleDrop}
       aria-label="Photo Library Filmstrip"
     >
-      {/* Real-time Import Progress Bar Banner (Only shown when actual import processing is underway) */}
+      {/* Batch Action Bar (Visible when photos are selected) */}
+      {selectedPhotoIds.length > 0 && <BatchActionBar />}
+
+      {/* Real-time Import Progress Bar Banner */}
       {showProgressBar && (
         <div className={styles.progressBarContainer}>
           <div className={styles.progressTopRow}>
             <div className={styles.progressInfo}>
               <div className={styles.spinner} />
               <span className={styles.progressTitle}>
-                Importing {importProgress.current} of {importProgress.total} photos...
+                Importing {importProgress.current} of {importProgress.total} photos {activeFolderName ? `to [${activeFolderName}]` : ''}...
               </span>
             </div>
 
@@ -170,42 +254,50 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
       {/* Top Header Bar */}
       <div className={styles.header}>
-        {/* Left: Title, Counts, Filters */}
+        {/* Left: Title, Counts, Filters, and Folder Collections */}
         <div className={styles.leftHeader}>
           <span className={styles.title}>PHOTOS</span>
           <span className={styles.countBadge}>{totalCount}</span>
 
           {isOpen && (
-            <div className={styles.filtersGroup}>
-              <button
-                type="button"
-                className={`${styles.filterBtn} ${filter === 'all' ? styles.active : ''}`}
-                onClick={() => setFilter('all')}
-              >
-                All ({totalCount})
-              </button>
-              <button
-                type="button"
-                className={`${styles.filterBtn} ${filter === 'unused' ? styles.active : ''}`}
-                onClick={() => setFilter('unused')}
-              >
-                Unused ({unusedCount})
-              </button>
-              <button
-                type="button"
-                className={`${styles.filterBtn} ${filter === 'used' ? styles.active : ''}`}
-                onClick={() => setFilter('used')}
-              >
-                Used ({usedCount})
-              </button>
-              <button
-                type="button"
-                className={`${styles.filterBtn} ${filter === 'favorites' ? styles.active : ''}`}
-                onClick={() => setFilter('favorites')}
-              >
-                ★ Favorites ({favCount})
-              </button>
-            </div>
+            <>
+              {/* Folder Collections Tabs */}
+              <div className={styles.divider} />
+              <FolderTabs />
+              <div className={styles.divider} />
+
+              {/* Status Filters */}
+              <div className={styles.filtersGroup}>
+                <button
+                  type="button"
+                  className={`${styles.filterBtn} ${filter === 'all' ? styles.active : ''}`}
+                  onClick={() => setFilter('all')}
+                >
+                  All ({totalCount})
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterBtn} ${filter === 'unused' ? styles.active : ''}`}
+                  onClick={() => setFilter('unused')}
+                >
+                  Unused ({unusedCount})
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterBtn} ${filter === 'used' ? styles.active : ''}`}
+                  onClick={() => setFilter('used')}
+                >
+                  Used ({usedCount})
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterBtn} ${filter === 'favorites' ? styles.active : ''}`}
+                  onClick={() => setFilter('favorites')}
+                >
+                  ★ ({favCount})
+                </button>
+              </div>
+            </>
           )}
         </div>
 
@@ -220,7 +312,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   onClick={openRelink}
                   title="Click to relink missing photos"
                 >
-                  ⚠️ {missingCount} Missing Photo{missingCount > 1 ? 's' : ''} (Relink)
+                  ⚠️ {missingCount} Missing (Relink)
                 </button>
               )}
 
@@ -248,7 +340,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 size="sm"
                 onClick={() => importFiles(currentProject.id)}
                 disabled={isImporting}
-                title="Import individual image files (multi-select)"
+                title={activeFolderName ? `Import photos into ${activeFolderName}` : 'Import photos into project library'}
               >
                 + Import Files
               </Button>
@@ -258,7 +350,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 size="sm"
                 onClick={() => importFolder(currentProject.id)}
                 disabled={isImporting}
-                title="Import entire folder of photos"
+                title={activeFolderName ? `Import folder into ${activeFolderName}` : 'Import folder into project library'}
               >
                 + Import Folder
               </Button>
@@ -277,7 +369,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
         </div>
       </div>
 
-      {/* Drag & Drop Visual Overlay */}
+      {/* External Drag & Drop Visual Overlay */}
       {isDragOver && (
         <div className={styles.dropzoneOverlay}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -285,91 +377,111 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" x2="12" y1="3" y2="15"/>
           </svg>
-          <span>Drop photos or folders here to import</span>
+          <span>Drop photos here to import {activeFolderName ? `to [${activeFolderName}]` : ''}</span>
         </div>
       )}
 
       {/* Filmstrip Body */}
       {isOpen && (
-        <div className={styles.body}>
+        <div className={styles.body} onClick={clearSelection}>
           {sortedPhotos.length > 0 ? (
             <div className={styles.photoList}>
-              {sortedPhotos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className={`${styles.photoCard} ${photo.isMissing ? styles.cardMissing : ''}`}
-                  title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nPath: ${photo.filePath}`}
-                >
-                  {/* Thumbnail Image */}
-                  <div className={styles.thumbnailWrapper}>
-                    {photo.thumbnailPath ? (
-                      <img
-                        src={convertFileSrc(photo.thumbnailPath)}
-                        alt={photo.fileName}
-                        className={styles.thumbnailImg}
-                        loading="lazy"
-                      />
-                    ) : photo.thumbnailBase64 ? (
-                      <img
-                        src={photo.thumbnailBase64}
-                        alt={photo.fileName}
-                        className={styles.thumbnailImg}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className={styles.thumbnailPlaceholder}>
-                        <span>{photo.format.toUpperCase()}</span>
+              {sortedPhotos.map((photo) => {
+                const isSelected = selectedPhotoIds.includes(photo.id);
+
+                return (
+                  <div
+                    key={photo.id}
+                    className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${photo.isMissing ? styles.cardMissing : ''}`}
+                    onClick={(e) => handleCardClick(e, photo)}
+                    draggable={true}
+                    onDragStart={(e) => handleCardDragStart(e, photo)}
+                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nPath: ${photo.filePath}`}
+                  >
+                    {/* Thumbnail Image */}
+                    <div className={styles.thumbnailWrapper}>
+                      {photo.thumbnailPath ? (
+                        <img
+                          src={convertFileSrc(photo.thumbnailPath)}
+                          alt={photo.fileName}
+                          className={styles.thumbnailImg}
+                          loading="lazy"
+                        />
+                      ) : photo.thumbnailBase64 ? (
+                        <img
+                          src={photo.thumbnailBase64}
+                          alt={photo.fileName}
+                          className={styles.thumbnailImg}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className={styles.thumbnailPlaceholder}>
+                          <span>{photo.format.toUpperCase()}</span>
+                        </div>
+                      )}
+
+                      {/* Missing Banner */}
+                      {photo.isMissing && (
+                        <div className={styles.missingBadge} onClick={openRelink}>
+                          ⚠️ Missing
+                        </div>
+                      )}
+
+                      {/* Selection Checkbox Overlay */}
+                      <button
+                        type="button"
+                        className={`${styles.selectCheckbox} ${isSelected ? styles.checkboxChecked : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectPhoto(photo.id, 'toggle', sortedPhotos);
+                        }}
+                        title={isSelected ? 'Deselect photo' : 'Select photo'}
+                      >
+                        {isSelected ? '✓' : ''}
+                      </button>
+
+                      {/* Top Right: Favorite Star */}
+                      <button
+                        type="button"
+                        className={`${styles.favBtn} ${photo.isFavorite ? styles.favActive : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(photo.id);
+                        }}
+                        title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        ★
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        className={styles.deletePhotoBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removePhoto(photo.id);
+                        }}
+                        title="Remove photo from library"
+                      >
+                        ✕
+                      </button>
+
+                      {/* Bottom Status Overlay */}
+                      <div className={styles.bottomOverlay}>
+                        <span className={`${styles.usedTag} ${photo.usedCount > 0 ? styles.usedActive : ''}`}>
+                          {photo.usedCount > 0 ? `Used ${photo.usedCount}×` : 'Unused'}
+                        </span>
+                        <span className={styles.dimTag}>
+                          {photo.width > photo.height ? 'Landscape' : photo.width < photo.height ? 'Portrait' : 'Square'}
+                        </span>
                       </div>
-                    )}
-
-                    {/* Missing Banner */}
-                    {photo.isMissing && (
-                      <div className={styles.missingBadge} onClick={openRelink}>
-                        ⚠️ Missing
-                      </div>
-                    )}
-
-                    {/* Top Left: Favorite Star */}
-                    <button
-                      type="button"
-                      className={`${styles.favBtn} ${photo.isFavorite ? styles.favActive : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(photo.id);
-                      }}
-                      title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                      ★
-                    </button>
-
-                    {/* Top Right: Delete Button */}
-                    <button
-                      type="button"
-                      className={styles.deletePhotoBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removePhoto(photo.id);
-                      }}
-                      title="Remove photo from library"
-                    >
-                      ✕
-                    </button>
-
-                    {/* Bottom Status Overlay */}
-                    <div className={styles.bottomOverlay}>
-                      <span className={`${styles.usedTag} ${photo.usedCount > 0 ? styles.usedActive : ''}`}>
-                        {photo.usedCount > 0 ? `Used ${photo.usedCount}×` : 'Unused'}
-                      </span>
-                      <span className={styles.dimTag}>
-                        {photo.width > photo.height ? 'Landscape' : photo.width < photo.height ? 'Portrait' : 'Square'}
-                      </span>
                     </div>
-                  </div>
 
-                  {/* Filename under thumbnail */}
-                  <span className={styles.fileNameText}>{photo.fileName}</span>
-                </div>
-              ))}
+                    {/* Filename under thumbnail */}
+                    <span className={styles.fileNameText}>{photo.fileName}</span>
+                  </div>
+                );
+              })}
             </div>
           ) : !isImporting ? (
             <div className={styles.emptyState}>
@@ -379,7 +491,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
               </svg>
               <span>
-                {photos.length === 0
+                {activeFolderName
+                  ? `No photos in folder "${activeFolderName}". Drag & drop photos here or import above.`
+                  : photos.length === 0
                   ? 'No photos in library. Drag & drop photos here or click Import above.'
                   : 'No photos match the current filter or search query.'}
               </span>
@@ -387,6 +501,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           ) : null}
         </div>
       )}
+
+      {/* Folder Create/Rename Modal Dialog */}
+      <FolderDialog />
     </section>
   );
 }
