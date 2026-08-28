@@ -490,19 +490,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         </div>
                       )}
 
-                      {/* Selection Checkbox Overlay (Lightroom style check toggle) */}
-                      <button
-                        type="button"
-                        className={`${styles.selectCheckbox} ${isSelected ? styles.checkboxChecked : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectPhoto(photo.id, 'toggle', sortedPhotos);
-                        }}
-                        title={isSelected ? 'Deselect photo' : 'Select photo for batch actions'}
-                      >
-                        {isSelected ? '✓' : ''}
-                      </button>
-
                       {/* Top Right: Favorite Star */}
                       <button
                         type="button"
@@ -514,19 +501,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                       >
                         ★
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        type="button"
-                        className={styles.deletePhotoBtn}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPhotoToDelete({ ids: [photo.id], name: photo.fileName });
-                        }}
-                        title="Remove photo from library"
-                      >
-                        ✕
                       </button>
 
                       {/* Bottom Status Overlay */}

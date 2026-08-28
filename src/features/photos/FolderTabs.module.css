@@ -1,3 +1,10 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: transparent;
+}
+
 .container {
   display: flex;
   align-items: center;

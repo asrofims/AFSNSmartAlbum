@@ -25,9 +25,11 @@ export function FolderTabs() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const handleGlobalClick = () => setMenuOpenFolderId(null);
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpenFolderId(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   if (!currentProject) return null;
@@ -90,6 +92,17 @@ export function FolderTabs() {
 
   return (
     <>
+      {/* Backdrop overlay for reliable outside click dismissal */}
+      {menuOpenFolderId && (
+        <div
+          className={styles.backdrop}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpenFolderId(null);
+          }}
+        />
+      )}
+
       <div className={styles.container}>
         {/* Tab: All Photos */}
         <button
