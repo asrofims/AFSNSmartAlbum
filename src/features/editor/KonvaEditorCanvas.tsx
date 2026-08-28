@@ -523,23 +523,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
-  const selectedFramesForProxy = (activeSpread?.elements || []).filter((f) =>
-    selectedFrameIds.includes(f.id)
-  );
-  const multiSelectionBounds =
-    selectedFramesForProxy.length > 1
-      ? {
-          x: Math.min(...selectedFramesForProxy.map((f) => f.x)),
-          y: Math.min(...selectedFramesForProxy.map((f) => f.y)),
-          width:
-            Math.max(...selectedFramesForProxy.map((f) => f.x + f.width)) -
-            Math.min(...selectedFramesForProxy.map((f) => f.x)),
-          height:
-            Math.max(...selectedFramesForProxy.map((f) => f.y + f.height)) -
-            Math.min(...selectedFramesForProxy.map((f) => f.y)),
-        }
-      : null;
-
   // Sync Konva Transformer to selected node(s)
   useEffect(() => {
     if (!trRef.current || !stageRef.current) return;
@@ -548,17 +531,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       trRef.current.nodes([]);
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
-    } else if (selectedFrameIds.length === 1) {
-      // In Single Selection Mode: Transformer attaches directly to the frame node
-      const singleNode = stageRef.current.findOne(`#${selectedFrameIds[0]}`);
-      trRef.current.nodes(singleNode ? [singleNode] : []);
-      trRef.current.update();
-      trRef.current.forceUpdate();
-      trRef.current.getLayer()?.batchDraw();
-    } else if (selectedFrameIds.length > 1) {
-      // In Multi Selection Mode: Transformer attaches to the proxy box for glitch-free live scaling
-      const proxyNode = stageRef.current.findOne('#multi-selection-proxy');
-      trRef.current.nodes(proxyNode ? [proxyNode] : []);
+    } else if (selectedFrameIds.length > 0) {
+      const selectedNodes = selectedFrameIds
+        .map((id) => stageRef.current?.findOne(`#${id}`))
+        .filter(Boolean) as Konva.Node[];
+
+      trRef.current.nodes(selectedNodes);
       trRef.current.update();
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
@@ -1484,19 +1462,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               />
             )}
 
-            {/* Multi-Selection Bounding Proxy for Rock-Solid Glitch-Free Resizing */}
-            {multiSelectionBounds && selectedFrameIds.length > 1 && (
-              <Rect
-                id="multi-selection-proxy"
-                x={multiSelectionBounds.x * scaleFactor}
-                y={multiSelectionBounds.y * scaleFactor}
-                width={multiSelectionBounds.width * scaleFactor}
-                height={multiSelectionBounds.height * scaleFactor}
-                listening={false}
-                visible={false}
-              />
-            )}
-
             {/* Dynamic Contextual Transformer */}
             <Transformer
               ref={trRef}
@@ -1556,47 +1521,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   multiTransformInitialStateRef.current = null;
                 }
               }}
-              onTransform={() => {
-                if (selectedFrameIds.length <= 1 || !multiTransformInitialStateRef.current || !activeSpread) {
-                  return;
-                }
-
-                const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
-                const proxyNode = stageRef.current?.findOne('#multi-selection-proxy') as Konva.Rect | undefined;
-                if (!proxyNode) return;
-
-                const sx = Math.abs(proxyNode.scaleX());
-                const sy = Math.abs(proxyNode.scaleY());
-                const currentPixelW = proxyNode.width() * sx;
-                const currentPixelH = proxyNode.height() * sy;
-
-                const currentGroupBounds: RectBounds = {
-                  x: proxyNode.x() / scaleFactor,
-                  y: proxyNode.y() / scaleFactor,
-                  width: currentPixelW / scaleFactor,
-                  height: currentPixelH / scaleFactor,
-                };
-
-                // Real-time calculation with strictly preserved gaps and aspect ratio
-                const updates = calculateMultiFrameResize(initialFrames, initialBounds, currentGroupBounds);
-
-                updates.forEach((u) => {
-                  const node = stageRef.current?.findOne(`#${u.id}`) as Konva.Group | undefined;
-                  const initialFrame = initialFrames.find((f) => f.id === u.id);
-                  if (!node || !u.geometry || !initialFrame) return;
-
-                  if (u.geometry.x !== undefined) node.x(u.geometry.x * scaleFactor);
-                  if (u.geometry.y !== undefined) node.y(u.geometry.y * scaleFactor);
-
-                  if (u.geometry.width !== undefined && initialFrame.width > 0) {
-                    const liveScale = u.geometry.width / initialFrame.width;
-                    node.scaleX(liveScale);
-                    node.scaleY(liveScale);
-                  }
-                });
-
-                trRef.current?.getLayer()?.batchDraw();
-              }}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits (allow tiny micro sizes down to 4px)
                 if (newBox.width < 4 || newBox.height < 4) {
@@ -1651,35 +1575,40 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
                 if (selectedFrameIds.length > 1 && multiTransformInitialStateRef.current && activeSpread) {
                   const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
-                  const proxyNode = stageRef.current?.findOne('#multi-selection-proxy') as Konva.Rect | undefined;
+                  const selectedNodes = selectedFrameIds
+                    .map((id) => stageRef.current?.findOne(`#${id}`))
+                    .filter(Boolean) as Konva.Node[];
 
-                  if (proxyNode) {
-                    const sx = Math.abs(proxyNode.scaleX());
-                    const sy = Math.abs(proxyNode.scaleY());
-                    const finalPixelW = proxyNode.width() * sx;
-                    const finalPixelH = proxyNode.height() * sy;
-
-                    const finalGroupBounds: RectBounds = {
-                      x: proxyNode.x() / scaleFactor,
-                      y: proxyNode.y() / scaleFactor,
-                      width: finalPixelW / scaleFactor,
-                      height: finalPixelH / scaleFactor,
-                    };
-
-                    // Reset proxy scale so next transform starts clean
-                    proxyNode.scaleX(1);
-                    proxyNode.scaleY(1);
-
-                    // Reset selected frame node scales
-                    selectedFrameIds.forEach((id) => {
-                      const node = stageRef.current?.findOne(`#${id}`);
-                      if (node) {
-                        node.scaleX(1);
-                        node.scaleY(1);
-                      }
+                  if (selectedNodes.length > 0) {
+                    const pixelBoxes = selectedNodes.map((n) => {
+                      const sx = Math.abs(n.scaleX());
+                      const sy = Math.abs(n.scaleY());
+                      return {
+                        x: n.x(),
+                        y: n.y(),
+                        width: n.width() * sx,
+                        height: n.height() * sy,
+                      };
                     });
 
-                    const updates = calculateMultiFrameResize(initialFrames, initialBounds, finalGroupBounds);
+                    const minPxX = Math.min(...pixelBoxes.map((b) => b.x));
+                    const minPxY = Math.min(...pixelBoxes.map((b) => b.y));
+                    const maxPxX = Math.max(...pixelBoxes.map((b) => b.x + b.width));
+                    const maxPxY = Math.max(...pixelBoxes.map((b) => b.y + b.height));
+
+                    const newGroupBounds: RectBounds = {
+                      x: minPxX / scaleFactor,
+                      y: minPxY / scaleFactor,
+                      width: (maxPxX - minPxX) / scaleFactor,
+                      height: (maxPxY - minPxY) / scaleFactor,
+                    };
+
+                    selectedNodes.forEach((n) => {
+                      n.scaleX(1);
+                      n.scaleY(1);
+                    });
+
+                    const updates = calculateMultiFrameResize(initialFrames, initialBounds, newGroupBounds);
                     if (updates.length > 0) {
                       batchUpdateFrames(activeSpread.id, updates);
                     }
