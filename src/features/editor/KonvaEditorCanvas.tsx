@@ -1017,7 +1017,49 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 if (newBox.width < 15 || newBox.height < 15) {
                   return oldBox;
                 }
+
+                if (snapEnabled && selectedFrameIds.length === 1) {
+                  const selectedId = selectedFrameIds[0];
+                  const otherRects = (activeSpread.elements || [])
+                    .filter((f) => f.id !== selectedId)
+                    .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                  const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+
+                  const physicalX = newBox.x / scaleFactor;
+                  const physicalY = newBox.y / scaleFactor;
+                  const physicalW = newBox.width / scaleFactor;
+                  const physicalH = newBox.height / scaleFactor;
+
+                  const snapRes = calculateResizeSnapping(
+                    { x: physicalX, y: physicalY, width: physicalW, height: physicalH },
+                    totalSpreadPhysicalW,
+                    totalSpreadPhysicalH,
+                    activeSpread.safeArea,
+                    gutterPhysicalW,
+                    otherRects,
+                    thresholdUnits,
+                    unit
+                  );
+
+                  if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                    setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                  } else {
+                    clearSnapLines();
+                  }
+
+                  return {
+                    ...newBox,
+                    x: snapRes.snappedBounds.x * scaleFactor,
+                    y: snapRes.snappedBounds.y * scaleFactor,
+                    width: snapRes.snappedBounds.width * scaleFactor,
+                    height: snapRes.snappedBounds.height * scaleFactor,
+                  };
+                }
+
                 return newBox;
+              }}
+              onTransformEnd={() => {
+                clearSnapLines();
               }}
             />
 

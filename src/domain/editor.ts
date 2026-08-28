@@ -458,14 +458,14 @@ export function calculateSnapping(
   }
 
   // --- EQUAL SPACING & GAP DETECTION ---
-  // 1. Horizontal Gaps (frames aligned in a row / overlapping Y)
-  const yOverlapFrames = otherFrames.filter((f) => {
-    const overlapY = Math.min(dragged.y + dragged.height, f.y + f.height) - Math.max(dragged.y, f.y);
-    return overlapY > 10;
+  // 1. Horizontal Gaps (frames nearby in Y)
+  const yNearbyFrames = otherFrames.filter((f) => {
+    const verticalDistance = Math.max(0, Math.max(dragged.y, f.y) - Math.min(dragged.y + dragged.height, f.y + f.height));
+    return verticalDistance <= Math.max(dragged.height, f.height) * 0.5 + 25;
   });
 
-  const leftFrames = yOverlapFrames.filter((f) => f.x + f.width <= dragged.x + threshold).sort((a, b) => (b.x + b.width) - (a.x + a.width));
-  const rightFrames = yOverlapFrames.filter((f) => f.x >= dragged.x + dragged.width - threshold).sort((a, b) => a.x - b.x);
+  const leftFrames = yNearbyFrames.filter((f) => f.x + f.width <= dragged.x + threshold).sort((a, b) => (b.x + b.width) - (a.x + a.width));
+  const rightFrames = yNearbyFrames.filter((f) => f.x >= dragged.x + dragged.width - threshold).sort((a, b) => a.x - b.x);
 
   const leftNeighbor = leftFrames[0];
   const rightNeighbor = rightFrames[0];
@@ -499,7 +499,33 @@ export function calculateSnapping(
           label: `${roundToTenth(equalGap)} ${unit}`,
         }
       );
-    } else if (leftGap > 0 && leftGap <= 40) {
+    } else {
+      if (leftGap > 0 && leftGap <= 80) {
+        const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
+        gapGuides.push({
+          type: 'horizontal',
+          start: leftNeighbor.x + leftNeighbor.width,
+          end: snappedX,
+          crossPos: crossY,
+          distance: roundToTenth(leftGap),
+          label: `${roundToTenth(leftGap)} ${unit}`,
+        });
+      }
+      if (rightGap > 0 && rightGap <= 80) {
+        const crossY = Math.min(dragged.y + dragged.height / 2, rightNeighbor.y + rightNeighbor.height / 2);
+        gapGuides.push({
+          type: 'horizontal',
+          start: snappedX + dragged.width,
+          end: rightNeighbor.x,
+          crossPos: crossY,
+          distance: roundToTenth(rightGap),
+          label: `${roundToTenth(rightGap)} ${unit}`,
+        });
+      }
+    }
+  } else if (leftNeighbor) {
+    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
+    if (leftGap > 0 && leftGap <= 80) {
       const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
       gapGuides.push({
         type: 'horizontal',
@@ -510,29 +536,29 @@ export function calculateSnapping(
         label: `${roundToTenth(leftGap)} ${unit}`,
       });
     }
-  } else if (leftNeighbor) {
-    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
-    if (leftGap > 0 && leftGap <= 40) {
-      const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
+  } else if (rightNeighbor) {
+    const rightGap = rightNeighbor.x - (dragged.x + dragged.width);
+    if (rightGap > 0 && rightGap <= 80) {
+      const crossY = Math.min(dragged.y + dragged.height / 2, rightNeighbor.y + rightNeighbor.height / 2);
       gapGuides.push({
         type: 'horizontal',
-        start: leftNeighbor.x + leftNeighbor.width,
-        end: snappedX,
+        start: snappedX + dragged.width,
+        end: rightNeighbor.x,
         crossPos: crossY,
-        distance: roundToTenth(leftGap),
-        label: `${roundToTenth(leftGap)} ${unit}`,
+        distance: roundToTenth(rightGap),
+        label: `${roundToTenth(rightGap)} ${unit}`,
       });
     }
   }
 
-  // 2. Vertical Gaps (frames aligned in a column / overlapping X)
-  const xOverlapFrames = otherFrames.filter((f) => {
-    const overlapX = Math.min(dragged.x + dragged.width, f.x + f.width) - Math.max(dragged.x, f.x);
-    return overlapX > 10;
+  // 2. Vertical Gaps (frames nearby in X)
+  const xNearbyFrames = otherFrames.filter((f) => {
+    const horizontalDistance = Math.max(0, Math.max(dragged.x, f.x) - Math.min(dragged.x + dragged.width, f.x + f.width));
+    return horizontalDistance <= Math.max(dragged.width, f.width) * 0.5 + 25;
   });
 
-  const topFrames = xOverlapFrames.filter((f) => f.y + f.height <= dragged.y + threshold).sort((a, b) => (b.y + b.height) - (a.y + a.height));
-  const bottomFrames = xOverlapFrames.filter((f) => f.y >= dragged.y + dragged.height - threshold).sort((a, b) => a.y - b.y);
+  const topFrames = xNearbyFrames.filter((f) => f.y + f.height <= dragged.y + threshold).sort((a, b) => (b.y + b.height) - (a.y + a.height));
+  const bottomFrames = xNearbyFrames.filter((f) => f.y >= dragged.y + dragged.height - threshold).sort((a, b) => a.y - b.y);
 
   const topNeighbor = topFrames[0];
   const bottomNeighbor = bottomFrames[0];
@@ -565,7 +591,33 @@ export function calculateSnapping(
           label: `${roundToTenth(equalGap)} ${unit}`,
         }
       );
-    } else if (topGap > 0 && topGap <= 40) {
+    } else {
+      if (topGap > 0 && topGap <= 80) {
+        const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
+        gapGuides.push({
+          type: 'vertical',
+          start: topNeighbor.y + topNeighbor.height,
+          end: snappedY,
+          crossPos: crossX,
+          distance: roundToTenth(topGap),
+          label: `${roundToTenth(topGap)} ${unit}`,
+        });
+      }
+      if (bottomGap > 0 && bottomGap <= 80) {
+        const crossX = Math.min(dragged.x + dragged.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2);
+        gapGuides.push({
+          type: 'vertical',
+          start: snappedY + dragged.height,
+          end: bottomNeighbor.y,
+          crossPos: crossX,
+          distance: roundToTenth(bottomGap),
+          label: `${roundToTenth(bottomGap)} ${unit}`,
+        });
+      }
+    }
+  } else if (topNeighbor) {
+    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
+    if (topGap > 0 && topGap <= 80) {
       const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
       gapGuides.push({
         type: 'vertical',
@@ -576,17 +628,17 @@ export function calculateSnapping(
         label: `${roundToTenth(topGap)} ${unit}`,
       });
     }
-  } else if (topNeighbor) {
-    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
-    if (topGap > 0 && topGap <= 40) {
-      const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
+  } else if (bottomNeighbor) {
+    const bottomGap = bottomNeighbor.y - (dragged.y + dragged.height);
+    if (bottomGap > 0 && bottomGap <= 80) {
+      const crossX = Math.min(dragged.x + dragged.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2);
       gapGuides.push({
         type: 'vertical',
-        start: topNeighbor.y + topNeighbor.height,
-        end: snappedY,
+        start: snappedY + dragged.height,
+        end: bottomNeighbor.y,
         crossPos: crossX,
-        distance: roundToTenth(topGap),
-        label: `${roundToTenth(topGap)} ${unit}`,
+        distance: roundToTenth(bottomGap),
+        label: `${roundToTenth(bottomGap)} ${unit}`,
       });
     }
   }
@@ -713,6 +765,46 @@ export function calculateResizeSnapping(
         label: target.label,
       });
       break;
+    }
+  }
+
+  // Calculate gap to right neighbor during resize
+  const rightNeighborFrames = otherFrames.filter((f) => f.x >= x + width - threshold);
+  if (rightNeighborFrames.length > 0) {
+    const sorted = rightNeighborFrames.sort((a, b) => a.x - b.x);
+    const firstRight = sorted[0];
+    if (firstRight) {
+      const gap = firstRight.x - (x + width);
+      if (gap > 0 && gap <= 80) {
+        gapGuides.push({
+          type: 'horizontal',
+          start: x + width,
+          end: firstRight.x,
+          crossPos: Math.min(y + height / 2, firstRight.y + firstRight.height / 2),
+          distance: roundToTenth(gap),
+          label: `${roundToTenth(gap)} ${unit}`,
+        });
+      }
+    }
+  }
+
+  // Calculate gap to bottom neighbor during resize
+  const bottomNeighborFrames = otherFrames.filter((f) => f.y >= y + height - threshold);
+  if (bottomNeighborFrames.length > 0) {
+    const sorted = bottomNeighborFrames.sort((a, b) => a.y - b.y);
+    const firstBottom = sorted[0];
+    if (firstBottom) {
+      const gap = firstBottom.y - (y + height);
+      if (gap > 0 && gap <= 80) {
+        gapGuides.push({
+          type: 'vertical',
+          start: y + height,
+          end: firstBottom.y,
+          crossPos: Math.min(x + width / 2, firstBottom.x + firstBottom.width / 2),
+          distance: roundToTenth(gap),
+          label: `${roundToTenth(gap)} ${unit}`,
+        });
+      }
     }
   }
 
