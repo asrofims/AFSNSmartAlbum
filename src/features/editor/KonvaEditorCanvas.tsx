@@ -134,6 +134,11 @@ function PhotoFrameNode({
           y: Math.round((node.y() / scaleFactor) * 10) / 10,
           width: Math.round(newW * 10) / 10,
           height: Math.round(newH * 10) / 10,
+          imageWidth: Math.round(newW * 10) / 10,
+          imageHeight: Math.round(newH * 10) / 10,
+          cropX: 0,
+          cropY: 0,
+          cropScale: 1.0,
           rotation: Math.round(node.rotation()),
         });
       }}
@@ -169,6 +174,7 @@ function PhotoFrameNode({
       >
         {imageObj ? (
           <KonvaImage
+            id={`crop-img-${frame.id}`}
             image={imageObj}
             x={offsetX}
             y={offsetY}
@@ -195,6 +201,25 @@ function PhotoFrameNode({
                 const newCropX = e.target.x() / scaleFactor;
                 const newCropY = e.target.y() / scaleFactor;
                 onChange({
+                  cropX: Math.round(newCropX * 10) / 10,
+                  cropY: Math.round(newCropY * 10) / 10,
+                });
+              }
+            }}
+            onTransformEnd={(e) => {
+              if (isCropMode) {
+                const node = e.target as Konva.Image;
+                const scaleX = node.scaleX();
+                const scaleY = node.scaleY();
+                node.scaleX(1);
+                node.scaleY(1);
+                const newImgW = (node.width() * scaleX) / scaleFactor;
+                const newImgH = (node.height() * scaleY) / scaleFactor;
+                const newCropX = node.x() / scaleFactor;
+                const newCropY = node.y() / scaleFactor;
+                onChange({
+                  imageWidth: Math.round(newImgW * 10) / 10,
+                  imageHeight: Math.round(newImgH * 10) / 10,
                   cropX: Math.round(newCropX * 10) / 10,
                   cropY: Math.round(newCropY * 10) / 10,
                 });
@@ -340,7 +365,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   useEffect(() => {
     if (!trRef.current || !stageRef.current) return;
 
-    if (selectedFrameIds.length > 0 && !editingCropFrameId) {
+    if (editingCropFrameId) {
+      // In Crop Mode: Transformer attaches to the Photo Image behind the window!
+      const imgNode = stageRef.current.findOne(`#crop-img-${editingCropFrameId}`);
+      if (imgNode) {
+        trRef.current.nodes([imgNode]);
+        trRef.current.forceUpdate();
+        trRef.current.getLayer()?.batchDraw();
+      } else {
+        trRef.current.nodes([]);
+      }
+    } else if (selectedFrameIds.length > 0) {
+      // In Normal Layout Mode: Transformer attaches to the Frame Window!
       const selectedNodes = selectedFrameIds
         .map((id) => stageRef.current?.findOne(`#${id}`))
         .filter(Boolean) as Konva.Node[];
@@ -747,28 +783,33 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               );
             })}
 
-            {/* Konva Multi-Handle Transformer with Dynamic 8-Anchor Trimming & Scaling */}
+            {/* Dynamic Contextual Transformer */}
             <Transformer
               ref={trRef}
-              rotateEnabled={true}
-              enabledAnchors={[
-                'top-left',
-                'top-center',
-                'top-right',
-                'middle-right',
-                'bottom-right',
-                'bottom-center',
-                'bottom-left',
-                'middle-left',
-              ]}
+              rotateEnabled={!editingCropFrameId}
+              keepRatio={editingCropFrameId ? true : false}
+              enabledAnchors={
+                editingCropFrameId
+                  ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+                  : [
+                      'top-left',
+                      'top-center',
+                      'top-right',
+                      'middle-right',
+                      'bottom-right',
+                      'bottom-center',
+                      'bottom-left',
+                      'middle-left',
+                    ]
+              }
               anchorSize={8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
-              anchorStroke="#3b82f6"
+              anchorStroke={editingCropFrameId ? '#f59e0b' : '#3b82f6'}
               anchorStrokeWidth={1.5}
-              borderStroke="#3b82f6"
+              borderStroke={editingCropFrameId ? '#f59e0b' : '#3b82f6'}
               borderStrokeWidth={1.5}
-              borderDash={[4, 3]}
+              borderDash={editingCropFrameId ? [5, 3] : [4, 3]}
               boundBoxFunc={(oldBox, newBox) => {
                 // Minimum size limits
                 if (newBox.width < 20 || newBox.height < 20) {
