@@ -642,15 +642,11 @@ export function calculateSnapping(
       });
     }
   }
-
-  return { snappedX, snappedY, snapLines, gapGuides };
+return { snappedX, snappedY, snapLines, gapGuides };
 }
 
 /**
- * Calculates smart resize snapping to match neighbor frame dimensions and edge alignments cleanly.
- */
-/**
- * Calculates smart resize snapping to match neighbor frame dimensions and edge alignments cleanly.
+ * Calculates smart resize snapping to match neighbor frame dimensions and primary collinear edge alignments.
  */
 export function calculateResizeSnapping(
   current: RectBounds,
@@ -659,7 +655,7 @@ export function calculateResizeSnapping(
   _safeArea: number,
   _gutterWidth: number,
   otherFrames: RectBounds[],
-  threshold: number = 3.0,
+  threshold: number = 2.0,
   unit: string = 'mm',
   anchor?: string
 ): ResizeSnapResult {
@@ -671,15 +667,20 @@ export function calculateResizeSnapping(
   const bottom = y + height;
 
   const isTopAnchor = anchor ? anchor.includes('top') : false;
+  const isBottomAnchor = anchor ? anchor.includes('bottom') : false;
   const isLeftAnchor = anchor ? anchor.includes('left') : false;
+  const isRightAnchor = anchor ? anchor.includes('right') : false;
   const isCorner = anchor
     ? anchor === 'top-left' || anchor === 'top-right' || anchor === 'bottom-left' || anchor === 'bottom-right'
     : false;
 
+  const isWidthResizable = !anchor || isLeftAnchor || isRightAnchor || isCorner;
+  const isHeightResizable = !anchor || isTopAnchor || isBottomAnchor || isCorner;
+
   // Aspect ratio of the frame
   const aspect = width > 0 && height > 0 ? width / height : 1;
 
-  // 1. Primary: Dimension Matching (Match Width / Match Height)
+  // 1. Primary: Dimension Matching (Equal Width / Equal Height)
   let bestWidthDiff = threshold + 1;
   let bestWidthMatch: { other: RectBounds; val: number } | null = null;
 
@@ -687,29 +688,32 @@ export function calculateResizeSnapping(
   let bestHeightMatch: { other: RectBounds; val: number } | null = null;
 
   for (const other of otherFrames) {
-    // Width matching
-    const wDiff = Math.abs(width - other.width);
-    if (wDiff <= threshold && wDiff < bestWidthDiff) {
-      bestWidthDiff = wDiff;
-      bestWidthMatch = { other, val: other.width };
+    // Width matching (only if resizing width)
+    if (isWidthResizable) {
+      const wDiff = Math.abs(width - other.width);
+      if (wDiff <= threshold && wDiff < bestWidthDiff) {
+        bestWidthDiff = wDiff;
+        bestWidthMatch = { other, val: other.width };
+      }
     }
 
-    // Height matching
-    const hDiff = Math.abs(height - other.height);
-    if (hDiff <= threshold && hDiff < bestHeightDiff) {
-      bestHeightDiff = hDiff;
-      bestHeightMatch = { other, val: other.height };
+    // Height matching (only if resizing height)
+    if (isHeightResizable) {
+      const hDiff = Math.abs(height - other.height);
+      if (hDiff <= threshold && hDiff < bestHeightDiff) {
+        bestHeightDiff = hDiff;
+        bestHeightMatch = { other, val: other.height };
+      }
     }
   }
 
-  // Handle Height Snap (if resizing top or bottom or corner)
+  // Apply Height Snap (if resizing top or bottom or corner)
   if (bestHeightMatch && (!bestWidthMatch || bestHeightDiff <= bestWidthDiff)) {
     const o = bestHeightMatch.other;
     const targetH = bestHeightMatch.val;
     const diffH = targetH - height;
 
     if (isTopAnchor) {
-      // Snapping from Top
       y = y - diffH;
       height = targetH;
       if (isCorner) {
@@ -726,7 +730,6 @@ export function calculateResizeSnapping(
         label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
       });
     } else {
-      // Snapping from Bottom
       height = targetH;
       if (isCorner) {
         const targetW = targetH * aspect;
@@ -743,14 +746,13 @@ export function calculateResizeSnapping(
       });
     }
   }
-  // Handle Width Snap (if resizing left or right or corner)
+  // Apply Width Snap (if resizing left or right or corner)
   else if (bestWidthMatch) {
     const o = bestWidthMatch.other;
     const targetW = bestWidthMatch.val;
     const diffW = targetW - width;
 
     if (isLeftAnchor) {
-      // Snapping from Left
       x = x - diffW;
       width = targetW;
       if (isCorner) {
@@ -767,7 +769,6 @@ export function calculateResizeSnapping(
         label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
       });
     } else {
-      // Snapping from Right
       width = targetW;
       if (isCorner) {
         const targetH = targetW / aspect;
@@ -785,8 +786,8 @@ export function calculateResizeSnapping(
     }
   }
 
-  // 2. Secondary: Edge Alignments (when dimension matching is not triggered)
-  if (snapLines.length === 0) {
+  // 2. Secondary: Primary Collinear Edge Alignment (Only for the active side being moved)
+  if (snapLines.length === 0 && !isCorner) {
     let bestEdgeV: { line: SnapLine; snapX?: number; snapW?: number } | null = null;
     let bestEdgeVDiff = threshold + 1;
 
@@ -797,12 +798,11 @@ export function calculateResizeSnapping(
       const otherRight = other.x + other.width;
       const otherBottom = other.y + other.height;
 
-      // Vertical (Left or Right Edge)
+      // Vertical (Left-to-Left or Right-to-Right only)
       if (isLeftAnchor) {
-        // Snapping Left edge of current to Left or Right of other
-        const diffL_L = Math.abs(x - other.x);
-        if (diffL_L <= threshold && diffL_L < bestEdgeVDiff) {
-          bestEdgeVDiff = diffL_L;
+        const diffL = Math.abs(x - other.x);
+        if (diffL <= threshold && diffL < bestEdgeVDiff) {
+          bestEdgeVDiff = diffL;
           const newX = other.x;
           const newW = (x + width) - newX;
           bestEdgeV = {
@@ -817,11 +817,10 @@ export function calculateResizeSnapping(
             snapW: newW,
           };
         }
-      } else {
-        // Snapping Right edge of current to Right or Left of other
-        const diffR_R = Math.abs(right - otherRight);
-        if (diffR_R <= threshold && diffR_R < bestEdgeVDiff) {
-          bestEdgeVDiff = diffR_R;
+      } else if (isRightAnchor) {
+        const diffR = Math.abs(right - otherRight);
+        if (diffR <= threshold && diffR < bestEdgeVDiff) {
+          bestEdgeVDiff = diffR;
           const newW = otherRight - x;
           bestEdgeV = {
             line: {
@@ -836,12 +835,11 @@ export function calculateResizeSnapping(
         }
       }
 
-      // Horizontal (Top or Bottom Edge)
+      // Horizontal (Top-to-Top or Bottom-to-Bottom only)
       if (isTopAnchor) {
-        // Snapping Top edge of current to Top or Bottom of other
-        const diffT_T = Math.abs(y - other.y);
-        if (diffT_T <= threshold && diffT_T < bestEdgeHDiff) {
-          bestEdgeHDiff = diffT_T;
+        const diffT = Math.abs(y - other.y);
+        if (diffT <= threshold && diffT < bestEdgeHDiff) {
+          bestEdgeHDiff = diffT;
           const newY = other.y;
           const newH = (y + height) - newY;
           bestEdgeH = {
@@ -856,11 +854,10 @@ export function calculateResizeSnapping(
             snapH: newH,
           };
         }
-      } else {
-        // Snapping Bottom edge of current to Bottom or Top of other
-        const diffB_B = Math.abs(bottom - otherBottom);
-        if (diffB_B <= threshold && diffB_B < bestEdgeHDiff) {
-          bestEdgeHDiff = diffB_B;
+      } else if (isBottomAnchor) {
+        const diffB = Math.abs(bottom - otherBottom);
+        if (diffB <= threshold && diffB < bestEdgeHDiff) {
+          bestEdgeHDiff = diffB;
           const newH = otherBottom - y;
           bestEdgeH = {
             line: {

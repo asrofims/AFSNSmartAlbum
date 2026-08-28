@@ -1477,7 +1477,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   const otherRects = (activeSpread.elements || [])
                     .filter((f) => f.id !== selectedId)
                     .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-                  const thresholdUnits = Math.max(1.2, 6 / scaleFactor);
+                  const thresholdUnits = Math.max(0.6, 3.5 / scaleFactor);
 
                   const physicalX = newBox.x / scaleFactor;
                   const physicalY = newBox.y / scaleFactor;
