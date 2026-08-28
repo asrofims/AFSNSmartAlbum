@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions } from '../../domain/units';
+import { getAllAlbumSpreads } from '../../domain/album';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { SpreadCanvas } from '../album/SpreadCanvas';
@@ -18,6 +20,16 @@ export function WorkspaceLayout() {
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
+
+  const currentAlbum = useAlbumStore((s) => s.currentAlbum);
+  const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
+  const showGutterGuide = useAlbumStore((s) => s.showGutterGuide);
+  const showBleedGuide = useAlbumStore((s) => s.showBleedGuide);
+  const showSafeAreaGuide = useAlbumStore((s) => s.showSafeAreaGuide);
+  const toggleGuide = useAlbumStore((s) => s.toggleGuide);
+  const updateGutterWidth = useAlbumStore((s) => s.updateGutterWidth);
+  const updateBleed = useAlbumStore((s) => s.updateBleed);
+  const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
 
   const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -40,6 +52,9 @@ export function WorkspaceLayout() {
 
   const spreadW = currentProject ? currentProject.canvasWidth * 2 : 16;
   const spreadH = currentProject ? currentProject.canvasHeight : 8;
+
+  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
+  const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
   return (
     <div className={styles.workspace}>
@@ -186,19 +201,21 @@ export function WorkspaceLayout() {
         </div>
       </header>
 
-      {/* Center Canvas Area (Spread Visualizer) */}
-      <main className={styles.canvas}>
-        {!currentProject ? (
-          <WelcomeScreen />
-        ) : (
-          <SpreadCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
-        )}
-      </main>
+      {/* Center Editor Area (contains Canvas + Bottom Full-Width PageNavigator) */}
+      <div className={styles.centerArea}>
+        <main className={styles.canvas}>
+          {!currentProject ? (
+            <WelcomeScreen />
+          ) : (
+            <SpreadCanvas zoomLevel={zoomLevel} activeTool={activeTool} />
+          )}
+        </main>
 
-      {/* Page & Spread Navigation Bar */}
-      {currentProject && <PageNavigator />}
+        {/* Page & Spread Navigation Bar spanning full width of the editor */}
+        {currentProject && <PageNavigator />}
+      </div>
 
-      {/* Right Panel: Collapsible Properties & Album Structure */}
+      {/* Right Panel: Collapsible Properties */}
       {isPropertiesOpen && (
         <aside className={styles.rightPanel}>
           <div style={{
@@ -268,6 +285,91 @@ export function WorkspaceLayout() {
                 <div className={styles.propRow}>
                   <span>Resolution</span>
                   <span className={styles.propValue}>{currentProject.canvasDpi} DPI</span>
+                </div>
+              </div>
+
+              {/* Safe Margins & Guides Section (Interactive inputs for Batas Aman) */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Batas Aman & Panduan (Margins & Guides)</div>
+
+                {/* Guide Toggles */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showSafeAreaGuide}
+                      onChange={() => toggleGuide('safeArea')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Tampilkan Batas Aman (Blue)</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showBleedGuide}
+                      onChange={() => toggleGuide('bleed')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Tampilkan Batas Potong Bleed (Red)</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showGutterGuide}
+                      onChange={() => toggleGuide('gutter')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Tampilkan Lipatan Tengah (Gutter Crease)</span>
+                  </label>
+                </div>
+
+                {/* Input Nilai Batas Aman */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Margin Tepi (Safe Area)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
+                        onChange={(val) => updateSafeArea(val)}
+                        min={0.1}
+                        max={50}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Batas Potong (Bleed)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.bleed ?? 3}
+                        onChange={(val) => updateBleed(val)}
+                        min={0}
+                        max={20}
+                        step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                      {activeSpread?.type === 'cover' ? 'Tebal Punggung (Spine)' : 'Lipatan Tengah (Gutter)'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.gutterWidth ?? 0}
+                        onChange={(val) => updateGutterWidth(val)}
+                        min={0}
+                        max={50}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
