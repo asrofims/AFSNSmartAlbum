@@ -225,7 +225,7 @@ function PhotoFrameNode({
         let rawH = (node.height() * scaleY) / scaleFactor;
 
         // Maintain exact aspect ratio even when hitting minimum dimension limits
-        const minDim = 5; // Minimum 5mm
+        const minDim = 1; // 1mm minimum limit
         if (rawW < minDim || rawH < minDim) {
           const origRatio = frame.width > 0 && frame.height > 0 ? frame.width / frame.height : 1;
           if (rawW < minDim) {
@@ -1465,8 +1465,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 tr.keepRatio(isCorner || selectedFrameIds.length > 1);
               }}
               boundBoxFunc={(oldBox, newBox) => {
-                // Minimum size limits
-                if (newBox.width < 15 || newBox.height < 15) {
+                // Minimum size limits (allow tiny micro sizes down to 4px)
+                if (newBox.width < 4 || newBox.height < 4) {
                   return oldBox;
                 }
                 return newBox;
