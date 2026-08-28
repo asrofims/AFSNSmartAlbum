@@ -1038,6 +1038,10 @@ export interface FrameBounds {
  * Calculates resized dimensions and positions for multiple frames while strictly preserving
  * the exact inter-frame gap spacing (both horizontally and vertically).
  */
+/**
+ * Calculates resized dimensions and positions for multiple frames while strictly preserving
+ * the exact inter-frame gap spacing (both horizontally and vertically) across any layout topology.
+ */
 export function calculateMultiFrameResize(
   initialFrames: FrameBounds[],
   initialGroupBounds: RectBounds,
@@ -1059,166 +1063,168 @@ export function calculateMultiFrameResize(
     }];
   }
 
-  // --- 1. Horizontal Column Clustering & Gap Analysis ---
-  const sortedByX = [...initialFrames].sort((a, b) => a.x - b.x);
-  const columnClusters: FrameBounds[][] = [];
-  const colClusterTolerance = 2.0; // mm
+  const minGroupX = Math.min(...initialFrames.map((f) => f.x));
+  const minGroupY = Math.min(...initialFrames.map((f) => f.y));
+  const maxGroupX = Math.max(...initialFrames.map((f) => f.x + f.width));
+  const maxGroupY = Math.max(...initialFrames.map((f) => f.y + f.height));
+  const initW = maxGroupX - minGroupX;
+  const initH = maxGroupY - minGroupY;
 
-  for (const f of sortedByX) {
-    const matchingCol = columnClusters.find((col) =>
-      col.some((item) => Math.abs(item.x - f.x) < colClusterTolerance)
-    );
-    if (matchingCol) {
-      matchingCol.push(f);
-    } else {
-      columnClusters.push([f]);
+  // --- 1. Build 2D Spatial Neighbor Relations & Extract Invariant Gaps ---
+  // Horizontal neighbor: A is immediate left neighbor of B if A is to the left of B and their Y spans overlap
+  const leftNeighbors = new Map<string, { neighborId: string; gap: number }>();
+  for (const b of initialFrames) {
+    let closestA: FrameBounds | null = null;
+    let closestDist = -Infinity;
+
+    for (const a of initialFrames) {
+      if (a.id === b.id) continue;
+      const rightEdgeA = a.x + a.width;
+      if (rightEdgeA <= b.x + 0.1) {
+        // Check if vertical spans overlap
+        const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+        if (overlapY > 0.5) {
+          if (rightEdgeA > closestDist) {
+            closestDist = rightEdgeA;
+            closestA = a;
+          }
+        }
+      }
+    }
+
+    if (closestA) {
+      const gap = Math.max(0, b.x - (closestA.x + closestA.width));
+      leftNeighbors.set(b.id, { neighborId: closestA.id, gap });
     }
   }
 
-  columnClusters.sort((a, b) => {
-    const minA = Math.min(...a.map((f) => f.x));
-    const minB = Math.min(...b.map((f) => f.x));
-    return minA - minB;
-  });
+  // Vertical neighbor: C is immediate top neighbor of B if C is above B and their X spans overlap
+  const topNeighbors = new Map<string, { neighborId: string; gap: number }>();
+  for (const b of initialFrames) {
+    let closestC: FrameBounds | null = null;
+    let closestDist = -Infinity;
 
-  const columnWidths = columnClusters.map((col) => Math.max(...col.map((f) => f.width)));
-  const horizontalGaps: number[] = [];
-  for (let i = 0; i < columnClusters.length - 1; i++) {
-    const colA = columnClusters[i];
-    const colB = columnClusters[i + 1];
-    if (!colA || !colB) continue;
-    const maxRightA = Math.max(...colA.map((f) => f.x + f.width));
-    const minLeftB = Math.min(...colB.map((f) => f.x));
-    horizontalGaps.push(Math.max(0, minLeftB - maxRightA));
-  }
+    for (const c of initialFrames) {
+      if (c.id === b.id) continue;
+      const bottomEdgeC = c.y + c.height;
+      if (bottomEdgeC <= b.y + 0.1) {
+        // Check if horizontal spans overlap
+        const overlapX = Math.min(c.x + c.width, b.x + b.width) - Math.max(c.x, b.x);
+        if (overlapX > 0.5) {
+          if (bottomEdgeC > closestDist) {
+            closestDist = bottomEdgeC;
+            closestC = c;
+          }
+        }
+      }
+    }
 
-  const totalHorizontalGaps = horizontalGaps.reduce((sum, g) => sum + g, 0);
-  const totalColsWidth = columnWidths.reduce((sum, w) => sum + w, 0);
-
-  // --- 2. Vertical Row Clustering & Gap Analysis ---
-  const sortedByY = [...initialFrames].sort((a, b) => a.y - b.y);
-  const rowClusters: FrameBounds[][] = [];
-  const rowClusterTolerance = 2.0; // mm
-
-  for (const f of sortedByY) {
-    const matchingRow = rowClusters.find((row) =>
-      row.some((item) => Math.abs(item.y - f.y) < rowClusterTolerance)
-    );
-    if (matchingRow) {
-      matchingRow.push(f);
-    } else {
-      rowClusters.push([f]);
+    if (closestC) {
+      const gap = Math.max(0, b.y - (closestC.y + closestC.height));
+      topNeighbors.set(b.id, { neighborId: closestC.id, gap });
     }
   }
 
-  rowClusters.sort((a, b) => {
-    const minA = Math.min(...a.map((f) => f.y));
-    const minB = Math.min(...b.map((f) => f.y));
-    return minA - minB;
-  });
-
-  const rowHeights = rowClusters.map((row) => Math.max(...row.map((f) => f.height)));
-  const verticalGaps: number[] = [];
-  for (let i = 0; i < rowClusters.length - 1; i++) {
-    const rowA = rowClusters[i];
-    const rowB = rowClusters[i + 1];
-    if (!rowA || !rowB) continue;
-    const maxBottomA = Math.max(...rowA.map((f) => f.y + f.height));
-    const minTopB = Math.min(...rowB.map((f) => f.y));
-    verticalGaps.push(Math.max(0, minTopB - maxBottomA));
+  // --- 2. Calculate Longest Path Gaps to Determine Available Frame Scaling ---
+  // Compute max accumulated horizontal gap along any path
+  let maxPathGapX = 0;
+  for (const frame of initialFrames) {
+    let curGap = 0;
+    let curId = frame.id;
+    while (leftNeighbors.has(curId)) {
+      const edge = leftNeighbors.get(curId)!;
+      curGap += edge.gap;
+      curId = edge.neighborId;
+    }
+    maxPathGapX = Math.max(maxPathGapX, curGap);
   }
 
-  const totalVerticalGaps = verticalGaps.reduce((sum, g) => sum + g, 0);
-  const totalRowsHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+  // Compute max accumulated vertical gap along any path
+  let maxPathGapY = 0;
+  for (const frame of initialFrames) {
+    let curGap = 0;
+    let curId = frame.id;
+    while (topNeighbors.has(curId)) {
+      const edge = topNeighbors.get(curId)!;
+      curGap += edge.gap;
+      curId = edge.neighborId;
+    }
+    maxPathGapY = Math.max(maxPathGapY, curGap);
+  }
 
-  // --- 3. UNIFORM ASPECT-RATIO PRESERVING SCALE FACTOR ---
-  // To strictly preserve the aspect ratio of each photo, we use a single uniform frame scale
-  const scaleXFromGroup = totalColsWidth > 0
-    ? Math.max(0.05, (newGroupBounds.width - totalHorizontalGaps) / totalColsWidth)
-    : 1;
-  const scaleYFromGroup = totalRowsHeight > 0
-    ? Math.max(0.05, (newGroupBounds.height - totalVerticalGaps) / totalRowsHeight)
-    : 1;
+  const frameSpanX = Math.max(1, initW - maxPathGapX);
+  const frameSpanY = Math.max(1, initH - maxPathGapY);
 
-  // Determine dominant change from initial bounds to pick uniform scaling factor
-  const rawRatioX = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
-  const rawRatioY = initialGroupBounds.height > 0 ? newGroupBounds.height / initialGroupBounds.height : 1;
+  const scaleXFromGroup = Math.max(0.05, (newGroupBounds.width - maxPathGapX) / frameSpanX);
+  const scaleYFromGroup = Math.max(0.05, (newGroupBounds.height - maxPathGapY) / frameSpanY);
+
+  const rawRatioX = initW > 0 ? newGroupBounds.width / initW : 1;
+  const rawRatioY = initH > 0 ? newGroupBounds.height / initH : 1;
   const uniformScale = Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
     ? scaleXFromGroup
     : scaleYFromGroup;
 
+  // --- 3. Compute Topologically Sorted Positions with 100% Invariant Gaps ---
+  const newPositionsX = new Map<string, number>();
+  const sortedByX = [...initialFrames].sort((a, b) => a.x - b.x);
+  for (const f of sortedByX) {
+    const leftEdge = leftNeighbors.get(f.id);
+    if (leftEdge && newPositionsX.has(leftEdge.neighborId)) {
+      const leftNeighbor = initialFrames.find((item) => item.id === leftEdge.neighborId)!;
+      const leftNeighborNewX = newPositionsX.get(leftEdge.neighborId)!;
+      const leftNeighborNewW = leftNeighbor.width * uniformScale;
+      newPositionsX.set(f.id, leftNeighborNewX + leftNeighborNewW + leftEdge.gap);
+    } else {
+      // Root frame along X axis
+      newPositionsX.set(f.id, (f.x - minGroupX) * uniformScale);
+    }
+  }
+
+  const newPositionsY = new Map<string, number>();
+  const sortedByY = [...initialFrames].sort((a, b) => a.y - b.y);
+  for (const f of sortedByY) {
+    const topEdge = topNeighbors.get(f.id);
+    if (topEdge && newPositionsY.has(topEdge.neighborId)) {
+      const topNeighbor = initialFrames.find((item) => item.id === topEdge.neighborId)!;
+      const topNeighborNewY = newPositionsY.get(topEdge.neighborId)!;
+      const topNeighborNewH = topNeighbor.height * uniformScale;
+      newPositionsY.set(f.id, topNeighborNewY + topNeighborNewH + topEdge.gap);
+    } else {
+      // Root frame along Y axis
+      newPositionsY.set(f.id, (f.y - minGroupY) * uniformScale);
+    }
+  }
+
   // --- 4. Anchor-Directional Origin Alignment ---
-  const newTotalWidth = totalColsWidth * uniformScale + totalHorizontalGaps;
-  const newTotalHeight = totalRowsHeight * uniformScale + totalVerticalGaps;
+  const minComputedX = Math.min(...Array.from(newPositionsX.values()));
+  const maxComputedX = Math.max(...sortedByX.map((f) => (newPositionsX.get(f.id) ?? 0) + f.width * uniformScale));
+  const newTotalW = maxComputedX - minComputedX;
 
-  // Check if left/top was the dragged anchor (position changed significantly)
-  const isLeftDragged = Math.abs(newGroupBounds.x - initialGroupBounds.x) > 0.01;
-  const isTopDragged = Math.abs(newGroupBounds.y - initialGroupBounds.y) > 0.01;
+  const minComputedY = Math.min(...Array.from(newPositionsY.values()));
+  const maxComputedY = Math.max(...sortedByY.map((f) => (newPositionsY.get(f.id) ?? 0) + f.height * uniformScale));
+  const newTotalH = maxComputedY - minComputedY;
 
-  const originX = isLeftDragged
-    ? initialGroupBounds.x + initialGroupBounds.width - newTotalWidth
-    : initialGroupBounds.x;
-  const originY = isTopDragged
-    ? initialGroupBounds.y + initialGroupBounds.height - newTotalHeight
-    : initialGroupBounds.y;
+  const isLeftDragged = Math.abs(newGroupBounds.x - minGroupX) > 0.01;
+  const isTopDragged = Math.abs(newGroupBounds.y - minGroupY) > 0.01;
 
-  // Calculate new column positions preserving horizontal gaps
-  const newColPositions: number[] = [];
-  let curColX = originX;
-  for (let i = 0; i < columnClusters.length; i++) {
-    newColPositions.push(curColX);
-    const newColW = (columnWidths[i] ?? 0) * uniformScale;
-    const gap = horizontalGaps[i] ?? 0;
-    curColX += newColW + gap;
-  }
-
-  // Calculate new row positions preserving vertical gaps
-  const newRowPositions: number[] = [];
-  let curRowY = originY;
-  for (let i = 0; i < rowClusters.length; i++) {
-    newRowPositions.push(curRowY);
-    const newRowH = (rowHeights[i] ?? 0) * uniformScale;
-    const gap = verticalGaps[i] ?? 0;
-    curRowY += newRowH + gap;
-  }
-
-  // Map each frame to its new position and dimension
-  const frameXUpdates = new Map<string, { x: number; width: number }>();
-  columnClusters.forEach((col, colIdx) => {
-    const baseColX = newColPositions[colIdx] ?? originX;
-    for (const f of col) {
-      const origColMinX = Math.min(...col.map((item) => item.x));
-      const internalOffset = (f.x - origColMinX) * uniformScale;
-      frameXUpdates.set(f.id, {
-        x: roundToHundredth(baseColX + internalOffset),
-        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
-      });
-    }
-  });
-
-  const frameYUpdates = new Map<string, { y: number; height: number }>();
-  rowClusters.forEach((row, rowIdx) => {
-    const baseRowY = newRowPositions[rowIdx] ?? originY;
-    for (const f of row) {
-      const origRowMinY = Math.min(...row.map((item) => item.y));
-      const internalOffset = (f.y - origRowMinY) * uniformScale;
-      frameYUpdates.set(f.id, {
-        y: roundToHundredth(baseRowY + internalOffset),
-        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
-      });
-    }
-  });
+  const finalOriginX = isLeftDragged
+    ? minGroupX + initW - newTotalW
+    : newGroupBounds.x;
+  const finalOriginY = isTopDragged
+    ? minGroupY + initH - newTotalH
+    : newGroupBounds.y;
 
   return initialFrames.map((f) => {
-    const xUpdate = frameXUpdates.get(f.id);
-    const yUpdate = frameYUpdates.get(f.id);
+    const rawX = newPositionsX.get(f.id) ?? (f.x - minGroupX) * uniformScale;
+    const rawY = newPositionsY.get(f.id) ?? (f.y - minGroupY) * uniformScale;
+
     return {
       id: f.id,
       geometry: {
-        x: xUpdate?.x ?? roundToHundredth(f.x),
-        y: yUpdate?.y ?? roundToHundredth(f.y),
-        width: xUpdate?.width ?? roundToHundredth(f.width * uniformScale),
-        height: yUpdate?.height ?? roundToHundredth(f.height * uniformScale),
+        x: roundToHundredth(finalOriginX + rawX - minComputedX),
+        y: roundToHundredth(finalOriginY + rawY - minComputedY),
+        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
+        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
       },
     };
   });

@@ -225,4 +225,26 @@ console.assert(Math.abs(ratioA - (100 / 80)) < 0.001, `Frame A aspect ratio must
 const ratioB = (multiResizeUpdates[1].geometry.width ?? 0) / (multiResizeUpdates[1].geometry.height ?? 0);
 console.assert(Math.abs(ratioB - (100 / 80)) < 0.001, `Frame B aspect ratio must remain exactly 1.25, got ${ratioB}`);
 
+// 13. Test Multi-Frame Resize on Asymmetric Layout (1 big left, 2 stacked right)
+const asymGroup = [
+  { id: 'left', x: 0, y: 0, width: 100, height: 165 },
+  { id: 'topRight', x: 105, y: 0, width: 100, height: 80 },
+  { id: 'bottomRight', x: 105, y: 85, width: 100, height: 80 },
+];
+const asymInitialBounds = { x: 0, y: 0, width: 205, height: 165 };
+const asymNewBounds = { x: 0, y: 0, width: 245, height: 197 };
+const asymUpdates = calculateMultiFrameResize(asymGroup, asymInitialBounds, asymNewBounds);
+
+const leftU = asymUpdates.find((u) => u.id === 'left')!;
+const topU = asymUpdates.find((u) => u.id === 'topRight')!;
+const bottomU = asymUpdates.find((u) => u.id === 'bottomRight')!;
+
+// Check Horizontal Gap between left and right (100 -> 120, right starts at 125 -> gap = 5mm)
+const hGap = (topU.geometry.x ?? 0) - ((leftU.geometry.x ?? 0) + (leftU.geometry.width ?? 0));
+console.assert(Math.abs(hGap - 5) < 0.01, `Horizontal gap must remain 5mm, got ${hGap}mm`);
+
+// Check Vertical Gap between topRight and bottomRight (top ends at 96, bottom starts at 101 -> gap = 5mm)
+const vGap = (bottomU.geometry.y ?? 0) - ((topU.geometry.y ?? 0) + (topU.geometry.height ?? 0));
+console.assert(Math.abs(vGap - 5) < 0.01, `Vertical gap must remain 5mm, got ${vGap}mm`);
+
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, and Snapping tests passed successfully!');
