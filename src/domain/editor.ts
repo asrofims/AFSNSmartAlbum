@@ -649,6 +649,9 @@ export function calculateSnapping(
 /**
  * Calculates smart resize snapping to match neighbor frame dimensions and edge alignments cleanly.
  */
+/**
+ * Calculates smart resize snapping to match neighbor frame dimensions and edge alignments cleanly.
+ */
 export function calculateResizeSnapping(
   current: RectBounds,
   _spreadWidth: number,
@@ -657,7 +660,8 @@ export function calculateResizeSnapping(
   _gutterWidth: number,
   otherFrames: RectBounds[],
   threshold: number = 3.0,
-  unit: string = 'mm'
+  unit: string = 'mm',
+  anchor?: string
 ): ResizeSnapResult {
   let { x, y, width, height } = current;
   const snapLines: SnapLine[] = [];
@@ -665,6 +669,15 @@ export function calculateResizeSnapping(
 
   const right = x + width;
   const bottom = y + height;
+
+  const isTopAnchor = anchor ? anchor.includes('top') : false;
+  const isLeftAnchor = anchor ? anchor.includes('left') : false;
+  const isCorner = anchor
+    ? anchor === 'top-left' || anchor === 'top-right' || anchor === 'bottom-left' || anchor === 'bottom-right'
+    : false;
+
+  // Aspect ratio of the frame
+  const aspect = width > 0 && height > 0 ? width / height : 1;
 
   // 1. Primary: Dimension Matching (Match Width / Match Height)
   let bestWidthDiff = threshold + 1;
@@ -689,96 +702,190 @@ export function calculateResizeSnapping(
     }
   }
 
-  if (bestWidthMatch) {
-    const o = bestWidthMatch.other;
-    width = bestWidthMatch.val;
-    snapLines.push({
-      type: 'vertical',
-      position: x + width,
-      start: Math.min(y, o.y),
-      end: Math.max(y + height, o.y + o.height),
-      label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
-    });
-  }
-
-  if (bestHeightMatch) {
+  // Handle Height Snap (if resizing top or bottom or corner)
+  if (bestHeightMatch && (!bestWidthMatch || bestHeightDiff <= bestWidthDiff)) {
     const o = bestHeightMatch.other;
-    height = bestHeightMatch.val;
-    snapLines.push({
-      type: 'horizontal',
-      position: y + height,
-      start: Math.min(x, o.x),
-      end: Math.max(x + width, o.x + o.width),
-      label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
-    });
-  }
+    const targetH = bestHeightMatch.val;
+    const diffH = targetH - height;
 
-  // 2. Secondary: Clean Edge Alignment with Nearest Frames
-  let bestEdgeV: SnapLine | null = null;
-  let bestEdgeVDiff = threshold + 1;
-
-  let bestEdgeH: SnapLine | null = null;
-  let bestEdgeHDiff = threshold + 1;
-
-  for (const other of otherFrames) {
-    const otherRight = other.x + other.width;
-    const otherBottom = other.y + other.height;
-
-    // Check Right Edge alignment
-    const diffR_R = Math.abs(right - otherRight);
-    if (diffR_R <= threshold && diffR_R < bestEdgeVDiff) {
-      bestEdgeVDiff = diffR_R;
-      bestEdgeV = {
-        type: 'vertical',
-        position: otherRight,
-        start: Math.min(y, other.y),
-        end: Math.max(bottom, otherBottom),
-        label: 'Rata Kanan',
-      };
-    }
-    const diffR_L = Math.abs(right - other.x);
-    if (diffR_L <= threshold && diffR_L < bestEdgeVDiff) {
-      bestEdgeVDiff = diffR_L;
-      bestEdgeV = {
-        type: 'vertical',
-        position: other.x,
-        start: Math.min(y, other.y),
-        end: Math.max(bottom, otherBottom),
-        label: 'Sejajar Sisi',
-      };
-    }
-
-    // Check Bottom Edge alignment
-    const diffB_B = Math.abs(bottom - otherBottom);
-    if (diffB_B <= threshold && diffB_B < bestEdgeHDiff) {
-      bestEdgeHDiff = diffB_B;
-      bestEdgeH = {
+    if (isTopAnchor) {
+      // Snapping from Top
+      y = y - diffH;
+      height = targetH;
+      if (isCorner) {
+        const targetW = targetH * aspect;
+        const diffW = targetW - width;
+        if (isLeftAnchor) x = x - diffW;
+        width = targetW;
+      }
+      snapLines.push({
         type: 'horizontal',
-        position: otherBottom,
-        start: Math.min(x, other.x),
-        end: Math.max(right, otherRight),
-        label: 'Rata Bawah',
-      };
-    }
-    const diffB_T = Math.abs(bottom - other.y);
-    if (diffB_T <= threshold && diffB_T < bestEdgeHDiff) {
-      bestEdgeHDiff = diffB_T;
-      bestEdgeH = {
+        position: y,
+        start: Math.min(x, o.x),
+        end: Math.max(x + width, o.x + o.width),
+        label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
+      });
+    } else {
+      // Snapping from Bottom
+      height = targetH;
+      if (isCorner) {
+        const targetW = targetH * aspect;
+        const diffW = targetW - width;
+        if (isLeftAnchor) x = x - diffW;
+        width = targetW;
+      }
+      snapLines.push({
         type: 'horizontal',
-        position: other.y,
-        start: Math.min(x, other.x),
-        end: Math.max(right, otherRight),
-        label: 'Sejajar Sisi',
-      };
+        position: y + height,
+        start: Math.min(x, o.x),
+        end: Math.max(x + width, o.x + o.width),
+        label: `Sama Tinggi (${roundToTenth(height)} ${unit})`,
+      });
+    }
+  }
+  // Handle Width Snap (if resizing left or right or corner)
+  else if (bestWidthMatch) {
+    const o = bestWidthMatch.other;
+    const targetW = bestWidthMatch.val;
+    const diffW = targetW - width;
+
+    if (isLeftAnchor) {
+      // Snapping from Left
+      x = x - diffW;
+      width = targetW;
+      if (isCorner) {
+        const targetH = targetW / aspect;
+        const diffH = targetH - height;
+        if (isTopAnchor) y = y - diffH;
+        height = targetH;
+      }
+      snapLines.push({
+        type: 'vertical',
+        position: x,
+        start: Math.min(y, o.y),
+        end: Math.max(y + height, o.y + o.height),
+        label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
+      });
+    } else {
+      // Snapping from Right
+      width = targetW;
+      if (isCorner) {
+        const targetH = targetW / aspect;
+        const diffH = targetH - height;
+        if (isTopAnchor) y = y - diffH;
+        height = targetH;
+      }
+      snapLines.push({
+        type: 'vertical',
+        position: x + width,
+        start: Math.min(y, o.y),
+        end: Math.max(y + height, o.y + o.height),
+        label: `Sama Lebar (${roundToTenth(width)} ${unit})`,
+      });
     }
   }
 
-  // Only display edge lines if dimension line is not active on that axis
-  if (bestEdgeV && !bestWidthMatch) {
-    snapLines.push(bestEdgeV);
-  }
-  if (bestEdgeH && !bestHeightMatch) {
-    snapLines.push(bestEdgeH);
+  // 2. Secondary: Edge Alignments (when dimension matching is not triggered)
+  if (snapLines.length === 0) {
+    let bestEdgeV: { line: SnapLine; snapX?: number; snapW?: number } | null = null;
+    let bestEdgeVDiff = threshold + 1;
+
+    let bestEdgeH: { line: SnapLine; snapY?: number; snapH?: number } | null = null;
+    let bestEdgeHDiff = threshold + 1;
+
+    for (const other of otherFrames) {
+      const otherRight = other.x + other.width;
+      const otherBottom = other.y + other.height;
+
+      // Vertical (Left or Right Edge)
+      if (isLeftAnchor) {
+        // Snapping Left edge of current to Left or Right of other
+        const diffL_L = Math.abs(x - other.x);
+        if (diffL_L <= threshold && diffL_L < bestEdgeVDiff) {
+          bestEdgeVDiff = diffL_L;
+          const newX = other.x;
+          const newW = (x + width) - newX;
+          bestEdgeV = {
+            line: {
+              type: 'vertical',
+              position: other.x,
+              start: Math.min(y, other.y),
+              end: Math.max(y + height, otherBottom),
+              label: 'Rata Kiri',
+            },
+            snapX: newX,
+            snapW: newW,
+          };
+        }
+      } else {
+        // Snapping Right edge of current to Right or Left of other
+        const diffR_R = Math.abs(right - otherRight);
+        if (diffR_R <= threshold && diffR_R < bestEdgeVDiff) {
+          bestEdgeVDiff = diffR_R;
+          const newW = otherRight - x;
+          bestEdgeV = {
+            line: {
+              type: 'vertical',
+              position: otherRight,
+              start: Math.min(y, other.y),
+              end: Math.max(bottom, otherBottom),
+              label: 'Rata Kanan',
+            },
+            snapW: newW,
+          };
+        }
+      }
+
+      // Horizontal (Top or Bottom Edge)
+      if (isTopAnchor) {
+        // Snapping Top edge of current to Top or Bottom of other
+        const diffT_T = Math.abs(y - other.y);
+        if (diffT_T <= threshold && diffT_T < bestEdgeHDiff) {
+          bestEdgeHDiff = diffT_T;
+          const newY = other.y;
+          const newH = (y + height) - newY;
+          bestEdgeH = {
+            line: {
+              type: 'horizontal',
+              position: other.y,
+              start: Math.min(x, other.x),
+              end: Math.max(x + width, otherRight),
+              label: 'Rata Atas',
+            },
+            snapY: newY,
+            snapH: newH,
+          };
+        }
+      } else {
+        // Snapping Bottom edge of current to Bottom or Top of other
+        const diffB_B = Math.abs(bottom - otherBottom);
+        if (diffB_B <= threshold && diffB_B < bestEdgeHDiff) {
+          bestEdgeHDiff = diffB_B;
+          const newH = otherBottom - y;
+          bestEdgeH = {
+            line: {
+              type: 'horizontal',
+              position: otherBottom,
+              start: Math.min(x, other.x),
+              end: Math.max(bottom, otherBottom),
+              label: 'Rata Bawah',
+            },
+            snapH: newH,
+          };
+        }
+      }
+    }
+
+    if (bestEdgeV) {
+      snapLines.push(bestEdgeV.line);
+      if (bestEdgeV.snapX !== undefined) x = bestEdgeV.snapX;
+      if (bestEdgeV.snapW !== undefined) width = bestEdgeV.snapW;
+    }
+    if (bestEdgeH) {
+      snapLines.push(bestEdgeH.line);
+      if (bestEdgeH.snapY !== undefined) y = bestEdgeH.snapY;
+      if (bestEdgeH.snapH !== undefined) height = bestEdgeH.snapH;
+    }
   }
 
   return {

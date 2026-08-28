@@ -1472,6 +1472,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 }
 
                 if (snapEnabled && selectedFrameIds.length === 1) {
+                  const currentAnchor = trRef.current?.getActiveAnchor();
                   const selectedId = selectedFrameIds[0];
                   const otherRects = (activeSpread.elements || [])
                     .filter((f) => f.id !== selectedId)
@@ -1491,11 +1492,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     gutterPhysicalW,
                     otherRects,
                     thresholdUnits,
-                    unit
+                    unit,
+                    currentAnchor || undefined
                   );
 
                   if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                     setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                    return {
+                      ...newBox,
+                      x: snapRes.snappedBounds.x * scaleFactor,
+                      y: snapRes.snappedBounds.y * scaleFactor,
+                      width: Math.max(4, snapRes.snappedBounds.width * scaleFactor),
+                      height: Math.max(4, snapRes.snappedBounds.height * scaleFactor),
+                    };
                   } else {
                     clearSnapLines();
                   }
