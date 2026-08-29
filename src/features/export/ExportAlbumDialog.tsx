@@ -105,6 +105,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   // Pre-Flight Validation State (missing photos & existing destination file collisions)
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
   const [isVerifyingPreflight, setIsVerifyingPreflight] = useState(false);
+  const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
+  const [isMissingModalOpen, setIsMissingModalOpen] = useState(false);
 
   const allSpreads: Spread[] = useMemo(() => {
     return currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
@@ -220,14 +222,16 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       }
 
       if (report.missingPhotos && report.missingPhotos.length > 0) {
-        // Pre-Flight found missing photos -> show missing warning panel!
+        // Pre-Flight found missing photos -> open dedicated Missing Photos modal popup!
         setPreflightReport(report);
+        setIsMissingModalOpen(true);
         return;
       }
 
       if (report.existingFiles && report.existingFiles.length > 0) {
-        // Pre-Flight found conflicting output files in destination folder -> show Overwrite confirmation!
+        // Pre-Flight found conflicting output files in destination folder -> open dedicated Overwrite modal popup!
         setPreflightReport(report);
+        setIsOverwriteModalOpen(true);
         return;
       }
 
@@ -258,101 +262,23 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       selectedSpreadIds,
     });
     setPreflightReport(null);
+    setIsOverwriteModalOpen(false);
+    setIsMissingModalOpen(false);
     onClose();
   };
 
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Export Album for Print"
-      width={560}
-      closeOnOverlayClick={false}
-    >
-      <div className={styles.container}>
-        {/* 1. Pre-Flight Warning Card if Missing Photos Found */}
-        {preflightReport && preflightReport.missingPhotos && preflightReport.missingPhotos.length > 0 && (
-          <div className={styles.preflightWarningBox}>
-            <div className={styles.preflightHeader}>
-              <span>⚠️ Pre-Flight Check: {preflightReport.missingPhotos.length} Missing Photo(s) Detected</span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-              The original files for the photos below could not be found at their disk path. If you proceed, they will be rendered using low-resolution cached previews.
-            </div>
-            <div className={styles.missingList}>
-              {preflightReport.missingPhotos.map((item) => (
-                <div key={item.elementId} className={styles.missingItem}>
-                  <span style={{ fontWeight: 600 }}>{item.spreadName}: {item.fileName}</span>
-                  <span className={styles.missingPath} title={item.filePath}>{item.filePath}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setPreflightReport(null);
-                  onClose();
-                  openRelink();
-                }}
-              >
-                Locate & Relink Photos...
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleProceedConfirmed}
-                style={{ backgroundColor: '#f59e0b', borderColor: '#d97706', color: '#000' }}
-              >
-                Export Using Previews
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* 2. Pre-Flight Warning Card if Existing Matching Files Found in Destination Folder */}
-        {preflightReport && (!preflightReport.missingPhotos || preflightReport.missingPhotos.length === 0) && preflightReport.existingFiles && preflightReport.existingFiles.length > 0 && (
-          <div
-            className={styles.preflightWarningBox}
-            style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
-          >
-            <div className={styles.preflightHeader} style={{ color: '#ef4444' }}>
-              <span>⚠️ Overwrite Warning: {preflightReport.existingFiles.length} Existing File(s) Detected</span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-              The destination folder already contains {preflightReport.existingFiles.length} file(s) with matching names. Exporting will overwrite these files:
-            </div>
-            <div className={styles.missingList}>
-              {preflightReport.existingFiles.map((filename, i) => (
-                <div key={i} className={styles.missingItem}>
-                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>📄 {filename}</span>
-                  <span style={{ color: '#ef4444', fontSize: '10px' }}>Will be overwritten</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPreflightReport(null)}
-              >
-                Cancel / Change Folder
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleProceedConfirmed}
-                style={{ backgroundColor: '#ef4444', borderColor: '#dc2626', color: '#fff' }}
-              >
-                Overwrite Existing Files
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* 1. Format Selection */}
-        <div className={styles.section}>
+    <>
+      <Dialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Export Album for Print"
+        width={560}
+        closeOnOverlayClick={false}
+      >
+        <div className={styles.container}>
+          {/* 1. Format Selection */}
+          <div className={styles.section}>
           <label className={styles.sectionTitle}>Export Format</label>
           <div className={styles.formatGrid}>
             <div
@@ -672,5 +598,97 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
         </div>
       </div>
     </Dialog>
+
+    {/* Dedicated Overwrite Confirmation Modal Popup */}
+    {isOverwriteModalOpen && preflightReport && preflightReport.existingFiles && preflightReport.existingFiles.length > 0 && (
+      <Dialog
+        isOpen={isOverwriteModalOpen}
+        onClose={() => setIsOverwriteModalOpen(false)}
+        title="⚠️ Overwrite Warning"
+        width={500}
+        closeOnOverlayClick={false}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
+            The destination folder already contains <strong>{preflightReport.existingFiles.length} file(s)</strong> with matching export names. Proceeding will overwrite and replace them:
+          </div>
+
+          <div className={styles.missingList} style={{ maxHeight: '180px', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+            {preflightReport.existingFiles.map((filename, i) => (
+              <div key={i} className={styles.missingItem}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>📄 {filename}</span>
+                <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: 600 }}>Will be overwritten</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setIsOverwriteModalOpen(false)}
+            >
+              Cancel / Change Folder
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleProceedConfirmed}
+              style={{ backgroundColor: '#ef4444', borderColor: '#dc2626', color: '#ffffff' }}
+            >
+              Overwrite Existing Files
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    )}
+
+    {/* Dedicated Missing Photos Warning Modal Popup */}
+    {isMissingModalOpen && preflightReport && preflightReport.missingPhotos && preflightReport.missingPhotos.length > 0 && (
+      <Dialog
+        isOpen={isMissingModalOpen}
+        onClose={() => setIsMissingModalOpen(false)}
+        title="⚠️ Missing Photos Detected"
+        width={520}
+        closeOnOverlayClick={false}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
+            The original high-resolution master files for <strong>{preflightReport.missingPhotos.length} photo(s)</strong> could not be found at their disk paths.
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '-8px' }}>
+            If you proceed with export, these frames will be rendered using low-resolution thumbnail previews.
+          </div>
+
+          <div className={styles.missingList} style={{ maxHeight: '180px', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+            {preflightReport.missingPhotos.map((item) => (
+              <div key={item.elementId} className={styles.missingItem}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{item.spreadName}: {item.fileName}</span>
+                <span className={styles.missingPath} title={item.filePath}>{item.filePath}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsMissingModalOpen(false);
+                onClose();
+                openRelink();
+              }}
+            >
+              Locate & Relink Photos...
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleProceedConfirmed}
+              style={{ backgroundColor: '#f59e0b', borderColor: '#d97706', color: '#000000' }}
+            >
+              Export Using Previews
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    )}
+  </>
   );
 }

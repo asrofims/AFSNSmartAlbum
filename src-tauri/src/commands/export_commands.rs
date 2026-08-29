@@ -388,6 +388,26 @@ fn export_album_high_res_worker(
                     return Err("Export cancelled by user".to_string());
                 }
 
+                // Emit status for sharpening & disk encoding
+                let _ = app_handle.emit(
+                    "export-progress",
+                    &ExportProgressEvent {
+                        current: current_num,
+                        total: total_spreads,
+                        current_photos: total_photos,
+                        total_photos,
+                        percent: 94.0,
+                        spread_name: spread_name.clone(),
+                        status: if options.sharpen_enabled {
+                            format!("Applying print output sharpening to {}...", spread_name)
+                        } else {
+                            format!("Encoding high-resolution {}...", spread_name)
+                        },
+                        is_finished: false,
+                        output_files: Vec::new(),
+                    },
+                );
+
                 // Apply Print Output Sharpening if enabled
                 let spread_img = if options.sharpen_enabled {
                     apply_print_sharpening(&spread_img, &options.sharpen_amount)
