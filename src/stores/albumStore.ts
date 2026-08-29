@@ -189,8 +189,33 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         return true;
       }
     } catch (err) {
-      console.warn('Could not load album structure from SQLite DB:', err);
+      console.warn('Could not load album structure from SQLite DB, checking snapshot:', err);
     }
+
+    // Fallback: Check local storage snapshot
+    try {
+      const raw = localStorage.getItem(`afsn_snapshot_${projectId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.album && parsed.album.spreads && parsed.album.spreads.length > 0) {
+          useHistoryStore.getState().clearHistory();
+          set({
+            currentAlbum: parsed.album as Album,
+            activeSpreadId: parsed.album.spreads[0]?.id || parsed.album.coverSpread?.id || '',
+            activeSpreadIndex: 0,
+            selectedPageId: null,
+            saveStatus: 'saved',
+            lastSavedAt: new Date().toLocaleTimeString(),
+          });
+          // Resync to SQLite
+          try {
+            await invoke('save_album_structure', { album: parsed.album });
+          } catch {}
+          return true;
+        }
+      }
+    } catch {}
+
     return false;
   },
 
@@ -199,15 +224,77 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     if (!currentAlbum) return false;
 
     set({ saveStatus: 'saving' });
+
+    // Clean up / sanitize album payload so all fields are defined
+    const sanitizeElement = (el: PhotoFrameElement): PhotoFrameElement => ({
+      ...el,
+      type: el.type || 'photo',
+      photoId: el.photoId || null,
+      filePath: el.filePath || '',
+      fileName: el.fileName || '',
+      previewPath: el.previewPath || el.filePath || '',
+      thumbnailPath: el.thumbnailPath || el.filePath || '',
+      x: Number.isFinite(el.x) ? el.x : 0,
+      y: Number.isFinite(el.y) ? el.y : 0,
+      width: Number.isFinite(el.width) ? el.width : 100,
+      height: Number.isFinite(el.height) ? el.height : 100,
+      rotation: Number.isFinite(el.rotation) ? el.rotation : 0,
+      zIndex: Number.isFinite(el.zIndex) ? el.zIndex : 1,
+      photoAspect: typeof el.photoAspect === 'number' && el.photoAspect > 0 ? el.photoAspect : 1.5,
+      cropX: Number.isFinite(el.cropX) ? el.cropX : 0,
+      cropY: Number.isFinite(el.cropY) ? el.cropY : 0,
+      cropScale: Number.isFinite(el.cropScale) && el.cropScale > 0 ? el.cropScale : 1.0,
+      borderEnabled: Boolean(el.borderEnabled),
+      borderWidth: Number.isFinite(el.borderWidth) ? el.borderWidth : 0,
+      borderColor: el.borderColor || '#FFFFFF',
+      opacity: Number.isFinite(el.opacity) ? el.opacity : 1.0,
+    });
+
+    const sanitizedAlbum: Album = {
+      ...currentAlbum,
+      coverSpread: {
+        ...currentAlbum.coverSpread,
+        elements: (currentAlbum.coverSpread.elements || []).map(sanitizeElement),
+      },
+      spreads: (currentAlbum.spreads || []).map((spread) => ({
+        ...spread,
+        elements: (spread.elements || []).map(sanitizeElement),
+      })),
+    };
+
     try {
-      await invoke('save_album_structure', { album: currentAlbum });
+      await invoke('save_album_structure', { album: sanitizedAlbum });
+      // Update local storage crash recovery snapshot
+      try {
+        localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+          projectId: sanitizedAlbum.projectId,
+          savedAt: new Date().toISOString(),
+          album: sanitizedAlbum,
+        }));
+      } catch {}
+
       set({
+        currentAlbum: sanitizedAlbum,
         saveStatus: 'saved',
         lastSavedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       });
       return true;
     } catch (err) {
       console.error('Failed to save album to SQLite DB:', err);
+      // Fallback: save to localStorage snapshot so data is never lost
+      try {
+        localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+          projectId: sanitizedAlbum.projectId,
+          savedAt: new Date().toISOString(),
+          album: sanitizedAlbum,
+        }));
+        set({
+          currentAlbum: sanitizedAlbum,
+          saveStatus: 'saved',
+          lastSavedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        });
+        return true;
+      } catch {}
       set({ saveStatus: 'unsaved' });
       return false;
     }

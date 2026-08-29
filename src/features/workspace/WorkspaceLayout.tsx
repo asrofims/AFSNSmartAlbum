@@ -134,11 +134,18 @@ export function WorkspaceLayout() {
 
   useTauriInfo();
 
-  // Initialize or load album structure from SQLite DB on project load
+  // Initialize or load album structure and photos from SQLite DB on project load
   useEffect(() => {
     if (currentProject) {
       const albumStore = useAlbumStore.getState();
       const existingAlbum = albumStore.currentAlbum;
+
+      // Ensure photos & folders for this project are loaded in photoStore
+      import('../../stores/photoStore').then(({ usePhotoStore }) => {
+        usePhotoStore.getState().loadPhotos(currentProject.id);
+        usePhotoStore.getState().loadFolders(currentProject.id);
+      });
+
       if (!existingAlbum || existingAlbum.projectId !== currentProject.id) {
         albumStore.loadAlbumFromDb(currentProject.id).then((loaded) => {
           if (!loaded) {

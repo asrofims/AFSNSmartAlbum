@@ -64,33 +64,61 @@ pub struct PhotoFolderRow {
     pub updated_at: String,
 }
 
+fn default_element_type() -> String { "photo".to_string() }
+fn default_one_hundred() -> f64 { 100.0 }
+fn default_one_i32() -> i32 { 1 }
+fn default_photo_aspect() -> f64 { 1.5 }
+fn default_crop_scale() -> f64 { 1.0 }
+fn default_border_color() -> String { "#FFFFFF".to_string() }
+fn default_opacity() -> f64 { 1.0 }
+fn default_gutter_unit() -> String { "mm".to_string() }
+fn default_bg_color() -> String { "#FFFFFF".to_string() }
+fn default_bg_type() -> String { "solid".to_string() }
+
 /// Represents an element / photo frame on a spread.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementPayload {
     pub id: String,
+    #[serde(default = "default_element_type")]
     pub r#type: String,
     pub photo_id: Option<String>,
+    #[serde(default)]
     pub file_path: String,
+    #[serde(default)]
     pub file_name: String,
     pub preview_path: Option<String>,
     pub thumbnail_path: Option<String>,
+    #[serde(default)]
     pub x: f64,
+    #[serde(default)]
     pub y: f64,
+    #[serde(default = "default_one_hundred")]
     pub width: f64,
+    #[serde(default = "default_one_hundred")]
     pub height: f64,
+    #[serde(default)]
     pub rotation: f64,
+    #[serde(default = "default_one_i32")]
     pub z_index: i32,
+    #[serde(default = "default_photo_aspect")]
     pub photo_aspect: f64,
     pub original_width: Option<f64>,
     pub original_height: Option<f64>,
+    #[serde(default)]
     pub crop_x: f64,
+    #[serde(default)]
     pub crop_y: f64,
+    #[serde(default = "default_crop_scale")]
     pub crop_scale: f64,
     pub crop_rotation: Option<f64>,
+    #[serde(default)]
     pub border_enabled: bool,
+    #[serde(default)]
     pub border_width: f64,
+    #[serde(default = "default_border_color")]
     pub border_color: String,
+    #[serde(default = "default_opacity")]
     pub opacity: f64,
 }
 
@@ -99,14 +127,23 @@ pub struct ElementPayload {
 #[serde(rename_all = "camelCase")]
 pub struct PagePayload {
     pub id: String,
+    #[serde(default)]
     pub page_number: i32,
+    #[serde(default)]
     pub r#type: String,
+    #[serde(default)]
     pub width: f64,
+    #[serde(default)]
     pub height: f64,
+    #[serde(default)]
     pub unit: String,
+    #[serde(default)]
     pub bleed: f64,
+    #[serde(default)]
     pub safe_area: f64,
+    #[serde(default = "default_bg_color")]
     pub background_color: String,
+    #[serde(default = "default_bg_type")]
     pub background_type: String,
 }
 
@@ -115,16 +152,25 @@ pub struct PagePayload {
 #[serde(rename_all = "camelCase")]
 pub struct SpreadPayload {
     pub id: String,
+    #[serde(default)]
     pub spread_index: i32,
+    #[serde(default)]
     pub r#type: String,
+    #[serde(default)]
     pub name: String,
     pub left_page: Option<PagePayload>,
     pub right_page: Option<PagePayload>,
+    #[serde(default)]
     pub gutter_width: f64,
+    #[serde(default = "default_gutter_unit")]
     pub gutter_unit: String,
+    #[serde(default)]
     pub bleed: f64,
+    #[serde(default)]
     pub safe_area: f64,
+    #[serde(default = "default_bg_color")]
     pub background_color: String,
+    #[serde(default)]
     pub elements: Vec<ElementPayload>,
 }
 
@@ -135,8 +181,11 @@ pub struct AlbumPayload {
     pub id: String,
     pub project_id: String,
     pub cover_spread: SpreadPayload,
+    #[serde(default)]
     pub spreads: Vec<SpreadPayload>,
+    #[serde(default)]
     pub total_spreads: i32,
+    #[serde(default)]
     pub total_pages: i32,
 }
 

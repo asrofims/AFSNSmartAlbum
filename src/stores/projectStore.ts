@@ -110,7 +110,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
   },
 
-  closeProject: () => set({ currentProject: null }),
+  closeProject: async () => {
+    set({ currentProject: null });
+    try {
+      const { useAlbumStore } = await import('./albumStore');
+      const { usePhotoStore } = await import('./photoStore');
+      const { useEditorStore } = await import('./editorStore');
+      useAlbumStore.setState({ currentAlbum: null, activeSpreadId: null, activeSpreadIndex: 0, saveStatus: 'saved' });
+      usePhotoStore.setState({ photos: [], folders: [], selectedPhotoIds: [] });
+      useEditorStore.setState({ selectedFrameIds: [], editingCropFrameId: null });
+    } catch {}
+  },
 
   loadRecentProjects: async () => {
     try {
@@ -178,6 +188,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         error: null,
       }));
 
+      // Initialize album for this new project
+      const { useAlbumStore } = await import('./albumStore');
+      useAlbumStore.getState().initializeAlbum(created);
+      await useAlbumStore.getState().saveAlbumToDb();
+
       return created;
     } catch (tauriErr) {
       console.warn('[AFSN] Tauri create_project invoke failed, falling back to local storage:', tauriErr);
@@ -207,6 +222,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         error: null,
       }));
 
+      const { useAlbumStore } = await import('./albumStore');
+      useAlbumStore.getState().initializeAlbum(mockProject);
+      await useAlbumStore.getState().saveAlbumToDb();
+
       return mockProject;
     }
   },
@@ -214,24 +233,38 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   openProjectById: async (id: string) => {
     set({ isLoading: true, error: null });
 
+    let project: Project | null = null;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const project = await invoke<Project | null>('get_project', { id });
-      if (project) {
-        set((state) => ({
-          currentProject: project,
-          recentProjects: [project, ...state.recentProjects.filter((p) => p.id !== project.id)].slice(0, 10),
-          isLoading: false,
-        }));
-        return;
-      }
+      project = await invoke<Project | null>('get_project', { id });
     } catch (err) {
       console.warn('[AFSN] get_project via Tauri failed, checking state/localStorage:', err);
     }
 
-    const found = get().recentProjects.find((p) => p.id === id);
-    if (found) {
-      set({ currentProject: found, isLoading: false });
+    if (!project) {
+      project = get().recentProjects.find((p) => p.id === id) || null;
+    }
+
+    if (project) {
+      set((state) => ({
+        currentProject: project,
+        recentProjects: [project!, ...state.recentProjects.filter((p) => p.id !== project!.id)].slice(0, 10),
+        isLoading: false,
+      }));
+
+      // Load Photos, Folders, and Album Structure for this Project
+      try {
+        const { usePhotoStore } = await import('./photoStore');
+        const { useAlbumStore } = await import('./albumStore');
+        await usePhotoStore.getState().loadPhotos(project.id);
+        await usePhotoStore.getState().loadFolders(project.id);
+        const loaded = await useAlbumStore.getState().loadAlbumFromDb(project.id);
+        if (!loaded) {
+          useAlbumStore.getState().initializeAlbum(project);
+        }
+      } catch (e) {
+        console.error('[AFSN] Failed to load album/photos on openProjectById:', e);
+      }
     } else {
       set({ error: 'Project not found', isLoading: false });
     }
