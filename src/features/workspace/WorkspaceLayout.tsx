@@ -1239,82 +1239,38 @@ export function WorkspaceLayout() {
 
                 {/* Safe Margins & Spine Inputs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Safe Zone Margin with Slider */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                        <NumberInput
-                          value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val);
-                            updateProjectMargin(val);
-                          }}
-                          min={0.1}
-                          max={50}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                        />
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                      </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
+                        onChange={(val) => {
+                          updateSafeArea(val);
+                          updateProjectMargin(val);
+                        }}
+                        min={0}
+                        max={999}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                     </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={currentProject.canvasUnit === 'inch' ? 2 : currentProject.canvasUnit === 'cm' ? 5 : 50}
-                      step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        updateSafeArea(val);
-                        updateProjectMargin(val);
-                      }}
-                      style={{
-                        width: '100%',
-                        accentColor: 'var(--color-accent)',
-                        cursor: 'pointer',
-                        height: '4px',
-                        marginBottom: '4px',
-                      }}
-                    />
                   </div>
 
-                  {/* Inner Safe Inset with Slider */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }} title="Additional breathing room distance of photos inside the blue safe area margin">Inner Safe Inset</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                        <NumberInput
-                          value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
-                          onChange={(val) => {
-                            updatePhotoInset(val);
-                            updateProjectPhotoInset(val);
-                          }}
-                          min={0}
-                          max={40}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                        />
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                      </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }} title="Additional breathing room distance of photos inside the blue safe area margin">Inner Safe Inset</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
+                        onChange={(val) => {
+                          updatePhotoInset(val);
+                          updateProjectPhotoInset(val);
+                        }}
+                        min={0}
+                        max={999}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                     </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={currentProject.canvasUnit === 'inch' ? 2 : currentProject.canvasUnit === 'cm' ? 5 : 40}
-                      step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        updatePhotoInset(val);
-                        updateProjectPhotoInset(val);
-                      }}
-                      style={{
-                        width: '100%',
-                        accentColor: 'var(--color-accent)',
-                        cursor: 'pointer',
-                        height: '4px',
-                        marginBottom: '4px',
-                      }}
-                    />
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -1324,7 +1280,7 @@ export function WorkspaceLayout() {
                         value={activeSpread?.bleed ?? 3}
                         onChange={(val) => updateBleed(val)}
                         min={0}
-                        max={20}
+                        max={999}
                         step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
                       />
                       <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
