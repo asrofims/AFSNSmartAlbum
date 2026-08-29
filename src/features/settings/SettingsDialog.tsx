@@ -45,15 +45,6 @@ export function SettingsDialog() {
 
           <button
             type="button"
-            className={`${styles.tabBtn} ${activeTab === 'pipeline' ? styles.tabBtnActive : ''}`}
-            onClick={() => setActiveTab('pipeline')}
-          >
-            <span className={styles.tabIcon}>🖼️</span>
-            <span>Photo Pipeline</span>
-          </button>
-
-          <button
-            type="button"
             className={`${styles.tabBtn} ${activeTab === 'shortcuts' ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab('shortcuts')}
           >
@@ -308,27 +299,7 @@ export function SettingsDialog() {
             </div>
           )}
 
-          {/* 3. Photo Pipeline Tab */}
-          {activeTab === 'pipeline' && (
-            <div>
-              <div className={styles.sectionHeader}>
-                <div className={styles.sectionTitle}>Photo Pipeline & Cache</div>
-                <div className={styles.sectionSubtitle}>
-                  High-performance background rendering engine powered by libvips.
-                </div>
-              </div>
-
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Image Pipeline Hierarchy</div>
-                <div className={styles.cardSubtitle} style={{ marginTop: '6px', lineHeight: 1.5 }}>
-                  AFSNSmartAlbum protects system memory by never loading multi-megapixel raw master photos onto the canvas.
-                  Images flow through: <strong>Original $\to$ Preview (2000px) $\to$ Thumbnail (400px)</strong>.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 4. Keyboard Shortcuts Tab */}
+          {/* 3. Keyboard Shortcuts Tab */}
           {activeTab === 'shortcuts' && (
             <div>
               <div className={styles.sectionHeader}>
