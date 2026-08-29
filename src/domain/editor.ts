@@ -969,116 +969,246 @@ export function intersectRect(r1: RectBounds, r2: RectBounds): boolean {
 }
 
 /**
- * Calculates alignment updates for multiple selected frames.
+ * Represents a composite layout entity (either a single independent frame or a grouped cluster of frames).
+ */
+export interface LayoutEntity {
+  id: string; // groupId if group, or frameId if standalone
+  isGroup: boolean;
+  frames: PhotoFrameElement[];
+  x: number;      // minX of all member frames
+  y: number;      // minY of all member frames
+  width: number;  // maxX - minX
+  height: number; // maxY - minY
+}
+
+/**
+ * Clusters an array of frames into LayoutEntities based on their groupId.
+ * All frames sharing a non-empty groupId form a single composite LayoutEntity (rigid bounding box).
+ * Standalone frames without groupId form individual 1-frame LayoutEntities.
+ */
+export function clusterFramesIntoEntities(frames: PhotoFrameElement[]): LayoutEntity[] {
+  const groupMap = new Map<string, PhotoFrameElement[]>();
+  const standaloneFrames: PhotoFrameElement[] = [];
+
+  for (const frame of frames) {
+    if (frame.groupId) {
+      const existing = groupMap.get(frame.groupId) || [];
+      existing.push(frame);
+      groupMap.set(frame.groupId, existing);
+    } else {
+      standaloneFrames.push(frame);
+    }
+  }
+
+  const entities: LayoutEntity[] = [];
+
+  // Add grouped entities
+  for (const [groupId, groupFrames] of groupMap.entries()) {
+    const minX = Math.min(...groupFrames.map((f) => f.x));
+    const minY = Math.min(...groupFrames.map((f) => f.y));
+    const maxX = Math.max(...groupFrames.map((f) => f.x + f.width));
+    const maxY = Math.max(...groupFrames.map((f) => f.y + f.height));
+
+    entities.push({
+      id: groupId,
+      isGroup: true,
+      frames: groupFrames,
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    });
+  }
+
+  // Add standalone frame entities
+  for (const frame of standaloneFrames) {
+    entities.push({
+      id: frame.id,
+      isGroup: false,
+      frames: [frame],
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+    });
+  }
+
+  return entities;
+}
+
+/**
+ * Calculates batch alignment updates for multiple selected frames.
+ * Groups of frames are treated as single rigid entities, preserving their internal relative layout.
  */
 export function alignFrames(
   frames: PhotoFrameElement[],
   alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
-  if (frames.length < 2) return [];
+  const entities = clusterFramesIntoEntities(frames);
+  if (entities.length < 2) return [];
 
-  const minX = Math.min(...frames.map((f) => f.x));
-  const maxX = Math.max(...frames.map((f) => f.x + f.width));
-  const minY = Math.min(...frames.map((f) => f.y));
-  const maxY = Math.max(...frames.map((f) => f.y + f.height));
+  const minX = Math.min(...entities.map((e) => e.x));
+  const maxX = Math.max(...entities.map((e) => e.x + e.width));
+  const minY = Math.min(...entities.map((e) => e.y));
+  const maxY = Math.max(...entities.map((e) => e.y + e.height));
   const centerX = (minX + maxX) / 2;
   const middleY = (minY + maxY) / 2;
 
-  return frames.map((f) => {
+  const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
+
+  for (const entity of entities) {
+    let deltaX = 0;
+    let deltaY = 0;
+    let applyX = false;
+    let applyY = false;
+
     switch (alignment) {
       case 'left':
-        return { id: f.id, geometry: { x: roundToTenth(minX) } };
+        deltaX = minX - entity.x;
+        applyX = true;
+        break;
       case 'center':
-        return { id: f.id, geometry: { x: roundToTenth(centerX - f.width / 2) } };
+        deltaX = centerX - entity.width / 2 - entity.x;
+        applyX = true;
+        break;
       case 'right':
-        return { id: f.id, geometry: { x: roundToTenth(maxX - f.width) } };
+        deltaX = maxX - entity.width - entity.x;
+        applyX = true;
+        break;
       case 'top':
-        return { id: f.id, geometry: { y: roundToTenth(minY) } };
+        deltaY = minY - entity.y;
+        applyY = true;
+        break;
       case 'middle':
-        return { id: f.id, geometry: { y: roundToTenth(middleY - f.height / 2) } };
+        deltaY = middleY - entity.height / 2 - entity.y;
+        applyY = true;
+        break;
       case 'bottom':
-        return { id: f.id, geometry: { y: roundToTenth(maxY - f.height) } };
+        deltaY = maxY - entity.height - entity.y;
+        applyY = true;
+        break;
     }
-  });
+
+    for (const f of entity.frames) {
+      const geometry: Partial<PhotoFrameElement> = {};
+      if (applyX) geometry.x = roundToTenth(f.x + deltaX);
+      if (applyY) geometry.y = roundToTenth(f.y + deltaY);
+      updates.push({ id: f.id, geometry });
+    }
+  }
+
+  return updates;
 }
 
 /**
- * Calculates equidistant gap distribution updates for multiple selected frames.
- * Keeps the outermost bounds intact and distributes equal gaps between all frames.
- * Supports large, normal, and micro-thin gaps without floating-point accumulation drift.
+ * Calculates equidistant gap distribution updates for multiple selected entities (standalone frames or groups).
+ * Keeps the outermost bounds intact and distributes equal gaps between all entities while preserving group interiors.
  */
 export function distributeFrames(
   frames: PhotoFrameElement[],
   direction: 'horizontal' | 'vertical'
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
-  if (frames.length < 3) return [];
+  const entities = clusterFramesIntoEntities(frames);
+  if (entities.length < 3) return [];
+
+  const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
 
   if (direction === 'horizontal') {
-    // Sort frames strictly from left to right
-    const sorted = [...frames].sort((a, b) => a.x - b.x || a.y - b.y);
+    const sorted = [...entities].sort((a, b) => a.x - b.x || a.y - b.y);
     if (!sorted[0]) return [];
     const minX = sorted[0].x;
-    const maxRight = Math.max(...sorted.map((f) => f.x + f.width));
-    const totalFramesW = sorted.reduce((sum, f) => sum + f.width, 0);
+    const maxRight = Math.max(...sorted.map((e) => e.x + e.width));
+    const totalEntitiesW = sorted.reduce((sum, e) => sum + e.width, 0);
     const totalSpan = maxRight - minX;
-    const availableGap = Math.max(0, totalSpan - totalFramesW);
+    const availableGap = Math.max(0, totalSpan - totalEntitiesW);
     const gapPerItem = availableGap / (sorted.length - 1);
 
     let cumulativeWidth = 0;
-    return sorted.map((f, i) => {
-      const targetX = minX + cumulativeWidth + i * gapPerItem;
-      cumulativeWidth += f.width;
-      return { id: f.id, geometry: { x: roundToHundredth(targetX) } };
+    sorted.forEach((entity, i) => {
+      const targetEntityX = minX + cumulativeWidth + i * gapPerItem;
+      const deltaX = targetEntityX - entity.x;
+      for (const f of entity.frames) {
+        updates.push({
+          id: f.id,
+          geometry: { x: roundToHundredth(f.x + deltaX) },
+        });
+      }
+      cumulativeWidth += entity.width;
     });
   } else {
-    // Sort frames strictly from top to bottom
-    const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
+    const sorted = [...entities].sort((a, b) => a.y - b.y || a.x - b.x);
     if (!sorted[0]) return [];
     const minY = sorted[0].y;
-    const maxBottom = Math.max(...sorted.map((f) => f.y + f.height));
-    const totalFramesH = sorted.reduce((sum, f) => sum + f.height, 0);
+    const maxBottom = Math.max(...sorted.map((e) => e.y + e.height));
+    const totalEntitiesH = sorted.reduce((sum, e) => sum + e.height, 0);
     const totalSpan = maxBottom - minY;
-    const availableGap = Math.max(0, totalSpan - totalFramesH);
+    const availableGap = Math.max(0, totalSpan - totalEntitiesH);
     const gapPerItem = availableGap / (sorted.length - 1);
 
     let cumulativeHeight = 0;
-    return sorted.map((f, i) => {
-      const targetY = minY + cumulativeHeight + i * gapPerItem;
-      cumulativeHeight += f.height;
-      return { id: f.id, geometry: { y: roundToHundredth(targetY) } };
+    sorted.forEach((entity, i) => {
+      const targetEntityY = minY + cumulativeHeight + i * gapPerItem;
+      const deltaY = targetEntityY - entity.y;
+      for (const f of entity.frames) {
+        updates.push({
+          id: f.id,
+          geometry: { y: roundToHundredth(f.y + deltaY) },
+        });
+      }
+      cumulativeHeight += entity.height;
     });
   }
+
+  return updates;
 }
 
 /**
- * Applies a fixed custom gap spacing between multiple frames starting from the first frame's position.
+ * Applies a fixed custom gap spacing between multiple entities (standalone frames or groups)
+ * starting from the first entity's position. Groups move as rigid units without breaking internal gaps.
  */
 export function applyFixedGap(
   frames: PhotoFrameElement[],
   direction: 'horizontal' | 'vertical',
   gap: number
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
-  if (frames.length < 2) return [];
+  const entities = clusterFramesIntoEntities(frames);
+  if (entities.length < 2) return [];
+
+  const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
 
   if (direction === 'horizontal') {
-    const sorted = [...frames].sort((a, b) => a.x - b.x || a.y - b.y);
+    const sorted = [...entities].sort((a, b) => a.x - b.x || a.y - b.y);
     if (!sorted[0]) return [];
     let currentX = sorted[0].x;
-    return sorted.map((f) => {
-      const update = { id: f.id, geometry: { x: roundToHundredth(currentX) } };
-      currentX += f.width + gap;
-      return update;
-    });
+
+    for (const entity of sorted) {
+      const deltaX = currentX - entity.x;
+      for (const f of entity.frames) {
+        updates.push({
+          id: f.id,
+          geometry: { x: roundToHundredth(f.x + deltaX) },
+        });
+      }
+      currentX += entity.width + gap;
+    }
   } else {
-    const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
+    const sorted = [...entities].sort((a, b) => a.y - b.y || a.x - b.x);
     if (!sorted[0]) return [];
     let currentY = sorted[0].y;
-    return sorted.map((f) => {
-      const update = { id: f.id, geometry: { y: roundToHundredth(currentY) } };
-      currentY += f.height + gap;
-      return update;
-    });
+
+    for (const entity of sorted) {
+      const deltaY = currentY - entity.y;
+      for (const f of entity.frames) {
+        updates.push({
+          id: f.id,
+          geometry: { y: roundToHundredth(f.y + deltaY) },
+        });
+      }
+      currentY += entity.height + gap;
+    }
   }
+
+  return updates;
 }
 
 export interface FrameBounds {

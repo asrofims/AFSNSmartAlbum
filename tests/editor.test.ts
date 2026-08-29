@@ -17,6 +17,7 @@ import {
   applyFixedGap,
   calculateMultiFrameResize,
   matchFrameDimensions,
+  clusterFramesIntoEntities,
 } from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
@@ -541,4 +542,36 @@ console.assert(vertDrag.x === 100 && vertDrag.y === 180, `Shift vertical drag sh
 const freeDrag = applyShiftDragConstraint(100, 100, 150, 150, false);
 console.assert(freeDrag.x === 150 && freeDrag.y === 150, 'Free drag should allow diagonal movement');
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
+// 11. Test Group-Aware Layout Operations (Set Gap Spacing, Align, Distribute as single entities)
+// Group 1: 2 frames (F1 at x=10, w=50; F2 at x=70, w=50) -> total group span: x=10, width=110, internal gap=10
+const frameGroupA1: PhotoFrameElement = { ...testFrameA, id: 'ga1', x: 10, y: 50, width: 50, height: 80, groupId: 'grp-A' };
+const frameGroupA2: PhotoFrameElement = { ...testFrameB, id: 'ga2', x: 70, y: 50, width: 50, height: 80, groupId: 'grp-A' };
+// Standalone Frame 3: at x=250, w=60
+const frameStandalone3: PhotoFrameElement = { ...testFrameA, id: 's3', x: 250, y: 50, width: 60, height: 80, groupId: undefined };
+
+// Test Clustering
+const entities = clusterFramesIntoEntities([frameGroupA1, frameGroupA2, frameStandalone3]);
+console.assert(entities.length === 2, `Should cluster 3 frames into 2 entities, got ${entities.length}`);
+console.assert(entities[0].isGroup === true && entities[0].width === 110, 'Entity 0 should be group of width 110');
+console.assert(entities[1].isGroup === false && entities[1].width === 60, 'Entity 1 should be standalone of width 60');
+
+// Test applyFixedGap with Group and Standalone frame (gap = 20mm)
+const gapUpdates = applyFixedGap([frameGroupA1, frameGroupA2, frameStandalone3], 'horizontal', 20);
+const updatedX = new Map(gapUpdates.map((u) => [u.id, u.geometry.x!]));
+
+console.assert(updatedX.get('ga1') === 10, `Frame GA1 should stay at x=10, got ${updatedX.get('ga1')}`);
+console.assert(updatedX.get('ga2') === 70, `Frame GA2 should stay at x=70 (internal gap preserved), got ${updatedX.get('ga2')}`);
+// Standalone frame 3 should start at 10 + 110 + 20 = 140
+console.assert(updatedX.get('s3') === 140, `Standalone Frame 3 should move to x=140, got ${updatedX.get('s3')}`);
+
+// Test alignFrames with Group and Standalone frame (align 'bottom' where standalone has height 100, group has height 80)
+const frameTallStandalone: PhotoFrameElement = { ...testFrameA, id: 'sTall', x: 250, y: 20, width: 60, height: 120, groupId: undefined };
+const alignUpdates = alignFrames([frameGroupA1, frameGroupA2, frameTallStandalone], 'bottom');
+const updatedY = new Map(alignUpdates.map((u) => [u.id, u.geometry.y!]));
+
+// Max Y is 20 + 120 = 140. Group (height 80) should align bottom to y = 140 - 80 = 60
+console.assert(updatedY.get('ga1') === 60, `GA1 should align to y=60, got ${updatedY.get('ga1')}`);
+console.assert(updatedY.get('ga2') === 60, `GA2 should align to y=60, got ${updatedY.get('ga2')}`);
+console.assert(updatedY.get('sTall') === 20, `sTall should stay at y=20 (maxY=140), got ${updatedY.get('sTall')}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
