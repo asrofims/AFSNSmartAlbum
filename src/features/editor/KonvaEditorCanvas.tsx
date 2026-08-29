@@ -763,7 +763,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
   const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
-  const effectiveMarginPixel = Math.max(1, Math.round((dims.safeMargin + dims.photoInset) * scaleFactor));
   const activeCropFrame = editingCropFrameId
     ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
     : null;
@@ -1419,22 +1418,22 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 />
 
                 {/* Inner Safe Inset (Teal Guide) */}
-                {dims.photoInset > 0 && (
+                {(dims.photoInsetTop > 0 || dims.photoInsetBottom > 0 || dims.photoInsetLeft > 0 || dims.photoInsetRight > 0) && (
                   <>
                     <Rect
-                      x={effectiveMarginPixel}
-                      y={effectiveMarginPixel}
-                      width={leftPagePixelW - effectiveMarginPixel * 2}
-                      height={screenSpreadH - effectiveMarginPixel * 2}
+                      x={safeAreaPixel + Math.round(dims.photoInsetLeft * scaleFactor)}
+                      y={safeAreaPixel + Math.round(dims.photoInsetTop * scaleFactor)}
+                      width={leftPagePixelW - safeAreaPixel * 2 - Math.round(dims.photoInsetLeft * scaleFactor)}
+                      height={screenSpreadH - safeAreaPixel * 2 - Math.round((dims.photoInsetTop + dims.photoInsetBottom) * scaleFactor)}
                       stroke="rgba(20, 184, 166, 0.75)"
                       strokeWidth={1}
                       dash={[3, 3]}
                     />
                     <Rect
-                      x={leftPagePixelW + gutterPixelW + effectiveMarginPixel}
-                      y={effectiveMarginPixel}
-                      width={rightPagePixelW - effectiveMarginPixel * 2}
-                      height={screenSpreadH - effectiveMarginPixel * 2}
+                      x={leftPagePixelW + gutterPixelW + safeAreaPixel}
+                      y={safeAreaPixel + Math.round(dims.photoInsetTop * scaleFactor)}
+                      width={rightPagePixelW - safeAreaPixel * 2 - Math.round(dims.photoInsetRight * scaleFactor)}
+                      height={screenSpreadH - safeAreaPixel * 2 - Math.round((dims.photoInsetTop + dims.photoInsetBottom) * scaleFactor)}
                       stroke="rgba(20, 184, 166, 0.75)"
                       strokeWidth={1}
                       dash={[3, 3]}

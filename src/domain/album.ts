@@ -15,6 +15,10 @@ export interface Page {
   bleed: number;
   safeArea: number;
   photoInset?: number;
+  photoInsetTop?: number;
+  photoInsetBottom?: number;
+  photoInsetLeft?: number;
+  photoInsetRight?: number;
   backgroundColor: string;
   backgroundType: 'solid' | 'gradient' | 'image';
   elements?: PhotoFrameElement[];
@@ -32,6 +36,10 @@ export interface Spread {
   bleed: number;
   safeArea: number;
   photoInset?: number;
+  photoInsetTop?: number;
+  photoInsetBottom?: number;
+  photoInsetLeft?: number;
+  photoInsetRight?: number;
   backgroundColor: string;
   elements: PhotoFrameElement[];
 }

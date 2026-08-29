@@ -46,6 +46,10 @@ export interface Project {
   marginValue?: number;
   marginUnit?: Unit;
   photoInset?: number;
+  photoInsetTop?: number;
+  photoInsetBottom?: number;
+  photoInsetLeft?: number;
+  photoInsetRight?: number;
   photoInsetUnit?: Unit;
   borderEnabled: boolean;
   borderWidth: number;

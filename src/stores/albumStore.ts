@@ -60,7 +60,7 @@ export interface AlbumState {
   updateGutterWidth: (width: number) => void;
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
-  updatePhotoInset: (photoInset: number) => void;
+  updatePhotoInset: (photoInset: number, side?: 'all' | 'top' | 'bottom' | 'left' | 'right') => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
   selectPage: (pageId: string | null) => void;
   setSpreadDrawerOpen: (isOpen: boolean) => void;
@@ -504,26 +504,43 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     });
   },
 
-  updatePhotoInset: (photoInset: number) => {
+  updatePhotoInset: (photoInset: number, side: 'all' | 'top' | 'bottom' | 'left' | 'right' = 'all') => {
     const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
     const currentProject = useProjectStore.getState().currentProject;
 
+    const patch: Partial<Spread> = {};
+    if (side === 'all') {
+      patch.photoInset = photoInset;
+      patch.photoInsetTop = photoInset;
+      patch.photoInsetBottom = photoInset;
+      patch.photoInsetLeft = photoInset;
+      patch.photoInsetRight = photoInset;
+    } else if (side === 'top') {
+      patch.photoInsetTop = photoInset;
+    } else if (side === 'bottom') {
+      patch.photoInsetBottom = photoInset;
+    } else if (side === 'left') {
+      patch.photoInsetLeft = photoInset;
+    } else if (side === 'right') {
+      patch.photoInsetRight = photoInset;
+    }
+
     if (currentAlbum.coverSpread.id === activeSpreadId) {
+      const mergedSpread: Spread = { ...currentAlbum.coverSpread, ...patch };
       const updatedElements = recomputeSpreadElementsWithParams(
-        currentAlbum.coverSpread,
+        mergedSpread,
         true,
         currentProject,
         activeSpreadId,
-        spreadLayoutIndices,
-        { photoInset }
+        spreadLayoutIndices
       );
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, photoInset, elements: updatedElements },
+          coverSpread: { ...mergedSpread, elements: updatedElements },
         },
         saveStatus: 'unsaved',
       });
@@ -532,15 +549,15 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     const updatedSpreads = currentAlbum.spreads.map((s) => {
       if (s.id !== activeSpreadId) return s;
+      const mergedSpread: Spread = { ...s, ...patch };
       const updatedElements = recomputeSpreadElementsWithParams(
-        s,
+        mergedSpread,
         false,
         currentProject,
         activeSpreadId,
-        spreadLayoutIndices,
-        { photoInset }
+        spreadLayoutIndices
       );
-      return { ...s, photoInset, elements: updatedElements };
+      return { ...mergedSpread, elements: updatedElements };
     });
 
     set({
