@@ -689,6 +689,7 @@ export function WorkspaceLayout() {
                               min={0}
                               max={200}
                               step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                              precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                             />
                             <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                           </div>
@@ -897,6 +898,7 @@ export function WorkspaceLayout() {
                               min={0.1}
                               max={50}
                               step={0.5}
+                              precision={1}
                             />
                             <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>mm</span>
                           </div>
@@ -947,73 +949,83 @@ export function WorkspaceLayout() {
                     <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Dimensions & Transform</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                      </div>
+
+                      {/* W & H Inputs with Compact Chain Link Button */}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Width (W)</div>
+                          <NumberInput
+                            value={selectedFrame.width}
+                            onChange={(newW) => {
+                              if (newW <= 0) return;
+                              const updates: Partial<PhotoFrameElement> = { width: newW };
+                              if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
+                                const ratio = selectedFrame.width / selectedFrame.height;
+                                updates.height = Number((newW / ratio).toFixed(currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1));
+                              }
+                              updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
+                            }}
+                            min={0.1}
+                            max={2000}
+                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                          />
+                        </div>
+
+                        {/* Aspect Ratio Chain Link Button (Adobe / Figma style) */}
                         <button
                           type="button"
                           onClick={() => setIsRatioLocked(!isRatioLocked)}
-                          className={styles.ratioLockButton}
                           style={{
-                            padding: '2px 6px',
-                            fontSize: '10px',
-                            fontWeight: 600,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             borderRadius: 'var(--radius-sm)',
-                            backgroundColor: isRatioLocked ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                            backgroundColor: isRatioLocked ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.04)',
                             border: isRatioLocked ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid var(--color-border)',
                             color: isRatioLocked ? 'var(--color-accent)' : 'var(--color-text-muted)',
                             cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
+                            marginBottom: '1px',
+                            transition: 'all 0.15s ease',
                           }}
-                          title={isRatioLocked ? 'Lock Aspect Ratio (Active)' : 'Unlock Aspect Ratio (Free)'}
+                          title={isRatioLocked ? 'Constrain Proportions: ON (Lock aspect ratio)' : 'Constrain Proportions: OFF (Unlock aspect ratio)'}
                         >
-                          <span>{isRatioLocked ? '🔗 Locked' : '🔓 Unlocked'}</span>
+                          {isRatioLocked ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
+                              <path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                              <path d="m5.16 11.75-1.72 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                              <line x1="2" x2="22" y1="2" y2="22" strokeWidth="2" />
+                            </svg>
+                          )}
                         </button>
-                      </div>
 
-                      {/* W & H Inputs in 2 columns */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <div>
-                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Width (W)</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <NumberInput
-                              value={selectedFrame.width}
-                              onChange={(newW) => {
-                                if (newW <= 0) return;
-                                const updates: Partial<PhotoFrameElement> = { width: newW };
-                                if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
-                                  const ratio = selectedFrame.width / selectedFrame.height;
-                                  updates.height = Number((newW / ratio).toFixed(1));
-                                }
-                                updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
-                              }}
-                              min={0.1}
-                              max={2000}
-                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                            />
-                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                          </div>
-                        </div>
-
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Height (H)</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <NumberInput
-                              value={selectedFrame.height}
-                              onChange={(newH) => {
-                                if (newH <= 0) return;
-                                const updates: Partial<PhotoFrameElement> = { height: newH };
-                                if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
-                                  const ratio = selectedFrame.width / selectedFrame.height;
-                                  updates.width = Number((newH * ratio).toFixed(1));
-                                }
-                                updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
-                              }}
-                              min={0.1}
-                              max={2000}
-                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                            />
-                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                          </div>
+                          <NumberInput
+                            value={selectedFrame.height}
+                            onChange={(newH) => {
+                              if (newH <= 0) return;
+                              const updates: Partial<PhotoFrameElement> = { height: newH };
+                              if (isRatioLocked && selectedFrame.width > 0 && selectedFrame.height > 0) {
+                                const ratio = selectedFrame.width / selectedFrame.height;
+                                updates.width = Number((newH * ratio).toFixed(currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1));
+                              }
+                              updateFrameGeometry(activeSpread.id, selectedFrame.id, updates);
+                            }}
+                            min={0.1}
+                            max={2000}
+                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                          />
                         </div>
                       </div>
 
@@ -1021,26 +1033,22 @@ export function WorkspaceLayout() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <div>
                           <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Position X</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <NumberInput
-                              value={selectedFrame.x}
-                              onChange={(newX) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { x: newX })}
-                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                            />
-                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                          </div>
+                          <NumberInput
+                            value={selectedFrame.x}
+                            onChange={(newX) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { x: newX })}
+                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                          />
                         </div>
 
                         <div>
                           <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Position Y</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <NumberInput
-                              value={selectedFrame.y}
-                              onChange={(newY) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { y: newY })}
-                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                            />
-                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                          </div>
+                          <NumberInput
+                            value={selectedFrame.y}
+                            onChange={(newY) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { y: newY })}
+                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                            precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                          />
                         </div>
                       </div>
 
@@ -1055,6 +1063,7 @@ export function WorkspaceLayout() {
                               min={-360}
                               max={360}
                               step={1}
+                              precision={0}
                             />
                             <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
                           </div>

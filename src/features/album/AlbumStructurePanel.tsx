@@ -131,6 +131,7 @@ export function AlbumStructurePanel() {
                 min={0}
                 max={50}
                 step={unit === 'inch' ? 0.05 : 1}
+                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
               />
               <span className={styles.unitText}>{unit}</span>
             </div>
@@ -146,6 +147,7 @@ export function AlbumStructurePanel() {
                 min={0}
                 max={20}
                 step={unit === 'inch' ? 0.025 : 0.5}
+                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
               />
               <span className={styles.unitText}>{unit}</span>
             </div>
@@ -161,6 +163,7 @@ export function AlbumStructurePanel() {
                 min={1}
                 max={50}
                 step={unit === 'inch' ? 0.05 : 1}
+                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
               />
               <span className={styles.unitText}>{unit}</span>
             </div>

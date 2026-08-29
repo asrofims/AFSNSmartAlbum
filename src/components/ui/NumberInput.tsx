@@ -7,10 +7,20 @@ interface NumberInputProps {
   min?: number;
   max?: number;
   step?: number;
+  precision?: number;
   label?: string;
   disabled?: boolean;
   suffix?: string;
   className?: string;
+}
+
+function formatNumber(val: number, precision?: number): string {
+  if (isNaN(val) || !isFinite(val)) return '0';
+  if (precision !== undefined) {
+    return Number(val.toFixed(precision)).toString();
+  }
+  // Default clean floating-point display: round to 2 decimal places maximum, avoiding 124.5829104
+  return Number((Math.round(val * 100) / 100).toFixed(2)).toString();
 }
 
 export function NumberInput({
@@ -19,20 +29,21 @@ export function NumberInput({
   min,
   max,
   step = 1,
+  precision,
   label,
   disabled,
   suffix,
   className = '',
 }: NumberInputProps) {
-  const [localValue, setLocalValue] = useState<string>(value.toString());
+  const [localValue, setLocalValue] = useState<string>(() => formatNumber(value, precision));
   const isFocusedRef = useRef(false);
 
   // Sync from props only when NOT focused (avoids cursor jumping & typing overwrites)
   useEffect(() => {
     if (!isFocusedRef.current) {
-      setLocalValue(value.toString());
+      setLocalValue(formatNumber(value, precision));
     }
-  }, [value]);
+  }, [value, precision]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -58,11 +69,11 @@ export function NumberInput({
     if (min !== undefined && numVal < min) numVal = min;
     if (max !== undefined && numVal > max) numVal = max;
 
-    // Clean floating point rounding
-    numVal = Math.round(numVal * 100) / 100;
+    const formatted = formatNumber(numVal, precision);
+    const finalNum = parseFloat(formatted);
 
-    setLocalValue(numVal.toString());
-    onChange(numVal);
+    setLocalValue(formatted);
+    onChange(finalNum);
   };
 
   const handleFocus = () => {
@@ -75,17 +86,19 @@ export function NumberInput({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const current = parseFloat(localValue) || 0;
-      const next = Math.round((current + step) * 100) / 100;
+      const next = current + step;
       const clamped = max !== undefined ? Math.min(max, next) : next;
-      setLocalValue(clamped.toString());
-      onChange(clamped);
+      const formatted = formatNumber(clamped, precision);
+      setLocalValue(formatted);
+      onChange(parseFloat(formatted));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const current = parseFloat(localValue) || 0;
-      const next = Math.round((current - step) * 100) / 100;
+      const next = current - step;
       const clamped = min !== undefined ? Math.max(min, next) : next;
-      setLocalValue(clamped.toString());
-      onChange(clamped);
+      const formatted = formatNumber(clamped, precision);
+      setLocalValue(formatted);
+      onChange(parseFloat(formatted));
     }
   };
 
