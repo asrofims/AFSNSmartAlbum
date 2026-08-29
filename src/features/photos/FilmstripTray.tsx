@@ -162,8 +162,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const filtered = filterPhotos(currentPhotoPool, filter, searchQuery, usedPhotoIdSet);
   const sortedPhotos = sortPhotos(filtered, sortBy);
 
-  const isHoveredRef = useRef(false);
-
   // Global Keyboard Shortcuts for Lightroom-style photo interaction
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
