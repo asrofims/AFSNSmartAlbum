@@ -10,6 +10,7 @@ import {
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
 } from '../domain/album';
+import { LayoutTemplate, generateSpreadElementsFromTemplate } from '../domain/templates';
 import { useHistoryStore } from './historyStore';
 
 export interface AlbumState {
@@ -51,6 +52,7 @@ export interface AlbumState {
   selectPage: (pageId: string | null) => void;
   setSpreadDrawerOpen: (isOpen: boolean) => void;
   toggleSpreadDrawer: () => void;
+  applyLayoutTemplate: (spreadId: string, template: LayoutTemplate, project: Project) => void;
 }
 
 export const useAlbumStore = create<AlbumState>((set, get) => ({
@@ -409,5 +411,78 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
   selectPage: (pageId: string | null) => {
     set({ selectedPageId: pageId });
+  },
+
+  applyLayoutTemplate: (spreadId: string, template: LayoutTemplate, project: Project) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!targetSpread) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    // Collect currently assigned photos from current elements
+    const currentPhotos = targetSpread.elements.map((el) => ({
+      id: el.id,
+      photoId: el.photoId,
+      filePath: el.filePath,
+      fileName: el.fileName,
+      previewPath: el.previewPath,
+      thumbnailPath: el.thumbnailPath,
+      photoAspect: el.photoAspect,
+    }));
+
+    const isSpread = !isCover;
+    const spreadWidth = isCover
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+        (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
+        targetSpread.gutterWidth
+      : project.canvasWidth * 2 + targetSpread.gutterWidth;
+    const spreadHeight = project.canvasHeight;
+
+    const newElements = generateSpreadElementsFromTemplate(
+      template,
+      {
+        spreadWidth,
+        spreadHeight,
+        isSpread,
+        safeMargin: targetSpread.safeArea || project.marginValue || 10,
+        gutterWidth: targetSpread.gutterWidth || 0,
+        spacing: project.spacingValue || 4,
+        currentPhotos,
+      },
+      project.borderEnabled,
+      project.borderWidth,
+      project.borderColor
+    );
+
+    if (isCover) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: newElements,
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: newElements } : s
+      );
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: updatedSpreads,
+        },
+        saveStatus: 'unsaved',
+      });
+    }
   },
 }));

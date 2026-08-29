@@ -19,6 +19,7 @@ import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { PageNavigator } from '../album/PageNavigator';
+import { TemplatesPanel } from '../templates/TemplatesPanel';
 import appLogo from '../../assets/app-logo.png';
 import styles from './WorkspaceLayout.module.css';
 
@@ -72,6 +73,7 @@ export function WorkspaceLayout() {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
+  const [inspectorTab, setInspectorTab] = useState<'properties' | 'templates'>('properties');
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -534,20 +536,57 @@ export function WorkspaceLayout() {
         {currentProject && <PageNavigator />}
       </div>
 
-      {/* Right Panel: Collapsible Properties */}
+      {/* Right Panel: Collapsible Properties & Templates */}
       {isPropertiesOpen && (
         <aside className={styles.rightPanel}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '8px 12px',
+            padding: '6px 8px',
             borderBottom: '1px solid var(--color-border)',
             background: 'var(--color-surface)',
           }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.05em' }}>
-              PROJECT PROPERTIES
-            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setInspectorTab('properties')}
+                style={{
+                  background: inspectorTab === 'properties' ? 'var(--color-bg-secondary)' : 'transparent',
+                  border: inspectorTab === 'properties' ? '1px solid var(--color-border)' : '1px solid transparent',
+                  color: inspectorTab === 'properties' ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>⚙ Properties</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectorTab('templates')}
+                style={{
+                  background: inspectorTab === 'templates' ? 'var(--color-bg-secondary)' : 'transparent',
+                  border: inspectorTab === 'templates' ? '1px solid var(--color-border)' : '1px solid transparent',
+                  color: inspectorTab === 'templates' ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>📑 Templates</span>
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => setIsPropertiesOpen(false)}
@@ -559,7 +598,7 @@ export function WorkspaceLayout() {
                 fontSize: '12px',
                 padding: '2px 4px',
               }}
-              title="Collapse Properties Panel"
+              title="Collapse Panel"
             >
               ▶
             </button>
@@ -569,6 +608,8 @@ export function WorkspaceLayout() {
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
               No project open
             </div>
+          ) : inspectorTab === 'templates' ? (
+            <TemplatesPanel onApplyToast={(msg) => showToast(msg)} />
           ) : (
             <div className={styles.propertyList}>
               {/* Selected Photo Frame Properties / Multi-Selection Controls (Placed at TOP when active) */}

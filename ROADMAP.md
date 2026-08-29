@@ -72,10 +72,11 @@
 - [x] Project Migration & Schema Versioning
 
 ## Phase 6 — Templates & Layout Generator
-- [ ] Layout Preset Library (Single, 2-photo, 3-photo, collage grids)
-- [ ] Dynamic Template Matching based on selected photo count
-- [ ] Custom User Template Saver
-- [ ] Frame Aspect Ratio Smart Fitting
+- [x] Layout Preset Library (23+ Curated Presets: 1-8+ photos, diptychs, triptychs, grids, collages)
+- [x] Dynamic Template Matching based on selected photo count
+- [x] 1-Click Layout Apply with Photo Preservation & Undo/Redo integration
+- [x] Mini-SVG Wireframe Preview Cards & Right Inspector Templates Tab
+- [x] Frame Aspect Ratio Smart Fitting & Gap Preserving Solver
 
 ## Phase 7 — Auto Layout Engine
 - [ ] Photo Orientation Analysis (Landscape vs Portrait vs Square)
