@@ -47,6 +47,14 @@ export function NewProjectDialog() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Helper to round values cleanly based on unit
+  const roundUnit = (val: number, unit: Unit): number => {
+    if (unit === 'inch') return Math.round(val * 100) / 100;
+    if (unit === 'cm') return Math.round(val * 100) / 100;
+    if (unit === 'mm') return Math.round(val * 10) / 10;
+    return Math.round(val);
+  };
+
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
@@ -56,14 +64,14 @@ export function NewProjectDialog() {
       setCanvasHeight(8);
       setCanvasUnit('inch');
       setCanvasDpi(300);
-      setSpacingValue(3);
-      setSpacingUnit('mm');
+      setSpacingValue(0.12);
+      setSpacingUnit('inch');
       setMarginEnabled(true);
-      setMarginValue(10);
-      setMarginUnit('mm');
-      setBorderEnabled(false); // Default nonaktif
-      setBorderWidth(1);
-      setBorderUnit('mm');
+      setMarginValue(0.5);
+      setMarginUnit('inch');
+      setBorderEnabled(false); // Default disabled
+      setBorderWidth(0.04);
+      setBorderUnit('inch');
       setBorderColor('#FFFFFF');
       setBackgroundColor('#FFFFFF');
       setErrorMessage(null);
@@ -71,7 +79,7 @@ export function NewProjectDialog() {
     }
   }, [isOpen]);
 
-  // Preset Selection
+  // Preset Selection with full unit synchronization
   const handlePresetSelect = (id: string) => {
     setPresetId(id);
     if (id === CUSTOM_PRESET_ID) return;
@@ -80,22 +88,47 @@ export function NewProjectDialog() {
     if (preset) {
       setCanvasWidth(preset.width);
       setCanvasHeight(preset.height);
-      setCanvasUnit(preset.unit);
       setCanvasDpi(preset.dpi);
+
+      const targetUnit = preset.unit;
+      if (targetUnit !== canvasUnit) {
+        setCanvasUnit(targetUnit);
+        setMarginValue(roundUnit(convertUnit(marginValue, marginUnit, targetUnit, preset.dpi), targetUnit));
+        setMarginUnit(targetUnit);
+        setSpacingValue(roundUnit(convertUnit(spacingValue, spacingUnit, targetUnit, preset.dpi), targetUnit));
+        setSpacingUnit(targetUnit);
+        setBorderWidth(roundUnit(convertUnit(borderWidth, borderUnit, targetUnit, preset.dpi), targetUnit));
+        setBorderUnit(targetUnit);
+      }
     }
   };
 
-  // Unit Change with automatic mathematical conversion
+  // Synchronize all units across the entire project dialog with automatic mathematical conversion
   const handleUnitChange = (newUnitStr: string) => {
     const newUnit = newUnitStr as Unit;
     if (newUnit === canvasUnit) return;
 
-    const convertedW = convertUnit(canvasWidth, canvasUnit, newUnit, canvasDpi);
-    const convertedH = convertUnit(canvasHeight, canvasUnit, newUnit, canvasDpi);
-
+    // Convert Page Dimensions
+    const convertedW = roundUnit(convertUnit(canvasWidth, canvasUnit, newUnit, canvasDpi), newUnit);
+    const convertedH = roundUnit(convertUnit(canvasHeight, canvasUnit, newUnit, canvasDpi), newUnit);
     setCanvasWidth(convertedW);
     setCanvasHeight(convertedH);
     setCanvasUnit(newUnit);
+
+    // Convert Safe Margin
+    const convertedMargin = roundUnit(convertUnit(marginValue, marginUnit, newUnit, canvasDpi), newUnit);
+    setMarginValue(convertedMargin);
+    setMarginUnit(newUnit);
+
+    // Convert Spacing
+    const convertedSpacing = roundUnit(convertUnit(spacingValue, spacingUnit, newUnit, canvasDpi), newUnit);
+    setSpacingValue(convertedSpacing);
+    setSpacingUnit(newUnit);
+
+    // Convert Border
+    const convertedBorder = roundUnit(convertUnit(borderWidth, borderUnit, newUnit, canvasDpi), newUnit);
+    setBorderWidth(convertedBorder);
+    setBorderUnit(newUnit);
 
     const matched = findMatchingPreset(convertedW, convertedH, newUnit);
     setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
@@ -393,8 +426,8 @@ export function NewProjectDialog() {
                       value={marginValue}
                       onChange={setMarginValue}
                       min={0.1}
-                      max={100}
-                      step={marginUnit === 'inch' ? 0.05 : marginUnit === 'cm' ? 0.1 : 0.5}
+                      max={1000}
+                      step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
                     />
                   </div>
                   <div style={{ width: '90px' }}>
@@ -402,7 +435,7 @@ export function NewProjectDialog() {
                       label="Unit"
                       value={marginUnit}
                       options={UNIT_OPTIONS}
-                      onChange={(u) => setMarginUnit(u as Unit)}
+                      onChange={handleUnitChange}
                     />
                   </div>
                 </div>
@@ -419,8 +452,8 @@ export function NewProjectDialog() {
                     value={spacingValue}
                     onChange={setSpacingValue}
                     min={0}
-                    max={100}
-                    step={0.5}
+                    max={500}
+                    step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 2 : 0.5}
                   />
                 </div>
                 <div style={{ width: '90px' }}>
@@ -428,7 +461,7 @@ export function NewProjectDialog() {
                     label="Unit"
                     value={spacingUnit}
                     options={UNIT_OPTIONS}
-                    onChange={(u) => setSpacingUnit(u as Unit)}
+                    onChange={handleUnitChange}
                   />
                 </div>
               </div>
@@ -453,9 +486,9 @@ export function NewProjectDialog() {
                       label="Border Width"
                       value={borderWidth}
                       onChange={setBorderWidth}
-                      min={0.1}
-                      max={50}
-                      step={0.5}
+                      min={0.01}
+                      max={500}
+                      step={canvasUnit === 'inch' ? 0.01 : canvasUnit === 'cm' ? 0.02 : canvasUnit === 'px' ? 1 : 0.2}
                     />
                   </div>
                   <div style={{ width: '90px' }}>
@@ -463,7 +496,7 @@ export function NewProjectDialog() {
                       label="Unit"
                       value={borderUnit}
                       options={UNIT_OPTIONS}
-                      onChange={(u) => setBorderUnit(u as Unit)}
+                      onChange={handleUnitChange}
                     />
                   </div>
                   <div className={styles.flex1}>

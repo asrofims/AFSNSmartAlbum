@@ -44,7 +44,7 @@ export function WelcomeScreen() {
             <div className={styles.heroTextGroup}>
               <h1 className={styles.heroTitle}>AFSNSmartAlbum</h1>
               <p className={styles.heroSubtitle}>
-                Hai kreator hebat! Siap bikin album foto kece tanpa drama lemot atau foto kepotong? Duduk manis, seruput kopi hangatmu, dan mari kita sulap ribuan foto jadi mahakarya visual! ✨
+                Professional offline photo album layout suite. Turn your photo stories into stunning album spreads with intelligent auto-layout, smart snapping, and print-ready exports.
               </p>
             </div>
 
@@ -75,7 +75,7 @@ export function WelcomeScreen() {
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              <span>+ Create New Project</span>
+              <span>Create New Project</span>
             </Button>
 
             <Button
@@ -90,7 +90,7 @@ export function WelcomeScreen() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
               </svg>
-              <span>Open .afsn / .zip</span>
+              <span>Open Project</span>
             </Button>
           </div>
 
