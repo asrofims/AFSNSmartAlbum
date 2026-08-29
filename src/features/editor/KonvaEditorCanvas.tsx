@@ -302,6 +302,7 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             draggable={isCropMode}
+            listening={isCropMode}
             onMouseDown={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
@@ -1439,21 +1440,32 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       currentGroupIds = [frame.id];
                     }
 
-                    primaryDragStartPosRef.current = { x: e.target.x(), y: e.target.y() };
+                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                    const startX = draggedNode ? draggedNode.x() : frame.x * scaleFactor;
+                    const startY = draggedNode ? draggedNode.y() : frame.y * scaleFactor;
+                    primaryDragStartPosRef.current = { x: startX, y: startY };
+
                     const startMap = new Map<string, { x: number; y: number }>();
                     currentGroupIds.forEach((id) => {
-                      const node = stageRef.current?.findOne(`#${id}`);
+                      const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
                       if (node) {
                         startMap.set(id, { x: node.x(), y: node.y() });
+                      } else {
+                        const f = (activeSpread.elements || []).find((el) => el.id === id);
+                        if (f) {
+                          startMap.set(id, { x: f.x * scaleFactor, y: f.y * scaleFactor });
+                        }
                       }
                     });
                     dragStartPositionsRef.current = startMap;
                   }}
                   onDragMove={(e) => {
                     if (!primaryDragStartPosRef.current) return;
+                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                    if (!draggedNode) return;
 
-                    const rawDeltaPxX = e.target.x() - primaryDragStartPosRef.current.x;
-                    const rawDeltaPxY = e.target.y() - primaryDragStartPosRef.current.y;
+                    const rawDeltaPxX = draggedNode.x() - primaryDragStartPosRef.current.x;
+                    const rawDeltaPxY = draggedNode.y() - primaryDragStartPosRef.current.y;
                     const rawDeltaPhysicalX = rawDeltaPxX / scaleFactor;
                     const rawDeltaPhysicalY = rawDeltaPxY / scaleFactor;
 
@@ -1489,8 +1501,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                         finalDeltaPxX = snappedDeltaPhysX * scaleFactor;
                         finalDeltaPxY = snappedDeltaPhysY * scaleFactor;
-                        e.target.x(primaryDragStartPosRef.current.x + finalDeltaPxX);
-                        e.target.y(primaryDragStartPosRef.current.y + finalDeltaPxY);
+                        draggedNode.x(primaryDragStartPosRef.current.x + finalDeltaPxX);
+                        draggedNode.y(primaryDragStartPosRef.current.y + finalDeltaPxY);
                         setSnapLines(snapRes.snapLines, snapRes.gapGuides);
                       } else {
                         clearSnapLines();
@@ -1500,7 +1512,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     // Move all other selected member photo nodes synchronously
                     dragStartPositionsRef.current.forEach((initPos, id) => {
                       if (id !== frame.id) {
-                        const node = stageRef.current?.findOne(`#${id}`);
+                        const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
                         if (node) {
                           node.x(initPos.x + finalDeltaPxX);
                           node.y(initPos.y + finalDeltaPxY);
@@ -1510,23 +1522,28 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   }}
                   onDragEnd={(e) => {
                     clearSnapLines();
-                    if (primaryDragStartPosRef.current && dragStartPositionsRef.current.size > 0) {
-                      const finalDeltaPhysicalX = (e.target.x() - primaryDragStartPosRef.current.x) / scaleFactor;
-                      const finalDeltaPhysicalY = (e.target.y() - primaryDragStartPosRef.current.y) / scaleFactor;
+                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                    if (draggedNode && primaryDragStartPosRef.current && dragStartPositionsRef.current.size > 0) {
+                      const finalDeltaPhysicalX = (draggedNode.x() - primaryDragStartPosRef.current.x) / scaleFactor;
+                      const finalDeltaPhysicalY = (draggedNode.y() - primaryDragStartPosRef.current.y) / scaleFactor;
 
-                      const groupIds = Array.from(dragStartPositionsRef.current.keys());
-                      const updates = groupIds.map((id) => {
-                        const f = (activeSpread.elements || []).find((el) => el.id === id);
-                        return {
-                          id,
-                          geometry: {
-                            x: Math.round(((f?.x || 0) + finalDeltaPhysicalX) * 10) / 10,
-                            y: Math.round(((f?.y || 0) + finalDeltaPhysicalY) * 10) / 10,
-                          },
-                        };
-                      });
+                      if (Number.isFinite(finalDeltaPhysicalX) && Number.isFinite(finalDeltaPhysicalY)) {
+                        const groupIds = Array.from(dragStartPositionsRef.current.keys());
+                        const updates = groupIds.map((id) => {
+                          const f = (activeSpread.elements || []).find((el) => el.id === id);
+                          const originalX = f?.x ?? 0;
+                          const originalY = f?.y ?? 0;
+                          return {
+                            id,
+                            geometry: {
+                              x: Math.round((originalX + finalDeltaPhysicalX) * 10) / 10,
+                              y: Math.round((originalY + finalDeltaPhysicalY) * 10) / 10,
+                            },
+                          };
+                        });
 
-                      batchUpdateFrames(activeSpread.id, updates);
+                        batchUpdateFrames(activeSpread.id, updates);
+                      }
                       primaryDragStartPosRef.current = null;
                       dragStartPositionsRef.current.clear();
                     }
