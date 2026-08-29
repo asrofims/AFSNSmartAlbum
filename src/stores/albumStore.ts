@@ -22,6 +22,8 @@ import {
   shuffleElementsPhotos,
 } from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
+import { useProjectStore } from './projectStore';
+import { PhotoFrameElement } from '../domain/editor';
 
 export interface AlbumState {
   currentAlbum: Album | null;
@@ -69,6 +71,74 @@ export interface AlbumState {
   shuffleSpreadPhotos: (spreadId: string) => void;
   applyAdaptiveLayoutByIndex: (spreadId: string, index: number, project: Project) => void;
   applyLayoutTemplate: (spreadId: string, template: LayoutTemplate, project: Project) => void;
+}
+
+
+function recomputeSpreadElementsWithParams(
+  targetSpread: Spread,
+  isCover: boolean,
+  currentProject: Project | null,
+  activeSpreadId: string,
+  spreadLayoutIndices: Record<string, number>,
+  overrides?: { safeArea?: number; photoInset?: number }
+): PhotoFrameElement[] {
+  if (!currentProject || !targetSpread.elements || targetSpread.elements.length === 0) {
+    return targetSpread.elements;
+  }
+
+  const photos = targetSpread.elements.map((el) => ({
+    id: el.id,
+    photoId: el.photoId,
+    filePath: el.filePath,
+    fileName: el.fileName,
+    previewPath: el.previewPath,
+    thumbnailPath: el.thumbnailPath,
+    photoAspect: el.photoAspect,
+  }));
+
+  const mergedSpread: Spread = {
+    ...targetSpread,
+    safeArea: overrides?.safeArea !== undefined ? overrides.safeArea : (targetSpread.safeArea ?? currentProject.marginValue ?? 10),
+    photoInset: overrides?.photoInset !== undefined ? overrides.photoInset : (targetSpread.photoInset ?? currentProject.photoInset ?? 0),
+  };
+
+  const isSpread = !isCover;
+  const dims = getProjectDimensionsInCanvasUnit(currentProject, mergedSpread);
+  const spreadWidth = isCover
+    ? (mergedSpread.leftPage ? mergedSpread.leftPage.width : dims.pageWidth) +
+      (mergedSpread.rightPage ? mergedSpread.rightPage.width : 0) +
+      dims.gutterWidth
+    : dims.pageWidth * 2 + dims.gutterWidth;
+  const spreadHeight = dims.pageHeight;
+
+  const variations = generateAdaptiveLayoutVariations(
+    {
+      spreadWidth,
+      spreadHeight,
+      isSpread,
+      safeMargin: dims.safeMargin,
+      photoInset: dims.photoInset,
+      gutterWidth: dims.gutterWidth,
+      spacing: dims.spacing,
+    },
+    photos
+  );
+
+  const currentIndex = spreadLayoutIndices[activeSpreadId] || 0;
+  const safeIndex = variations.length > 0 ? currentIndex % variations.length : 0;
+  const chosenVar = variations[safeIndex];
+
+  if (chosenVar) {
+    return buildSpreadElementsFromVariation(
+      chosenVar,
+      photos,
+      currentProject.borderEnabled,
+      currentProject.borderWidth,
+      currentProject.borderColor
+    );
+  }
+
+  return targetSpread.elements;
 }
 
 export const useAlbumStore = create<AlbumState>((set, get) => ({
@@ -386,26 +456,44 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     });
   },
 
-  updateSafeArea: (safeArea: number) => {
-    const { currentAlbum, activeSpreadId } = get();
+    updateSafeArea: (safeArea: number) => {
+    const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
+    const currentProject = useProjectStore.getState().currentProject;
 
     if (currentAlbum.coverSpread.id === activeSpreadId) {
+      const updatedElements = recomputeSpreadElementsWithParams(
+        currentAlbum.coverSpread,
+        true,
+        currentProject,
+        activeSpreadId,
+        spreadLayoutIndices,
+        { safeArea }
+      );
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, safeArea },
+          coverSpread: { ...currentAlbum.coverSpread, safeArea, elements: updatedElements },
         },
         saveStatus: 'unsaved',
       });
       return;
     }
 
-    const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, safeArea } : s
-    );
+    const updatedSpreads = currentAlbum.spreads.map((s) => {
+      if (s.id !== activeSpreadId) return s;
+      const updatedElements = recomputeSpreadElementsWithParams(
+        s,
+        false,
+        currentProject,
+        activeSpreadId,
+        spreadLayoutIndices,
+        { safeArea }
+      );
+      return { ...s, safeArea, elements: updatedElements };
+    });
 
     set({
       currentAlbum: {
@@ -417,25 +505,43 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   updatePhotoInset: (photoInset: number) => {
-    const { currentAlbum, activeSpreadId } = get();
+    const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
+    const currentProject = useProjectStore.getState().currentProject;
 
     if (currentAlbum.coverSpread.id === activeSpreadId) {
+      const updatedElements = recomputeSpreadElementsWithParams(
+        currentAlbum.coverSpread,
+        true,
+        currentProject,
+        activeSpreadId,
+        spreadLayoutIndices,
+        { photoInset }
+      );
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, photoInset },
+          coverSpread: { ...currentAlbum.coverSpread, photoInset, elements: updatedElements },
         },
         saveStatus: 'unsaved',
       });
       return;
     }
 
-    const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, photoInset } : s
-    );
+    const updatedSpreads = currentAlbum.spreads.map((s) => {
+      if (s.id !== activeSpreadId) return s;
+      const updatedElements = recomputeSpreadElementsWithParams(
+        s,
+        false,
+        currentProject,
+        activeSpreadId,
+        spreadLayoutIndices,
+        { photoInset }
+      );
+      return { ...s, photoInset, elements: updatedElements };
+    });
 
     set({
       currentAlbum: {

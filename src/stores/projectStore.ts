@@ -13,6 +13,8 @@ interface ProjectState {
   closeNewProject: () => void;
   setCurrentProject: (project: Project | null) => void;
   updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
+  updateProjectMargin: (marginValue: number, marginUnit?: Unit) => Promise<void>;
+  updateProjectPhotoInset: (photoInset: number, photoInsetUnit?: Unit) => Promise<void>;
   closeProject: () => void;
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
@@ -72,6 +74,40 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (e) {
       console.warn('[AFSN] localStorage write error:', e);
     }
+  },
+
+  updateProjectMargin: async (marginValue: number, marginUnit?: Unit) => {
+    const current = get().currentProject;
+    if (!current) return;
+    const unit = marginUnit || current.marginUnit || 'mm';
+    const updatedProject: Project = {
+      ...current,
+      marginValue: Number(marginValue),
+      marginUnit: unit,
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      currentProject: updatedProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+    }));
+  },
+
+  updateProjectPhotoInset: async (photoInset: number, photoInsetUnit?: Unit) => {
+    const current = get().currentProject;
+    if (!current) return;
+    const unit = photoInsetUnit || current.photoInsetUnit || 'mm';
+    const updatedProject: Project = {
+      ...current,
+      photoInset: Number(photoInset),
+      photoInsetUnit: unit,
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      currentProject: updatedProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+    }));
   },
 
   closeProject: () => set({ currentProject: null }),

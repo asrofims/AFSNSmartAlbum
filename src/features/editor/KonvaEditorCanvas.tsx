@@ -763,6 +763,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
   const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
+  const effectiveMarginPixel = Math.max(1, Math.round((dims.safeMargin + dims.photoInset) * scaleFactor));
   const activeCropFrame = editingCropFrameId
     ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
     : null;
@@ -1396,7 +1397,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
             {/* Safe Area Guides (Left & Right Facing Pages) */}
             {showSafeAreaGuide && (
               <Group listening={false}>
-                {/* Left Page Safe Area */}
+                {/* Left Page Safe Area (Blue) */}
                 <Rect
                   x={safeAreaPixel}
                   y={safeAreaPixel}
@@ -1406,7 +1407,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   strokeWidth={1}
                   dash={[5, 4]}
                 />
-                {/* Right Page Safe Area */}
+                {/* Right Page Safe Area (Blue) */}
                 <Rect
                   x={leftPagePixelW + gutterPixelW + safeAreaPixel}
                   y={safeAreaPixel}
@@ -1416,6 +1417,30 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   strokeWidth={1}
                   dash={[5, 4]}
                 />
+
+                {/* Inner Safe Inset (Teal Guide) */}
+                {dims.photoInset > 0 && (
+                  <>
+                    <Rect
+                      x={effectiveMarginPixel}
+                      y={effectiveMarginPixel}
+                      width={leftPagePixelW - effectiveMarginPixel * 2}
+                      height={screenSpreadH - effectiveMarginPixel * 2}
+                      stroke="rgba(20, 184, 166, 0.75)"
+                      strokeWidth={1}
+                      dash={[3, 3]}
+                    />
+                    <Rect
+                      x={leftPagePixelW + gutterPixelW + effectiveMarginPixel}
+                      y={effectiveMarginPixel}
+                      width={rightPagePixelW - effectiveMarginPixel * 2}
+                      height={screenSpreadH - effectiveMarginPixel * 2}
+                      stroke="rgba(20, 184, 166, 0.75)"
+                      strokeWidth={1}
+                      dash={[3, 3]}
+                    />
+                  </>
+                )}
               </Group>
             )}
           </Layer>
