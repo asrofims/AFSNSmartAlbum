@@ -22,14 +22,30 @@ export interface ContextMenuProps {
   onClose: () => void;
 }
 
+interface FloatingSubmenuState {
+  id: string;
+  items: ContextMenuItem[];
+  top: number;
+  left: number;
+}
+
 export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [activeSubmenuId, setActiveSubmenuId] = useState<string | null>(null);
+  const [floatingSubmenu, setFloatingSubmenu] = useState<FloatingSubmenuState | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x, y });
+  const closeSubmenuTimerRef = useRef<number | null>(null);
+
+  const clearCloseTimer = () => {
+    if (closeSubmenuTimerRef.current) {
+      clearTimeout(closeSubmenuTimerRef.current);
+      closeSubmenuTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
-      setActiveSubmenuId(null);
+      setFloatingSubmenu(null);
+      clearCloseTimer();
       return;
     }
 
@@ -40,7 +56,10 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearCloseTimer();
+    };
   }, [isOpen, onClose]);
 
   // Viewport boundary adjustment after DOM mount
@@ -62,6 +81,41 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
     setMenuPos({ x: targetX, y: targetY });
   }, [isOpen, x, y, items]);
 
+  const handleItemMouseEnter = (item: ContextMenuItem, element: HTMLElement) => {
+    clearCloseTimer();
+    if (item.children && item.children.length > 0) {
+      const rect = element.getBoundingClientRect();
+      const submenuWidth = 220;
+      const submenuHeight = item.children.length * 32 + 16;
+      const isNearRight = rect.right + submenuWidth + 12 > window.innerWidth;
+
+      const left = isNearRight
+        ? Math.max(10, rect.left - submenuWidth - 4)
+        : rect.right + 4;
+
+      const top = Math.max(
+        10,
+        Math.min(rect.top - 4, window.innerHeight - submenuHeight - 12)
+      );
+
+      setFloatingSubmenu({
+        id: item.id,
+        items: item.children,
+        top,
+        left,
+      });
+    } else {
+      setFloatingSubmenu(null);
+    }
+  };
+
+  const handleMenuMouseLeave = () => {
+    clearCloseTimer();
+    closeSubmenuTimerRef.current = window.setTimeout(() => {
+      setFloatingSubmenu(null);
+    }, 250);
+  };
+
   if (!isOpen || items.length === 0) return null;
 
   return (
@@ -77,11 +131,13 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
         onClose();
       }}
     >
+      {/* Primary Menu Panel */}
       <div
         ref={menuRef}
         className={styles.menu}
         style={{ left: menuPos.x, top: menuPos.y }}
         onClick={(e) => e.stopPropagation()}
+        onMouseLeave={handleMenuMouseLeave}
       >
         {items.map((item, idx) => {
           if (item.divider) {
@@ -97,90 +153,81 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
           }
 
           const hasSubmenu = Boolean(item.children && item.children.length > 0);
-          const isSubmenuOpen = activeSubmenuId === item.id;
+          const isSubmenuOpen = floatingSubmenu?.id === item.id;
 
           return (
-            <div
+            <button
               key={item.id || `item-${idx}`}
-              className={styles.itemWrapper}
-              onMouseEnter={() => {
+              type="button"
+              className={`${styles.menuItem} ${item.disabled ? styles.disabled : ''} ${item.danger ? styles.danger : ''} ${isSubmenuOpen ? styles.menuItemActive : ''}`}
+              disabled={item.disabled}
+              onMouseEnter={(e) => handleItemMouseEnter(item, e.currentTarget)}
+              onClick={() => {
                 if (hasSubmenu) {
-                  setActiveSubmenuId(item.id);
-                } else {
-                  setActiveSubmenuId(null);
+                  return;
+                }
+                if (!item.disabled && item.onClick) {
+                  item.onClick();
+                  onClose();
                 }
               }}
             >
+              <div className={styles.itemLeft}>
+                {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
+                <span className={styles.itemLabel}>{item.label}</span>
+              </div>
+              <div className={styles.itemRight}>
+                {item.shortcut && <span className={styles.itemShortcut}>{item.shortcut}</span>}
+                {hasSubmenu && <span className={styles.chevron}>›</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Independent Floating Flyout Submenu Panel */}
+      {floatingSubmenu && (
+        <div
+          className={styles.submenu}
+          style={{ top: floatingSubmenu.top, left: floatingSubmenu.left }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={clearCloseTimer}
+          onMouseLeave={handleMenuMouseLeave}
+        >
+          {floatingSubmenu.items.map((subItem, subIdx) => {
+            if (subItem.divider) {
+              return <div key={`subdiv-${subIdx}`} className={styles.divider} />;
+            }
+            if (subItem.header) {
+              return (
+                <div key={`subhead-${subIdx}`} className={styles.sectionHeader}>
+                  {subItem.label}
+                </div>
+              );
+            }
+            return (
               <button
+                key={subItem.id || `sub-${subIdx}`}
                 type="button"
-                className={`${styles.menuItem} ${item.disabled ? styles.disabled : ''} ${item.danger ? styles.danger : ''} ${isSubmenuOpen ? styles.menuItemActive : ''}`}
-                disabled={item.disabled}
+                className={`${styles.menuItem} ${subItem.disabled ? styles.disabled : ''} ${subItem.danger ? styles.danger : ''}`}
+                disabled={subItem.disabled}
                 onClick={() => {
-                  if (hasSubmenu) {
-                    setActiveSubmenuId(isSubmenuOpen ? null : item.id);
-                    return;
-                  }
-                  if (!item.disabled && item.onClick) {
-                    item.onClick();
+                  if (!subItem.disabled && subItem.onClick) {
+                    subItem.onClick();
                     onClose();
                   }
                 }}
               >
                 <div className={styles.itemLeft}>
-                  {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
-                  <span className={styles.itemLabel}>{item.label}</span>
+                  {subItem.icon && <span className={styles.itemIcon}>{subItem.icon}</span>}
+                  <span className={styles.itemLabel}>{subItem.label}</span>
                 </div>
-                <div className={styles.itemRight}>
-                  {item.shortcut && <span className={styles.itemShortcut}>{item.shortcut}</span>}
-                  {hasSubmenu && <span className={styles.chevron}>›</span>}
-                </div>
+                {subItem.shortcut && <span className={styles.itemShortcut}>{subItem.shortcut}</span>}
               </button>
-
-              {/* Cascading Submenu */}
-              {hasSubmenu && isSubmenuOpen && (
-                <div
-                  className={`${styles.submenu} ${
-                    menuPos.x + 220 + 220 > window.innerWidth ? styles.submenuLeft : ''
-                  }`}
-                >
-                  {item.children!.map((subItem, subIdx) => {
-                    if (subItem.divider) {
-                      return <div key={`subdiv-${subIdx}`} className={styles.divider} />;
-                    }
-                    if (subItem.header) {
-                      return (
-                        <div key={`subhead-${subIdx}`} className={styles.sectionHeader}>
-                          {subItem.label}
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-                        key={subItem.id || `sub-${subIdx}`}
-                        type="button"
-                        className={`${styles.menuItem} ${subItem.disabled ? styles.disabled : ''} ${subItem.danger ? styles.danger : ''}`}
-                        disabled={subItem.disabled}
-                        onClick={() => {
-                          if (!subItem.disabled && subItem.onClick) {
-                            subItem.onClick();
-                            onClose();
-                          }
-                        }}
-                      >
-                        <div className={styles.itemLeft}>
-                          {subItem.icon && <span className={styles.itemIcon}>{subItem.icon}</span>}
-                          <span className={styles.itemLabel}>{subItem.label}</span>
-                        </div>
-                        {subItem.shortcut && <span className={styles.itemShortcut}>{subItem.shortcut}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
