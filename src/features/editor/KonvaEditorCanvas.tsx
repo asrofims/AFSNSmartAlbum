@@ -560,6 +560,27 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     };
   }, []);
 
+  // Attach native drag events directly to the Konva canvas DOM element.
+  // Konva's <canvas> element can eat HTML5 drag events in some browsers,
+  // preventing them from bubbling to the parent React container div.
+  // The dragover handler MUST call preventDefault() to make the element a valid drop target.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const canvasContainer = stage.container();
+    if (!canvasContainer) return;
+
+    const nativeDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    };
+
+    canvasContainer.addEventListener('dragover', nativeDragOver);
+    return () => {
+      canvasContainer.removeEventListener('dragover', nativeDragOver);
+    };
+  });
+
   // Marquee Selection State
   const [selectionRect, setSelectionRect] = useState<{
     x: number;
@@ -1343,6 +1364,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           width: `${screenSpreadW}px`,
           height: `${screenSpreadH}px`,
         }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         {/* Outer Bleed Guide Boundary */}
         {showBleedGuide && (
