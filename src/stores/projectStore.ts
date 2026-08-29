@@ -23,6 +23,7 @@ interface ProjectState {
   exportProjectAsAfsn: () => Promise<string | null>;
   exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
   importProjectFromAfsn: () => Promise<boolean>;
+  openProjectFromFile: (filePath: string) => Promise<boolean>;
   removeRecentProject: (id: string) => Promise<void>;
   clearAllRecentProjects: () => Promise<void>;
 }
@@ -408,6 +409,37 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
     } catch (err) {
       console.error('[AFSN] import_afsn_with_dialog failed:', err);
+    }
+    return false;
+  },
+
+  openProjectFromFile: async (filePath: string): Promise<boolean> => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      console.log('[AFSN] Opening project from file:', filePath);
+      const packageData = await invoke<any>('import_afsn_package', { sourcePath: filePath });
+      if (packageData && packageData.project) {
+        const project = packageData.project as Project;
+        set((state) => ({
+          currentProject: project,
+          recentProjects: [project, ...state.recentProjects.filter((p) => p.id !== project.id)].slice(0, 10),
+          error: null,
+        }));
+
+        try {
+          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
+        } catch {}
+
+        // Load imported photos, folders, and album structure
+        const { usePhotoStore } = await import('./photoStore');
+        const { useAlbumStore } = await import('./albumStore');
+        await usePhotoStore.getState().loadPhotos(project.id);
+        await usePhotoStore.getState().loadFolders(project.id);
+        await useAlbumStore.getState().loadAlbumFromDb(project.id);
+        return true;
+      }
+    } catch (err) {
+      console.error('[AFSN] openProjectFromFile failed:', err);
     }
     return false;
   },

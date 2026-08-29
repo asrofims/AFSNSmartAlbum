@@ -3,18 +3,49 @@ mod db;
 mod photo_engine;
 mod export_engine;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use db::Database;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Check initial CLI argument for file associations (.afsn, .afsnz, .zip)
+    let mut initial_open_file: Option<String> = None;
+    for arg in std::env::args().skip(1) {
+        let path = std::path::Path::new(&arg);
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            let lower = ext.to_lowercase();
+            if (lower == "afsn" || lower == "afsnz" || lower == "zip") && path.exists() {
+                log::info!("Initial launch with project file: {}", arg);
+                initial_open_file = Some(arg);
+                break;
+            }
+        }
+    }
+
+    let launch_state = commands::project_commands::LaunchState {
+        pending_open_file: std::sync::Mutex::new(initial_open_file),
+    };
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            log::info!("Single instance trigger: bringing main window to focus");
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            log::info!("Single instance trigger: args={:?}", args);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+
+            // Check if any arg passed in single instance is a project file
+            for arg in args.into_iter().skip(1) {
+                let path = std::path::Path::new(&arg);
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    let lower = ext.to_lowercase();
+                    if (lower == "afsn" || lower == "afsnz" || lower == "zip") && path.exists() {
+                        log::info!("Emitting open-project-file event for: {}", arg);
+                        let _ = app.emit("open-project-file", &arg);
+                        break;
+                    }
+                }
             }
         }))
         .plugin(tauri_plugin_os::init())
@@ -40,8 +71,9 @@ pub fn run() {
             let database = Database::init(db_path)
                 .expect("Failed to initialize database");
 
-            // Make database and import state available as managed state
+            // Make database, launch state, import and export state available as managed state
             app.manage(database);
+            app.manage(launch_state);
             app.manage(commands::photo_commands::ImportState::default());
             app.manage(commands::export_commands::ExportState::default());
 
@@ -51,6 +83,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_commands::get_app_info,
             commands::app_commands::get_db_status,
+            commands::project_commands::get_initial_open_path,
             commands::project_commands::create_project,
             commands::project_commands::get_project,
             commands::project_commands::list_recent_projects,

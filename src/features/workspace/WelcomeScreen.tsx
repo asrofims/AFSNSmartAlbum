@@ -49,7 +49,7 @@ export function WelcomeScreen() {
             </div>
 
             <div className={styles.heroFooter}>
-              <span>v1.0.1 - Afsunmedia - Asrofims</span>
+              <span>v1.0.1-beta - Afsunmedia - Asrofims</span>
             </div>
           </div>
         </div>

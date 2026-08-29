@@ -4,6 +4,17 @@ use uuid::Uuid;
 
 use crate::db::{AlbumPayload, Database, ProjectPackagePayload, ProjectRow};
 
+#[derive(Default)]
+pub struct LaunchState {
+    pub pending_open_file: std::sync::Mutex<Option<String>>,
+}
+
+#[tauri::command]
+pub fn get_initial_open_path(launch_state: State<'_, LaunchState>) -> Option<String> {
+    let mut lock = launch_state.pending_open_file.lock().unwrap();
+    lock.take()
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateProjectRequest {

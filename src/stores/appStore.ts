@@ -27,7 +27,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   appInfo: {
-    version: '1.0.1',
+    version: 'v1.0.1-beta',
     buildNumber: '1',
     platform: 'unknown',
   },
