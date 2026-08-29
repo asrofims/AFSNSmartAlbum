@@ -17,6 +17,9 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
   openProjectById: (id: string) => Promise<void>;
+  exportProjectAsAfsn: () => Promise<string | null>;
+  exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
+  importProjectFromAfsn: () => Promise<boolean>;
   removeRecentProject: (id: string) => Promise<void>;
   clearAllRecentProjects: () => Promise<void>;
 }
@@ -190,6 +193,76 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } else {
       set({ error: 'Project not found', isLoading: false });
     }
+  },
+
+  exportProjectAsAfsn: async (): Promise<string | null> => {
+    const current = get().currentProject;
+    if (!current) return null;
+
+    try {
+      // 1. Ensure latest album state in memory is flushed to SQLite
+      const { useAlbumStore } = await import('./albumStore');
+      await useAlbumStore.getState().saveAlbumToDb();
+
+      // 2. Open native Save File Dialog and write .afsn
+      const { invoke } = await import('@tauri-apps/api/core');
+      const savedPath = await invoke<string | null>('export_afsn_with_dialog', {
+        projectId: current.id,
+        suggestedName: current.name,
+      });
+      return savedPath;
+    } catch (err) {
+      console.error('[AFSN] export_afsn_with_dialog failed:', err);
+      return null;
+    }
+  },
+
+  exportCompleteProjectPackageWithPhotos: async (): Promise<string | null> => {
+    const current = get().currentProject;
+    if (!current) return null;
+
+    try {
+      // 1. Ensure latest album state in memory is flushed to SQLite
+      const { useAlbumStore } = await import('./albumStore');
+      await useAlbumStore.getState().saveAlbumToDb();
+
+      // 2. Open native Save File Dialog and write complete .zip package
+      const { invoke } = await import('@tauri-apps/api/core');
+      const savedPath = await invoke<string | null>('export_bundled_package_with_dialog', {
+        projectId: current.id,
+        suggestedName: current.name,
+      });
+      return savedPath;
+    } catch (err) {
+      console.error('[AFSN] export_bundled_package_with_dialog failed:', err);
+      return null;
+    }
+  },
+
+  importProjectFromAfsn: async (): Promise<boolean> => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const packageData = await invoke<any>('import_afsn_with_dialog');
+      if (packageData && packageData.project) {
+        const project = packageData.project as Project;
+        set((state) => ({
+          currentProject: project,
+          recentProjects: [project, ...state.recentProjects.filter((p) => p.id !== project.id)].slice(0, 10),
+          error: null,
+        }));
+
+        // Load imported photos, folders, and album structure
+        const { usePhotoStore } = await import('./photoStore');
+        const { useAlbumStore } = await import('./albumStore');
+        await usePhotoStore.getState().loadPhotos(project.id);
+        await usePhotoStore.getState().loadFolders(project.id);
+        await useAlbumStore.getState().loadAlbumFromDb(project.id);
+        return true;
+      }
+    } catch (err) {
+      console.error('[AFSN] import_afsn_with_dialog failed:', err);
+    }
+    return false;
   },
 
   removeRecentProject: async (id: string) => {

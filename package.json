@@ -1,12 +1,12 @@
 {
   "name": "afsn-smart-album",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "tsx tests/domain.test.ts && tsx tests/album.test.ts && tsx tests/editor.test.ts",
+    "test": "tsx tests/domain.test.ts && tsx tests/album.test.ts && tsx tests/editor.test.ts && tsx tests/history.test.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },

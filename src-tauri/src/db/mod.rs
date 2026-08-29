@@ -64,14 +64,102 @@ pub struct PhotoFolderRow {
     pub updated_at: String,
 }
 
+/// Represents an element / photo frame on a spread.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementPayload {
+    pub id: String,
+    pub r#type: String,
+    pub photo_id: Option<String>,
+    pub file_path: String,
+    pub file_name: String,
+    pub preview_path: Option<String>,
+    pub thumbnail_path: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub rotation: f64,
+    pub z_index: i32,
+    pub photo_aspect: f64,
+    pub original_width: Option<f64>,
+    pub original_height: Option<f64>,
+    pub crop_x: f64,
+    pub crop_y: f64,
+    pub crop_scale: f64,
+    pub crop_rotation: Option<f64>,
+    pub border_enabled: bool,
+    pub border_width: f64,
+    pub border_color: String,
+    pub opacity: f64,
+}
+
+/// Represents a single page in a spread.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagePayload {
+    pub id: String,
+    pub page_number: i32,
+    pub r#type: String,
+    pub width: f64,
+    pub height: f64,
+    pub unit: String,
+    pub bleed: f64,
+    pub safe_area: f64,
+    pub background_color: String,
+    pub background_type: String,
+}
+
+/// Represents a full spread (cover or interior).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpreadPayload {
+    pub id: String,
+    pub spread_index: i32,
+    pub r#type: String,
+    pub name: String,
+    pub left_page: Option<PagePayload>,
+    pub right_page: Option<PagePayload>,
+    pub gutter_width: f64,
+    pub gutter_unit: String,
+    pub bleed: f64,
+    pub safe_area: f64,
+    pub background_color: String,
+    pub elements: Vec<ElementPayload>,
+}
+
+/// Represents the complete Album structure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumPayload {
+    pub id: String,
+    pub project_id: String,
+    pub cover_spread: SpreadPayload,
+    pub spreads: Vec<SpreadPayload>,
+    pub total_spreads: i32,
+    pub total_pages: i32,
+}
+
+/// Represents a portable .afsn project package.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPackagePayload {
+    pub version: i32,
+    pub project: ProjectRow,
+    pub photos: Vec<PhotoRow>,
+    pub folders: Vec<PhotoFolderRow>,
+    pub album: Option<AlbumPayload>,
+}
+
 /// Thread-safe wrapper around SQLite connection.
 pub struct Database {
     conn: Mutex<Connection>,
+    db_path: PathBuf,
 }
 
 impl Database {
     pub fn expected_version() -> i32 {
-        5
+        6
     }
 
     /// Initialize the database at the given path.
@@ -99,6 +187,7 @@ impl Database {
 
         Ok(Self {
             conn: Mutex::new(conn),
+            db_path,
         })
     }
 
@@ -138,6 +227,10 @@ impl Database {
 
         if current_version < 5 {
             Self::migrate_v5(conn)?;
+        }
+
+        if current_version < 6 {
+            Self::migrate_v6(conn)?;
         }
 
         Ok(())
@@ -291,6 +384,74 @@ impl Database {
         )?;
 
         log::info!("Applied database migration v5");
+        Ok(())
+    }
+
+    /// Schema version 6: Album Spreads and Photo Frame Elements.
+    fn migrate_v6(conn: &Connection) -> SqliteResult<()> {
+        conn.execute_batch(
+            "BEGIN;
+
+            CREATE TABLE IF NOT EXISTS album_spreads (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                spread_index INTEGER NOT NULL DEFAULT 0,
+                spread_type TEXT NOT NULL DEFAULT 'interior',
+                name TEXT NOT NULL,
+                left_page_id TEXT,
+                right_page_id TEXT,
+                gutter_width REAL NOT NULL DEFAULT 0.0,
+                gutter_unit TEXT NOT NULL DEFAULT 'mm',
+                bleed REAL NOT NULL DEFAULT 3.0,
+                safe_area REAL NOT NULL DEFAULT 10.0,
+                background_color TEXT NOT NULL DEFAULT '#FFFFFF',
+                is_cover INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS spread_elements (
+                id TEXT PRIMARY KEY,
+                spread_id TEXT NOT NULL,
+                element_type TEXT NOT NULL DEFAULT 'photo',
+                photo_id TEXT,
+                file_path TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                preview_path TEXT,
+                thumbnail_path TEXT,
+                x REAL NOT NULL DEFAULT 0.0,
+                y REAL NOT NULL DEFAULT 0.0,
+                width REAL NOT NULL DEFAULT 100.0,
+                height REAL NOT NULL DEFAULT 80.0,
+                rotation REAL NOT NULL DEFAULT 0.0,
+                z_index INTEGER NOT NULL DEFAULT 1,
+                photo_aspect REAL NOT NULL DEFAULT 1.0,
+                original_width REAL NOT NULL DEFAULT 100.0,
+                original_height REAL NOT NULL DEFAULT 80.0,
+                crop_x REAL NOT NULL DEFAULT 0.0,
+                crop_y REAL NOT NULL DEFAULT 0.0,
+                crop_scale REAL NOT NULL DEFAULT 1.0,
+                crop_rotation REAL NOT NULL DEFAULT 0.0,
+                border_enabled INTEGER NOT NULL DEFAULT 0,
+                border_width REAL NOT NULL DEFAULT 0.0,
+                border_color TEXT NOT NULL DEFAULT '#FFFFFF',
+                opacity REAL NOT NULL DEFAULT 1.0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(spread_id) REFERENCES album_spreads(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_album_spreads_project ON album_spreads(project_id);
+            CREATE INDEX IF NOT EXISTS idx_album_spreads_index ON album_spreads(project_id, spread_index);
+            CREATE INDEX IF NOT EXISTS idx_spread_elements_spread ON spread_elements(spread_id);
+
+            INSERT INTO schema_version (version) VALUES (6);
+
+            COMMIT;",
+        )?;
+
+        log::info!("Applied database migration v6");
         Ok(())
     }
 
@@ -881,6 +1042,601 @@ impl Database {
         }
         Ok(photos)
     }
+
+    // --- Album Structure & Elements Persistence ---
+
+    pub fn save_album_structure(&self, album: &AlbumPayload) -> SqliteResult<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+
+        // Ensure project exists to satisfy FK constraint
+        let project_exists: bool = tx.query_row(
+            "SELECT 1 FROM projects WHERE id = ?1",
+            [&album.project_id],
+            |_| Ok(true),
+        ).unwrap_or(false);
+
+        if !project_exists {
+            tx.execute(
+                "INSERT OR IGNORE INTO projects (
+                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
+                    spacing_value, spacing_unit, margin_enabled, margin_value, margin_unit,
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, created_at, updated_at
+                ) VALUES (?1, 'Untitled Album', 200.0, 200.0, 'mm', 300, 2.0, 'mm', 1, 10.0, 'mm', 0, 0.0, 'mm', '#000000', 'solid', '#FFFFFF', datetime('now'), datetime('now'))",
+                [&album.project_id],
+            )?;
+        }
+
+        // Delete existing spreads for this project (will CASCADE delete spread_elements)
+        tx.execute("DELETE FROM album_spreads WHERE project_id = ?1", [&album.project_id])?;
+
+        // Helper to insert a spread and its elements into SQLite
+        fn insert_spread_record(tx: &rusqlite::Transaction, project_id: &str, spread: &SpreadPayload, is_cover: bool) -> SqliteResult<()> {
+            let left_id = spread.left_page.as_ref().map(|p| p.id.clone());
+            let right_id = spread.right_page.as_ref().map(|p| p.id.clone());
+
+            tx.execute(
+                "INSERT INTO album_spreads (
+                    id, project_id, spread_index, spread_type, name,
+                    left_page_id, right_page_id, gutter_width, gutter_unit,
+                    bleed, safe_area, background_color, is_cover,
+                    created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'), datetime('now'))",
+                rusqlite::params![
+                    spread.id,
+                    project_id,
+                    spread.spread_index,
+                    spread.r#type,
+                    spread.name,
+                    left_id,
+                    right_id,
+                    spread.gutter_width,
+                    spread.gutter_unit,
+                    spread.bleed,
+                    spread.safe_area,
+                    spread.background_color,
+                    if is_cover { 1 } else { 0 },
+                ],
+            )?;
+
+            for elem in &spread.elements {
+                tx.execute(
+                    "INSERT INTO spread_elements (
+                        id, spread_id, element_type, photo_id, file_path, file_name,
+                        preview_path, thumbnail_path, x, y, width, height,
+                        rotation, z_index, photo_aspect, original_width, original_height,
+                        crop_x, crop_y, crop_scale, crop_rotation,
+                        border_enabled, border_width, border_color, opacity,
+                        created_at, updated_at
+                    ) VALUES (
+                        ?1, ?2, ?3, ?4, ?5, ?6,
+                        ?7, ?8, ?9, ?10, ?11, ?12,
+                        ?13, ?14, ?15, ?16, ?17,
+                        ?18, ?19, ?20, ?21,
+                        ?22, ?23, ?24, ?25,
+                        datetime('now'), datetime('now')
+                    )",
+                    rusqlite::params![
+                        elem.id,
+                        spread.id,
+                        elem.r#type,
+                        elem.photo_id,
+                        elem.file_path,
+                        elem.file_name,
+                        elem.preview_path,
+                        elem.thumbnail_path,
+                        elem.x,
+                        elem.y,
+                        elem.width,
+                        elem.height,
+                        elem.rotation,
+                        elem.z_index,
+                        elem.photo_aspect,
+                        elem.original_width.unwrap_or(elem.width),
+                        elem.original_height.unwrap_or(elem.height),
+                        elem.crop_x,
+                        elem.crop_y,
+                        elem.crop_scale,
+                        elem.crop_rotation.unwrap_or(0.0),
+                        elem.border_enabled as i32,
+                        elem.border_width,
+                        elem.border_color,
+                        elem.opacity,
+                    ],
+                )?;
+            }
+            Ok(())
+        }
+
+        // Save cover spread
+        insert_spread_record(&tx, &album.project_id, &album.cover_spread, true)?;
+
+        // Save interior spreads
+        for spread in &album.spreads {
+            insert_spread_record(&tx, &album.project_id, spread, false)?;
+        }
+
+        // Update project updated_at timestamp
+        tx.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?1", [&album.project_id])?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn load_album_structure(&self, project_id: &str) -> SqliteResult<Option<AlbumPayload>> {
+        let conn = self.conn.lock().unwrap();
+
+        // Check if project exists directly without re-locking self.conn (prevents deadlock)
+        let mut proj_stmt = conn.prepare(
+            "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
+                    spacing_value, spacing_unit,
+                    margin_enabled, margin_value, margin_unit,
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, file_path,
+                    created_at, updated_at
+             FROM projects WHERE id = ?1",
+        )?;
+        let mut proj_rows = proj_stmt.query([project_id])?;
+        let project = if let Some(row) = proj_rows.next()? {
+            let margin_enabled_int: i32 = row.get(8)?;
+            let border_enabled_int: i32 = row.get(11)?;
+            ProjectRow {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                canvas_width: row.get(2)?,
+                canvas_height: row.get(3)?,
+                canvas_unit: row.get(4)?,
+                canvas_dpi: row.get(5)?,
+                spacing_value: row.get(6)?,
+                spacing_unit: row.get(7)?,
+                margin_enabled: margin_enabled_int != 0,
+                margin_value: row.get(9)?,
+                margin_unit: row.get(10)?,
+                border_enabled: border_enabled_int != 0,
+                border_width: row.get(12)?,
+                border_unit: row.get(13)?,
+                border_color: row.get(14)?,
+                background_type: row.get(15)?,
+                background_color: row.get(16)?,
+                file_path: row.get(17)?,
+                created_at: row.get(18)?,
+                updated_at: row.get(19)?,
+            }
+        } else {
+            return Ok(None);
+        };
+
+        // Query all spreads for this project
+        let mut spread_stmt = conn.prepare(
+            "SELECT id, project_id, spread_index, spread_type, name,
+                    left_page_id, right_page_id, gutter_width, gutter_unit,
+                    bleed, safe_area, background_color, is_cover,
+                    created_at, updated_at
+             FROM album_spreads
+             WHERE project_id = ?1
+             ORDER BY spread_index ASC",
+        )?;
+
+        let mut elem_stmt = conn.prepare(
+            "SELECT id, spread_id, element_type, photo_id, file_path, file_name,
+                    preview_path, thumbnail_path, x, y, width, height,
+                    rotation, z_index, photo_aspect, original_width, original_height,
+                    crop_x, crop_y, crop_scale, crop_rotation,
+                    border_enabled, border_width, border_color, opacity,
+                    created_at, updated_at
+             FROM spread_elements
+             WHERE spread_id = ?1
+             ORDER BY z_index ASC",
+        )?;
+
+        let spread_rows = spread_stmt.query_map([project_id], |row| {
+            let is_cover_int: i32 = row.get(12)?;
+            Ok((
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // project_id
+                row.get::<_, i32>(2)?,    // spread_index
+                row.get::<_, String>(3)?, // spread_type
+                row.get::<_, String>(4)?, // name
+                row.get::<_, Option<String>>(5)?, // left_page_id
+                row.get::<_, Option<String>>(6)?, // right_page_id
+                row.get::<_, f64>(7)?,    // gutter_width
+                row.get::<_, String>(8)?, // gutter_unit
+                row.get::<_, f64>(9)?,    // bleed
+                row.get::<_, f64>(10)?,   // safe_area
+                row.get::<_, String>(11)?, // background_color
+                is_cover_int != 0,        // is_cover
+            ))
+        })?;
+
+        let mut cover_spread: Option<SpreadPayload> = None;
+        let mut interior_spreads: Vec<SpreadPayload> = Vec::new();
+
+        for s_res in spread_rows {
+            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, background_color, is_cover) = s_res?;
+
+            // Load elements for this spread
+            let elem_rows = elem_stmt.query_map([&id], |er| {
+                let border_int: i32 = er.get(21)?;
+                Ok(ElementPayload {
+                    id: er.get(0)?,
+                    r#type: er.get(2)?,
+                    photo_id: er.get(3)?,
+                    file_path: er.get(4)?,
+                    file_name: er.get(5)?,
+                    preview_path: er.get(6)?,
+                    thumbnail_path: er.get(7)?,
+                    x: er.get(8)?,
+                    y: er.get(9)?,
+                    width: er.get(10)?,
+                    height: er.get(11)?,
+                    rotation: er.get(12)?,
+                    z_index: er.get(13)?,
+                    photo_aspect: er.get(14)?,
+                    original_width: Some(er.get(15)?),
+                    original_height: Some(er.get(16)?),
+                    crop_x: er.get(17)?,
+                    crop_y: er.get(18)?,
+                    crop_scale: er.get(19)?,
+                    crop_rotation: Some(er.get(20)?),
+                    border_enabled: border_int != 0,
+                    border_width: er.get(22)?,
+                    border_color: er.get(23)?,
+                    opacity: er.get(24)?,
+                })
+            })?;
+
+            let mut elements = Vec::new();
+            for e in elem_rows {
+                elements.push(e?);
+            }
+
+            // Construct Left & Right Page payloads
+            let (left_page, right_page) = if is_cover {
+                let left = PagePayload {
+                    id: left_page_id.unwrap_or_else(|| format!("{}-page-cover-back", id)),
+                    page_number: 0,
+                    r#type: "cover_back".to_string(),
+                    width: project.canvas_width,
+                    height: project.canvas_height,
+                    unit: project.canvas_unit.clone(),
+                    bleed,
+                    safe_area,
+                    background_color: background_color.clone(),
+                    background_type: "solid".to_string(),
+                };
+                let right = PagePayload {
+                    id: right_page_id.unwrap_or_else(|| format!("{}-page-cover-front", id)),
+                    page_number: 1,
+                    r#type: "cover_front".to_string(),
+                    width: project.canvas_width,
+                    height: project.canvas_height,
+                    unit: project.canvas_unit.clone(),
+                    bleed,
+                    safe_area,
+                    background_color: background_color.clone(),
+                    background_type: "solid".to_string(),
+                };
+                (Some(left), Some(right))
+            } else {
+                let left_num = (spread_index - 1) * 2 + 1;
+                let right_num = left_num + 1;
+                let left = PagePayload {
+                    id: left_page_id.unwrap_or_else(|| format!("{}-page-{}", id, left_num)),
+                    page_number: left_num,
+                    r#type: "left".to_string(),
+                    width: project.canvas_width,
+                    height: project.canvas_height,
+                    unit: project.canvas_unit.clone(),
+                    bleed,
+                    safe_area,
+                    background_color: background_color.clone(),
+                    background_type: "solid".to_string(),
+                };
+                let right = PagePayload {
+                    id: right_page_id.unwrap_or_else(|| format!("{}-page-{}", id, right_num)),
+                    page_number: right_num,
+                    r#type: "right".to_string(),
+                    width: project.canvas_width,
+                    height: project.canvas_height,
+                    unit: project.canvas_unit.clone(),
+                    bleed,
+                    safe_area,
+                    background_color: background_color.clone(),
+                    background_type: "solid".to_string(),
+                };
+                (Some(left), Some(right))
+            };
+
+            let spread_payload = SpreadPayload {
+                id,
+                spread_index,
+                r#type: spread_type,
+                name,
+                left_page,
+                right_page,
+                gutter_width,
+                gutter_unit,
+                bleed,
+                safe_area,
+                background_color,
+                elements,
+            };
+
+            if is_cover {
+                cover_spread = Some(spread_payload);
+            } else {
+                interior_spreads.push(spread_payload);
+            }
+        }
+
+        if cover_spread.is_none() && interior_spreads.is_empty() {
+            return Ok(None);
+        }
+
+        let total_spreads = interior_spreads.len() as i32;
+        let total_pages = total_spreads * 2;
+
+        let final_cover = cover_spread.unwrap_or_else(|| SpreadPayload {
+            id: format!("album-{}-spread-cover", project_id),
+            spread_index: 0,
+            r#type: "cover".to_string(),
+            name: "Cover Spread".to_string(),
+            left_page: None,
+            right_page: None,
+            gutter_width: 6.0,
+            gutter_unit: "mm".to_string(),
+            bleed: 3.0,
+            safe_area: 10.0,
+            background_color: "#1e293b".to_string(),
+            elements: Vec::new(),
+        });
+
+        Ok(Some(AlbumPayload {
+            id: format!("album-{}", project_id),
+            project_id: project_id.to_string(),
+            cover_spread: final_cover,
+            spreads: interior_spreads,
+            total_spreads,
+            total_pages,
+        }))
+    }
+
+    pub fn export_project_package(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
+        let project = self.get_project(project_id)?.ok_or_else(|| {
+            rusqlite::Error::QueryReturnedNoRows
+        })?;
+        let photos = self.get_photos_for_project(project_id)?;
+        let folders = self.get_folders_for_project(project_id)?;
+        let album = self.load_album_structure(project_id)?;
+
+        let package = ProjectPackagePayload {
+            version: 1,
+            project,
+            photos,
+            folders,
+            album,
+        };
+
+        let json_str = serde_json::to_string_pretty(&package).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to serialize package: {}", e).into())
+        })?;
+
+        std::fs::write(target_path, json_str).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to write .afsn file: {}", e).into())
+        })?;
+
+        Ok(())
+    }
+
+    /// Exports a standalone complete package (.zip) containing project.afsn and all raw photo files.
+    pub fn export_bundled_project_package(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
+        let project = self.get_project(project_id)?.ok_or_else(|| {
+            rusqlite::Error::QueryReturnedNoRows
+        })?;
+        let mut photos = self.get_photos_for_project(project_id)?;
+        let folders = self.get_folders_for_project(project_id)?;
+        let mut album = self.load_album_structure(project_id)?;
+
+        let file = std::fs::File::create(target_path).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to create package file: {}", e).into())
+        })?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        let mut path_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
+        // Write all original photo files into photos/ folder in zip
+        for photo in &mut photos {
+            let orig_path = std::path::Path::new(&photo.file_path);
+            if orig_path.exists() {
+                let safe_name = photo.file_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+                let zip_entry_name = format!("{}_{}", photo.id, safe_name);
+                let zip_entry_path = format!("photos/{}", zip_entry_name);
+
+                if let Ok(mut src_file) = std::fs::File::open(orig_path) {
+                    if zip.start_file(&zip_entry_path, options).is_ok() {
+                        let _ = std::io::copy(&mut src_file, &mut zip);
+                    }
+                }
+                path_remap.insert(photo.file_path.clone(), zip_entry_path.clone());
+                photo.file_path = zip_entry_path;
+            }
+        }
+
+        // Remap photo paths inside album elements to matching bundled relative paths
+        if let Some(ref mut alb) = album {
+            for elem in &mut alb.cover_spread.elements {
+                if let Some(new_p) = path_remap.get(&elem.file_path) {
+                    elem.file_path = new_p.clone();
+                }
+            }
+            for spread in &mut alb.spreads {
+                for elem in &mut spread.elements {
+                    if let Some(new_p) = path_remap.get(&elem.file_path) {
+                        elem.file_path = new_p.clone();
+                    }
+                }
+            }
+        }
+
+        let package = ProjectPackagePayload {
+            version: 1,
+            project,
+            photos,
+            folders,
+            album,
+        };
+
+        let json_str = serde_json::to_string_pretty(&package).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to serialize package: {}", e).into())
+        })?;
+
+        use std::io::Write;
+        zip.start_file("project.afsn", options).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to add project.afsn to zip: {}", e).into())
+        })?;
+        zip.write_all(json_str.as_bytes()).map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to write project.afsn into zip: {}", e).into())
+        })?;
+
+        zip.finish().map_err(|e| {
+            rusqlite::Error::InvalidPath(format!("Failed to finalize package zip: {}", e).into())
+        })?;
+
+        Ok(())
+    }
+
+    pub fn import_project_package(&self, source_path: &str) -> SqliteResult<ProjectPackagePayload> {
+        let path = std::path::Path::new(source_path);
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+
+        let mut package: ProjectPackagePayload;
+
+        if ext == "zip" || ext == "afsnz" {
+            // Open and extract ZIP package
+            let file = std::fs::File::open(path).map_err(|e| {
+                rusqlite::Error::InvalidPath(format!("Failed to open package zip: {}", e).into())
+            })?;
+            let mut archive = zip::ZipArchive::new(file).map_err(|e| {
+                rusqlite::Error::InvalidPath(format!("Invalid zip archive: {}", e).into())
+            })?;
+
+            // Read project.afsn from zip
+            let json_str = {
+                let mut afsn_file = archive.by_name("project.afsn").map_err(|e| {
+                    rusqlite::Error::InvalidPath(format!("Missing project.afsn inside zip: {}", e).into())
+                })?;
+                let mut s = String::new();
+                use std::io::Read;
+                afsn_file.read_to_string(&mut s).map_err(|e| {
+                    rusqlite::Error::InvalidPath(format!("Failed to read project.afsn from zip: {}", e).into())
+                })?;
+                s
+            };
+
+            package = serde_json::from_str(&json_str).map_err(|e| {
+                rusqlite::Error::InvalidPath(format!("Invalid project.afsn in zip: {}", e).into())
+            })?;
+
+            // Extract bundled photos to local app cache/user directory
+            let extract_base_dir = self.db_path.parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join("extracted_packages")
+                .join(&package.project.id);
+            let _ = std::fs::create_dir_all(&extract_base_dir);
+
+            for i in 0..archive.len() {
+                if let Ok(mut entry) = archive.by_index(i) {
+                    let entry_name = entry.name().to_string();
+                    if entry_name.starts_with("photos/") && !entry.is_dir() {
+                        let out_path = extract_base_dir.join(&entry_name);
+                        if let Some(parent) = out_path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        if let Ok(mut out_file) = std::fs::File::create(&out_path) {
+                            let _ = std::io::copy(&mut entry, &mut out_file);
+                        }
+                    }
+                }
+            }
+
+            // Remap photos to absolute extracted disk paths
+            let mut remapped_paths: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+            for photo in &mut package.photos {
+                if photo.file_path.starts_with("photos/") {
+                    let abs_path = extract_base_dir.join(&photo.file_path);
+                    let abs_str = abs_path.to_string_lossy().to_string();
+                    remapped_paths.insert(photo.file_path.clone(), abs_str.clone());
+                    photo.file_path = abs_str;
+                }
+            }
+
+            // Remap in album elements
+            if let Some(ref mut alb) = package.album {
+                for elem in &mut alb.cover_spread.elements {
+                    if let Some(abs_p) = remapped_paths.get(&elem.file_path) {
+                        elem.file_path = abs_p.clone();
+                    }
+                }
+                for spread in &mut alb.spreads {
+                    for elem in &mut spread.elements {
+                        if let Some(abs_p) = remapped_paths.get(&elem.file_path) {
+                            elem.file_path = abs_p.clone();
+                        }
+                    }
+                }
+            }
+        } else {
+            let json_str = std::fs::read_to_string(source_path).map_err(|e| {
+                rusqlite::Error::InvalidPath(format!("Failed to read .afsn file: {}", e).into())
+            })?;
+
+            package = serde_json::from_str(&json_str).map_err(|e| {
+                rusqlite::Error::InvalidPath(format!("Invalid .afsn package format: {}", e).into())
+            })?;
+        }
+
+        // Import project into SQLite
+        let p = &package.project;
+        let _ = self.create_project(
+            &p.id,
+            &p.name,
+            p.canvas_width,
+            p.canvas_height,
+            &p.canvas_unit,
+            p.canvas_dpi,
+            p.spacing_value,
+            &p.spacing_unit,
+            p.margin_enabled,
+            p.margin_value,
+            &p.margin_unit,
+            p.border_enabled,
+            p.border_width,
+            &p.border_unit,
+            &p.border_color,
+            &p.background_type,
+            &p.background_color,
+        );
+
+        // Import photos
+        for photo in &package.photos {
+            let _ = self.add_photo(photo);
+        }
+
+        // Import folders
+        for folder in &package.folders {
+            let _ = self.create_folder(&folder.id, &folder.project_id, &folder.name);
+        }
+
+        // Import album structure
+        if let Some(album) = &package.album {
+            self.save_album_structure(album)?;
+        }
+
+        Ok(package)
+    }
 }
 
 #[cfg(test)]
@@ -910,11 +1666,11 @@ mod tests {
 
     #[test]
     fn test_project_crud() {
-        let temp_dir = std::env::temp_dir().join("afsn_test_db_v5");
+        let temp_dir = std::env::temp_dir().join("afsn_test_db_v6");
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 5);
+        assert_eq!(db.get_schema_version().unwrap(), 6);
 
         db.create_project(
             "test-id-1",
@@ -1027,6 +1783,167 @@ mod tests {
         // Batch Delete
         db.batch_delete_photos(&["photo-1".to_string(), "photo-2".to_string()]).expect("Failed batch delete");
         assert_eq!(db.get_photos_for_project("test-id-1").unwrap().len(), 0);
+
+        // Test Album Structure Persistence (Migration v6)
+        let cover_spread = SpreadPayload {
+            id: "spread-cover-1".to_string(),
+            spread_index: 0,
+            r#type: "cover".to_string(),
+            name: "Cover Spread".to_string(),
+            left_page: Some(PagePayload {
+                id: "page-cover-back".to_string(),
+                page_number: 0,
+                r#type: "cover_back".to_string(),
+                width: 8.0,
+                height: 8.0,
+                unit: "inch".to_string(),
+                bleed: 0.125,
+                safe_area: 10.0,
+                background_color: "#1e293b".to_string(),
+                background_type: "solid".to_string(),
+            }),
+            right_page: Some(PagePayload {
+                id: "page-cover-front".to_string(),
+                page_number: 1,
+                r#type: "cover_front".to_string(),
+                width: 8.0,
+                height: 8.0,
+                unit: "inch".to_string(),
+                bleed: 0.125,
+                safe_area: 10.0,
+                background_color: "#1e293b".to_string(),
+                background_type: "solid".to_string(),
+            }),
+            gutter_width: 0.25,
+            gutter_unit: "inch".to_string(),
+            bleed: 0.125,
+            safe_area: 10.0,
+            background_color: "#1e293b".to_string(),
+            elements: vec![],
+        };
+
+        let interior_spread_1 = SpreadPayload {
+            id: "spread-int-1".to_string(),
+            spread_index: 1,
+            r#type: "interior".to_string(),
+            name: "Spread 1 (Pages 1-2)".to_string(),
+            left_page: Some(PagePayload {
+                id: "page-1".to_string(),
+                page_number: 1,
+                r#type: "left".to_string(),
+                width: 8.0,
+                height: 8.0,
+                unit: "inch".to_string(),
+                bleed: 0.125,
+                safe_area: 10.0,
+                background_color: "#FFFFFF".to_string(),
+                background_type: "solid".to_string(),
+            }),
+            right_page: Some(PagePayload {
+                id: "page-2".to_string(),
+                page_number: 2,
+                r#type: "right".to_string(),
+                width: 8.0,
+                height: 8.0,
+                unit: "inch".to_string(),
+                bleed: 0.125,
+                safe_area: 10.0,
+                background_color: "#FFFFFF".to_string(),
+                background_type: "solid".to_string(),
+            }),
+            gutter_width: 0.0,
+            gutter_unit: "inch".to_string(),
+            bleed: 0.125,
+            safe_area: 10.0,
+            background_color: "#FFFFFF".to_string(),
+            elements: vec![
+                ElementPayload {
+                    id: "frame-1".to_string(),
+                    r#type: "photo".to_string(),
+                    photo_id: Some("photo-1".to_string()),
+                    file_path: "C:\\photos\\img1.jpg".to_string(),
+                    file_name: "img1.jpg".to_string(),
+                    preview_path: None,
+                    thumbnail_path: None,
+                    x: 10.0,
+                    y: 10.0,
+                    width: 50.0,
+                    height: 40.0,
+                    rotation: 0.0,
+                    z_index: 1,
+                    photo_aspect: 1.25,
+                    original_width: Some(50.0),
+                    original_height: Some(40.0),
+                    crop_x: 0.0,
+                    crop_y: 0.0,
+                    crop_scale: 1.0,
+                    crop_rotation: Some(0.0),
+                    border_enabled: true,
+                    border_width: 1.0,
+                    border_color: "#FFFFFF".to_string(),
+                    opacity: 1.0,
+                }
+            ],
+        };
+
+        let album = AlbumPayload {
+            id: "album-test-id-1".to_string(),
+            project_id: "test-id-1".to_string(),
+            cover_spread,
+            spreads: vec![interior_spread_1],
+            total_spreads: 1,
+            total_pages: 2,
+        };
+
+        db.save_album_structure(&album).expect("Failed to save album structure");
+
+        let loaded_album = db.load_album_structure("test-id-1").expect("Failed to load album").expect("Album not found");
+        assert_eq!(loaded_album.total_spreads, 1);
+        assert_eq!(loaded_album.spreads.len(), 1);
+        assert_eq!(loaded_album.spreads[0].elements.len(), 1);
+        assert_eq!(loaded_album.spreads[0].elements[0].id, "frame-1");
+        assert_eq!(loaded_album.spreads[0].elements[0].width, 50.0);
+        assert_eq!(loaded_album.spreads[0].elements[0].border_enabled, true);
+
+        // Test Export & Import .afsn Package
+        let afsn_path = temp_dir.join("test_package.afsn");
+        db.export_project_package("test-id-1", afsn_path.to_str().unwrap()).expect("Failed export .afsn");
+        assert!(afsn_path.exists());
+
+        let imported_pkg = db.import_project_package(afsn_path.to_str().unwrap()).expect("Failed import .afsn");
+        assert_eq!(imported_pkg.project.id, "test-id-1");
+        assert_eq!(imported_pkg.album.unwrap().spreads.len(), 1);
+
+        // Test Export & Import Standalone Bundle .zip Package (with photos)
+        let sample_img_path = temp_dir.join("sample_img.jpg");
+        std::fs::write(&sample_img_path, b"fake_jpeg_binary_data").unwrap();
+        db.add_photo(&PhotoRow {
+            id: "photo-bundle-1".to_string(),
+            project_id: "test-id-1".to_string(),
+            file_path: sample_img_path.to_string_lossy().to_string(),
+            file_name: "sample_img.jpg".to_string(),
+            file_size: 21,
+            width: 100,
+            height: 100,
+            format: "jpeg".to_string(),
+            thumbnail_path: None,
+            thumbnail_base64: None,
+            preview_path: None,
+            is_favorite: false,
+            used_count: 0,
+            is_missing: false,
+            created_at: "2026-08-29T12:00:00Z".to_string(),
+            updated_at: "2026-08-29T12:00:00Z".to_string(),
+        }).unwrap();
+
+        let zip_path = temp_dir.join("test_bundle.zip");
+        db.export_bundled_project_package("test-id-1", zip_path.to_str().unwrap()).expect("Failed export bundle .zip");
+        assert!(zip_path.exists());
+
+        // Test Import from .zip package
+        let zip_imported = db.import_project_package(zip_path.to_str().unwrap()).expect("Failed import zip bundle");
+        assert_eq!(zip_imported.project.id, "test-id-1");
+        assert!(zip_imported.photos.iter().any(|p| p.file_name == "sample_img.jpg"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

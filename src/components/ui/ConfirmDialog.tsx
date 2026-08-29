@@ -10,6 +10,9 @@ export interface ConfirmDialogProps {
   detail?: string;
   confirmText?: string;
   cancelText?: string;
+  secondaryText?: string;
+  onSecondary?: () => void | Promise<void>;
+  secondaryVariant?: 'ghost' | 'danger' | 'secondary';
   variant?: 'danger' | 'warning' | 'info';
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
@@ -23,6 +26,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   detail,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
+  secondaryText,
+  onSecondary,
+  secondaryVariant = 'ghost',
   variant = 'danger',
   onConfirm,
   onCancel,
@@ -115,6 +121,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           >
             {cancelText}
           </button>
+
+          {secondaryText && onSecondary && (
+            <Button
+              variant={secondaryVariant}
+              onClick={onSecondary}
+              disabled={isLoading}
+            >
+              {secondaryText}
+            </Button>
+          )}
+
           <Button
             variant={variant === 'danger' ? 'danger' : 'primary'}
             onClick={onConfirm}

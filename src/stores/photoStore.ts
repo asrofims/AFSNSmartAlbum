@@ -137,6 +137,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const photos = await invoke<Photo[]>('get_project_photos', { projectId });
       set({ photos: photos || [], error: null });
       await get().loadFolders(projectId);
+      await get().checkMissing(projectId);
     } catch (err) {
       console.warn('[AFSN] loadPhotos fallback or error:', err);
     }

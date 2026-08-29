@@ -19,6 +19,14 @@
   cursor: grabbing;
 }
 
+.spacePanning {
+  cursor: grab !important;
+}
+
+.spacePanningActive {
+  cursor: grabbing !important;
+}
+
 .cropModeActive {
   background-color: #0d0c09;
 }

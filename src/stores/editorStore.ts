@@ -16,6 +16,7 @@ import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
 import { usePhotoStore } from './photoStore';
+import { useHistoryStore } from './historyStore';
 
 export interface EditorState {
   selectedFrameIds: string[];
@@ -139,6 +140,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const currentProject = useProjectStore.getState().currentProject;
     if (!currentAlbum || !currentProject) return;
 
+    useHistoryStore.getState().pushState(currentAlbum);
+
     const pageW = currentProject.canvasWidth;
     const pageH = currentProject.canvasHeight;
 
@@ -194,6 +197,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -208,6 +212,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
 
@@ -218,6 +223,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
+    useHistoryStore.getState().pushState(currentAlbum);
+
     if (currentAlbum.coverSpread.id === spreadId) {
       const updatedCover = {
         ...currentAlbum.coverSpread,
@@ -227,6 +234,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -242,6 +250,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
   },
@@ -249,6 +258,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   batchUpdateFrames: (spreadId, updates) => {
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
 
     const updateMap = new Map(updates.map((u) => [u.id, u.geometry]));
 
@@ -261,6 +272,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -276,6 +288,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
   },
@@ -284,6 +297,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { selectedFrameIds } = get();
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length === 0) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
 
     if (currentAlbum.coverSpread.id === spreadId) {
       const updatedCover = {
@@ -294,6 +309,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -309,6 +325,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
 
@@ -378,6 +395,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
         useAlbumStore.setState({
           currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+          saveStatus: 'unsaved',
         });
       } else {
         const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -395,6 +413,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         });
         useAlbumStore.setState({
           currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+          saveStatus: 'unsaved',
         });
       }
 
@@ -421,6 +440,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
+    useHistoryStore.getState().pushState(currentAlbum);
+
     const updateElements = (elements: PhotoFrameElement[]) => {
       const item = elements.find((f) => f.id === frameId);
       if (!item) return elements;
@@ -435,6 +456,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -448,6 +470,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
   },
@@ -455,6 +478,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   sendToBack: (spreadId, frameId) => {
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
 
     const updateElements = (elements: PhotoFrameElement[]) => {
       const item = elements.find((f) => f.id === frameId);
@@ -470,6 +495,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((spread) => {
@@ -483,6 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       useAlbumStore.setState({
         currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
       });
     }
   },

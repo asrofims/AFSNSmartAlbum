@@ -2,7 +2,7 @@ use serde::Deserialize;
 use tauri::State;
 use uuid::Uuid;
 
-use crate::db::{Database, ProjectRow};
+use crate::db::{AlbumPayload, Database, ProjectPackagePayload, ProjectRow};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,4 +112,149 @@ pub fn update_project_spacing(
     log::info!("update_project_spacing: id={}, value={}, unit={}", id, spacing_value, spacing_unit);
     db.update_project_spacing(&id, spacing_value, &spacing_unit)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_album_structure(
+    db: State<'_, Database>,
+    album: AlbumPayload,
+) -> Result<(), String> {
+    log::info!("save_album_structure for project: {}", album.project_id);
+    db.save_album_structure(&album)
+        .map_err(|e| {
+            log::error!("Failed to save album structure: {:?}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub fn load_album_structure(
+    db: State<'_, Database>,
+    project_id: String,
+) -> Result<Option<AlbumPayload>, String> {
+    log::info!("load_album_structure for project: {}", project_id);
+    db.load_album_structure(&project_id)
+        .map_err(|e| {
+            log::error!("Failed to load album structure: {:?}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub fn export_afsn_package(
+    db: State<'_, Database>,
+    project_id: String,
+    target_path: String,
+) -> Result<(), String> {
+    log::info!("export_afsn_package: project_id={}, target_path={}", project_id, target_path);
+    db.export_project_package(&project_id, &target_path)
+        .map_err(|e| {
+            log::error!("Failed to export .afsn package: {:?}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub fn import_afsn_package(
+    db: State<'_, Database>,
+    source_path: String,
+) -> Result<ProjectPackagePayload, String> {
+    log::info!("import_afsn_package: source_path={}", source_path);
+    db.import_project_package(&source_path)
+        .map_err(|e| {
+            log::error!("Failed to import .afsn package: {:?}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub async fn export_afsn_with_dialog(
+    db: State<'_, Database>,
+    project_id: String,
+    suggested_name: Option<String>,
+) -> Result<Option<String>, String> {
+    let default_name = suggested_name.unwrap_or_else(|| "Album-Project".to_string());
+    let file_path = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_title("Export AFSNSmartAlbum Project (.afsn)")
+            .set_file_name(&format!("{}.afsn", default_name))
+            .add_filter("AFSNSmartAlbum Package (*.afsn)", &["afsn"])
+            .save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some(mut path) = file_path {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("afsn") {
+            path.set_extension("afsn");
+        }
+        let path_str = path.to_string_lossy().to_string();
+        log::info!("export_afsn_with_dialog: exporting project {} to {}", project_id, path_str);
+        db.export_project_package(&project_id, &path_str)
+            .map_err(|e| {
+                log::error!("Failed export_project_package: {:?}", e);
+                e.to_string()
+            })?;
+        Ok(Some(path_str))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn export_bundled_package_with_dialog(
+    db: State<'_, Database>,
+    project_id: String,
+    suggested_name: Option<String>,
+) -> Result<Option<String>, String> {
+    let default_name = suggested_name.unwrap_or_else(|| "Album-Complete-Package".to_string());
+    let file_path = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_title("Export Complete Album Package with Photos (.zip)")
+            .set_file_name(&format!("{}-Package.zip", default_name))
+            .add_filter("AFSNSmartAlbum Complete Archive (*.zip, *.afsnz)", &["zip", "afsnz"])
+            .save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some(mut path) = file_path {
+        let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        if ext != "zip" && ext != "afsnz" {
+            path.set_extension("zip");
+        }
+        let path_str = path.to_string_lossy().to_string();
+        log::info!("export_bundled_package_with_dialog: exporting bundled package {} to {}", project_id, path_str);
+        db.export_bundled_project_package(&project_id, &path_str)
+            .map_err(|e| {
+                log::error!("Failed export_bundled_project_package: {:?}", e);
+                e.to_string()
+            })?;
+        Ok(Some(path_str))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn import_afsn_with_dialog(
+    db: State<'_, Database>,
+) -> Result<Option<ProjectPackagePayload>, String> {
+    let file_path = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_title("Open AFSNSmartAlbum Project or Package (.afsn, .zip)")
+            .add_filter("AFSNSmartAlbum Supported Files (*.afsn, *.zip, *.afsnz)", &["afsn", "zip", "afsnz"])
+            .pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some(path) = file_path {
+        let path_str = path.to_string_lossy().to_string();
+        let package = db.import_project_package(&path_str)
+            .map_err(|e| e.to_string())?;
+        Ok(Some(package))
+    } else {
+        Ok(None)
+    }
 }

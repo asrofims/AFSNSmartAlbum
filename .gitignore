@@ -26,6 +26,8 @@ cache/
 
 # User Project & Test Data
 *.afsn
+*.afsnz
+*.zip
 *.log
 
 # Environment & Secrets

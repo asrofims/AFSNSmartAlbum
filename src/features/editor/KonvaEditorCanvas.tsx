@@ -27,7 +27,7 @@ import styles from './KonvaEditorCanvas.module.css';
 
 interface KonvaEditorCanvasProps {
   zoomLevel: number;
-  activeTool: 'select' | 'pan';
+  activeTool?: 'select' | 'pan';
   onZoomChange?: (updater: (prev: number) => number) => void;
 }
 
@@ -482,6 +482,34 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
 
+  // Natural Pan Navigation State (Spacebar + Drag or Middle-Click Drag)
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+  useEffect(() => {
+    const handleSpaceDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target as HTMLElement)?.isContentEditable) return;
+      if (e.code === 'Space' && !e.repeat) {
+        setIsSpacePressed(true);
+      }
+    };
+    const handleSpaceUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+        setIsPanning(false);
+        panStartRef.current = null;
+      }
+    };
+    window.addEventListener('keydown', handleSpaceDown);
+    window.addEventListener('keyup', handleSpaceUp);
+    return () => {
+      window.removeEventListener('keydown', handleSpaceDown);
+      window.removeEventListener('keyup', handleSpaceUp);
+    };
+  }, []);
+
   // Marquee Selection State
   const [selectionRect, setSelectionRect] = useState<{
     x: number;
@@ -863,10 +891,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   // Marquee stage pointer events
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (activeTool === 'pan' || editingCropFrameId) return;
+    if (isSpacePressed || isPanning || activeTool === 'pan' || editingCropFrameId) return;
 
-    // Ignore right clicks so right clicking never cancels selection or triggers marquee
-    if ('button' in e.evt && e.evt.button === 2) return;
+    // Ignore middle & right clicks
+    if ('button' in e.evt && (e.evt.button === 1 || e.evt.button === 2)) return;
 
     const isBackground =
       e.target === e.target.getStage() ||
@@ -895,7 +923,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   };
 
   const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (!selectionRect || !selectionRect.visible || activeTool === 'pan') return;
+    if (isSpacePressed || isPanning || !selectionRect || !selectionRect.visible || activeTool === 'pan') return;
 
     const stage = e.target.getStage();
     if (!stage) return;
@@ -1181,7 +1209,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   return (
     <div
       ref={containerRef}
-      className={`${styles.canvasContainer} ${activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''} ${isDragOverCanvas ? styles.dragOverActive : ''}`}
+      className={`${styles.canvasContainer} ${isPanning ? styles.spacePanningActive : isSpacePressed ? styles.spacePanning : activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''} ${isDragOverCanvas ? styles.dragOverActive : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1199,6 +1227,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         }
       }}
       onMouseDown={(e) => {
+        if (isSpacePressed || e.button === 1 || activeTool === 'pan') {
+          e.preventDefault();
+          setIsPanning(true);
+          if (containerRef.current) {
+            panStartRef.current = {
+              x: e.clientX,
+              y: e.clientY,
+              scrollLeft: containerRef.current.scrollLeft,
+              scrollTop: containerRef.current.scrollTop,
+            };
+          }
+          return;
+        }
         if (e.button === 2) return;
         const target = e.target as HTMLElement;
         if (
@@ -1210,8 +1251,23 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           exitCropMode();
         }
       }}
+      onMouseMove={(e) => {
+        if (isPanning && panStartRef.current && containerRef.current) {
+          e.preventDefault();
+          const dx = e.clientX - panStartRef.current.x;
+          const dy = e.clientY - panStartRef.current.y;
+          containerRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+          containerRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+        }
+      }}
+      onMouseUp={() => {
+        if (isPanning) {
+          setIsPanning(false);
+          panStartRef.current = null;
+        }
+      }}
       onClick={(e) => {
-        if (e.button === 2) return;
+        if (isSpacePressed || isPanning || e.button === 1 || e.button === 2) return;
         const target = e.target as HTMLElement;
         if (
           target === containerRef.current ||

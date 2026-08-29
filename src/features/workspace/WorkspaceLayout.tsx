@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '../../components/ui/Button';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { NumberInput } from '../../components/ui/NumberInput';
 import { Switch } from '../../components/ui/Switch';
 import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useHistoryStore } from '../../stores/historyStore';
+import { useAutoSave } from '../persistence/useAutoSave';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions, convertUnit, Unit } from '../../domain/units';
@@ -16,9 +19,12 @@ import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { PageNavigator } from '../album/PageNavigator';
+import appLogo from '../../assets/app-logo.png';
 import styles from './WorkspaceLayout.module.css';
 
 export function WorkspaceLayout() {
+  useAutoSave();
+
   const openAbout = useAppStore((s) => s.openAbout);
   const openSettings = useAppStore((s) => s.openSettings);
 
@@ -26,6 +32,9 @@ export function WorkspaceLayout() {
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
+  const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
+  const exportCompleteProjectPackageWithPhotos = useProjectStore((s) => s.exportCompleteProjectPackageWithPhotos);
+  const importProjectFromAfsn = useProjectStore((s) => s.importProjectFromAfsn);
 
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
@@ -36,6 +45,14 @@ export function WorkspaceLayout() {
   const updateGutterWidth = useAlbumStore((s) => s.updateGutterWidth);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
+  const saveStatus = useAlbumStore((s) => s.saveStatus);
+  const lastSavedAt = useAlbumStore((s) => s.lastSavedAt);
+  const saveAlbumToDb = useAlbumStore((s) => s.saveAlbumToDb);
+  const undo = useAlbumStore((s) => s.undo);
+  const redo = useAlbumStore((s) => s.redo);
+
+  const canUndo = useHistoryStore((s) => s.canUndo);
+  const canRedo = useHistoryStore((s) => s.canRedo);
 
   const selectedFrameIds = useEditorStore((s) => s.selectedFrameIds);
   const updateFrameGeometry = useEditorStore((s) => s.updateFrameGeometry);
@@ -52,10 +69,58 @@ export function WorkspaceLayout() {
   const applyFixedGapToSelected = useEditorStore((s) => s.applyFixedGapToSelected);
   const matchSelectedDimensions = useEditorStore((s) => s.matchSelectedDimensions);
 
-  const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
+
+  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  // Unsaved Changes Protection Dialog State
+  const [pendingSafeAction, setPendingSafeAction] = useState<(() => void | Promise<void>) | null>(null);
+
+  const confirmSafeAction = useCallback((action: () => void | Promise<void>) => {
+    if (saveStatus === 'unsaved') {
+      setPendingSafeAction(() => action);
+    } else {
+      action();
+    }
+  }, [saveStatus]);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setIsFileMenuOpen(false);
+      }
+    };
+    if (isFileMenuOpen) {
+      window.addEventListener('mousedown', onMouseDown);
+    }
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [isFileMenuOpen]);
+
+  // Window BeforeUnload Warning when modifications are unsaved
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saveStatus === 'unsaved') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStatus]);
 
   // Collapsible Right Properties & Bottom Filmstrip
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
@@ -63,15 +128,73 @@ export function WorkspaceLayout() {
 
   useTauriInfo();
 
-  // Initialize album structure on project load
+  // Initialize or load album structure from SQLite DB on project load
   useEffect(() => {
     if (currentProject) {
-      const album = useAlbumStore.getState().currentAlbum;
-      if (!album || album.projectId !== currentProject.id) {
-        useAlbumStore.getState().initializeAlbum(currentProject);
+      const albumStore = useAlbumStore.getState();
+      const existingAlbum = albumStore.currentAlbum;
+      if (!existingAlbum || existingAlbum.projectId !== currentProject.id) {
+        albumStore.loadAlbumFromDb(currentProject.id).then((loaded) => {
+          if (!loaded) {
+            albumStore.initializeAlbum(currentProject);
+          }
+        });
       }
     }
   }, [currentProject]);
+
+  // Global Keyboard Shortcuts for Undo (Ctrl+Z), Redo (Ctrl+Y), Save (Ctrl+S), Save As (Ctrl+Shift+S), Open (Ctrl+O), New (Ctrl+N)
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (!cmdOrCtrl) return;
+
+      // Ignore when typing inside input / textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if (e.key === 'y' || e.key === 'Y') {
+        e.preventDefault();
+        redo();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Save As (.afsn)
+          exportProjectAsAfsn();
+        } else {
+          // Save
+          saveAlbumToDb().then((ok) => {
+            if (ok) showToast('✓ Project saved to database');
+          });
+        }
+      } else if (e.key === 'o' || e.key === 'O') {
+        e.preventDefault();
+        confirmSafeAction(async () => {
+          await importProjectFromAfsn();
+        });
+      } else if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        confirmSafeAction(() => openNewProject());
+      }
+    },
+    [undo, redo, saveAlbumToDb, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const spreadW = currentProject ? currentProject.canvasWidth * 2 : 16;
   const spreadH = currentProject ? currentProject.canvasHeight : 8;
@@ -87,21 +210,118 @@ export function WorkspaceLayout() {
         <div className={styles.toolbarSection}>
           <div className={styles.brand}>
             <span className={styles.brandIcon}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-                <circle cx="9" cy="9" r="2"/>
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-              </svg>
+              <img src={appLogo} alt="AFSN" style={{ width: 18, height: 18, objectFit: 'contain' }} />
             </span>
             <span>AFSNSmartAlbum</span>
           </div>
 
           <div className={styles.toolbarSeparator} />
 
+          {/* Professional File Menu Dropdown */}
+          <div className={styles.menuContainer} ref={fileMenuRef}>
+            <Button
+              variant={isFileMenuOpen ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setIsFileMenuOpen(!isFileMenuOpen)}
+              title="File Menu"
+            >
+              <span>File ▾</span>
+            </Button>
+
+            {isFileMenuOpen && (
+              <div className={styles.dropdownMenu}>
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  onClick={() => {
+                    setIsFileMenuOpen(false);
+                    confirmSafeAction(() => openNewProject());
+                  }}
+                >
+                  <span>+ New Project...</span>
+                  <span className={styles.shortcutText}>Ctrl+N</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  onClick={() => {
+                    setIsFileMenuOpen(false);
+                    confirmSafeAction(async () => {
+                      await importProjectFromAfsn();
+                    });
+                  }}
+                >
+                  <span>📂 Open .afsn Project...</span>
+                  <span className={styles.shortcutText}>Ctrl+O</span>
+                </button>
+
+                {currentProject && (
+                  <>
+                    <div className={styles.menuDivider} />
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={async () => {
+                        setIsFileMenuOpen(false);
+                        const ok = await saveAlbumToDb();
+                        if (ok) showToast('✓ Project saved to database');
+                      }}
+                    >
+                      <span>💾 Save</span>
+                      <span className={styles.shortcutText}>Ctrl+S</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={async () => {
+                        setIsFileMenuOpen(false);
+                        const path = await exportProjectAsAfsn();
+                        if (path) showToast(`✓ Project saved to: ${path}`);
+                      }}
+                    >
+                      <span>📑 Save As (.afsn)...</span>
+                      <span className={styles.shortcutText}>Ctrl+Shift+S</span>
+                    </button>
+
+                    <div className={styles.menuDivider} />
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={async () => {
+                        setIsFileMenuOpen(false);
+                        const path = await exportCompleteProjectPackageWithPhotos();
+                        if (path) showToast(`✓ Complete package exported to: ${path}`);
+                      }}
+                    >
+                      <span>📦 Export Complete Package (with Photos .zip)...</span>
+                    </button>
+
+                    <div className={styles.menuDivider} />
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setIsFileMenuOpen(false);
+                        confirmSafeAction(() => closeProject());
+                      }}
+                    >
+                      <span>✕ Close Project</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <Button
             variant="secondary"
             size="sm"
-            onClick={openNewProject}
+            onClick={() => confirmSafeAction(() => openNewProject())}
             title="Create a new album project"
           >
             + New Project
@@ -113,7 +333,7 @@ export function WorkspaceLayout() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={closeProject}
+                onClick={() => confirmSafeAction(() => closeProject())}
                 title="Close active project"
                 style={{ padding: '0 4px', height: '20px' }}
               >
@@ -126,31 +346,88 @@ export function WorkspaceLayout() {
             <>
               <div className={styles.toolbarSeparator} />
 
-              {/* Editor Tool Switcher */}
-              <div className={styles.toolGroup}>
+              {/* Undo / Redo & Save Action Stack */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <button
                   type="button"
-                  className={`${styles.toolButton} ${activeTool === 'select' ? styles.toolActive : ''}`}
-                  onClick={() => setActiveTool('select')}
-                  title="Selection Tool (V)"
+                  className={styles.historyBtn}
+                  onClick={undo}
+                  disabled={!canUndo}
+                  title="Undo (Ctrl+Z)"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m3 3 7 18 3-7 7-3L3 3z"/>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7v6h6" />
+                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
                   </svg>
                 </button>
                 <button
                   type="button"
-                  className={`${styles.toolButton} ${activeTool === 'pan' ? styles.toolActive : ''}`}
-                  onClick={() => setActiveTool('pan')}
-                  title="Pan Tool (H)"
+                  className={styles.historyBtn}
+                  onClick={redo}
+                  disabled={!canRedo}
+                  title="Redo (Ctrl+Y)"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
-                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
-                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
-                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 7v6h-6" />
+                    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
                   </svg>
                 </button>
+                <button
+                  type="button"
+                  className={styles.historyBtn}
+                  onClick={async () => {
+                    const ok = await saveAlbumToDb();
+                    if (ok) showToast('✓ Project saved to database');
+                  }}
+                  title="Save Project (Ctrl+S)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={styles.historyBtn}
+                  onClick={async () => {
+                    const path = await exportCompleteProjectPackageWithPhotos();
+                    if (path) showToast(`✓ Complete package exported to: ${path}`);
+                  }}
+                  title="Export Complete Album Package with Photos (.zip)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Auto-Save Status Badge */}
+              <div
+                className={`${styles.saveBadge} ${
+                  saveStatus === 'saved'
+                    ? styles.saveBadgeSaved
+                    : saveStatus === 'saving'
+                    ? styles.saveBadgeSaving
+                    : styles.saveBadgeUnsaved
+                }`}
+                title={
+                  saveStatus === 'saved'
+                    ? `All changes saved to database${lastSavedAt ? ` (${lastSavedAt})` : ''}`
+                    : saveStatus === 'saving'
+                    ? 'Saving changes to database...'
+                    : 'Unsaved modifications (auto-saving...)'
+                }
+                onClick={() => {
+                  if (saveStatus === 'unsaved') saveAlbumToDb();
+                }}
+                style={{ cursor: saveStatus === 'unsaved' ? 'pointer' : 'default' }}
+              >
+                {saveStatus === 'saved' && <span>✓ Saved</span>}
+                {saveStatus === 'saving' && <span>↻ Saving...</span>}
+                {saveStatus === 'unsaved' && <span>● Unsaved</span>}
               </div>
 
               <div className={styles.toolbarSeparator} />
@@ -246,7 +523,6 @@ export function WorkspaceLayout() {
             <>
               <KonvaEditorCanvas
                 zoomLevel={zoomLevel}
-                activeTool={activeTool}
                 onZoomChange={setZoomLevel}
               />
               <FrameToolbar />
@@ -1031,6 +1307,37 @@ export function WorkspaceLayout() {
 
       {/* Relink Missing Photos Dialog */}
       <RelinkDialog />
+
+      {/* Floating Notification Toast */}
+      {toastMessage && (
+        <div className={styles.toastBanner}>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={pendingSafeAction !== null}
+        title="Unsaved Changes"
+        message={`You have unsaved changes in "${currentProject?.name}". Do you want to save them before leaving?`}
+        detail="If you leave without saving, your recent page layouts and edits since the last save will be lost."
+        confirmText="Save & Continue"
+        secondaryText="Don't Save"
+        cancelText="Cancel"
+        variant="warning"
+        onConfirm={async () => {
+          await saveAlbumToDb();
+          const act = pendingSafeAction;
+          setPendingSafeAction(null);
+          if (act) await act();
+        }}
+        onSecondary={async () => {
+          const act = pendingSafeAction;
+          setPendingSafeAction(null);
+          if (act) await act();
+        }}
+        onCancel={() => setPendingSafeAction(null)}
+      />
     </div>
   );
 }

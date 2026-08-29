@@ -5,7 +5,7 @@ export const APP_CONFIG = {
   website: '',
   license: 'Proprietary — All Rights Reserved',
   credits: [
-    'Developed by AFSN Team',
+    'Afsunmedia - Asrofims',
   ],
   acknowledgements: [
     { name: 'React', url: 'https://react.dev', license: 'MIT' },

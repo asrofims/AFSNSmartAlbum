@@ -5,71 +5,191 @@
   justify-content: center;
   min-height: 100%;
   width: 100%;
-  padding: var(--space-8);
+  padding: var(--space-6);
   background-color: var(--color-bg-primary);
   user-select: none;
 }
 
 .welcomeCard {
   width: 100%;
-  max-width: 520px;
+  max-width: 920px;
+  min-height: 520px;
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.4);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+  flex-direction: row;
 }
 
-.header {
-  text-align: center;
+/* Left Hero Column */
+.heroColumn {
+  flex: 1.05;
+  position: relative;
+  overflow: hidden;
+  background-color: #0d0f12;
+  min-height: 480px;
+}
+
+.heroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.75) contrast(1.08);
+  transform: scale(1.03);
+  transition: transform 0.8s ease;
+}
+
+.welcomeCard:hover .heroImage {
+  transform: scale(1.05);
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 12, 16, 0.35) 0%,
+    rgba(10, 12, 16, 0.65) 50%,
+    rgba(10, 12, 16, 0.95) 100%
+  );
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  padding: 32px 28px;
+  color: #ffffff;
+  z-index: 2;
+}
+
+.brandBadge {
+  display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 12px;
 }
 
-.logoBadge {
+.logoIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.appLogoImg {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.engineTag {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.heroTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.heroTitle {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.025em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.heroSubtitle {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  max-width: 320px;
+}
+
+.heroFooter {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+}
+
+/* Right Content Column */
+.contentColumn {
+  flex: 1.3;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 36px;
+  background-color: var(--color-bg-secondary);
+  gap: 20px;
+  min-width: 360px;
+}
+
+.contentHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.welcomeHeading {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.welcomeSubheading {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Action Buttons */
+.actionsGroup {
+  display: flex;
+  gap: 12px;
+}
+
+.primaryActionButton {
+  flex: 1.2;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-accent);
-  margin-bottom: var(--space-2);
-}
-
-.appName {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  letter-spacing: -0.02em;
-}
-
-.appTagline {
+  gap: 8px;
+  font-weight: var(--font-weight-medium);
   font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
 }
 
-.actions {
-  display: flex;
+.secondaryActionButton {
+  flex: 1;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
 }
 
-.createButton {
-  width: 100%;
-  max-width: 260px;
-}
-
+/* Recent Projects Section */
 .recentSection {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  flex: 1;
 }
 
 .sectionHeader {
@@ -119,25 +239,24 @@
 .recentList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  max-height: 240px;
+  gap: 6px;
+  max-height: 250px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-/* Styled Scrollbar */
+/* Custom Scrollbar */
 .recentList::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .recentList::-webkit-scrollbar-track {
-  background: var(--color-surface);
-  border-radius: 3px;
+  background: transparent;
 }
 
 .recentList::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .recentList::-webkit-scrollbar-thumb:hover {
@@ -147,18 +266,32 @@
 .recentItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
+  gap: 12px;
+  padding: 8px 12px;
   background-color: var(--color-surface);
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .recentItem:hover {
   background-color: var(--color-surface-hover);
   border-color: var(--color-border);
+  transform: translateX(2px);
+}
+
+.projectIconBadge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 
 .projectInfo {
@@ -200,15 +333,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   background: transparent;
   border: none;
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
   font-size: 11px;
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.5;
   transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -219,8 +352,34 @@
 }
 
 .emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   text-align: center;
-  padding: var(--space-4);
-  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.emptyStateIcon {
+  font-size: 24px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .welcomeCard {
+    flex-direction: column;
+    max-width: 480px;
+    min-height: auto;
+  }
+
+  .heroColumn {
+    min-height: 200px;
+    height: 200px;
+  }
 }

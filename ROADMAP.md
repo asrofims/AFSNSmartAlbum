@@ -62,12 +62,14 @@
 - [x] **Standard Professional English UI** across all panels, menus, and HUD overlays
 
 ## Phase 5 — Persistence & Project Package
-- [ ] Portable `.afsn` Project Packaging
-- [ ] SQLite Project Save & Load
-- [ ] Auto-Save Background Timer
-- [ ] Crash Recovery & Temporary Snapshot
-- [ ] History Manager (Undo / Redo with `Ctrl+Z` / `Ctrl+Y`)
-- [ ] Project Migration & Schema Versioning
+- [x] Portable `.afsn` Project Packaging & Save As
+- [x] Standalone Complete ZIP Archive Packaging (`export_bundled_project_package` with full-res photos)
+- [x] SQLite Project Save & Load
+- [x] Relaxed Auto-Save Background Timer & Crash Snapshots
+- [x] History Manager (Undo / Redo with `Ctrl+Z` / `Ctrl+Y`)
+- [x] Modern 2-Column Split-Hero Welcome Screen with Visual Hero Artwork
+- [x] Custom Application Branding (`iconafsnsa.png`) & File Association
+- [x] Project Migration & Schema Versioning
 
 ## Phase 6 — Templates & Layout Generator
 - [ ] Layout Preset Library (Single, 2-photo, 3-photo, collage grids)
