@@ -189,7 +189,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       type: 'photo',
       photoId: photo.id,
       filePath: photo.filePath,
-      previewPath: photo.previewPath || '',
+      previewPath: photo.previewPath || photo.filePath || '',
       thumbnailPath: photo.thumbnailPath || '',
       fileName: photo.fileName,
       x: Math.max(0, posX),

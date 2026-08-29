@@ -69,7 +69,7 @@ function PhotoFrameNode({
 
   // Load preview or thumbnail image
   useEffect(() => {
-    const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
+    const imgPath = frame.previewPath || frame.filePath || frame.thumbnailPath;
     if (!imgPath) return;
 
     const img = new window.Image();
