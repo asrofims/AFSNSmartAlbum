@@ -78,19 +78,17 @@
 - [x] Mini-SVG Wireframe Preview Cards & Right Inspector Templates Tab
 - [x] Frame Aspect Ratio Smart Fitting & Gap Preserving Solver
 
-## Phase 7 — Auto Layout Engine
-- [ ] Photo Orientation Analysis (Landscape vs Portrait vs Square)
-- [ ] Visual Balance & Focal Point Scoring
-- [ ] 1-Click Auto Album Layout Generation
-- [ ] Storyboard Grouping & Chronological Clustering
+## Phase 7 — Auto Layout Engine (Skipped)
+- [x] Auto Layout generation & photo distribution skipped per project requirements
 
 ## Phase 8 — High-Resolution Export
-- [ ] Production Print JPEG / PNG Export
-- [ ] Multi-page Print-Ready PDF with Embedded Color Profiles (sRGB / CMYK)
-- [ ] Bleed Allowance & Crop Mark Generation
-- [ ] High-DPI Lab Presets (Photobook, Flush Mount, Layflat)
+- [x] Production Print High-Res JPEG Export (Quality 80%-100%)
+- [x] Lossless Production Print PNG Export
+- [x] Multi-page Print-Ready PDF with Embedded DCT Streams (sRGB)
+- [x] Bleed Allowance Inclusion & Trimmed Page Options
+- [x] High-DPI Lab Presets (300 DPI, 240 DPI, 600 DPI, Custom Project DPI)
+- [x] Split Spreads into Single Left & Right Pages option (Single-page binding)
+- [x] Multi-threaded Export Rendering Engine (`rayon` + `image`)
+- [x] Real-time Progress Tracking Modal with Direct Destination Folder Launcher
 
-## Phase 9 — RAW Image Support
-- [ ] Camera RAW Decoding (ARW, CR3, NEF, RAF, DNG) via Rust/Libraw
-- [ ] Background RAW Preview Extraction without UI blocking
 

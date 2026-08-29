@@ -21,6 +21,9 @@ import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
+import { invoke } from '@tauri-apps/api/core';
+import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
+import { ExportProgressModal } from '../export/ExportProgressModal';
 import appLogo from '../../assets/app-logo.png';
 import styles from './WorkspaceLayout.module.css';
 
@@ -84,6 +87,27 @@ export function WorkspaceLayout() {
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+
+  // Export Dialog & Progress Modal State
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isExportProgressOpen, setIsExportProgressOpen] = useState(false);
+  const [activeExportDir, setActiveExportDir] = useState('');
+
+  const handleStartExport = async (options: ExportOptions) => {
+    if (!currentProject) return;
+    setActiveExportDir(options.outputDir);
+    setIsExportProgressOpen(true);
+    try {
+      await saveAlbumToDb();
+      await invoke('export_album_high_res', {
+        projectId: currentProject.id,
+        options,
+      });
+    } catch (err: any) {
+      console.error('Export failed:', err);
+      showToast(`⚠️ Export failed: ${err?.message || err}`);
+    }
+  };
 
   // Unsaved Changes Protection Dialog State
   const [pendingSafeAction, setPendingSafeAction] = useState<(() => void | Promise<void>) | null>(null);
@@ -200,6 +224,11 @@ export function WorkspaceLayout() {
               }
             }
           });
+        }
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (currentProject) {
+          setIsExportDialogOpen(true);
         }
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -343,13 +372,25 @@ export function WorkspaceLayout() {
                     <button
                       type="button"
                       className={styles.menuItem}
+                      onClick={() => {
+                        setIsFileMenuOpen(false);
+                        setIsExportDialogOpen(true);
+                      }}
+                    >
+                      <span>📤 Export Album...</span>
+                      <span className={styles.shortcutText}>Ctrl+E</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
                       onClick={async () => {
                         setIsFileMenuOpen(false);
                         const path = await exportCompleteProjectPackageWithPhotos();
                         if (path) showToast(`✓ Complete package exported to: ${path}`);
                       }}
                     >
-                      <span>📦 Export Packaged...</span>
+                      <span>📦 Export Packaged (.zip)...</span>
                     </button>
                   </>
                 )}
@@ -514,6 +555,22 @@ export function WorkspaceLayout() {
         <div className={styles.toolbarSection}>
           {currentProject && (
             <>
+              {/* High-Resolution Print Export Button */}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsExportDialogOpen(true)}
+                title="Export Album for Print (Ctrl+E)"
+                style={{ backgroundColor: '#2563eb', borderColor: '#3b82f6', color: '#ffffff' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Export</span>
+              </Button>
+
               {/* Properties Panel Toggle Button */}
               <Button
                 variant={isPropertiesOpen ? 'secondary' : 'ghost'}
@@ -1540,6 +1597,20 @@ export function WorkspaceLayout() {
           if (act) await act();
         }}
         onCancel={() => setPendingSafeAction(null)}
+      />
+
+      {/* Phase 8: High-Resolution Print Export Dialog */}
+      <ExportAlbumDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        onStartExport={handleStartExport}
+      />
+
+      {/* Phase 8: Export Progress Modal */}
+      <ExportProgressModal
+        isOpen={isExportProgressOpen}
+        outputDir={activeExportDir}
+        onClose={() => setIsExportProgressOpen(false)}
       />
     </div>
   );
