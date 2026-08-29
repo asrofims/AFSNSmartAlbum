@@ -36,6 +36,14 @@ export function FrameToolbar() {
   const frame = (activeSpread.elements || []).find((f) => f.id === primaryFrameId);
   if (!frame) return null;
 
+  const selectedElements = (activeSpread.elements || []).filter((f) =>
+    selectedFrameIds.includes(f.id)
+  );
+  const distinctGroupIds = new Set(selectedElements.map((f) => f.groupId).filter(Boolean));
+  const hasUngrouped = selectedElements.some((f) => !f.groupId);
+  const canGroup = selectedElements.length >= 2 && (distinctGroupIds.size > 1 || hasUngrouped);
+  const canUngroup = distinctGroupIds.size > 0;
+
   const isCrop = editingCropFrameId === frame.id;
   const updateCropZoom = (delta: number) => {
     const nextCrop = zoomCropAtPoint(
@@ -193,7 +201,7 @@ export function FrameToolbar() {
           )}
 
           {/* Group Multiple Frames Button */}
-          {selectedFrameIds.length >= 2 && (
+          {canGroup && (
             <button
               type="button"
               className={styles.toolBtn}
@@ -208,7 +216,7 @@ export function FrameToolbar() {
           )}
 
           {/* Ungroup Frames Button */}
-          {(activeSpread.elements || []).some((f) => selectedFrameIds.includes(f.id) && Boolean(f.groupId)) && (
+          {canUngroup && (
             <button
               type="button"
               className={styles.toolBtn}

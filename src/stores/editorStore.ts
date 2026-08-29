@@ -699,6 +699,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
+    const targetSpread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+    const targetElements = (targetSpread?.elements || []).filter((el) =>
+      selectedFrameIds.includes(el.id)
+    );
+
+    const distinctGroupIds = new Set(targetElements.map((el) => el.groupId).filter(Boolean));
+    const hasUngrouped = targetElements.some((el) => !el.groupId);
+
+    // If all selected frames already belong to the exact same single group, no-op
+    if (distinctGroupIds.size === 1 && !hasUngrouped) return;
+
     useHistoryStore.getState().pushState(currentAlbum);
 
     const newGroupId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;

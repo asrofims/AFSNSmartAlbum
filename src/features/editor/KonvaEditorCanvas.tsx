@@ -1157,9 +1157,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     const selectedElements = (activeSpread.elements || []).filter((f) =>
       selectedFrameIds.includes(f.id)
     );
-    const hasAnyGroup = selectedElements.some((f) => Boolean(f.groupId));
+    const distinctGroupIds = new Set(selectedElements.map((f) => f.groupId).filter(Boolean));
+    const hasUngrouped = selectedElements.some((f) => !f.groupId);
+    const canGroup = selectedElements.length >= 2 && (distinctGroupIds.size > 1 || hasUngrouped);
+    const canUngroup = distinctGroupIds.size > 0;
 
-    if (count >= 2) {
+    if (canGroup) {
       items.push({
         id: 'group-photos',
         label: `Group ${count} Photos`,
@@ -1169,7 +1172,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       });
     }
 
-    if (hasAnyGroup) {
+    if (canUngroup) {
       items.push({
         id: 'ungroup-photos',
         label: 'Ungroup Photos',
