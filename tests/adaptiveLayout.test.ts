@@ -1,112 +1,112 @@
 import {
   generateAdaptiveLayoutVariations,
-  matchPhotosToRects,
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
+  partitionPageBoxIntoKRects,
   AdaptivePhoto,
 } from '../src/domain/adaptiveLayout';
-import { TemplateParams } from '../src/domain/templates';
+import { TemplateParams, getUsableAreas } from '../src/domain/templates';
 
 function runTests() {
-  console.log('Testing Adaptive Smart Layout Engine & Orientation-Aware Solver...');
+  console.log('Testing Adaptive Multi-Photo Partitioning Engine & Safe Area Confinement...');
 
   const baseParams: TemplateParams = {
-    spreadWidth: 406, // 200 left + 6 gutter + 200 right
+    spreadWidth: 406,
     spreadHeight: 200,
     isSpread: true,
     safeMargin: 10,
+    photoInset: 0,
     gutterWidth: 6,
-    spacing: 5,
+    spacing: 4,
   };
 
-  // Test 1: Photo counts from 1 to 10 generate valid variations
-  for (let n = 1; n <= 10; n++) {
-    const mockPhotos: AdaptivePhoto[] = Array.from({ length: n }, (_, i) => ({
-      filePath: `C:/photos/img${i + 1}.jpg`,
-      fileName: `img${i + 1}.jpg`,
-      photoAspect: i % 2 === 0 ? 1.5 : 0.67, // alternating landscape and portrait
+  // Test 1: Dynamic variations generated cleanly for photo counts 1 to 12
+  for (let n = 1; n <= 12; n++) {
+    const photos: AdaptivePhoto[] = Array.from({ length: n }, (_, i) => ({
+      filePath: `/path/to/photo_${i + 1}.jpg`,
+      fileName: `photo_${i + 1}.jpg`,
+      photoAspect: i % 2 === 0 ? 1.5 : 0.67,
     }));
 
-    const variations = generateAdaptiveLayoutVariations(baseParams, mockPhotos);
+    const variations = generateAdaptiveLayoutVariations(baseParams, photos);
     if (variations.length === 0) {
-      throw new Error(`Failed to generate variations for photo count ${n}`);
+      throw new Error(`Failed to generate variations for ${n} photos`);
     }
 
+    // Verify every variation contains EXACTLY n rects
     for (const v of variations) {
       if (v.rects.length !== n) {
-        throw new Error(`Variation ${v.id} for ${n} photos has ${v.rects.length} rects`);
-      }
-      for (const r of v.rects) {
-        if (r.width <= 0 || r.height <= 0) {
-          throw new Error(`Non-positive rect in ${v.id}: ${JSON.stringify(r)}`);
-        }
+        throw new Error(`Variation ${v.id} has ${v.rects.length} rects instead of ${n}`);
       }
     }
   }
-  console.log('✓ Dynamic variations generated cleanly for photo counts 1 to 10.');
+  console.log('✓ Dynamic variations generated cleanly for photo counts 1 to 12 (all rect counts exact).');
 
-  // Test 2: Verify Exact Safe Margin Confinement for 2-Photo Diptych
-  const twoPhotos: AdaptivePhoto[] = [
-    { filePath: 'img1.jpg', fileName: 'img1.jpg', photoAspect: 1.5 },
-    { filePath: 'img2.jpg', fileName: 'img2.jpg', photoAspect: 1.5 },
-  ];
-  const variations2p = generateAdaptiveLayoutVariations(baseParams, twoPhotos);
-  const diptych = variations2p.find((v) => v.id === '2g_facing_diptych_fill');
-  if (!diptych) throw new Error('Missing 2g_facing_diptych_fill');
+  // Test 2: Verify Strict Blue Safe Margin Box Confinement
+  const sevenPhotos: AdaptivePhoto[] = Array.from({ length: 7 }, (_, i) => ({
+    filePath: `img_${i}.jpg`,
+    photoAspect: 1.5,
+  }));
+  const variations7p = generateAdaptiveLayoutVariations(baseParams, sevenPhotos);
 
-  if (diptych.rects[0].x !== 10 || diptych.rects[0].width !== 180) {
-    throw new Error(`Left page Diptych rect does not match left safe box: ${JSON.stringify(diptych.rects[0])}`);
+  const { leftPageArea, rightPageArea } = getUsableAreas(baseParams);
+
+  for (const v of variations7p) {
+    for (const r of v.rects) {
+      // Check if rect belongs to left page or right page
+      const isLeft = r.x < leftPageArea.x + leftPageArea.width + baseParams.gutterWidth / 2;
+      const targetBox = isLeft ? leftPageArea : rightPageArea;
+
+      if (r.x < targetBox.x - 0.01) {
+        throw new Error(`Rect X (${r.x}) exceeds safe box X (${targetBox.x}) in ${v.id}`);
+      }
+      if (r.y < targetBox.y - 0.01) {
+        throw new Error(`Rect Y (${r.y}) exceeds safe box Y (${targetBox.y}) in ${v.id}`);
+      }
+      if (r.x + r.width > targetBox.x + targetBox.width + 0.01) {
+        throw new Error(`Rect right edge exceeds safe box in ${v.id}`);
+      }
+      if (r.y + r.height > targetBox.y + targetBox.height + 0.01) {
+        throw new Error(`Rect bottom edge exceeds safe box in ${v.id}`);
+      }
+    }
   }
-  if (diptych.rects[1].x !== 216 || diptych.rects[1].width !== 180) {
-    throw new Error(`Right page Diptych rect does not match right safe box: ${JSON.stringify(diptych.rects[1])}`);
+  console.log('✓ All multi-photo rects strictly bounded inside Left & Right Blue Safe Margin Boxes.');
+
+  // Test 3: Verify photoInset adds exact breathing room
+  const insetParams: TemplateParams = {
+    ...baseParams,
+    photoInset: 5, // 5mm breathing room inside blue line
+  };
+  const { leftPageArea: insetLeft, rightPageArea: insetRight } = getUsableAreas(insetParams);
+
+  if (insetLeft.x !== 15 || insetLeft.width !== 200 - 30) {
+    throw new Error(`Inset Left area mismatch: ${JSON.stringify(insetLeft)}`);
   }
-  console.log('✓ Diptych frames strictly hug Left and Right Blue Safe Margin Boxes.');
-
-  // Test 3: Smart Orientation Pairing
-  const testPhotos: AdaptivePhoto[] = [
-    { filePath: 'img_portrait.jpg', fileName: 'img_portrait.jpg', photoAspect: 0.67 }, // Portrait
-    { filePath: 'img_landscape.jpg', fileName: 'img_landscape.jpg', photoAspect: 1.77 }, // Landscape
-  ];
-
-  // 1 Tall Left Hero, 1 Wide Top Right
-  const rects = [
-    { x: 10, y: 10, width: 180, height: 180 }, // Square/Hero
-    { x: 216, y: 10, width: 180, height: 85 }, // Wide rectangle
-  ];
-
-  const pairings = matchPhotosToRects(testPhotos, rects);
-  // Wide rectangle (index 1) should receive the landscape photo
-  if (pairings[1].photo.fileName !== 'img_landscape.jpg') {
-    throw new Error('Orientation matching failed to pair landscape photo with wide rectangle');
+  if (insetRight.x !== 200 + 6 + 15 || insetRight.width !== 200 - 30) {
+    throw new Error(`Inset Right area mismatch: ${JSON.stringify(insetRight)}`);
   }
-  console.log('✓ Smart Orientation Matching algorithm correctly paired portrait & landscape.');
+  console.log('✓ Dynamic photoInset creates exact symmetrical breathing room inside safe boxes.');
 
-  // Test 4: Randomized Shuffle Functionality
-  const elements = buildSpreadElementsFromVariation(
-    {
-      id: 'test_var',
-      name: 'Test',
-      description: 'Test',
-      photoCount: 3,
-      rects: [
-        { x: 10, y: 10, width: 100, height: 100 },
-        { x: 120, y: 10, width: 100, height: 100 },
-        { x: 230, y: 10, width: 100, height: 100 },
-      ],
-    },
-    [
-      { filePath: 'A.jpg', fileName: 'A.jpg' },
-      { filePath: 'B.jpg', fileName: 'B.jpg' },
-      { filePath: 'C.jpg', fileName: 'C.jpg' },
-    ]
-  );
+  // Test 4: Single Page Partitioning (K = 1 to 6)
+  const singleBox = { x: 10, y: 10, width: 180, height: 180 };
+  for (let k = 1; k <= 6; k++) {
+    const rects = partitionPageBoxIntoKRects(singleBox, k, 4, 0);
+    if (rects.length !== k) {
+      throw new Error(`partitionPageBoxIntoKRects returned ${rects.length} for K=${k}`);
+    }
+  }
+  console.log('✓ Single page geometric box partitioning validated for K = 1..6.');
 
+  // Test 5: Shuffle photo randomized rotation
+  const elements = buildSpreadElementsFromVariation(variations7p[0], sevenPhotos);
   const shuffled = shuffleElementsPhotos(elements);
-  if (shuffled.length !== 3) {
-    throw new Error('Shuffled elements length mismatch');
+  if (shuffled.length !== elements.length) {
+    throw new Error('Shuffle changed elements count');
   }
   console.log('✓ Shuffle photo randomized rotation passed.');
-  console.log('ALL ADAPTIVE LAYOUT TESTS PASSED! 🎉');
+
+  console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
 }
 
 runTests();

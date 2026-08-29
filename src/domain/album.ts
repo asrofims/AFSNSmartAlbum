@@ -14,6 +14,7 @@ export interface Page {
   unit: Unit;
   bleed: number;
   safeArea: number;
+  photoInset?: number;
   backgroundColor: string;
   backgroundType: 'solid' | 'gradient' | 'image';
   elements?: PhotoFrameElement[];
@@ -30,6 +31,7 @@ export interface Spread {
   gutterUnit: Unit;
   bleed: number;
   safeArea: number;
+  photoInset?: number;
   backgroundColor: string;
   elements: PhotoFrameElement[];
 }

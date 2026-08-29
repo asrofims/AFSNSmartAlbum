@@ -17,6 +17,10 @@ export interface ProjectSettings {
     value: number;
     unit: Unit;
   };
+  photoInset?: {
+    value: number;
+    unit: Unit;
+  };
   border: {
     enabled: boolean;
     width: number;
@@ -41,6 +45,8 @@ export interface Project {
   marginEnabled?: boolean;
   marginValue?: number;
   marginUnit?: Unit;
+  photoInset?: number;
+  photoInsetUnit?: Unit;
   borderEnabled: boolean;
   borderWidth: number;
   borderUnit: Unit;
@@ -67,6 +73,10 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   margin: {
     enabled: true,
     value: 10,
+    unit: 'mm',
+  },
+  photoInset: {
+    value: 0,
     unit: 'mm',
   },
   border: {

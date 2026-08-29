@@ -58,6 +58,7 @@ export interface AlbumState {
   updateGutterWidth: (width: number) => void;
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
+  updatePhotoInset: (photoInset: number) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
   selectPage: (pageId: string | null) => void;
   setSpreadDrawerOpen: (isOpen: boolean) => void;
@@ -404,6 +405,36 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
       s.id === activeSpreadId ? { ...s, safeArea } : s
+    );
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  updatePhotoInset: (photoInset: number) => {
+    const { currentAlbum, activeSpreadId } = get();
+    if (!currentAlbum || !activeSpreadId) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    if (currentAlbum.coverSpread.id === activeSpreadId) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: { ...currentAlbum.coverSpread, photoInset },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === activeSpreadId ? { ...s, photoInset } : s
     );
 
     set({

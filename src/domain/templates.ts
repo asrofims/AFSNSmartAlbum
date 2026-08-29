@@ -17,6 +17,7 @@ export interface TemplateParams {
   spreadHeight: number;
   isSpread: boolean; // true for 2-page spread, false for single-page cover
   safeMargin: number; // in canvasUnit
+  photoInset?: number; // in canvasUnit (extra dynamic breathing room inside safeMargin)
   gutterWidth: number; // in canvasUnit
   spacing: number; // in canvasUnit
   currentPhotos?: Array<{
@@ -58,6 +59,7 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   unit: Unit;
   dpi: number;
   safeMargin: number;
+  photoInset: number;
   gutterWidth: number;
   spacing: number;
   bleed: number;
@@ -72,6 +74,11 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const rawMargin = spread?.safeArea ?? project.marginValue ?? 10;
   const marginUnit = project.marginUnit || 'mm';
   const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));
+
+  // Inset / Photo Padding: convert from project.photoInsetUnit (or 0) to project.canvasUnit
+  const rawInset = spread?.photoInset ?? project.photoInset ?? 0;
+  const insetUnit = project.photoInsetUnit || project.marginUnit || 'mm';
+  const photoInset = round4(convertUnit(rawInset, insetUnit, unit, dpi, 4));
 
   // Spacing: convert from project.spacingUnit (or 'mm') to project.canvasUnit
   const rawSpacing = project.spacingValue ?? 4;
@@ -93,6 +100,7 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
     unit,
     dpi,
     safeMargin,
+    photoInset,
     gutterWidth,
     spacing,
     bleed,
@@ -133,7 +141,7 @@ export function fitInsideBoxCentered(
 
 /**
  * Computes exact printable and designable Safe Margin boxes for Left Page and Right Page.
- * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas.
+ * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas + dynamic photoInset.
  */
 export function getUsableAreas(params: TemplateParams): {
   spreadArea: RectBounds;
@@ -142,14 +150,15 @@ export function getUsableAreas(params: TemplateParams): {
   pageWidth: number;
   gutterWidth: number;
 } {
-  const { spreadWidth, spreadHeight, isSpread, safeMargin, gutterWidth } = params;
+  const { spreadWidth, spreadHeight, isSpread, safeMargin, photoInset = 0, gutterWidth } = params;
+  const effectiveMargin = safeMargin + photoInset;
 
   if (!isSpread) {
     const singleArea: RectBounds = {
-      x: safeMargin,
-      y: safeMargin,
-      width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
-      height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+      x: effectiveMargin,
+      y: effectiveMargin,
+      width: Math.max(0.1, round4(spreadWidth - effectiveMargin * 2)),
+      height: Math.max(0.1, round4(spreadHeight - effectiveMargin * 2)),
     };
     return {
       spreadArea: singleArea,
@@ -163,28 +172,28 @@ export function getUsableAreas(params: TemplateParams): {
   // On a 2-page spread: spreadWidth = leftPageWidth + gutterWidth + rightPageWidth
   const pageWidth = round4((spreadWidth - gutterWidth) / 2);
 
-  // Left Page Safe Box (starts at safeMargin, ends safeMargin before spine gutter)
+  // Left Page Safe Box (starts at effectiveMargin, ends effectiveMargin before spine gutter)
   const leftPageArea: RectBounds = {
-    x: safeMargin,
-    y: safeMargin,
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: effectiveMargin,
+    y: effectiveMargin,
+    width: Math.max(0.1, round4(pageWidth - effectiveMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - effectiveMargin * 2)),
   };
 
-  // Right Page Safe Box (starts safeMargin after spine gutter, ends safeMargin before outer right edge)
+  // Right Page Safe Box (starts effectiveMargin after spine gutter, ends effectiveMargin before outer right edge)
   const rightPageArea: RectBounds = {
-    x: round4(pageWidth + gutterWidth + safeMargin),
-    y: safeMargin,
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: round4(pageWidth + gutterWidth + effectiveMargin),
+    y: effectiveMargin,
+    width: Math.max(0.1, round4(pageWidth - effectiveMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - effectiveMargin * 2)),
   };
 
   // Full Spread Safe Box (across both pages)
   const spreadArea: RectBounds = {
-    x: safeMargin,
-    y: safeMargin,
-    width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: effectiveMargin,
+    y: effectiveMargin,
+    width: Math.max(0.1, round4(spreadWidth - effectiveMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - effectiveMargin * 2)),
   };
 
   return { spreadArea, leftPageArea, rightPageArea, pageWidth, gutterWidth };
@@ -621,6 +630,7 @@ export function generateTemplateSvgPreview(
     spreadHeight: 100,
     isSpread: template.category !== 'single_page',
     safeMargin: 8,
+    photoInset: 0,
     gutterWidth: 6,
     spacing: 4,
   };

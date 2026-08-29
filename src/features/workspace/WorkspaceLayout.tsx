@@ -47,6 +47,7 @@ export function WorkspaceLayout() {
   const updateGutterWidth = useAlbumStore((s) => s.updateGutterWidth);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
+  const updatePhotoInset = useAlbumStore((s) => s.updatePhotoInset);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
   const lastSavedAt = useAlbumStore((s) => s.lastSavedAt);
   const saveAlbumToDb = useAlbumStore((s) => s.saveAlbumToDb);
@@ -1244,6 +1245,20 @@ export function WorkspaceLayout() {
                         onChange={(val) => updateSafeArea(val)}
                         min={0.1}
                         max={50}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }} title="Additional breathing room distance of photos inside the blue safe area margin">Inner Safe Inset</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
+                        onChange={(val) => updatePhotoInset(val)}
+                        min={0}
+                        max={40}
                         step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
                       />
                       <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
