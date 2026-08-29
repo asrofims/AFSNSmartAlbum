@@ -49,14 +49,14 @@ export function LayoutCycleHUD() {
       {
         spreadWidth,
         spreadHeight,
-        isSpread,
+        isSpread: true,
         safeMargin: dims.safeMargin,
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos, isCover]);
+  }, [currentProject, activeSpread, photos]);
 
   const currentIndex = (activeSpread && spreadLayoutIndices[activeSpread.id]) ?? 0;
   const safeIndex = variations.length > 0 ? currentIndex % variations.length : 0;

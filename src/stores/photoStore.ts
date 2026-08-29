@@ -30,6 +30,7 @@ interface PhotoState {
   importPaths: (projectId: string, paths: string[]) => Promise<void>;
   cancelImport: () => Promise<void>;
   toggleFavorite: (photoId: string) => Promise<void>;
+  removePhoto: (photoId: string) => Promise<void>;
   checkMissing: (projectId: string) => Promise<void>;
   healThumbnail: (photoId: string) => Promise<string | null>;
   relinkFolder: (projectId: string) => Promise<void>;

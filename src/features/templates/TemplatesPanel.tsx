@@ -55,14 +55,14 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
       {
         spreadWidth,
         spreadHeight,
-        isSpread,
+        isSpread: true,
         safeMargin: dims.safeMargin,
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos, isCover]);
+  }, [currentProject, activeSpread, photos]);
 
   const currentActiveIndex =
     activeSpread && spreadLayoutIndices[activeSpread.id] !== undefined
@@ -131,9 +131,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
           // Render mini SVG from variation rects
           const dims = currentProject ? getProjectDimensionsInCanvasUnit(currentProject, activeSpread) : null;
-          const totalW = isCover
-            ? (dims?.pageWidth || 200)
-            : (dims ? dims.pageWidth * 2 + dims.gutterWidth : 400);
+          const totalW = dims ? dims.pageWidth * 2 + dims.gutterWidth : 400;
           const totalH = dims?.pageHeight || 200;
 
           const scaleX = 140 / totalW;
@@ -146,9 +144,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
             )
             .join('');
 
-          const spine = !isCover
-            ? `<line x1="${((dims ? (dims.pageWidth + dims.gutterWidth / 2) * scaleX : 70)).toFixed(1)}" y1="4" x2="${((dims ? (dims.pageWidth + dims.gutterWidth / 2) * scaleX : 70)).toFixed(1)}" y2="66" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2 2" stroke-width="1"/>`
-            : '';
+          const spine = `<line x1="${((dims ? (dims.pageWidth + dims.gutterWidth / 2) * scaleX : 70)).toFixed(1)}" y1="4" x2="${((dims ? (dims.pageWidth + dims.gutterWidth / 2) * scaleX : 70)).toFixed(1)}" y2="66" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2 2" stroke-width="1"/>`;
 
           const svg = `<svg width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg"><rect width="140" height="70" rx="4" fill="var(--color-bg-secondary, #18181b)"/>${spine}${svgRects}</svg>`;
 
