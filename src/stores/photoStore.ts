@@ -231,6 +231,47 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       lastSelectedPhotoId: s.lastSelectedPhotoId === photoId ? null : s.lastSelectedPhotoId,
     }));
 
+    // Instantly remove / clear photo from all canvas spread frames
+    try {
+      const { useAlbumStore } = await import('./albumStore');
+      const { currentAlbum, saveAlbumToDb } = useAlbumStore.getState();
+      if (currentAlbum) {
+        let modified = false;
+
+        const updateElements = (elements: any[]) =>
+          elements.map((el) => {
+            if (el.photoId === photoId) {
+              modified = true;
+              return { ...el, photoId: null, crop: undefined };
+            }
+            return el;
+          });
+
+        const updatedCover = {
+          ...currentAlbum.coverSpread,
+          elements: updateElements(currentAlbum.coverSpread.elements || []),
+        };
+
+        const updatedSpreads = currentAlbum.spreads.map((spread) => ({
+          ...spread,
+          elements: updateElements(spread.elements || []),
+        }));
+
+        if (modified) {
+          useAlbumStore.setState({
+            currentAlbum: {
+              ...currentAlbum,
+              coverSpread: updatedCover,
+              spreads: updatedSpreads,
+            },
+          });
+          saveAlbumToDb();
+        }
+      }
+    } catch (e) {
+      console.error('[AFSN] Error clearing photo from canvas:', e);
+    }
+
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('remove_photo', { photoId });
@@ -312,11 +353,54 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const { selectedPhotoIds, photos } = get();
     if (selectedPhotoIds.length === 0) return;
 
+    const deletedSet = new Set(selectedPhotoIds);
+
     set({
-      photos: photos.filter((p) => !selectedPhotoIds.includes(p.id)),
+      photos: photos.filter((p) => !deletedSet.has(p.id)),
       selectedPhotoIds: [],
       lastSelectedPhotoId: null,
     });
+
+    // Instantly remove / clear all deleted photos from canvas spreads
+    try {
+      const { useAlbumStore } = await import('./albumStore');
+      const { currentAlbum, saveAlbumToDb } = useAlbumStore.getState();
+      if (currentAlbum) {
+        let modified = false;
+
+        const updateElements = (elements: any[]) =>
+          elements.map((el) => {
+            if (el.photoId && deletedSet.has(el.photoId)) {
+              modified = true;
+              return { ...el, photoId: null, crop: undefined };
+            }
+            return el;
+          });
+
+        const updatedCover = {
+          ...currentAlbum.coverSpread,
+          elements: updateElements(currentAlbum.coverSpread.elements || []),
+        };
+
+        const updatedSpreads = currentAlbum.spreads.map((spread) => ({
+          ...spread,
+          elements: updateElements(spread.elements || []),
+        }));
+
+        if (modified) {
+          useAlbumStore.setState({
+            currentAlbum: {
+              ...currentAlbum,
+              coverSpread: updatedCover,
+              spreads: updatedSpreads,
+            },
+          });
+          saveAlbumToDb();
+        }
+      }
+    } catch (e) {
+      console.error('[AFSN] Error clearing batch deleted photos from canvas:', e);
+    }
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
