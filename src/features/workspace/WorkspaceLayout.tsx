@@ -1122,6 +1122,22 @@ export function WorkspaceLayout() {
                           ↺ Reset Crop
                         </button>
                       </div>
+
+                      {/* Safe Margin Alignment Grid for Single Frame */}
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Align to Safe Margin</span>
+                          <span style={{ fontSize: '9px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: 500 }}>Blue Guides</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left to Blue Safe Margin">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right to Blue Safe Margin">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top to Blue Safe Margin">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
