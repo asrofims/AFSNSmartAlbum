@@ -105,6 +105,8 @@ pub fn run() {
             commands::photo_commands::remove_photo,
             commands::photo_commands::check_missing_photos,
             commands::photo_commands::relink_folder,
+            commands::photo_commands::sync_and_regenerate_thumbnails,
+            commands::photo_commands::purge_missing_photos,
             commands::photo_commands::cancel_photo_import,
             commands::photo_commands::batch_delete_photos,
             commands::photo_commands::batch_toggle_favorites,

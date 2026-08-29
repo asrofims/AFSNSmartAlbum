@@ -38,6 +38,35 @@ export function AboutDialog() {
           <span className={styles.infoValue}>{APP_CONFIG.license}</span>
         </div>
 
+        {/* Support & Contribution via QRIS */}
+        <div className={styles.supportCard}>
+          <div>
+            <div className={styles.supportTitle}>Support Independent Development</div>
+            <div className={styles.supportDesc}>Fund future features & updates via QRIS</div>
+          </div>
+          <button
+            type="button"
+            className={styles.ackLink}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: 'var(--color-primary, #6366f1)',
+              color: '#ffffff',
+              borderRadius: 'var(--radius-sm, 4px)',
+              fontSize: '11px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+            onClick={() => {
+              closeAbout();
+              useAppStore.getState().openSupportModal();
+            }}
+          >
+            ☕ Donate (QRIS)
+          </button>
+        </div>
+
         <div className={styles.divider} />
 
         <div>

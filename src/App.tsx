@@ -3,10 +3,27 @@ import { WorkspaceLayout } from './features/workspace/WorkspaceLayout';
 import { AboutDialog } from './features/about/AboutDialog';
 import { SettingsDialog } from './features/settings/SettingsDialog';
 import { NewProjectDialog } from './features/project/NewProjectDialog';
+import { SupportDonationModal } from './features/support/SupportDonationModal';
 import { useProjectStore } from './stores/projectStore';
+import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
 
 export default function App() {
+  // Trigger QRIS support popup on initial app launch session (non-intrusive)
+  useEffect(() => {
+    try {
+      const isSuppressed = localStorage.getItem('afsn_suppress_support_popup') === 'true';
+      const isShownSession = sessionStorage.getItem('afsn_shown_support_session') === 'true';
+      if (!isSuppressed && !isShownSession) {
+        sessionStorage.setItem('afsn_shown_support_session', 'true');
+        const timer = setTimeout(() => {
+          useAppStore.getState().openSupportModal();
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (!isTauri()) return;
 
@@ -48,6 +65,7 @@ export default function App() {
       <AboutDialog />
       <SettingsDialog />
       <NewProjectDialog />
+      <SupportDonationModal />
     </>
   );
 }

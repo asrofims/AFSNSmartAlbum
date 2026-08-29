@@ -20,6 +20,31 @@
   outline-offset: -2px;
 }
 
+.syncAlertBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 6px var(--space-3);
+  background-color: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+  font-size: var(--font-size-xs);
+  color: #fbbf24;
+}
+
+.syncAlertText {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+}
+
+.syncAlertActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .progressBarContainer {
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
   border-bottom: 1px solid var(--color-accent);

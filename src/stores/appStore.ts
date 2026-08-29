@@ -14,6 +14,7 @@ interface AppState {
   // Dialog states
   isAboutOpen: boolean;
   isSettingsOpen: boolean;
+  isSupportModalOpen: boolean;
   settingsActiveTab: string;
   
   // Actions
@@ -22,6 +23,8 @@ interface AppState {
   closeAbout: () => void;
   openSettings: (tab?: string) => void;
   closeSettings: () => void;
+  openSupportModal: () => void;
+  closeSupportModal: () => void;
   setSettingsActiveTab: (tab: string) => void;
 }
 
@@ -34,6 +37,7 @@ export const useAppStore = create<AppState>((set) => ({
   isAppInfoLoaded: false,
   isAboutOpen: false,
   isSettingsOpen: false,
+  isSupportModalOpen: false,
   settingsActiveTab: 'snapping',
   
   setAppInfo: (info) => set({ appInfo: info, isAppInfoLoaded: true }),
@@ -41,5 +45,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeAbout: () => set({ isAboutOpen: false }),
   openSettings: (tab = 'snapping') => set({ isSettingsOpen: true, settingsActiveTab: tab }),
   closeSettings: () => set({ isSettingsOpen: false }),
+  openSupportModal: () => set({ isSupportModalOpen: true }),
+  closeSupportModal: () => set({ isSupportModalOpen: false }),
   setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
 }));

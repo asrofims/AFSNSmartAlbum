@@ -901,6 +901,15 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_photo_thumbnail(&self, photo_id: &str, thumbnail_path: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE photos SET thumbnail_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![thumbnail_path, photo_id],
+        )?;
+        Ok(())
+    }
+
     pub fn relink_photo(&self, photo_id: &str, new_path: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

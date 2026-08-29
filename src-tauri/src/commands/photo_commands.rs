@@ -359,6 +359,105 @@ pub async fn relink_folder(
     db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailSyncResult {
+    pub total: usize,
+    pub regenerated: usize,
+    pub missing: usize,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeResult {
+    pub purged_count: usize,
+    pub purged_photo_ids: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn sync_and_regenerate_thumbnails(
+    app: AppHandle,
+    project_id: String,
+) -> Result<ThumbnailSyncResult, String> {
+    let cache_dir = get_cache_dir(&app);
+    let thumbs_dir = cache_dir.join("thumbnails");
+    let _ = std::fs::create_dir_all(&thumbs_dir);
+
+    let db = app.state::<Database>();
+    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+    let total = photos.len();
+
+    let app_clone = app.clone();
+    let (regenerated, missing) = tauri::async_runtime::spawn_blocking(move || {
+        let db_thread = app_clone.state::<Database>();
+        let mut regen_count = 0;
+        let mut miss_count = 0;
+
+        for photo in photos {
+            let orig_path = Path::new(&photo.file_path);
+            if !orig_path.exists() {
+                miss_count += 1;
+                let _ = db_thread.update_photo_missing(&photo.id, true);
+                continue;
+            }
+
+            // Original exists; check if thumbnail is missing on disk
+            let thumb_missing = match &photo.thumbnail_path {
+                Some(tp) => !Path::new(tp).exists(),
+                None => true,
+            };
+
+            if thumb_missing {
+                let thumb_file_path = thumbs_dir.join(format!("{}.jpg", photo.id));
+                if let Ok(img) = image::open(orig_path) {
+                    let thumb = img.thumbnail(240, 240);
+                    let rgb_thumb = image::DynamicImage::ImageRgba8(thumb.to_rgba8()).to_rgb8();
+                    if rgb_thumb.save_with_format(&thumb_file_path, image::ImageFormat::Jpeg).is_ok() {
+                        let path_str = thumb_file_path.to_string_lossy().to_string();
+                        let _ = db_thread.update_photo_thumbnail(&photo.id, &path_str);
+                        regen_count += 1;
+                    }
+                }
+            }
+        }
+
+        (regen_count, miss_count)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(ThumbnailSyncResult {
+        total,
+        regenerated,
+        missing,
+    })
+}
+
+#[tauri::command]
+pub async fn purge_missing_photos(
+    app: AppHandle,
+    project_id: String,
+) -> Result<PurgeResult, String> {
+    let db = app.state::<Database>();
+    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+
+    let missing_ids: Vec<String> = photos
+        .into_iter()
+        .filter(|p| p.is_missing || !Path::new(&p.file_path).exists())
+        .map(|p| p.id)
+        .collect();
+
+    let purged_count = missing_ids.len();
+    if !missing_ids.is_empty() {
+        db.batch_delete_photos(&missing_ids).map_err(|e| e.to_string())?;
+    }
+
+    Ok(PurgeResult {
+        purged_count,
+        purged_photo_ids: missing_ids,
+    })
+}
+
 // --- Batch Operations Commands ---
 
 #[tauri::command]
