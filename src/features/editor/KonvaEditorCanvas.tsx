@@ -473,6 +473,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
+  const activeTransformAnchorRef = useRef<string | null>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
@@ -1588,6 +1589,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 const tr = trRef.current;
                 if (!tr) return;
                 const anchor = tr.getActiveAnchor();
+                activeTransformAnchorRef.current = anchor;
                 const isCorner =
                   !anchor ||
                   anchor === 'top-left' ||
@@ -1669,6 +1671,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
                 if (selectedFrameIds.length > 1 && multiTransformInitialStateRef.current && activeSpread) {
                   const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
+                  const activeAnchor = activeTransformAnchorRef.current || tr.getActiveAnchor();
                   const selectedNodes = selectedFrameIds
                     .map((id) => stageRef.current?.findOne(`#${id}`))
                     .filter(Boolean) as Konva.Node[];
@@ -1702,12 +1705,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       n.scaleY(1);
                     });
 
-                    const updates = calculateMultiFrameResize(initialFrames, initialBounds, newGroupBounds);
+                    const updates = calculateMultiFrameResize(
+                      initialFrames,
+                      initialBounds,
+                      newGroupBounds,
+                      activeAnchor || undefined
+                    );
                     if (updates.length > 0) {
                       batchUpdateFrames(activeSpread.id, updates);
                     }
                   }
                   multiTransformInitialStateRef.current = null;
+                  activeTransformAnchorRef.current = null;
                 }
 
                 tr.keepRatio(true);

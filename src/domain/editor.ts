@@ -1099,7 +1099,8 @@ export interface FrameBounds {
 export function calculateMultiFrameResize(
   initialFrames: FrameBounds[],
   initialGroupBounds: RectBounds,
-  newGroupBounds: RectBounds
+  newGroupBounds: RectBounds,
+  anchor?: string
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
   if (initialFrames.length === 0) return [];
   if (initialFrames.length === 1) {
@@ -1258,15 +1259,35 @@ export function calculateMultiFrameResize(
   const maxComputedY = Math.max(...sortedByY.map((f) => (newPositionsY.get(f.id) ?? 0) + f.height * uniformScale));
   const newTotalH = maxComputedY - minComputedY;
 
-  const isLeftDragged = Math.abs(newGroupBounds.x - minGroupX) > 0.01;
-  const isTopDragged = Math.abs(newGroupBounds.y - minGroupY) > 0.01;
+  let finalOriginX: number;
+  let finalOriginY: number;
 
-  const finalOriginX = isLeftDragged
-    ? minGroupX + initW - newTotalW
-    : newGroupBounds.x;
-  const finalOriginY = isTopDragged
-    ? minGroupY + initH - newTotalH
-    : newGroupBounds.y;
+  if (anchor) {
+    // If left handle was pulled, right edge was fixed at minGroupX + initW
+    if (anchor.includes('left')) {
+      finalOriginX = (minGroupX + initW) - newTotalW;
+    } else {
+      finalOriginX = minGroupX;
+    }
+
+    // If top handle was pulled, bottom edge was fixed at minGroupY + initH
+    if (anchor.includes('top')) {
+      finalOriginY = (minGroupY + initH) - newTotalH;
+    } else {
+      finalOriginY = minGroupY;
+    }
+  } else {
+    // Fallback heuristic: check if group origin moved significantly (> 0.5mm)
+    const isLeftDragged = newGroupBounds.x < minGroupX - 0.5 || newGroupBounds.x > minGroupX + 0.5;
+    const isTopDragged = newGroupBounds.y < minGroupY - 0.5 || newGroupBounds.y > minGroupY + 0.5;
+
+    finalOriginX = isLeftDragged
+      ? minGroupX + initW - newTotalW
+      : newGroupBounds.x;
+    finalOriginY = isTopDragged
+      ? minGroupY + initH - newTotalH
+      : newGroupBounds.y;
+  }
 
   return initialFrames.map((f) => {
     const rawX = newPositionsX.get(f.id) ?? (f.x - minGroupX) * uniformScale;
