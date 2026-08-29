@@ -30,6 +30,7 @@ export interface MissingPhotoInfo {
 export interface PreflightReport {
   totalPhotos: number;
   missingPhotos: MissingPhotoInfo[];
+  existingFiles: string[];
   destinationWritable: boolean;
   destinationError: string | null;
 }
@@ -97,7 +98,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Pre-Flight Validation State
+  // Pre-Flight Validation State (missing photos & existing destination file collisions)
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
   const [isVerifyingPreflight, setIsVerifyingPreflight] = useState(false);
 
@@ -162,6 +163,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           localStorage.setItem(LAST_EXPORT_DIR_KEY, selected);
         } catch {}
         setErrorMsg(null);
+        setPreflightReport(null);
       }
     } catch (err) {
       console.error('Failed to pick directory:', err);
@@ -212,7 +214,13 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       }
 
       if (report.missingPhotos && report.missingPhotos.length > 0) {
-        // Pre-Flight found missing photos -> show warning panel!
+        // Pre-Flight found missing photos -> show missing warning panel!
+        setPreflightReport(report);
+        return;
+      }
+
+      if (report.existingFiles && report.existingFiles.length > 0) {
+        // Pre-Flight found conflicting output files in destination folder -> show Overwrite confirmation!
         setPreflightReport(report);
         return;
       }
@@ -229,7 +237,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     }
   };
 
-  const handleProceedWithMissingPhotos = () => {
+  const handleProceedConfirmed = () => {
     const trimmedDir = outputDir.trim();
     const selectedSpreadIds = targetSpreads.map((s) => s.id);
     onStartExport({
@@ -254,8 +262,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       closeOnOverlayClick={false}
     >
       <div className={styles.container}>
-        {/* Pre-Flight Warning Card if Missing Photos Found */}
-        {preflightReport && preflightReport.missingPhotos.length > 0 && (
+        {/* 1. Pre-Flight Warning Card if Missing Photos Found */}
+        {preflightReport && preflightReport.missingPhotos && preflightReport.missingPhotos.length > 0 && (
           <div className={styles.preflightWarningBox}>
             <div className={styles.preflightHeader}>
               <span>⚠️ Pre-Flight Check: {preflightReport.missingPhotos.length} Missing Photo(s) Detected</span>
@@ -286,10 +294,50 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
               <Button
                 variant="primary"
                 size="sm"
-                onClick={handleProceedWithMissingPhotos}
+                onClick={handleProceedConfirmed}
                 style={{ backgroundColor: '#f59e0b', borderColor: '#d97706', color: '#000' }}
               >
                 Export Using Previews
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 2. Pre-Flight Warning Card if Existing Matching Files Found in Destination Folder */}
+        {preflightReport && (!preflightReport.missingPhotos || preflightReport.missingPhotos.length === 0) && preflightReport.existingFiles && preflightReport.existingFiles.length > 0 && (
+          <div
+            className={styles.preflightWarningBox}
+            style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          >
+            <div className={styles.preflightHeader} style={{ color: '#ef4444' }}>
+              <span>⚠️ Overwrite Warning: {preflightReport.existingFiles.length} Existing File(s) Detected</span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+              The destination folder already contains {preflightReport.existingFiles.length} file(s) with matching names. Exporting will overwrite these files:
+            </div>
+            <div className={styles.missingList}>
+              {preflightReport.existingFiles.map((filename, i) => (
+                <div key={i} className={styles.missingItem}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>📄 {filename}</span>
+                  <span style={{ color: '#ef4444', fontSize: '10px' }}>Will be overwritten</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPreflightReport(null)}
+              >
+                Cancel / Change Folder
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleProceedConfirmed}
+                style={{ backgroundColor: '#ef4444', borderColor: '#dc2626', color: '#fff' }}
+              >
+                Overwrite Existing Files
               </Button>
             </div>
           </div>
@@ -301,7 +349,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           <div className={styles.formatGrid}>
             <div
               className={`${styles.formatCard} ${format === 'jpeg' ? styles.formatCardActive : ''}`}
-              onClick={() => setFormat('jpeg')}
+              onClick={() => {
+                setFormat('jpeg');
+                setPreflightReport(null);
+              }}
             >
               <span className={styles.formatIcon}>🖼️</span>
               <span className={styles.formatName}>High-Res JPEG</span>
@@ -309,7 +360,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
             </div>
             <div
               className={`${styles.formatCard} ${format === 'png' ? styles.formatCardActive : ''}`}
-              onClick={() => setFormat('png')}
+              onClick={() => {
+                setFormat('png');
+                setPreflightReport(null);
+              }}
             >
               <span className={styles.formatIcon}>🎨</span>
               <span className={styles.formatName}>Lossless PNG</span>
@@ -317,7 +371,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
             </div>
             <div
               className={`${styles.formatCard} ${format === 'pdf' ? styles.formatCardActive : ''}`}
-              onClick={() => setFormat('pdf')}
+              onClick={() => {
+                setFormat('pdf');
+                setPreflightReport(null);
+              }}
             >
               <span className={styles.formatIcon}>📑</span>
               <span className={styles.formatName}>Print PDF</span>
@@ -336,7 +393,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                   type="radio"
                   name="pageLayout"
                   checked={!splitPages}
-                  onChange={() => setSplitPages(false)}
+                  onChange={() => {
+                    setSplitPages(false);
+                    setPreflightReport(null);
+                  }}
                 />
                 Full Spreads (Facing)
               </label>
@@ -345,7 +405,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                   type="radio"
                   name="pageLayout"
                   checked={splitPages}
-                  onChange={() => setSplitPages(true)}
+                  onChange={() => {
+                    setSplitPages(true);
+                    setPreflightReport(null);
+                  }}
                 />
                 Single Pages (Split L/R)
               </label>
@@ -511,6 +574,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
               onChange={(e) => {
                 setOutputDir(e.target.value);
                 setErrorMsg(null);
+                setPreflightReport(null);
               }}
             />
             <Button variant="secondary" onClick={handleSelectFolder}>

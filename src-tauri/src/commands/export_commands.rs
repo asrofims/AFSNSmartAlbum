@@ -15,6 +15,7 @@ use crate::export_engine::{
 pub struct PreflightReport {
     pub total_photos: usize,
     pub missing_photos: Vec<MissingPhotoInfo>,
+    pub existing_files: Vec<String>,
     pub destination_writable: bool,
     pub destination_error: Option<String>,
 }
@@ -119,9 +120,55 @@ pub async fn preflight_check_export(
         }
     }
 
+    // Check if any output files already exist in destination directory
+    let mut existing_files = Vec::new();
+    let ext = if options.format == "png" { "png" } else { "jpg" };
+
+    if options.format == "pdf" {
+        let project = db.get_project(&project_id).ok().flatten();
+        let project_name = project.map(|p| p.name).unwrap_or_else(|| "Album".to_string());
+        let safe_name = project_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
+        let pdf_filename = format!("{}_Print_Ready.pdf", safe_name);
+        if out_dir.join(&pdf_filename).exists() {
+            existing_files.push(pdf_filename);
+        }
+    } else if options.split_pages {
+        for spread in &spreads {
+            if spread.r#type == "cover" {
+                let filename = format!("Spread_00_Cover.{}", ext);
+                if out_dir.join(&filename).exists() {
+                    existing_files.push(filename);
+                }
+            } else {
+                let left_num = (spread.spread_index - 1) * 2 + 1;
+                let right_num = left_num + 1;
+                let left_filename = format!("Page_{:03}.{}", left_num, ext);
+                let right_filename = format!("Page_{:03}.{}", right_num, ext);
+                if out_dir.join(&left_filename).exists() {
+                    existing_files.push(left_filename);
+                }
+                if out_dir.join(&right_filename).exists() {
+                    existing_files.push(right_filename);
+                }
+            }
+        }
+    } else {
+        for spread in &spreads {
+            let filename = if spread.r#type == "cover" {
+                format!("Spread_00_Cover.{}", ext)
+            } else {
+                format!("Spread_{:02}.{}", spread.spread_index, ext)
+            };
+            if out_dir.join(&filename).exists() {
+                existing_files.push(filename);
+            }
+        }
+    }
+
     Ok(PreflightReport {
         total_photos,
         missing_photos,
+        existing_files,
         destination_writable,
         destination_error,
     })
