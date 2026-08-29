@@ -280,7 +280,7 @@ export interface SnappingConfig {
 
 export const DEFAULT_SNAPPING_CONFIG: SnappingConfig = {
   enabled: true,
-  threshold: 1.0,
+  threshold: 0.1,
   snapToPageEdges: true,
   snapToPageCenters: true,
   snapToMargins: true,
@@ -316,7 +316,7 @@ export function calculateSnapping(
     return { snappedX: dragged.x, snappedY: dragged.y, snapLines: [], gapGuides: [] };
   }
 
-  const threshold = typeof config.threshold === 'number' ? config.threshold : 1.0;
+  const threshold = typeof config.threshold === 'number' ? config.threshold : 0.1;
   let snappedX = dragged.x;
   let snappedY = dragged.y;
   const snapLines: SnapLine[] = [];

@@ -1399,7 +1399,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     const thresholdUnits =
                       typeof snappingConfig.threshold === 'number'
                         ? snappingConfig.threshold
-                        : Math.max(0.1, 4 / scaleFactor);
+                        : 0.1;
 
                     const snapRes = calculateSnapping(
                       { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
@@ -1492,7 +1492,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     const thresholdUnits =
                       typeof snappingConfig.threshold === 'number'
                         ? snappingConfig.threshold
-                        : Math.max(0.1, 4 / scaleFactor);
+                        : 0.1;
 
                     const snapRes = calculateSnapping(
                       { x: currentGroupX, y: currentGroupY, width: group.width, height: group.height },

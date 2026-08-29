@@ -86,14 +86,14 @@ export function SettingsDialog() {
                 </div>
 
                 {/* Magnetic Distance / Sensitivity */}
-                <div className={styles.thresholdRow}>
+                <div className={styles.thresholdSection}>
                   <div className={styles.checkboxLabel}>
                     <span className={styles.checkboxTitle}>Snapping Distance Threshold</span>
                     <span className={styles.checkboxDesc}>
                       Magnet pull distance in physical project units (0.1 mm is subtle, 2.0 mm is strong).
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className={styles.thresholdControls}>
                     <div className={styles.presetGroup}>
                       {[
                         { label: '0.1mm', val: 0.1, title: 'Ultra Soft / Minimal Magnet (0.1mm)' },
@@ -112,7 +112,7 @@ export function SettingsDialog() {
                         </button>
                       ))}
                     </div>
-                    <div style={{ width: '70px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ width: '80px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <NumberInput
                         value={snappingConfig.threshold}
                         onChange={(val) => updateSnappingConfig({ threshold: Math.max(0.05, Math.round(val * 100) / 100) })}
@@ -120,7 +120,7 @@ export function SettingsDialog() {
                         max={20}
                         step={0.1}
                       />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>mm</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>mm</span>
                     </div>
                   </div>
                 </div>

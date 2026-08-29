@@ -153,14 +153,20 @@
   line-height: 1.35;
 }
 
-.thresholdRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.thresholdSection {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.thresholdControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .presetGroup {
