@@ -767,22 +767,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
     : null;
   const currentCropZoom = activeCropFrame?.cropScale || 1.0;
-  const cropHudWidth = 320;
-  const cropHudLeft = activeCropFrame
-    ? Math.max(
-        8,
-        Math.min(
-          screenSpreadW - cropHudWidth - 8,
-          activeCropFrame.x * scaleFactor + (activeCropFrame.width * scaleFactor - cropHudWidth) / 2
-        )
-      )
-    : 8;
-  const cropHudTop = activeCropFrame
-    ? Math.min(
-        screenSpreadH - 45,
-        Math.max(8, (activeCropFrame.y + activeCropFrame.height) * scaleFactor + 12)
-      )
-    : 8;
   const updateActiveCropZoom = (nextZoom: number) => {
     if (!activeCropFrame) return;
     const clampedZoom = clamp(Math.round(nextZoom * 100) / 100, 1.0, 3.5);
@@ -1914,15 +1898,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         {activeCropFrame && (
           <div
             className={styles.cropHud}
-            style={{
-              left: `${cropHudLeft}px`,
-              top: `${cropHudTop}px`,
-              width: `${cropHudWidth}px`,
-            }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <span className={styles.cropHudLabel}>Crop</span>
+            <span className={styles.cropHudLabel}>Crop Mode</span>
             <input
               type="range"
               min="1.0"

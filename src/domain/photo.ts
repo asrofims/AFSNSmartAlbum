@@ -45,13 +45,26 @@ export function formatFileSize(bytes: number): string {
   return `${val} ${units[i]}`;
 }
 
-export function filterPhotos(photos: Photo[], filter: PhotoFilter, query?: string): Photo[] {
+export function filterPhotos(
+  photos: Photo[],
+  filter: PhotoFilter,
+  query?: string,
+  usedPhotoIds?: Set<string>
+): Photo[] {
   let result = photos;
 
   if (filter === 'unused') {
-    result = result.filter((p) => p.usedCount === 0);
+    if (usedPhotoIds) {
+      result = result.filter((p) => !usedPhotoIds.has(p.id) && p.usedCount === 0);
+    } else {
+      result = result.filter((p) => p.usedCount === 0);
+    }
   } else if (filter === 'used') {
-    result = result.filter((p) => p.usedCount > 0);
+    if (usedPhotoIds) {
+      result = result.filter((p) => usedPhotoIds.has(p.id) || p.usedCount > 0);
+    } else {
+      result = result.filter((p) => p.usedCount > 0);
+    }
   } else if (filter === 'favorites') {
     result = result.filter((p) => p.isFavorite);
   }

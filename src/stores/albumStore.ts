@@ -153,7 +153,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   showGutterGuide: true,
   showBleedGuide: true,
   showSafeAreaGuide: true,
-  isSpreadDrawerOpen: false,
+  isSpreadDrawerOpen: true,
   spreadLayoutIndices: {},
 
   setSpreadDrawerOpen: (isOpen: boolean) => set({ isSpreadDrawerOpen: isOpen }),

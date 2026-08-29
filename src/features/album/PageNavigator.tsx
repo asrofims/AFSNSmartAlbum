@@ -1,9 +1,119 @@
 import React, { useState, useEffect } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, Spread } from '../../domain/album';
+import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import styles from './PageNavigator.module.css';
+
+function safeConvertFileSrc(filePath: string): string {
+  try {
+    return convertFileSrc(filePath);
+  } catch {
+    return filePath;
+  }
+}
+
+interface MiniSpreadPreviewProps {
+  spread: Spread;
+  project: Project;
+}
+
+function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
+  const isCover = spread.spreadIndex === 0;
+  const totalPhysicalW = isCover
+    ? (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || 0) + (spread.gutterWidth || 0)
+    : (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || project.canvasWidth) + (spread.gutterWidth || 0);
+  const totalPhysicalH = spread.leftPage?.height || project.canvasHeight || 200;
+
+  // Mini thumbnail box dimensions
+  const previewWidth = 124;
+  const previewHeight = 56;
+  const scaleX = previewWidth / (totalPhysicalW || 400);
+  const scaleY = previewHeight / (totalPhysicalH || 200);
+
+  const spineX = spread.leftPage ? spread.leftPage.width * scaleX : previewWidth / 2;
+  const bgStyle = project.backgroundType === 'color' ? project.backgroundColor || '#ffffff' : '#ffffff';
+
+  return (
+    <div
+      className={styles.miniSpread}
+      style={{
+        position: 'relative',
+        width: `${previewWidth}px`,
+        height: `${previewHeight}px`,
+        backgroundColor: bgStyle,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Spine / Gutter Line */}
+      {!isCover && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${spineX}px`,
+            top: 0,
+            bottom: 0,
+            width: '1px',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)',
+            zIndex: 1,
+          }}
+        />
+      )}
+
+      {/* Real-time Rendered Photo Elements */}
+      {(spread.elements || []).map((el) => {
+        const x = el.x * scaleX;
+        const y = el.y * scaleY;
+        const w = Math.max(3, el.width * scaleX);
+        const h = Math.max(3, el.height * scaleY);
+        const imgSrc = el.thumbnailPath || el.previewPath;
+
+        return (
+          <div
+            key={el.id}
+            style={{
+              position: 'absolute',
+              left: `${x}px`,
+              top: `${y}px`,
+              width: `${w}px`,
+              height: `${h}px`,
+              overflow: 'hidden',
+              backgroundColor: '#1e293b',
+              border: el.borderEnabled && el.borderWidth ? `1px solid ${el.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
+              borderRadius: '1px',
+              zIndex: 2,
+            }}
+          >
+            {imgSrc ? (
+              <img
+                src={safeConvertFileSrc(imgSrc)}
+                alt=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                  pointerEvents: 'none',
+                }}
+                loading="lazy"
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #334155, #1e293b)',
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function PageNavigator() {
   const currentProject = useProjectStore((s) => s.currentProject);
@@ -101,12 +211,8 @@ export function PageNavigator() {
                   }}
                   title={spread.name}
                 >
-                  {/* Miniature Spread Preview */}
-                  <div className={styles.miniSpread}>
-                    <div className={styles.miniLeftPage} />
-                    <div className={styles.miniGutter} />
-                    <div className={styles.miniRightPage} />
-                  </div>
+                  {/* Real-time Miniature Spread Preview */}
+                  <MiniSpreadPreview spread={spread} project={currentProject} />
 
                   {/* Card Label & Actions */}
                   <div className={styles.cardInfoRow}>

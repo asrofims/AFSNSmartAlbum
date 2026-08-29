@@ -97,6 +97,26 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   }, [currentProject?.id, loadPhotos, loadFolders, checkMissing]);
 
+  const currentAlbum = useAlbumStore((s) => s.currentAlbum);
+
+  // Real-time calculation of used photo IDs from all elements across all spreads in current album
+  const usedPhotoIdSet = React.useMemo(() => {
+    const set = new Set<string>();
+    if (!currentAlbum) return set;
+
+    (currentAlbum.coverSpread.elements || []).forEach((el) => {
+      if (el.photoId) set.add(el.photoId);
+    });
+
+    (currentAlbum.spreads || []).forEach((spread) => {
+      (spread.elements || []).forEach((el) => {
+        if (el.photoId) set.add(el.photoId);
+      });
+    });
+
+    return set;
+  }, [currentAlbum]);
+
   // Determine current photo pool based on active folder
   const currentPhotoPool = React.useMemo(() => {
     if (!activeFolderId) return photos;
@@ -104,7 +124,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     return photos.filter((p) => allowedIds.includes(p.id));
   }, [photos, activeFolderId, folderPhotoIds]);
 
-  const filtered = filterPhotos(currentPhotoPool, filter, searchQuery);
+  const filtered = filterPhotos(currentPhotoPool, filter, searchQuery, usedPhotoIdSet);
   const sortedPhotos = sortPhotos(filtered, sortBy);
 
   // Global Keyboard Shortcuts for Lightroom-style photo interaction
@@ -133,8 +153,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   if (!currentProject) return null;
 
   const totalCount = currentPhotoPool.length;
-  const unusedCount = currentPhotoPool.filter((p) => p.usedCount === 0).length;
-  const usedCount = currentPhotoPool.filter((p) => p.usedCount > 0).length;
+  const unusedCount = currentPhotoPool.filter((p) => !usedPhotoIdSet.has(p.id) && p.usedCount === 0).length;
+  const usedCount = currentPhotoPool.filter((p) => usedPhotoIdSet.has(p.id) || p.usedCount > 0).length;
   const favCount = currentPhotoPool.filter((p) => p.isFavorite).length;
   const missingCount = currentPhotoPool.filter((p) => p.isMissing).length;
 
@@ -428,13 +448,15 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
               {sortedPhotos.map((photo) => {
                 const isSelected = selectedPhotoIds.includes(photo.id);
                 const isActive = lastSelectedPhotoId === photo.id;
+                const isUsed = usedPhotoIdSet.has(photo.id) || photo.usedCount > 0;
 
                 return (
                   <div
                     key={photo.id}
-                    className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''} ${photo.isMissing ? styles.cardMissing : ''}`}
+                    className={`${styles.photoCard} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''} ${photo.isMissing ? styles.cardMissing : ''} ${isUsed ? styles.cardUsed : ''}`}
                     onClick={(e) => handleCardClick(e, photo)}
                     onDoubleClick={() => {
+                      if (isUsed) return;
                       const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
                       if (currentAlbum) {
                         const allSpreads = getAllAlbumSpreads(currentAlbum);
@@ -445,9 +467,19 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                       }
                     }}
                     onContextMenu={(e) => handleCardContextMenu(e, photo)}
-                    draggable={true}
-                    onDragStart={(e) => handleCardDragStart(e, photo)}
-                    title={`${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click or drag to place on canvas\nRight-click for options`}
+                    draggable={!isUsed}
+                    onDragStart={(e) => {
+                      if (isUsed) {
+                        e.preventDefault();
+                        return;
+                      }
+                      handleCardDragStart(e, photo);
+                    }}
+                    title={
+                      isUsed
+                        ? `${photo.fileName}\n(Already placed in album spread — Locked from re-adding)`
+                        : `${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click or drag to place on canvas\nRight-click for options`
+                    }
                   >
                     {/* Thumbnail Image */}
                     <div className={styles.thumbnailWrapper} draggable={false}>
@@ -473,6 +505,13 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         </div>
                       )}
 
+                      {/* Used Protective Lock Badge */}
+                      {isUsed && (
+                        <div className={styles.usedLockBadge}>
+                          ✓ Used
+                        </div>
+                      )}
+
                       {/* Missing Banner */}
                       {photo.isMissing && (
                         <div className={styles.missingBadge} onClick={openRelink}>
@@ -495,8 +534,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
                       {/* Bottom Status Overlay */}
                       <div className={styles.bottomOverlay}>
-                        <span className={`${styles.usedTag} ${photo.usedCount > 0 ? styles.usedActive : ''}`}>
-                          {photo.usedCount > 0 ? `Used ${photo.usedCount}×` : 'Unused'}
+                        <span className={`${styles.usedTag} ${isUsed ? styles.usedActive : ''}`}>
+                          {isUsed ? 'Used' : 'Unused'}
                         </span>
                         <span className={styles.dimTag}>
                           {photo.width > photo.height ? 'Landscape' : photo.width < photo.height ? 'Portrait' : 'Square'}

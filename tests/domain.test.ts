@@ -139,6 +139,11 @@ assert.strictEqual(filterPhotos(samplePhotos, 'used').length, 2);
 assert.strictEqual(filterPhotos(samplePhotos, 'favorites').length, 1);
 assert.strictEqual(sortPhotos(samplePhotos, 'size')[0].id, '2');
 
+// Test with real-time usedPhotoIds set
+const activeUsedSet = new Set(['1']);
+assert.strictEqual(filterPhotos(samplePhotos, 'unused', undefined, activeUsedSet).length, 0);
+assert.strictEqual(filterPhotos(samplePhotos, 'used', undefined, activeUsedSet).length, 3);
+
 // Test Range Selection
 const range = getRangeSelection(samplePhotos, '1', '3', ['1']);
 assert.strictEqual(range.length, 3);
