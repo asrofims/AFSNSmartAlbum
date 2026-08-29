@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 use crate::db::{AlbumPayload, Database, ProjectRow, SpreadPayload};
 use crate::export_engine::{
-    assemble_pdf_from_jpegs, render_spread_to_image, split_spread_into_pages, ExportOptions,
-    ExportProgressEvent,
+    assemble_pdf_from_jpegs, render_spread_to_image, render_spread_to_image_with_progress,
+    split_spread_into_pages, ExportOptions, ExportProgressEvent,
 };
 
 #[tauri::command]
@@ -107,8 +107,29 @@ fn export_album_high_res_worker(
             },
         );
 
-        // Render spread to high resolution bitmap
-        let spread_img = render_spread_to_image(&project, spread, options.dpi, options.include_bleed);
+        // Render spread to high resolution bitmap with live photo-by-photo progress
+        let spread_img = render_spread_to_image_with_progress(
+            &project,
+            spread,
+            options.dpi,
+            options.include_bleed,
+            |photo_idx, total_photos| {
+                let _ = app.emit(
+                    "export-progress",
+                    &ExportProgressEvent {
+                        current: current_num,
+                        total: total_spreads,
+                        spread_name: spread_name.clone(),
+                        status: format!(
+                            "Rendering {} ({} of {}): photo {} of {}...",
+                            spread_name, current_num, total_spreads, photo_idx, total_photos
+                        ),
+                        is_finished: false,
+                        output_files: output_files.clone(),
+                    },
+                );
+            },
+        );
 
         // Handle Split Pages vs Full Spread
         if options.split_pages && spread.r#type != "cover" {

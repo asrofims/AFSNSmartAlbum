@@ -71,28 +71,7 @@ pub fn parse_hex_color(hex: &str) -> Rgba<u8> {
     Rgba([255, 255, 255, 255]) // Default white
 }
 
-/// Calculate cover dimension and offset inside frame
-fn calculate_cover_dims(
-    frame_w: f64,
-    frame_h: f64,
-    photo_aspect: f64,
-    crop_scale: f64,
-) -> (f64, f64) {
-    let frame_aspect = if frame_h > 0.0 { frame_w / frame_h } else { 1.0 };
-    let scale = crop_scale.max(1.0);
-
-    if photo_aspect > frame_aspect {
-        let h = frame_h * scale;
-        let w = h * photo_aspect;
-        (w, h)
-    } else {
-        let w = frame_w * scale;
-        let h = w / photo_aspect.max(0.001);
-        (w, h)
-    }
-}
-
-/// Renders a single photo element onto the canvas at high resolution
+/// Renders a single photo element onto the canvas at high resolution with maximum speed and memory efficiency
 fn render_photo_element(
     canvas: &mut RgbaImage,
     elem: &ElementPayload,
@@ -104,11 +83,33 @@ fn render_photo_element(
         return;
     }
 
+    let frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
+    let frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
+    let frame_px_w = (elem.width * scale_factor).round() as u32;
+    let frame_px_h = (elem.height * scale_factor).round() as u32;
+
+    if frame_px_w == 0 || frame_px_h == 0 {
+        return;
+    }
+
+    let canvas_w = canvas.width() as i64;
+    let canvas_h = canvas.height() as i64;
+
+    // Quick boundary check: if frame is completely off canvas, skip
+    if frame_px_x + frame_px_w as i64 <= 0
+        || frame_px_x >= canvas_w
+        || frame_px_y + frame_px_h as i64 <= 0
+        || frame_px_y >= canvas_h
+    {
+        return;
+    }
+
     // Try loading original file, fallback to preview or thumbnail
     let img_path = Path::new(&elem.file_path);
     let mut dynamic_img = match image::open(img_path) {
         Ok(img) => img,
-        Err(_) => {
+        Err(e) => {
+            log::warn!("Could not open original image at {:?}: {}", img_path, e);
             if let Some(ref prev) = elem.preview_path {
                 match image::open(Path::new(prev)) {
                     Ok(img) => img,
@@ -135,64 +136,61 @@ fn render_photo_element(
     }
 
     let photo_aspect = img_w as f64 / img_h as f64;
-    let (cover_w, cover_h) = calculate_cover_dims(elem.width, elem.height, photo_aspect, elem.crop_scale);
+    let frame_aspect = if elem.height > 0.0 { elem.width / elem.height } else { 1.0 };
+    let crop_scale = elem.crop_scale.max(1.0);
 
-    let max_excess_x = (cover_w - elem.width).max(0.0);
-    let max_excess_y = (cover_h - elem.height).max(0.0);
+    // Calculate visible crop rectangle in original image pixel coordinates
+    let (visible_w, visible_h) = if photo_aspect > frame_aspect {
+        let vh = img_h as f64 / crop_scale;
+        let vw = (vh * frame_aspect).min(img_w as f64);
+        (vw, vh)
+    } else {
+        let vw = img_w as f64 / crop_scale;
+        let vh = (vw / frame_aspect.max(0.001)).min(img_h as f64);
+        (vw, vh)
+    };
+
+    let excess_x = (img_w as f64 - visible_w).max(0.0);
+    let excess_y = (img_h as f64 - visible_h).max(0.0);
 
     let norm_x = elem.crop_x.clamp(-1.0, 1.0);
     let norm_y = elem.crop_y.clamp(-1.0, 1.0);
 
-    let img_offset_x = -(max_excess_x / 2.0) + (norm_x * (max_excess_x / 2.0));
-    let img_offset_y = -(max_excess_y / 2.0) + (norm_y * (max_excess_y / 2.0));
+    // Center offset + pan offset
+    let src_x = ((excess_x / 2.0) + (norm_x * (excess_x / 2.0))).clamp(0.0, (img_w as f64 - visible_w).max(0.0));
+    let src_y = ((excess_y / 2.0) + (norm_y * (excess_y / 2.0))).clamp(0.0, (img_h as f64 - visible_h).max(0.0));
 
-    // Target pixel dimensions
-    let frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
-    let frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
-    let frame_px_w = (elem.width * scale_factor).round() as u32;
-    let frame_px_h = (elem.height * scale_factor).round() as u32;
+    let crop_x_px = src_x.round() as u32;
+    let crop_y_px = src_y.round() as u32;
+    let crop_w_px = (visible_w.round() as u32).min(img_w.saturating_sub(crop_x_px)).max(1);
+    let crop_h_px = (visible_h.round() as u32).min(img_h.saturating_sub(crop_y_px)).max(1);
 
-    let target_img_w = (cover_w * scale_factor).round().max(1.0) as u32;
-    let target_img_h = (cover_h * scale_factor).round().max(1.0) as u32;
+    // 1. Pre-crop the original image (virtually instant sub-view)
+    let cropped_sub = image::imageops::crop_imm(&dynamic_img, crop_x_px, crop_y_px, crop_w_px, crop_h_px);
 
-    if frame_px_w == 0 || frame_px_h == 0 {
-        return;
-    }
+    // 2. High speed, high quality Triangle/Bilinear resampling directly to frame dimensions
+    let resized_img = cropped_sub.to_image();
+    let resized_dynamic = image::DynamicImage::ImageRgba8(resized_img);
+    let final_frame_img = resized_dynamic.resize_exact(frame_px_w, frame_px_h, image::imageops::FilterType::Triangle);
+    let resized_rgba = final_frame_img.to_rgba8();
 
-    // High quality CatmullRom resampling
-    let resized_img = dynamic_img.resize_exact(target_img_w, target_img_h, image::imageops::FilterType::CatmullRom);
-    let resized_rgba = resized_img.to_rgba8();
+    // 3. Blit into canvas
+    let render_w = resized_rgba.width();
+    let render_h = resized_rgba.height();
 
-    let render_start_x = (img_offset_x * scale_factor).round() as i64;
-    let render_start_y = (img_offset_y * scale_factor).round() as i64;
-
-    let canvas_w = canvas.width() as i64;
-    let canvas_h = canvas.height() as i64;
-
-    // Draw cropped pixels into frame box
-    for fy in 0..frame_px_h as i64 {
-        let dest_y = frame_px_y + fy;
+    for fy in 0..render_h {
+        let dest_y = frame_px_y + fy as i64;
         if dest_y < 0 || dest_y >= canvas_h {
             continue;
         }
 
-        let src_y = fy - render_start_y;
-        if src_y < 0 || src_y >= target_img_h as i64 {
-            continue;
-        }
-
-        for fx in 0..frame_px_w as i64 {
-            let dest_x = frame_px_x + fx;
+        for fx in 0..render_w {
+            let dest_x = frame_px_x + fx as i64;
             if dest_x < 0 || dest_x >= canvas_w {
                 continue;
             }
 
-            let src_x = fx - render_start_x;
-            if src_x < 0 || src_x >= target_img_w as i64 {
-                continue;
-            }
-
-            let p = resized_rgba.get_pixel(src_x as u32, src_y as u32);
+            let p = resized_rgba.get_pixel(fx, fy);
             if elem.opacity < 0.999 {
                 let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
                 let alpha = (p[3] as f64 / 255.0 * elem.opacity).clamp(0.0, 1.0);
@@ -207,13 +205,12 @@ fn render_photo_element(
         }
     }
 
-    // Render frame border if enabled
+    // 4. Render frame border if enabled
     if elem.border_enabled && elem.border_width > 0.0 {
         let border_px = (elem.border_width * scale_factor).round().max(1.0) as i64;
         let border_color = parse_hex_color(&elem.border_color);
 
         for b in 0..border_px {
-            // Top and Bottom borders
             for fx in 0..frame_px_w as i64 {
                 let dx = frame_px_x + fx;
                 if dx >= 0 && dx < canvas_w {
@@ -227,7 +224,6 @@ fn render_photo_element(
                     }
                 }
             }
-            // Left and Right borders
             for fy in 0..frame_px_h as i64 {
                 let dy = frame_px_y + fy;
                 if dy >= 0 && dy < canvas_h {
@@ -245,13 +241,17 @@ fn render_photo_element(
     }
 }
 
-/// Renders an entire spread to high-res RgbaImage
-pub fn render_spread_to_image(
+/// Renders an entire spread to high-res RgbaImage with sub-step progress callback
+pub fn render_spread_to_image_with_progress<F>(
     project: &ProjectRow,
     spread: &SpreadPayload,
     dpi: u32,
     include_bleed: bool,
-) -> RgbaImage {
+    mut on_photo_progress: F,
+) -> RgbaImage
+where
+    F: FnMut(usize, usize),
+{
     let scale = unit_to_pixels(1.0, &project.canvas_unit, dpi);
     let single_page_w = project.canvas_width;
     let single_page_h = project.canvas_height;
@@ -280,11 +280,23 @@ pub fn render_spread_to_image(
     let mut sorted_elements = spread.elements.clone();
     sorted_elements.sort_by_key(|e| e.z_index);
 
-    for elem in &sorted_elements {
+    let total_elements = sorted_elements.len();
+    for (i, elem) in sorted_elements.iter().enumerate() {
+        on_photo_progress(i + 1, total_elements);
         render_photo_element(&mut canvas, elem, offset_x_px, offset_y_px, scale);
     }
 
     canvas
+}
+
+/// Renders an entire spread to high-res RgbaImage
+pub fn render_spread_to_image(
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    dpi: u32,
+    include_bleed: bool,
+) -> RgbaImage {
+    render_spread_to_image_with_progress(project, spread, dpi, include_bleed, |_, _| {})
 }
 
 /// Slices a spread image into Left Page and Right Page

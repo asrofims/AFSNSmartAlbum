@@ -105,7 +105,8 @@ export function WorkspaceLayout() {
       });
     } catch (err: any) {
       console.error('Export failed:', err);
-      showToast(`⚠️ Export failed: ${err?.message || err}`);
+      setIsExportProgressOpen(false);
+      alert(`Export could not be completed: ${err?.message || err}`);
     }
   };
 
