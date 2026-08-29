@@ -8,6 +8,9 @@ import styles from './ExportProgressModal.module.css';
 export interface ExportProgressPayload {
   current: number;
   total: number;
+  currentPhotos?: number;
+  totalPhotos?: number;
+  percent?: number;
   spreadName: string;
   status: string;
   isFinished: boolean;
@@ -24,6 +27,9 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
   const [progress, setProgress] = useState<ExportProgressPayload>({
     current: 0,
     total: 1,
+    currentPhotos: 0,
+    totalPhotos: 0,
+    percent: 0,
     spreadName: '',
     status: 'Preparing high-resolution rendering...',
     isFinished: false,
@@ -35,6 +41,9 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
       setProgress({
         current: 0,
         total: 1,
+        currentPhotos: 0,
+        totalPhotos: 0,
+        percent: 0,
         spreadName: '',
         status: 'Preparing high-resolution rendering...',
         isFinished: false,
@@ -52,7 +61,12 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
     };
   }, [isOpen]);
 
-  const percent = Math.min(100, Math.round((progress.current / Math.max(1, progress.total)) * 100));
+  const rawPercent = progress.isFinished
+    ? 100
+    : progress.percent !== undefined
+    ? progress.percent
+    : (progress.current / Math.max(1, progress.total)) * 100;
+  const percent = Math.min(100, Math.max(0, Math.round(rawPercent)));
 
   const handleOpenFolder = async () => {
     if (!outputDir) return;
@@ -91,7 +105,9 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
         </div>
 
         <div className={styles.percentLabel}>
-          {progress.current} of {progress.total} Spreads ({percent}%)
+          {progress.totalPhotos && progress.totalPhotos > 0
+            ? `${progress.currentPhotos || 0} of ${progress.totalPhotos} Photos (${percent}%)`
+            : `${progress.current} of ${progress.total} Spreads (${percent}%)`}
         </div>
 
         {progress.isFinished && progress.outputFiles.length > 0 && (

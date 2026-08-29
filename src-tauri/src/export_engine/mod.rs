@@ -29,6 +29,12 @@ fn default_jpeg_quality() -> u8 {
 pub struct ExportProgressEvent {
     pub current: usize,
     pub total: usize,
+    #[serde(default)]
+    pub current_photos: usize,
+    #[serde(default)]
+    pub total_photos: usize,
+    #[serde(default)]
+    pub percent: f64,
     pub spread_name: String,
     pub status: String,
     pub is_finished: bool,
