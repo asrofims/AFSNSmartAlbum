@@ -55,6 +55,8 @@ export interface EditorState {
   copySelectedFrames: (spreadId: string) => void;
   pasteFrames: (spreadId: string, targetPos?: { x: number; y: number }) => void;
   duplicateSelectedFrames: (spreadId: string) => void;
+  replacePhotoInFrame: (spreadId: string, frameId: string, photo: Photo) => void;
+  swapFrames: (spreadId: string, frameIdA: string, frameIdB: string) => void;
   bringToFront: (spreadId: string, frameId: string) => void;
   sendToBack: (spreadId: string, frameId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
@@ -447,6 +449,134 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   duplicateSelectedFrames: (spreadId) => {
     get().copySelectedFrames(spreadId);
     get().pasteFrames(spreadId);
+  },
+
+  replacePhotoInFrame: (spreadId, frameId, photo) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const photoAspect = photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
+
+    const updateFrame = (f: PhotoFrameElement): PhotoFrameElement => {
+      if (f.id !== frameId) return f;
+      return {
+        ...f,
+        photoId: photo.id,
+        filePath: photo.filePath,
+        previewPath: photo.previewPath || photo.filePath || '',
+        thumbnailPath: photo.thumbnailPath || '',
+        fileName: photo.fileName,
+        photoAspect: photoAspect,
+        // Reset crop for the new photo
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+      };
+    };
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      const updatedCover = {
+        ...currentAlbum.coverSpread,
+        elements: (currentAlbum.coverSpread.elements || []).map(updateFrame),
+      };
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((spread) => {
+        if (spread.id === spreadId) {
+          return {
+            ...spread,
+            elements: (spread.elements || []).map(updateFrame),
+          };
+        }
+        return spread;
+      });
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
+
+    set({ selectedFrameIds: [frameId] });
+  },
+
+  swapFrames: (spreadId, frameIdA, frameIdB) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || frameIdA === frameIdB) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const swapInElements = (elements: PhotoFrameElement[]): PhotoFrameElement[] => {
+      const elA = elements.find((f) => f.id === frameIdA);
+      const elB = elements.find((f) => f.id === frameIdB);
+      if (!elA || !elB) return elements;
+
+      return elements.map((f) => {
+        if (f.id === frameIdA) {
+          return {
+            ...f,
+            photoId: elB.photoId,
+            filePath: elB.filePath,
+            previewPath: elB.previewPath,
+            thumbnailPath: elB.thumbnailPath,
+            fileName: elB.fileName,
+            photoAspect: elB.photoAspect,
+            cropX: 0,
+            cropY: 0,
+            cropScale: 1.0,
+            cropRotation: 0,
+          };
+        }
+        if (f.id === frameIdB) {
+          return {
+            ...f,
+            photoId: elA.photoId,
+            filePath: elA.filePath,
+            previewPath: elA.previewPath,
+            thumbnailPath: elA.thumbnailPath,
+            fileName: elA.fileName,
+            photoAspect: elA.photoAspect,
+            cropX: 0,
+            cropY: 0,
+            cropScale: 1.0,
+            cropRotation: 0,
+          };
+        }
+        return f;
+      });
+    };
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      const updatedCover = {
+        ...currentAlbum.coverSpread,
+        elements: swapInElements(currentAlbum.coverSpread.elements || []),
+      };
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((spread) => {
+        if (spread.id === spreadId) {
+          return {
+            ...spread,
+            elements: swapInElements(spread.elements || []),
+          };
+        }
+        return spread;
+      });
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
+
+    set({ selectedFrameIds: [frameIdA, frameIdB] });
   },
 
   bringToFront: (spreadId, frameId) => {

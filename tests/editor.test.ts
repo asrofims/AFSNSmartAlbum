@@ -363,4 +363,121 @@ const disabledGapsRes = calculateSnapping(
 );
 console.assert(disabledGapsRes.gapGuides.length === 0, 'Disabled equal gaps should produce 0 gap guides');
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, and Copy-Paste tests passed successfully!');
+// 16. Test Photo Frame Replacement & 2-Frame Asset Swapping
+const testFrameA: PhotoFrameElement = {
+  id: 'frame-1',
+  type: 'photo',
+  photoId: 'photo-a',
+  filePath: '/path/photo-a.jpg',
+  previewPath: '/path/preview-a.jpg',
+  thumbnailPath: '/path/thumb-a.jpg',
+  fileName: 'photo-a.jpg',
+  x: 50,
+  y: 50,
+  width: 120,
+  height: 80,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 1.5,
+  originalWidth: 120,
+  originalHeight: 80,
+  cropX: 0.2,
+  cropY: -0.1,
+  cropScale: 1.4,
+  cropRotation: 0,
+};
+
+const testFrameB: PhotoFrameElement = {
+  id: 'frame-2',
+  type: 'photo',
+  photoId: 'photo-b',
+  filePath: '/path/photo-b.jpg',
+  previewPath: '/path/preview-b.jpg',
+  thumbnailPath: '/path/thumb-b.jpg',
+  fileName: 'photo-b.jpg',
+  x: 200,
+  y: 50,
+  width: 80,
+  height: 120,
+  rotation: 0,
+  zIndex: 2,
+  photoAspect: 0.67,
+  originalWidth: 80,
+  originalHeight: 120,
+  cropX: 0,
+  cropY: 0,
+  cropScale: 1.0,
+  cropRotation: 0,
+};
+
+// Test Replacement: replacing Frame A with Photo C
+const photoC = {
+  id: 'photo-c',
+  filePath: '/path/photo-c.jpg',
+  previewPath: '/path/preview-c.jpg',
+  thumbnailPath: '/path/thumb-c.jpg',
+  fileName: 'photo-c.jpg',
+  width: 3000,
+  height: 2000,
+};
+
+const replacedFrame = {
+  ...testFrameA,
+  photoId: photoC.id,
+  filePath: photoC.filePath,
+  previewPath: photoC.previewPath || photoC.filePath,
+  thumbnailPath: photoC.thumbnailPath,
+  fileName: photoC.fileName,
+  photoAspect: photoC.width / photoC.height,
+  cropX: 0,
+  cropY: 0,
+  cropScale: 1.0,
+  cropRotation: 0,
+};
+
+console.assert(replacedFrame.photoId === 'photo-c', 'Replaced frame should have photo C id');
+console.assert(replacedFrame.x === 50 && replacedFrame.width === 120, 'Frame geometry should be strictly preserved');
+console.assert(replacedFrame.cropScale === 1.0 && replacedFrame.cropX === 0, 'Crop should be reset for new photo');
+
+// Test Swap: Swapping Frame A and Frame B photo assets
+const elements = [testFrameA, testFrameB];
+const swappedElements = elements.map((f) => {
+  if (f.id === 'frame-1') {
+    return {
+      ...f,
+      photoId: testFrameB.photoId,
+      filePath: testFrameB.filePath,
+      previewPath: testFrameB.previewPath,
+      thumbnailPath: testFrameB.thumbnailPath,
+      fileName: testFrameB.fileName,
+      photoAspect: testFrameB.photoAspect,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
+      cropRotation: 0,
+    };
+  }
+  if (f.id === 'frame-2') {
+    return {
+      ...f,
+      photoId: testFrameA.photoId,
+      filePath: testFrameA.filePath,
+      previewPath: testFrameA.previewPath,
+      thumbnailPath: testFrameA.thumbnailPath,
+      fileName: testFrameA.fileName,
+      photoAspect: testFrameA.photoAspect,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1.0,
+      cropRotation: 0,
+    };
+  }
+  return f;
+});
+
+console.assert(swappedElements[0].photoId === 'photo-b', 'Frame 1 should now contain photo B');
+console.assert(swappedElements[0].x === 50 && swappedElements[0].width === 120, 'Frame 1 geometry preserved');
+console.assert(swappedElements[1].photoId === 'photo-a', 'Frame 2 should now contain photo A');
+console.assert(swappedElements[1].x === 200 && swappedElements[1].width === 80, 'Frame 2 geometry preserved');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');

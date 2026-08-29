@@ -19,6 +19,7 @@ export function FrameToolbar() {
     exitCropMode,
     resetToOriginalRatio,
     resetCrop,
+    swapFrames,
     updateFrameGeometry,
     updateCrop,
   } = useEditorStore();
@@ -171,6 +172,23 @@ export function FrameToolbar() {
               <rect width="18" height="18" x="3" y="3" rx="2" />
             </svg>
           </button>
+
+          {/* Swap 2 Photos Button (When 2 frames are selected) */}
+          {selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1] && (
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${styles.toolBtnActive}`}
+              onClick={() => swapFrames(activeSpread.id, selectedFrameIds[0]!, selectedFrameIds[1]!)}
+              title="Swap 2 Photos (S)"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m16 3 4 4-4 4" />
+                <path d="M20 7H4" />
+                <path d="m8 21-4-4 4-4" />
+                <path d="M4 17h16" />
+              </svg>
+            </button>
+          )}
 
           <div className={styles.divider} />
 

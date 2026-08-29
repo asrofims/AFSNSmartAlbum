@@ -39,6 +39,7 @@ function PhotoFrameNode({
   isMuted,
   isCropMode,
   isMultiSelectActive,
+  isHoveredForDrop,
   scaleFactor,
   onSelect,
   onDragStart,
@@ -54,6 +55,7 @@ function PhotoFrameNode({
   isMuted: boolean;
   isCropMode: boolean;
   isMultiSelectActive?: boolean;
+  isHoveredForDrop?: boolean;
   scaleFactor: number;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -408,6 +410,45 @@ function PhotoFrameNode({
         />
       )}
 
+      {/* Drag & Drop Replace Visual Feedback Glow & Badge */}
+      {isHoveredForDrop && (
+        <Group listening={false}>
+          <Rect
+            x={0}
+            y={0}
+            width={pixelW}
+            height={pixelH}
+            fill="rgba(16, 185, 129, 0.22)"
+            stroke="#10b981"
+            strokeWidth={3}
+            dash={[8, 4]}
+            strokeScaleEnabled={false}
+          />
+          <Rect
+            x={Math.max(0, (pixelW - 130) / 2)}
+            y={Math.max(0, (pixelH - 28) / 2)}
+            width={130}
+            height={28}
+            fill="rgba(6, 78, 59, 0.92)"
+            cornerRadius={6}
+            stroke="#10b981"
+            strokeWidth={1}
+            strokeScaleEnabled={false}
+          />
+          <KonvaText
+            x={Math.max(0, (pixelW - 130) / 2)}
+            y={Math.max(0, (pixelH - 28) / 2) + 7}
+            width={130}
+            align="center"
+            text="⇄ Replace Photo"
+            fontSize={12}
+            fontStyle="bold"
+            fill="#ffffff"
+            fontFamily="system-ui, -apple-system, sans-serif"
+          />
+        </Group>
+      )}
+
       {/* Crop Mode Grid & Indicator Overlay */}
       {isCropMode && (
         <Group listening={false}>
@@ -462,6 +503,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     copySelectedFrames,
     pasteFrames,
     duplicateSelectedFrames,
+    replacePhotoInFrame,
+    swapFrames,
     bringToFront,
     sendToBack,
     rotateFrame90,
@@ -487,6 +530,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
+  const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
 
   // Natural Pan Navigation State (Spacebar + Drag or Middle-Click Drag)
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -656,6 +700,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           e.preventDefault();
           duplicateSelectedFrames(activeSpread.id);
         }
+      } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1]) {
+          e.preventDefault();
+          swapFrames(activeSpread.id, selectedFrameIds[0], selectedFrameIds[1]);
+        }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (editingCropFrameId) {
           const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
@@ -792,16 +841,34 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     setIsDragOverCanvas(true);
+
+    if (stageRef.current && activeSpread?.elements) {
+      const stageBox = stageRef.current.container().getBoundingClientRect();
+      const dropX = e.clientX - stageBox.left;
+      const dropY = e.clientY - stageBox.top;
+      const physicalX = dropX / scaleFactor;
+      const physicalY = dropY / scaleFactor;
+
+      const targetFrame = [...activeSpread.elements].reverse().find((f) =>
+        physicalX >= f.x &&
+        physicalX <= f.x + f.width &&
+        physicalY >= f.y &&
+        physicalY <= f.y + f.height
+      );
+      setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
+    }
   };
 
   const handleDragLeave = () => {
     setIsDragOverCanvas(false);
+    setHoveredDropFrameId(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOverCanvas(false);
+    setHoveredDropFrameId(null);
 
     let photo: Photo | null = null;
     try {
@@ -840,7 +907,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropX / scaleFactor));
       const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropY / scaleFactor));
 
-      addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
+      // Check if dropped directly onto an existing frame
+      const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
+        physicalX >= f.x &&
+        physicalX <= f.x + f.width &&
+        physicalY >= f.y &&
+        physicalY <= f.y + f.height
+      );
+
+      if (targetFrame) {
+        replacePhotoInFrame(activeSpread.id, targetFrame.id, photo);
+      } else {
+        addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
+      }
     } else {
       addPhotoToSpread(activeSpread.id, photo);
     }
@@ -1058,6 +1137,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         },
       },
     ];
+
+    if (count === 2) {
+      items.unshift({
+        id: 'swap-photos',
+        label: 'Swap 2 Photos',
+        icon: '⇄',
+        shortcut: 'S',
+        onClick: () => {
+          if (selectedFrameIds[0] && selectedFrameIds[1]) {
+            swapFrames(activeSpread.id, selectedFrameIds[0], selectedFrameIds[1]);
+          }
+        },
+      });
+    }
 
     if (count >= 2) {
       items.push(
@@ -1423,6 +1516,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
                   isCropMode={isCrop}
                   isMultiSelectActive={isMultiSelected}
+                  isHoveredForDrop={hoveredDropFrameId === frame.id}
                   scaleFactor={scaleFactor}
                   onSelect={(e) => {
                     if (e) {
