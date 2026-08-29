@@ -679,26 +679,29 @@ export function NewProjectDialog() {
               </div>
 
               {borderEnabled && (
-                <div className={styles.row}>
-                  <div className={styles.flex1}>
-                    <NumberInput
-                      label="Border Width"
-                      value={borderWidth}
-                      onChange={setBorderWidth}
-                      min={0.01}
-                      max={500}
-                      step={canvasUnit === 'inch' ? 0.01 : canvasUnit === 'cm' ? 0.02 : canvasUnit === 'px' ? 1 : 0.2}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                  <div className={styles.row}>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Border Width"
+                        value={borderWidth}
+                        onChange={setBorderWidth}
+                        min={0.01}
+                        max={500}
+                        step={canvasUnit === 'inch' ? 0.01 : canvasUnit === 'cm' ? 0.02 : canvasUnit === 'px' ? 1 : 0.2}
+                      />
+                    </div>
+                    <div style={{ width: '90px' }}>
+                      <Select
+                        label="Unit"
+                        value={borderUnit}
+                        options={UNIT_OPTIONS}
+                        onChange={handleUnitChange}
+                      />
+                    </div>
                   </div>
-                  <div style={{ width: '90px' }}>
-                    <Select
-                      label="Unit"
-                      value={borderUnit}
-                      options={UNIT_OPTIONS}
-                      onChange={handleUnitChange}
-                    />
-                  </div>
-                  <div className={styles.flex1}>
+
+                  <div>
                     <ColorPicker
                       label="Border Color"
                       value={borderColor}
