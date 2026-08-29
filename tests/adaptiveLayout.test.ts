@@ -51,8 +51,8 @@ function runTests() {
     { filePath: 'img2.jpg', fileName: 'img2.jpg', photoAspect: 1.5 },
   ];
   const variations2p = generateAdaptiveLayoutVariations(baseParams, twoPhotos);
-  const diptych = variations2p.find((v) => v.id === '2g_facing_diptych');
-  if (!diptych) throw new Error('Missing 2g_facing_diptych');
+  const diptych = variations2p.find((v) => v.id === '2g_facing_diptych_fill');
+  if (!diptych) throw new Error('Missing 2g_facing_diptych_fill');
 
   if (diptych.rects[0].x !== 10 || diptych.rects[0].width !== 180) {
     throw new Error(`Left page Diptych rect does not match left safe box: ${JSON.stringify(diptych.rects[0])}`);

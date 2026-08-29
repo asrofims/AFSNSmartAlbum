@@ -1,5 +1,5 @@
 import { PhotoFrameElement } from './editor';
-import { RectBounds, getUsableAreas, TemplateParams, round2 } from './templates';
+import { RectBounds, getUsableAreas, TemplateParams, fitInsideBoxCentered, round2 } from './templates';
 
 export interface AdaptivePhoto {
   id?: string;
@@ -24,7 +24,7 @@ export interface AdaptiveLayoutVariation {
 
 /**
  * Generates dynamic, orientation-aware Visual Grid Blueprint variations strictly confined
- * within the Left and Right Page Safe Margin Boxes.
+ * within the Left and Right Page Safe Margin Boxes, centered horizontally and vertically.
  */
 export function generateAdaptiveLayoutVariations(
   params: TemplateParams,
@@ -38,78 +38,118 @@ export function generateAdaptiveLayoutVariations(
   const variations: AdaptiveLayoutVariation[] = [];
 
   // -------------------------------------------------------------
-  // 1 PHOTO VARIATIONS
+  // 1 PHOTO VARIATIONS (Centered & Middled on Page / Safe Box)
   // -------------------------------------------------------------
   if (count === 1) {
+    const aspect0 = photos[0]?.photoAspect || 1.5;
+
     if (isSpread) {
+      // 1. Right Page Safe Hero (Fit - Centered & Middled inside Right Safe Box)
       variations.push({
-        id: '1g_left_page_safe',
-        name: 'Left Page Safe Hero',
-        description: 'Single showcase photograph perfectly confined inside the left page safe box.',
+        id: '1g_right_page_hero_fit',
+        name: 'Right Page Hero (Centered in Safe Box)',
+        description: 'Single focal photograph centered in middle of right page inside blue safe lines.',
         photoCount: 1,
-        rects: [{ ...leftPageArea }],
+        rects: [fitInsideBoxCentered(rightPageArea, aspect0, 1.0)],
       });
+
+      // 2. Left Page Safe Hero (Fit - Centered & Middled inside Left Safe Box)
       variations.push({
-        id: '1g_right_page_safe',
-        name: 'Right Page Safe Hero',
-        description: 'Single showcase photograph perfectly confined inside the right page safe box.',
+        id: '1g_left_page_hero_fit',
+        name: 'Left Page Hero (Centered in Safe Box)',
+        description: 'Single focal photograph centered in middle of left page inside blue safe lines.',
+        photoCount: 1,
+        rects: [fitInsideBoxCentered(leftPageArea, aspect0, 1.0)],
+      });
+
+      // 3. Right Page Full Safe Box (Fill)
+      variations.push({
+        id: '1g_right_page_safe_fill',
+        name: 'Right Page Full Safe Box',
+        description: 'Fills the entire right page safe margin box cleanly.',
         photoCount: 1,
         rects: [{ ...rightPageArea }],
       });
+
+      // 4. Left Page Full Safe Box (Fill)
       variations.push({
-        id: '1g_full_spread_bleed',
-        name: 'Full Bleed Panoramic Hero',
-        description: 'Edge-to-edge panoramic hero spanning both pages.',
+        id: '1g_left_page_safe_fill',
+        name: 'Left Page Full Safe Box',
+        description: 'Fills the entire left page safe margin box cleanly.',
+        photoCount: 1,
+        rects: [{ ...leftPageArea }],
+      });
+
+      // 5. Centered in Spread Safe Area
+      variations.push({
+        id: '1g_spread_safe_centered',
+        name: 'Full Spread Safe Centered',
+        description: 'Panoramic statement photograph centered within the spread safe area.',
+        photoCount: 1,
+        rects: [fitInsideBoxCentered(spreadArea, aspect0, 1.0)],
+      });
+
+      // 6. Full Bleed Panoramic (Edge-to-Edge)
+      variations.push({
+        id: '1g_full_bleed',
+        name: 'Full Bleed Panoramic (Edge to Edge)',
+        description: 'Edge-to-edge full bleed photograph spanning the entire spread canvas.',
         photoCount: 1,
         rects: [{ x: 0, y: 0, width: round2(spreadWidth), height: round2(spreadHeight) }],
       });
+    } else {
       variations.push({
-        id: '1g_spread_safe_panorama',
-        name: 'Full Spread in Safe Zone',
-        description: 'Large panorama photo safely framed within the spread outer margin.',
+        id: '1g_single_page_hero_fit',
+        name: 'Page Hero (Centered in Safe Box)',
+        description: 'Centered focal photograph strictly inside safe margin box.',
+        photoCount: 1,
+        rects: [fitInsideBoxCentered(spreadArea, aspect0, 1.0)],
+      });
+      variations.push({
+        id: '1g_single_page_safe_fill',
+        name: 'Full Page Safe Box',
+        description: 'Fills the entire safe margin box.',
         photoCount: 1,
         rects: [{ ...spreadArea }],
       });
     }
-
-    const fineArtW = round2(spreadArea.width * 0.72);
-    const fineArtH = round2(spreadArea.height * 0.82);
-    variations.push({
-      id: '1g_fine_art_centered',
-      name: 'Classic Fine-Art Centered',
-      description: 'Generous white space with balanced centered focal presentation.',
-      photoCount: 1,
-      rects: [
-        {
-          x: round2(spreadArea.x + (spreadArea.width - fineArtW) / 2),
-          y: round2(spreadArea.y + (spreadArea.height - fineArtH) / 2),
-          width: fineArtW,
-          height: fineArtH,
-        },
-      ],
-    });
   }
 
   // -------------------------------------------------------------
-  // 2 PHOTOS VARIATIONS
+  // 2 PHOTOS VARIATIONS (Facing Diptych / Stacks)
   // -------------------------------------------------------------
   else if (count === 2) {
+    const aspect0 = photos[0]?.photoAspect || 1.5;
+    const aspect1 = photos[1]?.photoAspect || 1.5;
+
     if (isSpread) {
-      // Facing Diptych (Left Safe Box + Right Safe Box)
+      // 1. Facing Diptych (Fit & Centered on each page)
       variations.push({
-        id: '2g_facing_diptych',
-        name: 'Facing Page Diptych (Left + Right)',
-        description: 'Two balanced full-page photos side-by-side hugging the safe margin boxes.',
+        id: '2g_facing_diptych_fit',
+        name: 'Facing Diptych (Centered in Safe Boxes)',
+        description: 'Two photographs centered in the middle of left & right safe margin boxes.',
+        photoCount: 2,
+        rects: [
+          fitInsideBoxCentered(leftPageArea, aspect0, 1.0),
+          fitInsideBoxCentered(rightPageArea, aspect1, 1.0),
+        ],
+      });
+
+      // 2. Facing Diptych (Fill Full Safe Boxes)
+      variations.push({
+        id: '2g_facing_diptych_fill',
+        name: 'Facing Diptych (Full Safe Boxes)',
+        description: 'Two full-bleed-to-margin photographs filling left and right safe boxes.',
         photoCount: 2,
         rects: [{ ...leftPageArea }, { ...rightPageArea }],
       });
 
-      // Right Page 2 Stacks
+      // 3. Right Page 2 Stacks
       const rStackH = round2((rightPageArea.height - spacing) / 2);
       variations.push({
         id: '2g_right_page_stack',
         name: 'Right Page 2-Photo Stack',
-        description: 'Two photos stacked vertically inside the right page safe box.',
+        description: 'Two horizontal photos stacked vertically inside the right page safe box.',
         photoCount: 2,
         rects: [
           { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rStackH },
@@ -117,7 +157,7 @@ export function generateAdaptiveLayoutVariations(
         ],
       });
 
-      // Left Page 2 Stacks
+      // 4. Left Page 2 Stacks
       const lStackH = round2((leftPageArea.height - spacing) / 2);
       variations.push({
         id: '2g_left_page_stack',
@@ -130,9 +170,7 @@ export function generateAdaptiveLayoutVariations(
         ],
       });
 
-      // Left Hero + Right Inset
-      const rightW = round2(rightPageArea.width * 0.82);
-      const rightH = round2(rightPageArea.height * 0.85);
+      // 5. Left Hero + Right Inset
       variations.push({
         id: '2g_left_hero_right_inset',
         name: 'Left Safe Hero + Right Fine-Art',
@@ -140,31 +178,7 @@ export function generateAdaptiveLayoutVariations(
         photoCount: 2,
         rects: [
           { ...leftPageArea },
-          {
-            x: round2(rightPageArea.x + (rightPageArea.width - rightW) / 2),
-            y: round2(rightPageArea.y + (rightPageArea.height - rightH) / 2),
-            width: rightW,
-            height: rightH,
-          },
-        ],
-      });
-
-      // Right Hero + Left Inset
-      const leftW = round2(leftPageArea.width * 0.82);
-      const leftH = round2(leftPageArea.height * 0.85);
-      variations.push({
-        id: '2g_right_hero_left_inset',
-        name: 'Left Fine-Art + Right Safe Hero',
-        description: 'Centered left portrait leading into a full right safe box hero.',
-        photoCount: 2,
-        rects: [
-          {
-            x: round2(leftPageArea.x + (leftPageArea.width - leftW) / 2),
-            y: round2(leftPageArea.y + (leftPageArea.height - leftH) / 2),
-            width: leftW,
-            height: leftH,
-          },
-          { ...rightPageArea },
+          fitInsideBoxCentered(rightPageArea, aspect1, 0.82),
         ],
       });
     }
@@ -295,21 +309,6 @@ export function generateAdaptiveLayoutVariations(
           { x: rightPageArea.x, y: rightPageArea.y, width: stripW, height: rightPageArea.height },
           { x: round2(rightPageArea.x + stripW + spacing), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
           { x: round2(rightPageArea.x + (stripW + spacing) * 2), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-        ],
-      });
-
-      // 3 Left Strip Columns + 1 Right Hero
-      const lStripW = round2((leftPageArea.width - spacing * 2) / 3);
-      variations.push({
-        id: '4g_3strip_left_1hero_right',
-        name: '3 Left Triptych Strip + 1 Right Hero',
-        description: '3 vertical strip detail photos on left page with large showcase photo on right page.',
-        photoCount: 4,
-        rects: [
-          { x: leftPageArea.x, y: leftPageArea.y, width: lStripW, height: leftPageArea.height },
-          { x: round2(leftPageArea.x + lStripW + spacing), y: leftPageArea.y, width: lStripW, height: leftPageArea.height },
-          { x: round2(leftPageArea.x + (lStripW + spacing) * 2), y: leftPageArea.y, width: lStripW, height: leftPageArea.height },
-          { ...rightPageArea },
         ],
       });
 

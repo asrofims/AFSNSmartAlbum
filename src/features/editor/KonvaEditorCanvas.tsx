@@ -1403,7 +1403,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 <Rect
                   x={safeAreaPixel}
                   y={safeAreaPixel}
-                  width={leftPagePixelW - safeAreaPixel - Math.max(safeAreaPixel, gutterPixelW / 2 + 2)}
+                  width={leftPagePixelW - safeAreaPixel * 2}
                   height={screenSpreadH - safeAreaPixel * 2}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}
@@ -1411,9 +1411,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 />
                 {/* Right Page Safe Area */}
                 <Rect
-                  x={leftPagePixelW + gutterPixelW + Math.max(safeAreaPixel, gutterPixelW / 2 + 2)}
+                  x={leftPagePixelW + gutterPixelW + safeAreaPixel}
                   y={safeAreaPixel}
-                  width={rightPagePixelW - safeAreaPixel - Math.max(safeAreaPixel, gutterPixelW / 2 + 2)}
+                  width={rightPagePixelW - safeAreaPixel * 2}
                   height={screenSpreadH - safeAreaPixel * 2}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}

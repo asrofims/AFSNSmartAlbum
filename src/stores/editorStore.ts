@@ -145,21 +145,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const pageW = currentProject.canvasWidth;
     const pageH = currentProject.canvasHeight;
 
+    const targetSpread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    const safeMargin = targetSpread?.safeArea ?? currentProject.marginValue ?? 10;
+    const gutterW = targetSpread?.gutterWidth || 0;
+    const maxSafeW = Math.max(10, pageW - safeMargin * 2);
+    const maxSafeH = Math.max(10, pageH - safeMargin * 2);
+
     // Calculate default frame physical size based on photo aspect ratio
     const photoAspect = photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
-    let frameW = customSize?.width ?? (pageW * 0.45);
+    let frameW = customSize?.width ?? Math.min(maxSafeW * 0.85, maxSafeH * 0.85 * photoAspect);
     let frameH = customSize?.height ?? (frameW / photoAspect);
 
-    if (frameH > pageH * 0.8) {
-      frameH = pageH * 0.8;
+    if (frameW > maxSafeW) {
+      frameW = maxSafeW;
+      frameH = frameW / photoAspect;
+    }
+    if (frameH > maxSafeH) {
+      frameH = maxSafeH;
       frameW = frameH * photoAspect;
     }
-    frameW = Math.round(frameW * 10) / 10;
-    frameH = Math.round((frameW / photoAspect) * 10) / 10;
 
-    // Default position centered on left page or at drop point
-    const posX = pos?.x !== undefined ? pos.x - frameW / 2 : (pageW - frameW) / 2;
-    const posY = pos?.y !== undefined ? pos.y - frameH / 2 : (pageH - frameH) / 2;
+    frameW = Math.round(frameW * 10) / 10;
+    frameH = Math.round(frameH * 10) / 10;
+
+    // Center in left or right page according to drop X or center in left page safe box
+    let posX: number;
+    let posY: number;
+
+    if (pos?.x !== undefined && pos?.y !== undefined) {
+      posX = Math.max(safeMargin, Math.min(pageW * 2 + gutterW - safeMargin - frameW, pos.x - frameW / 2));
+      posY = Math.max(safeMargin, Math.min(pageH - safeMargin - frameH, pos.y - frameH / 2));
+    } else {
+      posX = safeMargin + (maxSafeW - frameW) / 2;
+      posY = safeMargin + (maxSafeH - frameH) / 2;
+    }
 
     const newFrame: PhotoFrameElement = {
       id: `frame-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,

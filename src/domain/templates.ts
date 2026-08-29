@@ -42,6 +42,38 @@ export function round2(n: number): number {
 }
 
 /**
+ * Fits a photo with given aspect ratio centered horizontally & vertically inside a container box.
+ */
+export function fitInsideBoxCentered(
+  container: RectBounds,
+  photoAspect = 1.5,
+  coverage = 1.0
+): RectBounds {
+  const maxW = container.width * coverage;
+  const maxH = container.height * coverage;
+  const boxAspect = maxW / Math.max(1, maxH);
+
+  let w: number;
+  let h: number;
+
+  if (photoAspect >= boxAspect) {
+    w = maxW;
+    h = w / photoAspect;
+  } else {
+    h = maxH;
+    w = h * photoAspect;
+  }
+
+  w = round2(w);
+  h = round2(h);
+
+  const x = round2(container.x + (container.width - w) / 2);
+  const y = round2(container.y + (container.height - h) / 2);
+
+  return { x, y, width: w, height: h };
+}
+
+/**
  * Computes exact printable and designable Safe Margin boxes for Left Page and Right Page.
  * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas.
  */
@@ -107,22 +139,62 @@ export function getUsableAreas(params: TemplateParams): {
 export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
   // --- 1 PHOTO ---
   {
-    id: '1p_left_page_safe_hero',
-    name: 'Left Page Safe Hero',
+    id: '1p_right_page_safe_hero',
+    name: 'Right Page Hero (Centered inside Safe Zone)',
     photoCount: 1,
     category: 'spread',
-    description: 'Perfect alignment within the left page blue safe margin box.',
-    tags: ['safe', 'hero', 'left'],
+    description: 'Perfect center & middle alignment within the right page blue safe margin box.',
+    tags: ['safe', 'hero', 'right', 'centered'],
+    generateRects: (p) => {
+      const { rightPageArea } = getUsableAreas(p);
+      const aspect = p.currentPhotos?.[0]?.photoAspect || 1.5;
+      return [fitInsideBoxCentered(rightPageArea, aspect, 1.0)];
+    },
+  },
+  {
+    id: '1p_left_page_safe_hero',
+    name: 'Left Page Hero (Centered inside Safe Zone)',
+    photoCount: 1,
+    category: 'spread',
+    description: 'Perfect center & middle alignment within the left page blue safe margin box.',
+    tags: ['safe', 'hero', 'left', 'centered'],
+    generateRects: (p) => {
+      const { leftPageArea } = getUsableAreas(p);
+      const aspect = p.currentPhotos?.[0]?.photoAspect || 1.5;
+      return [fitInsideBoxCentered(leftPageArea, aspect, 1.0)];
+    },
+  },
+  {
+    id: '1p_right_page_safe_fill',
+    name: 'Right Page Full Safe Box',
+    photoCount: 1,
+    category: 'spread',
+    description: 'Fills the entire right page safe margin box cleanly.',
+    tags: ['safe', 'hero', 'fill'],
+    generateRects: (p) => [{ ...getUsableAreas(p).rightPageArea }],
+  },
+  {
+    id: '1p_left_page_safe_fill',
+    name: 'Left Page Full Safe Box',
+    photoCount: 1,
+    category: 'spread',
+    description: 'Fills the entire left page safe margin box cleanly.',
+    tags: ['safe', 'hero', 'fill'],
     generateRects: (p) => [{ ...getUsableAreas(p).leftPageArea }],
   },
   {
-    id: '1p_right_page_safe_hero',
-    name: 'Right Page Safe Hero',
+    id: '1p_classic_centered',
+    name: 'Classic Centered Fine-Art',
     photoCount: 1,
-    category: 'spread',
-    description: 'Perfect alignment within the right page blue safe margin box.',
-    tags: ['safe', 'hero', 'right'],
-    generateRects: (p) => [{ ...getUsableAreas(p).rightPageArea }],
+    category: 'both',
+    description: 'Generous white borders with a balanced centered focal photo.',
+    tags: ['classic', 'minimal', 'fine-art'],
+    generateRects: (p) => {
+      const { spreadArea, rightPageArea } = getUsableAreas(p);
+      const targetBox = p.isSpread ? rightPageArea : spreadArea;
+      const aspect = p.currentPhotos?.[0]?.photoAspect || 1.5;
+      return [fitInsideBoxCentered(targetBox, aspect, 0.78)];
+    },
   },
   {
     id: '1p_full_spread_bleed',
@@ -134,27 +206,6 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     generateRects: (p) => [
       { x: 0, y: 0, width: round2(p.spreadWidth), height: round2(p.spreadHeight) },
     ],
-  },
-  {
-    id: '1p_classic_centered',
-    name: 'Classic Centered Fine-Art',
-    photoCount: 1,
-    category: 'both',
-    description: 'Generous white borders with a balanced centered focal photo.',
-    tags: ['classic', 'minimal', 'fine-art'],
-    generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const w = round2(spreadArea.width * 0.72);
-      const h = round2(spreadArea.height * 0.82);
-      return [
-        {
-          x: round2(spreadArea.x + (spreadArea.width - w) / 2),
-          y: round2(spreadArea.y + (spreadArea.height - h) / 2),
-          width: w,
-          height: h,
-        },
-      ];
-    },
   },
 
   // --- 2 PHOTOS ---
@@ -168,6 +219,23 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
       return [{ ...leftPageArea }, { ...rightPageArea }];
+    },
+  },
+  {
+    id: '2p_facing_diptych_fit',
+    name: 'Facing Diptych (Native Ratio Centered)',
+    photoCount: 2,
+    category: 'spread',
+    description: 'Two centered focal photographs respecting native aspect ratios inside blue safe boxes.',
+    tags: ['diptych', 'centered', 'fit'],
+    generateRects: (p) => {
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const aspect0 = p.currentPhotos?.[0]?.photoAspect || 1.5;
+      const aspect1 = p.currentPhotos?.[1]?.photoAspect || 1.5;
+      return [
+        fitInsideBoxCentered(leftPageArea, aspect0, 0.95),
+        fitInsideBoxCentered(rightPageArea, aspect1, 0.95),
+      ];
     },
   },
   {
@@ -195,16 +263,10 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'asymmetric', 'portrait'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const rightW = round2(rightPageArea.width * 0.82);
-      const rightH = round2(rightPageArea.height * 0.85);
+      const aspect1 = p.currentPhotos?.[1]?.photoAspect || 1.5;
       return [
         { ...leftPageArea },
-        {
-          x: round2(rightPageArea.x + (rightPageArea.width - rightW) / 2),
-          y: round2(rightPageArea.y + (rightPageArea.height - rightH) / 2),
-          width: rightW,
-          height: rightH,
-        },
+        fitInsideBoxCentered(rightPageArea, aspect1, 0.82),
       ];
     },
   },
@@ -363,26 +425,6 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       ];
     },
   },
-  {
-    id: '5p_2left_3right_story',
-    name: '2 Left Stacks + 3 Right Columns',
-    photoCount: 5,
-    category: 'spread',
-    description: 'Two landscapes on left page accompanied by three portrait columns on right page.',
-    tags: ['story', 'editorial', 'rich'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftH = round2((leftPageArea.height - p.spacing) / 2);
-      const rightW = round2((rightPageArea.width - p.spacing * 2) / 3);
-      return [
-        { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
-        { x: rightPageArea.x, y: rightPageArea.y, width: rightW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + rightW + p.spacing), y: rightPageArea.y, width: rightW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + (rightW + p.spacing) * 2), y: rightPageArea.y, width: rightW, height: rightPageArea.height },
-      ];
-    },
-  },
 
   // --- 6 PHOTOS ---
   {
@@ -409,30 +451,6 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightTopH },
         { x: rightPageArea.x, y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
         { x: round2(rightPageArea.x + rightBotW + p.spacing), y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
-      ];
-    },
-  },
-  {
-    id: '6p_hero_plus_5_thumbnails',
-    name: '1 Left Hero + 5 Right Gallery Grid',
-    photoCount: 6,
-    category: 'spread',
-    description: 'Major showcase hero on left page with 5 supporting gallery photos on right page.',
-    tags: ['gallery', 'hero', 'wedding'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const topH = round2((rightPageArea.height - p.spacing) * 0.5);
-      const botH = round2(rightPageArea.height - p.spacing - topH);
-      const topW = round2((rightPageArea.width - p.spacing) / 2);
-      const botW = round2((rightPageArea.width - p.spacing * 2) / 3);
-
-      return [
-        { ...leftPageArea },
-        { x: rightPageArea.x, y: rightPageArea.y, width: topW, height: topH },
-        { x: round2(rightPageArea.x + topW + p.spacing), y: rightPageArea.y, width: topW, height: topH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
-        { x: round2(rightPageArea.x + botW + p.spacing), y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
-        { x: round2(rightPageArea.x + (botW + p.spacing) * 2), y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
       ];
     },
   },
