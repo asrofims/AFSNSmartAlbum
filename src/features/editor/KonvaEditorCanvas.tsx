@@ -174,7 +174,8 @@ function PhotoFrameNode({
           return;
         }
         if (!isCropMode) {
-          if (e.evt?.shiftKey) {
+          const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+          if (isMulti) {
             onSelect(e);
           } else if (!isSelected) {
             onSelect(e);
@@ -183,7 +184,8 @@ function PhotoFrameNode({
       }}
       onClick={(e) => {
         e.cancelBubble = true;
-        if (!isCropMode && !isDraggingRef.current && isSelected && !e.evt?.shiftKey) {
+        const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+        if (!isCropMode && !isDraggingRef.current && isSelected && !isMulti) {
           onSelect(e);
         }
         isDraggingRef.current = false;
@@ -521,6 +523,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     startX: number;
     startY: number;
   } | null>(null);
+  const marqueeInitialSelectedIdsRef = useRef<string[]>([]);
 
   // Context Menu State & Click Location Tracking
   const [contextMenu, setContextMenu] = useState<{
@@ -895,8 +898,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
           startY: pos.y,
         });
 
-        if (!e.evt?.shiftKey) {
+        const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+        if (!isMulti) {
           clearSelection();
+          marqueeInitialSelectedIdsRef.current = [];
+        } else {
+          marqueeInitialSelectedIdsRef.current = [...selectedFrameIds];
         }
         exitCropMode();
       }
@@ -950,7 +957,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         )
         .map((f) => f.id);
 
-      selectFrames(matchedIds);
+      const combined = Array.from(new Set([...marqueeInitialSelectedIdsRef.current, ...matchedIds]));
+      selectFrames(combined);
     }
   };
 
@@ -1446,7 +1454,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   onSelect={(e) => {
                     if (e) {
                       e.cancelBubble = true;
-                      selectFrame(frame.id, Boolean(e.evt?.shiftKey));
+                      const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                      selectFrame(frame.id, isMulti);
                     } else {
                       selectFrame(frame.id);
                     }
@@ -1513,6 +1522,43 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 height={multiSelectBounds.pixelH}
                 fill="rgba(59, 130, 246, 0.001)"
                 draggable={activeTool !== 'pan'}
+                onMouseDown={(e) => {
+                  if ('button' in e.evt && e.evt.button === 2) return;
+                  const isMultiKey = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                  if (isMultiKey) {
+                    const stage = e.target.getStage();
+                    const pos = stage?.getPointerPosition();
+                    if (!pos || !activeSpread) return;
+                    const clickPhysX = pos.x / scaleFactor;
+                    const clickPhysY = pos.y / scaleFactor;
+                    const hitFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
+                      clickPhysX >= f.x && clickPhysX <= f.x + f.width &&
+                      clickPhysY >= f.y && clickPhysY <= f.y + f.height
+                    );
+                    if (hitFrame) {
+                      e.cancelBubble = true;
+                      selectFrame(hitFrame.id, true);
+                    }
+                  }
+                }}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  const isMultiKey = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                  const stage = e.target.getStage();
+                  const pos = stage?.getPointerPosition();
+                  if (!pos || !activeSpread) return;
+                  const clickPhysX = pos.x / scaleFactor;
+                  const clickPhysY = pos.y / scaleFactor;
+                  const hitFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
+                    clickPhysX >= f.x && clickPhysX <= f.x + f.width &&
+                    clickPhysY >= f.y && clickPhysY <= f.y + f.height
+                  );
+                  if (hitFrame) {
+                    selectFrame(hitFrame.id, isMultiKey);
+                  } else if (!isMultiKey) {
+                    clearSelection();
+                  }
+                }}
                 onContextMenu={(e) => {
                   e.evt.preventDefault();
                   e.cancelBubble = true;
