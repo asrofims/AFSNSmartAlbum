@@ -90,24 +90,38 @@ export function SettingsDialog() {
                   <div className={styles.checkboxLabel}>
                     <span className={styles.checkboxTitle}>Snapping Distance Threshold</span>
                     <span className={styles.checkboxDesc}>
-                      Magnet pull distance in physical project units.
+                      Magnet pull distance in physical project units (0.1 mm is subtle, 2.0 mm is strong).
                     </span>
                   </div>
-                  <div className={styles.presetGroup}>
-                    {[
-                      { label: 'Soft (1mm)', val: 1.0 },
-                      { label: 'Standard (2mm)', val: 2.0 },
-                      { label: 'Strong (4mm)', val: 4.0 },
-                    ].map((p) => (
-                      <button
-                        key={p.label}
-                        type="button"
-                        className={`${styles.presetBtn} ${snappingConfig.threshold === p.val ? styles.presetBtnActive : ''}`}
-                        onClick={() => updateSnappingConfig({ threshold: p.val })}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className={styles.presetGroup}>
+                      {[
+                        { label: '0.1mm', val: 0.1, title: 'Ultra Soft / Minimal Magnet (0.1mm)' },
+                        { label: '0.5mm', val: 0.5, title: 'Soft Snapping (0.5mm)' },
+                        { label: '1.0mm', val: 1.0, title: 'Standard Professional (1.0mm)' },
+                        { label: '2.0mm', val: 2.0, title: 'Strong Magnet (2.0mm)' },
+                      ].map((p) => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          className={`${styles.presetBtn} ${Math.abs(snappingConfig.threshold - p.val) < 0.01 ? styles.presetBtnActive : ''}`}
+                          onClick={() => updateSnappingConfig({ threshold: p.val })}
+                          title={p.title}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ width: '70px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <NumberInput
+                        value={snappingConfig.threshold}
+                        onChange={(val) => updateSnappingConfig({ threshold: Math.max(0.05, Math.round(val * 100) / 100) })}
+                        min={0.05}
+                        max={20}
+                        step={0.1}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>mm</span>
+                    </div>
                   </div>
                 </div>
               </div>
