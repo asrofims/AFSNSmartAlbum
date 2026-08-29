@@ -19,6 +19,10 @@ export interface ProjectSettings {
   };
   photoInset?: {
     value: number;
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
     unit: Unit;
   };
   border: {
@@ -65,28 +69,32 @@ export interface Project {
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   name: 'Untitled Album',
   canvas: {
-    width: 8,
-    height: 8,
-    unit: 'inch',
+    width: 20,
+    height: 20,
+    unit: 'cm',
     dpi: 300,
   },
   spacing: {
-    value: 3,
-    unit: 'mm',
+    value: 2,
+    unit: 'cm',
   },
   margin: {
     enabled: true,
-    value: 10,
-    unit: 'mm',
+    value: 2,
+    unit: 'cm',
   },
   photoInset: {
-    value: 0,
-    unit: 'mm',
+    value: 2,
+    top: 2,
+    bottom: 2,
+    left: 2,
+    right: 2,
+    unit: 'cm',
   },
   border: {
-    enabled: false, // Default nonaktif per request
-    width: 1,
-    unit: 'mm',
+    enabled: false, // Default disabled
+    width: 0.1,
+    unit: 'cm',
     color: '#FFFFFF',
   },
   background: {

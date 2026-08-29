@@ -30,24 +30,33 @@ export function NewProjectDialog() {
   const [presetSaveSuccess, setPresetSaveSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState('Untitled Album');
-  const [presetId, setPresetId] = useState<string>('square-8x8');
-  const [canvasWidth, setCanvasWidth] = useState(8);
-  const [canvasHeight, setCanvasHeight] = useState(8);
-  const [canvasUnit, setCanvasUnit] = useState<Unit>('inch');
+  const [presetId, setPresetId] = useState<string>('square-20x20-cm');
+  const [canvasWidth, setCanvasWidth] = useState(20);
+  const [canvasHeight, setCanvasHeight] = useState(20);
+  const [canvasUnit, setCanvasUnit] = useState<Unit>('cm');
   const [canvasDpi, setCanvasDpi] = useState(300);
 
-  const [spacingValue, setSpacingValue] = useState(3);
-  const [spacingUnit, setSpacingUnit] = useState<Unit>('mm');
+  const [spacingValue, setSpacingValue] = useState(2);
+  const [spacingUnit, setSpacingUnit] = useState<Unit>('cm');
 
-  // Request 5: Safe Margin
+  // Safe Margin
   const [marginEnabled, setMarginEnabled] = useState(true);
-  const [marginValue, setMarginValue] = useState(10);
-  const [marginUnit, setMarginUnit] = useState<Unit>('mm');
+  const [marginValue, setMarginValue] = useState(2);
+  const [marginUnit, setMarginUnit] = useState<Unit>('cm');
 
-  // Request 4: Default border is disabled (false)
+  // Inner Safe Inset
+  const [photoInsetValue, setPhotoInsetValue] = useState(2);
+  const [photoInsetTop, setPhotoInsetTop] = useState(2);
+  const [photoInsetBottom, setPhotoInsetBottom] = useState(2);
+  const [photoInsetLeft, setPhotoInsetLeft] = useState(2);
+  const [photoInsetRight, setPhotoInsetRight] = useState(2);
+  const [photoInsetUnit, setPhotoInsetUnit] = useState<Unit>('cm');
+  const [isInsetExpanded, setIsInsetExpanded] = useState(false);
+
+  // Border
   const [borderEnabled, setBorderEnabled] = useState(false);
-  const [borderWidth, setBorderWidth] = useState(1);
-  const [borderUnit, setBorderUnit] = useState<Unit>('mm');
+  const [borderWidth, setBorderWidth] = useState(0.1);
+  const [borderUnit, setBorderUnit] = useState<Unit>('cm');
   const [borderColor, setBorderColor] = useState('#FFFFFF');
 
   const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
@@ -69,19 +78,26 @@ export function NewProjectDialog() {
       const presets = getAllPresets();
       setAllPresets(presets);
       setName('Untitled Album');
-      setPresetId('square-8x8');
-      setCanvasWidth(8);
-      setCanvasHeight(8);
-      setCanvasUnit('inch');
+      setPresetId('square-20x20-cm');
+      setCanvasWidth(20);
+      setCanvasHeight(20);
+      setCanvasUnit('cm');
       setCanvasDpi(300);
-      setSpacingValue(0.12);
-      setSpacingUnit('inch');
+      setSpacingValue(2);
+      setSpacingUnit('cm');
       setMarginEnabled(true);
-      setMarginValue(0.5);
-      setMarginUnit('inch');
+      setMarginValue(2);
+      setMarginUnit('cm');
+      setPhotoInsetValue(2);
+      setPhotoInsetTop(2);
+      setPhotoInsetBottom(2);
+      setPhotoInsetLeft(2);
+      setPhotoInsetRight(2);
+      setPhotoInsetUnit('cm');
+      setIsInsetExpanded(false);
       setBorderEnabled(false); // Default disabled
-      setBorderWidth(0.04);
-      setBorderUnit('inch');
+      setBorderWidth(0.1);
+      setBorderUnit('cm');
       setBorderColor('#FFFFFF');
       setBackgroundColor('#FFFFFF');
       setErrorMessage(null);
@@ -123,6 +139,12 @@ export function NewProjectDialog() {
         if (targetUnit !== canvasUnit) {
           setMarginValue(roundUnit(convertUnit(marginValue, marginUnit, targetUnit, preset.dpi), targetUnit));
           setMarginUnit(targetUnit);
+          setPhotoInsetValue(roundUnit(convertUnit(photoInsetValue, photoInsetUnit, targetUnit, preset.dpi), targetUnit));
+          setPhotoInsetTop(roundUnit(convertUnit(photoInsetTop, photoInsetUnit, targetUnit, preset.dpi), targetUnit));
+          setPhotoInsetBottom(roundUnit(convertUnit(photoInsetBottom, photoInsetUnit, targetUnit, preset.dpi), targetUnit));
+          setPhotoInsetLeft(roundUnit(convertUnit(photoInsetLeft, photoInsetUnit, targetUnit, preset.dpi), targetUnit));
+          setPhotoInsetRight(roundUnit(convertUnit(photoInsetRight, photoInsetUnit, targetUnit, preset.dpi), targetUnit));
+          setPhotoInsetUnit(targetUnit);
           setSpacingValue(roundUnit(convertUnit(spacingValue, spacingUnit, targetUnit, preset.dpi), targetUnit));
           setSpacingUnit(targetUnit);
           setBorderWidth(roundUnit(convertUnit(borderWidth, borderUnit, targetUnit, preset.dpi), targetUnit));
@@ -190,6 +212,19 @@ export function NewProjectDialog() {
     const convertedMargin = roundUnit(convertUnit(marginValue, marginUnit, newUnit, canvasDpi), newUnit);
     setMarginValue(convertedMargin);
     setMarginUnit(newUnit);
+
+    // Convert Inner Safe Inset
+    const convertedInset = roundUnit(convertUnit(photoInsetValue, photoInsetUnit, newUnit, canvasDpi), newUnit);
+    const convertedInsetTop = roundUnit(convertUnit(photoInsetTop, photoInsetUnit, newUnit, canvasDpi), newUnit);
+    const convertedInsetBottom = roundUnit(convertUnit(photoInsetBottom, photoInsetUnit, newUnit, canvasDpi), newUnit);
+    const convertedInsetLeft = roundUnit(convertUnit(photoInsetLeft, photoInsetUnit, newUnit, canvasDpi), newUnit);
+    const convertedInsetRight = roundUnit(convertUnit(photoInsetRight, photoInsetUnit, newUnit, canvasDpi), newUnit);
+    setPhotoInsetValue(convertedInset);
+    setPhotoInsetTop(convertedInsetTop);
+    setPhotoInsetBottom(convertedInsetBottom);
+    setPhotoInsetLeft(convertedInsetLeft);
+    setPhotoInsetRight(convertedInsetRight);
+    setPhotoInsetUnit(newUnit);
 
     // Convert Spacing
     const convertedSpacing = roundUnit(convertUnit(spacingValue, spacingUnit, newUnit, canvasDpi), newUnit);
@@ -312,6 +347,14 @@ export function NewProjectDialog() {
         enabled: marginEnabled,
         value: marginValue,
         unit: marginUnit,
+      },
+      photoInset: {
+        value: photoInsetValue,
+        top: photoInsetTop,
+        bottom: photoInsetBottom,
+        left: photoInsetLeft,
+        right: photoInsetRight,
+        unit: photoInsetUnit,
       },
       border: {
         enabled: borderEnabled,
@@ -641,6 +684,117 @@ export function NewProjectDialog() {
               )}
             </div>
 
+            {/* Inner Safe Inset */}
+            <div className={styles.section}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <div className={styles.sectionTitle} style={{ margin: 0 }}>Inner Safe Inset</div>
+                <button
+                  type="button"
+                  onClick={() => setIsInsetExpanded(!isInsetExpanded)}
+                  style={{
+                    background: isInsetExpanded ? 'var(--color-accent)' : 'transparent',
+                    color: isInsetExpanded ? '#fff' : 'var(--color-accent)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                  title="Configure 4 sides (Top, Bottom, Left, Right) independently"
+                >
+                  {isInsetExpanded ? 'Unified Inset' : '4-Side Inset (4S)'}
+                </button>
+              </div>
+
+              {!isInsetExpanded ? (
+                <div className={styles.row}>
+                  <div className={styles.flex1}>
+                    <NumberInput
+                      label="Inner Inset"
+                      value={photoInsetValue}
+                      onChange={(val) => {
+                        setPhotoInsetValue(val);
+                        setPhotoInsetTop(val);
+                        setPhotoInsetBottom(val);
+                        setPhotoInsetLeft(val);
+                        setPhotoInsetRight(val);
+                      }}
+                      min={0}
+                      max={1000}
+                      step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                    />
+                  </div>
+                  <div style={{ width: '90px' }}>
+                    <Select
+                      label="Unit"
+                      value={photoInsetUnit}
+                      options={UNIT_OPTIONS}
+                      onChange={handleUnitChange}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.row}>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Top Inset"
+                        value={photoInsetTop}
+                        onChange={setPhotoInsetTop}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Bottom Inset"
+                        value={photoInsetBottom}
+                        onChange={setPhotoInsetBottom}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div style={{ width: '90px' }}>
+                      <Select
+                        label="Unit"
+                        value={photoInsetUnit}
+                        options={UNIT_OPTIONS}
+                        onChange={handleUnitChange}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.row}>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Left Inset"
+                        value={photoInsetLeft}
+                        onChange={setPhotoInsetLeft}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Right Inset"
+                        value={photoInsetRight}
+                        onChange={setPhotoInsetRight}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div style={{ width: '90px', visibility: 'hidden' }}>
+                      <div />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Photo Spacing */}
             <div className={styles.section}>
               <div className={styles.sectionTitle}>Photo Spacing & Gap</div>
@@ -752,6 +906,20 @@ export function NewProjectDialog() {
                       title="Safe Margin Guide"
                     />
                   )}
+                  {photoInsetValue > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        bottom: '12px',
+                        left: '12px',
+                        right: '8px',
+                        border: '1px dashed rgba(20, 184, 166, 0.65)',
+                        pointerEvents: 'none',
+                      }}
+                      title="Inner Safe Inset"
+                    />
+                  )}
                   <div
                     className={styles.samplePhotoBox}
                     style={{
@@ -778,6 +946,20 @@ export function NewProjectDialog() {
                         pointerEvents: 'none',
                       }}
                       title="Safe Margin Guide"
+                    />
+                  )}
+                  {photoInsetValue > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        bottom: '12px',
+                        left: '8px',
+                        right: '12px',
+                        border: '1px dashed rgba(20, 184, 166, 0.65)',
+                        pointerEvents: 'none',
+                      }}
+                      title="Inner Safe Inset"
                     />
                   )}
                   <div
@@ -818,6 +1000,12 @@ export function NewProjectDialog() {
                 <span>Safe Margin:</span>
                 <span className={styles.specValue}>
                   {marginEnabled ? `${marginValue} ${marginUnit}` : 'None'}
+                </span>
+              </div>
+              <div className={styles.specRow}>
+                <span>Inner Safe Inset:</span>
+                <span className={styles.specValue}>
+                  {photoInsetValue} {photoInsetUnit}
                 </span>
               </div>
               <div className={styles.specRow}>
