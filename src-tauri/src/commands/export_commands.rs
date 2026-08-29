@@ -10,6 +10,123 @@ use crate::export_engine::{
     ExportOptions, ExportProgressEvent,
 };
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreflightReport {
+    pub total_photos: usize,
+    pub missing_photos: Vec<MissingPhotoInfo>,
+    pub destination_writable: bool,
+    pub destination_error: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissingPhotoInfo {
+    pub element_id: String,
+    pub spread_name: String,
+    pub file_path: String,
+    pub file_name: String,
+    pub has_preview: bool,
+}
+
+#[tauri::command]
+pub async fn preflight_check_export(
+    db: State<'_, Database>,
+    project_id: String,
+    options: ExportOptions,
+) -> Result<PreflightReport, String> {
+    let album = db
+        .load_album_structure(&project_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No album structure found for project".to_string())?;
+
+    let mut candidate_spreads = Vec::new();
+    if !album.cover_spread.elements.is_empty() {
+        candidate_spreads.push(album.cover_spread);
+    }
+    candidate_spreads.extend(album.spreads);
+
+    let spreads: Vec<SpreadPayload> = if let Some(ref selected_ids) = options.selected_spread_ids {
+        if !selected_ids.is_empty() {
+            candidate_spreads
+                .into_iter()
+                .filter(|s| selected_ids.contains(&s.id))
+                .collect()
+        } else {
+            candidate_spreads
+        }
+    } else {
+        candidate_spreads
+    };
+
+    let mut total_photos = 0;
+    let mut missing_photos = Vec::new();
+
+    for spread in &spreads {
+        let spread_name = if spread.r#type == "cover" {
+            "Cover Spread".to_string()
+        } else {
+            format!("Spread {:02}", spread.spread_index)
+        };
+
+        for elem in &spread.elements {
+            if elem.file_path.is_empty() {
+                continue;
+            }
+            total_photos += 1;
+            let path = std::path::Path::new(&elem.file_path);
+            if !path.exists() {
+                let file_name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| elem.file_path.clone());
+
+                let has_preview = elem.preview_path.as_ref().map(|p| std::path::Path::new(p).exists()).unwrap_or(false);
+
+                missing_photos.push(MissingPhotoInfo {
+                    element_id: elem.id.clone(),
+                    spread_name: spread_name.clone(),
+                    file_path: elem.file_path.clone(),
+                    file_name,
+                    has_preview,
+                });
+            }
+        }
+    }
+
+    // Check if destination directory is writable
+    let out_dir = PathBuf::from(&options.output_dir);
+    let mut destination_writable = true;
+    let mut destination_error = None;
+
+    if !out_dir.exists() {
+        if let Err(e) = fs::create_dir_all(&out_dir) {
+            destination_writable = false;
+            destination_error = Some(format!("Cannot create output folder: {}", e));
+        }
+    }
+
+    if destination_writable {
+        let probe_file = out_dir.join(".afsn_write_test.tmp");
+        match fs::File::create(&probe_file) {
+            Ok(_) => {
+                let _ = fs::remove_file(&probe_file);
+            }
+            Err(e) => {
+                destination_writable = false;
+                destination_error = Some(format!("Destination folder is not writable: {}", e));
+            }
+        }
+    }
+
+    Ok(PreflightReport {
+        total_photos,
+        missing_photos,
+        destination_writable,
+        destination_error,
+    })
+}
+
 #[tauri::command]
 pub async fn select_export_directory() -> Result<Option<String>, String> {
     let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(|| {

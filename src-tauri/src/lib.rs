@@ -83,6 +83,7 @@ pub fn run() {
             commands::photo_commands::move_photos_between_folders,
             commands::photo_commands::get_photos_for_folder,
             commands::export_commands::export_album_high_res,
+            commands::export_commands::preflight_check_export,
             commands::export_commands::select_export_directory,
             commands::export_commands::open_export_directory,
         ])

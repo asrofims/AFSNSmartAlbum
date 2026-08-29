@@ -4,6 +4,7 @@ import { Dialog } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
+import { usePhotoStore } from '../../stores/photoStore';
 import { getAllAlbumSpreads, Spread } from '../../domain/album';
 import { toPixels } from '../../domain/units';
 import styles from './ExportAlbumDialog.module.css';
@@ -16,6 +17,21 @@ export interface ExportOptions {
   splitPages: boolean;
   outputDir: string;
   selectedSpreadIds?: string[];
+}
+
+export interface MissingPhotoInfo {
+  elementId: string;
+  spreadName: string;
+  filePath: string;
+  fileName: string;
+  hasPreview: boolean;
+}
+
+export interface PreflightReport {
+  totalPhotos: number;
+  missingPhotos: MissingPhotoInfo[];
+  destinationWritable: boolean;
+  destinationError: string | null;
 }
 
 interface ExportAlbumDialogProps {
@@ -60,6 +76,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const currentProject = useProjectStore((s) => s.currentProject);
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
+  const openRelink = usePhotoStore((s) => s.openRelink);
 
   const [format, setFormat] = useState<'jpeg' | 'png' | 'pdf'>('jpeg');
   const [dpi, setDpi] = useState<number>(currentProject?.canvasDpi || 300);
@@ -79,6 +96,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     }
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Pre-Flight Validation State
+  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
+  const [isVerifyingPreflight, setIsVerifyingPreflight] = useState(false);
 
   const allSpreads: Spread[] = useMemo(() => {
     return currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
@@ -147,7 +168,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     }
   };
 
-  const handleExport = () => {
+  const handleInitiateExport = async () => {
     const trimmedDir = outputDir.trim();
     if (!trimmedDir) {
       setErrorMsg('Please select a destination folder.');
@@ -163,7 +184,54 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     } catch {}
 
     const selectedSpreadIds = targetSpreads.map((s) => s.id);
+    const exportOpts: ExportOptions = {
+      format,
+      dpi,
+      jpegQuality,
+      includeBleed,
+      splitPages,
+      outputDir: trimmedDir,
+      selectedSpreadIds,
+    };
 
+    setIsVerifyingPreflight(true);
+    setErrorMsg(null);
+
+    try {
+      // 🔍 Upfront Pre-Flight Check before rendering
+      const report = await invoke<PreflightReport>('preflight_check_export', {
+        projectId: currentProject.id,
+        options: exportOpts,
+      });
+
+      setIsVerifyingPreflight(false);
+
+      if (!report.destinationWritable) {
+        setErrorMsg(report.destinationError || 'Destination folder is not accessible or writable.');
+        return;
+      }
+
+      if (report.missingPhotos && report.missingPhotos.length > 0) {
+        // Pre-Flight found missing photos -> show warning panel!
+        setPreflightReport(report);
+        return;
+      }
+
+      // Pre-Flight 100% clean -> proceed to export!
+      onStartExport(exportOpts);
+      onClose();
+    } catch (err: any) {
+      setIsVerifyingPreflight(false);
+      console.error('Pre-flight check error:', err);
+      // Fallback: proceed directly if preflight check call fails
+      onStartExport(exportOpts);
+      onClose();
+    }
+  };
+
+  const handleProceedWithMissingPhotos = () => {
+    const trimmedDir = outputDir.trim();
+    const selectedSpreadIds = targetSpreads.map((s) => s.id);
     onStartExport({
       format,
       dpi,
@@ -173,6 +241,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       outputDir: trimmedDir,
       selectedSpreadIds,
     });
+    setPreflightReport(null);
     onClose();
   };
 
@@ -185,6 +254,47 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       closeOnOverlayClick={false}
     >
       <div className={styles.container}>
+        {/* Pre-Flight Warning Card if Missing Photos Found */}
+        {preflightReport && preflightReport.missingPhotos.length > 0 && (
+          <div className={styles.preflightWarningBox}>
+            <div className={styles.preflightHeader}>
+              <span>⚠️ Pre-Flight Check: {preflightReport.missingPhotos.length} Missing Photo(s) Detected</span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+              The original files for the photos below could not be found at their disk path. If you proceed, they will be rendered using low-resolution cached previews.
+            </div>
+            <div className={styles.missingList}>
+              {preflightReport.missingPhotos.map((item) => (
+                <div key={item.elementId} className={styles.missingItem}>
+                  <span style={{ fontWeight: 600 }}>{item.spreadName}: {item.fileName}</span>
+                  <span className={styles.missingPath} title={item.filePath}>{item.filePath}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setPreflightReport(null);
+                  onClose();
+                  openRelink();
+                }}
+              >
+                Locate & Relink Photos...
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleProceedWithMissingPhotos}
+                style={{ backgroundColor: '#f59e0b', borderColor: '#d97706', color: '#000' }}
+              >
+                Export Using Previews
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* 1. Format Selection */}
         <div className={styles.section}>
           <label className={styles.sectionTitle}>Export Format</label>
@@ -322,7 +432,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                 type="radio"
                 name="exportScope"
                 checked={scope === 'all'}
-                onChange={() => setScope('all')}
+                onChange={() => {
+                  setScope('all');
+                  setPreflightReport(null);
+                }}
               />
               All Spreads ({allSpreads.length} Spreads / {allSpreads.length * 2} Pages)
             </label>
@@ -331,7 +444,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                 type="radio"
                 name="exportScope"
                 checked={scope === 'current'}
-                onChange={() => setScope('current')}
+                onChange={() => {
+                  setScope('current');
+                  setPreflightReport(null);
+                }}
               />
               Current Spread ({activeSpread?.name || 'Spread 1'})
             </label>
@@ -340,7 +456,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                 type="radio"
                 name="exportScope"
                 checked={scope === 'custom'}
-                onChange={() => setScope('custom')}
+                onChange={() => {
+                  setScope('custom');
+                  setPreflightReport(null);
+                }}
               />
               Custom Range...
             </label>
@@ -353,7 +472,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                     className={styles.select}
                     style={{ height: '28px', fontSize: '11px', padding: '0 4px' }}
                     value={rangeMode}
-                    onChange={(e) => setRangeMode(e.target.value as any)}
+                    onChange={(e) => {
+                      setRangeMode(e.target.value as any);
+                      setPreflightReport(null);
+                    }}
                   >
                     <option value="spreads">Spread Numbers (1-{allSpreads.length})</option>
                     <option value="pages">Page Numbers (1-{allSpreads.length * 2})</option>
@@ -363,7 +485,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                     className={styles.rangeInput}
                     placeholder={rangeMode === 'spreads' ? 'e.g. 3-6 or 1,3,5' : 'e.g. 3-8 or 1,4'}
                     value={customRange}
-                    onChange={(e) => setCustomRange(e.target.value)}
+                    onChange={(e) => {
+                      setCustomRange(e.target.value);
+                      setPreflightReport(null);
+                    }}
                   />
                 </div>
                 <div className={styles.rangeBadge}>
@@ -422,8 +547,12 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleExport}>
-            Export Album 📤
+          <Button
+            variant="primary"
+            onClick={handleInitiateExport}
+            disabled={isVerifyingPreflight}
+          >
+            {isVerifyingPreflight ? 'Verifying Files...' : 'Export Album 📤'}
           </Button>
         </div>
       </div>
