@@ -8,7 +8,10 @@ export interface DialogProps {
   title: string;
   children: ReactNode;
   width?: number;
+  height?: number;
   className?: string;
+  bodyClassName?: string;
+  noPadding?: boolean;
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
 }
@@ -19,7 +22,10 @@ export const Dialog: React.FC<DialogProps> = ({
   title,
   children,
   width = 480,
+  height,
   className = '',
+  bodyClassName = '',
+  noPadding = false,
   closeOnOverlayClick = false, // Default false: user must explicitly click the close button
   closeOnEscape = true,
 }) => {
@@ -55,7 +61,10 @@ export const Dialog: React.FC<DialogProps> = ({
     <div className={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
       <div
         className={`${styles.dialog} ${className}`.trim()}
-        style={{ width: `${width}px` }}
+        style={{
+          width: `${width}px`,
+          ...(height ? { height: `${height}px` } : {}),
+        }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
@@ -68,7 +77,10 @@ export const Dialog: React.FC<DialogProps> = ({
             </svg>
           </button>
         </div>
-        <div className={styles.body}>
+        <div
+          className={`${styles.body} ${bodyClassName}`.trim()}
+          style={noPadding ? { padding: 0, overflow: 'hidden' } : undefined}
+        >
           {children}
         </div>
       </div>

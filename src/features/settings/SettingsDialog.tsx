@@ -16,7 +16,7 @@ export function SettingsDialog() {
   const { currentProject, updateProjectSpacing } = useProjectStore();
 
   return (
-    <Dialog isOpen={isOpen} onClose={closeSettings} title="Settings" width={720}>
+    <Dialog isOpen={isOpen} onClose={closeSettings} title="Settings" width={740} height={550} noPadding>
       <div className={styles.container}>
         {/* Left Navigation Sidebar */}
         <div className={styles.sidebar}>
