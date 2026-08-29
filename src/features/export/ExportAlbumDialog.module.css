@@ -158,6 +158,50 @@
   outline: none;
 }
 
+.rangeBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rangeInput {
+  width: 140px;
+  height: 30px;
+  padding: 0 8px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  outline: none;
+}
+
+.rangeInput:focus {
+  border-color: var(--color-primary);
+}
+
+.rangeHint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.rangeBadge {
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
 .summaryBox {
   display: flex;
   flex-direction: column;

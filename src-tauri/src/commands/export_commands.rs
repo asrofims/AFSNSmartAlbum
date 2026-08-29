@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
-use crate::db::Database;
+use crate::db::{AlbumPayload, Database, ProjectRow, SpreadPayload};
 use crate::export_engine::{
     assemble_pdf_from_jpegs, render_spread_to_image, split_spread_into_pages, ExportOptions,
     ExportProgressEvent,
@@ -46,53 +46,40 @@ pub async fn open_export_directory(dir_path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub async fn export_album_high_res(
+fn export_album_high_res_worker(
     app: AppHandle,
-    db: State<'_, Database>,
-    project_id: String,
+    project: ProjectRow,
+    album: AlbumPayload,
     options: ExportOptions,
 ) -> Result<ExportProgressEvent, String> {
-    log::info!(
-        "export_album_high_res: project_id={}, format={}, dpi={}, out_dir={}",
-        project_id,
-        options.format,
-        options.dpi,
-        options.output_dir
-    );
-
     let output_path = PathBuf::from(&options.output_dir);
     if !output_path.exists() {
         fs::create_dir_all(&output_path).map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
 
-    let project = db
-        .get_project(&project_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
-
-    let album = db
-        .load_album_structure(&project_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "No album structure found for project".to_string())?;
-
-    // Gather all spreads to export
-    let mut spreads = Vec::new();
-    // Include cover spread if present
-    spreads.push(album.cover_spread);
-    // Include interior spreads
-    spreads.extend(album.spreads);
-
-    // Filter if specific spreads were selected
-    if let Some(ref selected_ids) = options.selected_spread_ids {
-        if !selected_ids.is_empty() {
-            spreads.retain(|s| selected_ids.contains(&s.id));
-        }
+    let mut candidate_spreads = Vec::new();
+    // Only include cover spread if it has elements and was not excluded
+    if !album.cover_spread.elements.is_empty() {
+        candidate_spreads.push(album.cover_spread);
     }
+    candidate_spreads.extend(album.spreads);
+
+    let spreads: Vec<SpreadPayload> = if let Some(ref selected_ids) = options.selected_spread_ids {
+        if !selected_ids.is_empty() {
+            candidate_spreads
+                .into_iter()
+                .filter(|s| selected_ids.contains(&s.id))
+                .collect()
+        } else {
+            candidate_spreads
+        }
+    } else {
+        candidate_spreads
+    };
 
     let total_spreads = spreads.len();
     if total_spreads == 0 {
-        return Err("No spreads found to export".to_string());
+        return Err("No spreads selected to export".to_string());
     }
 
     let mut output_files = Vec::new();
@@ -106,7 +93,8 @@ pub async fn export_album_high_res(
             format!("Spread {:02}", spread.spread_index)
         };
 
-        // Emit progress before rendering
+        log::info!("Exporting {} ({} of {})...", spread_name, current_num, total_spreads);
+
         let _ = app.emit(
             "export-progress",
             &ExportProgressEvent {
@@ -191,7 +179,8 @@ pub async fn export_album_high_res(
 
     // If PDF format requested, assemble the rendered JPEGs into a single multi-page PDF document
     if options.format == "pdf" && !temp_jpegs_for_pdf.is_empty() {
-        let pdf_filename = format!("{}_Print_Ready.pdf", project.name.replace(' ', "_"));
+        let safe_name = project.name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
+        let pdf_filename = format!("{}_Print_Ready.pdf", safe_name);
         let pdf_dest = output_path.join(&pdf_filename);
 
         assemble_pdf_from_jpegs(&temp_jpegs_for_pdf, &pdf_dest, options.dpi)
@@ -204,7 +193,7 @@ pub async fn export_album_high_res(
         current: total_spreads,
         total: total_spreads,
         spread_name: "Complete".to_string(),
-        status: format!("Successfully exported {} files to {}", output_files.len(), output_path.display()),
+        status: format!("Successfully exported {} file(s) to {}", output_files.len(), output_path.display()),
         is_finished: true,
         output_files: output_files.clone(),
     };
@@ -212,4 +201,36 @@ pub async fn export_album_high_res(
     let _ = app.emit("export-progress", &final_event);
 
     Ok(final_event)
+}
+
+#[tauri::command]
+pub async fn export_album_high_res(
+    app: AppHandle,
+    db: State<'_, Database>,
+    project_id: String,
+    options: ExportOptions,
+) -> Result<ExportProgressEvent, String> {
+    log::info!(
+        "export_album_high_res: project_id={}, format={}, dpi={}, out_dir={}",
+        project_id,
+        options.format,
+        options.dpi,
+        options.output_dir
+    );
+
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
+
+    let album = db
+        .load_album_structure(&project_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No album structure found for project".to_string())?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        export_album_high_res_worker(app, project, album, options)
+    })
+    .await
+    .map_err(|e| format!("Export worker execution failed: {}", e))?
 }
