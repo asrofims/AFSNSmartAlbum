@@ -3,8 +3,8 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: var(--space-4);
-  padding: var(--space-2) 0;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
 }
 
 .headerIcon {
@@ -13,10 +13,10 @@
 }
 
 .title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin-top: -4px;
+  margin-top: -2px;
 }
 
 .description {
@@ -26,67 +26,115 @@
   max-width: 380px;
 }
 
+/* Reconstructed Vector QRIS Card */
 .qrisCard {
   display: flex;
   flex-direction: column;
   align-items: center;
   background-color: #ffffff;
-  padding: 16px;
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-  border: 2px solid var(--color-border);
-  width: 280px;
+  padding: 18px 16px 14px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  border: 1px solid #e5e7eb;
+  width: 290px;
+  position: relative;
+  overflow: hidden;
 }
 
-.merchantName {
-  font-size: var(--font-size-md);
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.nmidText {
-  font-size: 11px;
-  font-weight: 600;
-  color: #4b5563;
+.qrisTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #ef4444;
   margin-bottom: 8px;
 }
 
-.qrImageWrapper {
-  width: 220px;
-  height: 220px;
-  overflow: hidden;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #ffffff;
+.qrisLogoText {
+  font-size: 16px;
+  font-weight: 900;
+  color: #111827;
+  letter-spacing: -0.5px;
 }
 
-.qrImage {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.qrisSubLogo {
+  font-size: 8px;
+  font-weight: 700;
+  color: #6b7280;
+  line-height: 1;
+  text-align: left;
 }
 
-.paymentBadges {
+.gpnLogoBadge {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #dc2626;
+  letter-spacing: -0.5px;
+}
+
+.merchantInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.merchantName {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.5px;
+}
+
+.nmidText {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4b5563;
+  margin-top: 1px;
+}
+
+.tagA01 {
   font-size: 10px;
   font-weight: 700;
-  color: #dc2626;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  color: #1f2937;
+  margin-top: 1px;
 }
 
-.supportedText {
+.qrVectorWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.qrisBottomTag {
   font-size: 10px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+.paymentList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 600;
   color: #6b7280;
   margin-top: 2px;
+  max-width: 250px;
+  line-height: 1.3;
 }
 
 .footer {
@@ -94,7 +142,7 @@
   flex-direction: column;
   width: 100%;
   gap: var(--space-3);
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }

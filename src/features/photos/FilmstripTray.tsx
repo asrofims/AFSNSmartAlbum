@@ -67,6 +67,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConfirmPurgeOpen, setIsConfirmPurgeOpen] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [brokenThumbIds, setBrokenThumbIds] = useState<Set<string>>(new Set());
   const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
 
@@ -174,12 +175,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const favCount = currentPhotoPool.filter((p) => p.isFavorite).length;
   const missingCount = currentPhotoPool.filter((p) => p.isMissing).length;
   const missingThumbCount = currentPhotoPool.filter((p) => !p.thumbnailPath && !p.isMissing).length;
+  const needsThumbSync = missingThumbCount > 0 || brokenThumbIds.size > 0;
 
   const handleSyncThumbnails = async () => {
     if (!currentProject) return;
     setIsSyncing(true);
     try {
       const res = await syncThumbnails(currentProject.id);
+      setBrokenThumbIds(new Set());
       setSyncToast(`Synchronized ${res.regenerated} thumbnail(s) successfully!`);
       setTimeout(() => setSyncToast(null), 4000);
     } catch (err) {
@@ -383,18 +386,18 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       )}
 
       {/* Missing Photos / Broken Thumbnails Recovery Banner */}
-      {(missingCount > 0 || missingThumbCount > 0) && (
+      {(missingCount > 0 || needsThumbSync) && (
         <div className={styles.syncAlertBanner}>
           <div className={styles.syncAlertText}>
             <span>⚠️</span>
             <span>
               {missingCount > 0 && `${missingCount} photo(s) missing from disk.`}
-              {missingCount > 0 && missingThumbCount > 0 && ' • '}
-              {missingThumbCount > 0 && `${missingThumbCount} thumbnail(s) need sync.`}
+              {missingCount > 0 && needsThumbSync && ' • '}
+              {needsThumbSync && `${brokenThumbIds.size > 0 ? brokenThumbIds.size : missingThumbCount} thumbnail(s) need sync.`}
             </span>
           </div>
           <div className={styles.syncAlertActions}>
-            {missingThumbCount > 0 && (
+            {needsThumbSync && (
               <button
                 type="button"
                 className={styles.cancelImportBtn}
@@ -505,6 +508,17 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 </button>
               )}
 
+              {/* Permanent Sync Thumbnails Action Button */}
+              <button
+                type="button"
+                className={styles.syncToolbarBtn}
+                onClick={handleSyncThumbnails}
+                disabled={isSyncing}
+                title="Scan and rebuild missing thumbnail cache files from project photos"
+              >
+                <span>{isSyncing ? '⏳ Syncing...' : '🔄 Sync Thumbnails'}</span>
+              </button>
+
               {/* Unified Import Options Dropdown Button */}
               <button
                 type="button"
@@ -553,6 +567,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 const isSelected = selectedPhotoIds.includes(photo.id);
                 const isActive = lastSelectedPhotoId === photo.id;
                 const isUsed = usedPhotoIdSet.has(photo.id) || photo.usedCount > 0;
+                const isBrokenThumb = brokenThumbIds.has(photo.id);
 
                 return (
                   <div
@@ -583,7 +598,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   >
                     {/* Thumbnail Image */}
                     <div className={styles.thumbnailWrapper} draggable={false}>
-                      {photo.thumbnailPath ? (
+                      {photo.thumbnailPath && !isBrokenThumb ? (
                         <img
                           src={convertFileSrc(photo.thumbnailPath)}
                           alt={photo.fileName}
@@ -591,8 +606,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                           loading="lazy"
                           draggable={false}
                           onError={(e) => {
-                            // Hide broken image and prevent loading heavy full-res photo into RAM
+                            // Hide broken image and track broken thumb to trigger sync
                             e.currentTarget.style.display = 'none';
+                            setBrokenThumbIds((prev) => new Set(prev).add(photo.id));
                           }}
                         />
                       ) : photo.thumbnailBase64 ? (

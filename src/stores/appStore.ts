@@ -28,6 +28,21 @@ interface AppState {
   setSettingsActiveTab: (tab: string) => void;
 }
 
+const shouldOpenSupportOnLaunch = (): boolean => {
+  try {
+    if (localStorage.getItem('afsn_suppress_support_popup') === 'true') {
+      return false;
+    }
+    if (sessionStorage.getItem('afsn_shown_support_session') === 'true') {
+      return false;
+    }
+    sessionStorage.setItem('afsn_shown_support_session', 'true');
+    return true;
+  } catch {
+    return true;
+  }
+};
+
 export const useAppStore = create<AppState>((set) => ({
   appInfo: {
     version: 'v1.0.1-beta',
@@ -37,7 +52,7 @@ export const useAppStore = create<AppState>((set) => ({
   isAppInfoLoaded: false,
   isAboutOpen: false,
   isSettingsOpen: false,
-  isSupportModalOpen: false,
+  isSupportModalOpen: shouldOpenSupportOnLaunch(),
   settingsActiveTab: 'snapping',
   
   setAppInfo: (info) => set({ appInfo: info, isAppInfoLoaded: true }),
