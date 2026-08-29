@@ -11,7 +11,7 @@ function runTests() {
   console.log('Testing Adaptive Smart Layout Engine & Orientation-Aware Solver...');
 
   const baseParams: TemplateParams = {
-    spreadWidth: 400,
+    spreadWidth: 406, // 200 left + 6 gutter + 200 right
     spreadHeight: 200,
     isSpread: true,
     safeMargin: 10,
@@ -45,7 +45,24 @@ function runTests() {
   }
   console.log('✓ Dynamic variations generated cleanly for photo counts 1 to 10.');
 
-  // Test 2: Smart Orientation Pairing
+  // Test 2: Verify Exact Safe Margin Confinement for 2-Photo Diptych
+  const twoPhotos: AdaptivePhoto[] = [
+    { filePath: 'img1.jpg', fileName: 'img1.jpg', photoAspect: 1.5 },
+    { filePath: 'img2.jpg', fileName: 'img2.jpg', photoAspect: 1.5 },
+  ];
+  const variations2p = generateAdaptiveLayoutVariations(baseParams, twoPhotos);
+  const diptych = variations2p.find((v) => v.id === '2g_facing_diptych');
+  if (!diptych) throw new Error('Missing 2g_facing_diptych');
+
+  if (diptych.rects[0].x !== 10 || diptych.rects[0].width !== 180) {
+    throw new Error(`Left page Diptych rect does not match left safe box: ${JSON.stringify(diptych.rects[0])}`);
+  }
+  if (diptych.rects[1].x !== 216 || diptych.rects[1].width !== 180) {
+    throw new Error(`Right page Diptych rect does not match right safe box: ${JSON.stringify(diptych.rects[1])}`);
+  }
+  console.log('✓ Diptych frames strictly hug Left and Right Blue Safe Margin Boxes.');
+
+  // Test 3: Smart Orientation Pairing
   const testPhotos: AdaptivePhoto[] = [
     { filePath: 'img_portrait.jpg', fileName: 'img_portrait.jpg', photoAspect: 0.67 }, // Portrait
     { filePath: 'img_landscape.jpg', fileName: 'img_landscape.jpg', photoAspect: 1.77 }, // Landscape
@@ -54,7 +71,7 @@ function runTests() {
   // 1 Tall Left Hero, 1 Wide Top Right
   const rects = [
     { x: 10, y: 10, width: 180, height: 180 }, // Square/Hero
-    { x: 200, y: 10, width: 180, height: 85 }, // Wide rectangle
+    { x: 216, y: 10, width: 180, height: 85 }, // Wide rectangle
   ];
 
   const pairings = matchPhotosToRects(testPhotos, rects);
@@ -64,7 +81,7 @@ function runTests() {
   }
   console.log('✓ Smart Orientation Matching algorithm correctly paired portrait & landscape.');
 
-  // Test 3: Shuffle functionality
+  // Test 4: Randomized Shuffle Functionality
   const elements = buildSpreadElementsFromVariation(
     {
       id: 'test_var',
@@ -88,7 +105,7 @@ function runTests() {
   if (shuffled.length !== 3) {
     throw new Error('Shuffled elements length mismatch');
   }
-  console.log('✓ Shuffle photo rotation passed.');
+  console.log('✓ Shuffle photo randomized rotation passed.');
   console.log('ALL ADAPTIVE LAYOUT TESTS PASSED! 🎉');
 }
 

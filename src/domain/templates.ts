@@ -37,20 +37,20 @@ export interface LayoutTemplate {
   generateRects: (params: TemplateParams) => RectBounds[];
 }
 
-/**
- * Normalizes a number to 2 decimal places to avoid floating point math artifacts.
- */
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
 /**
- * Computes the printable / designable canvas boundaries considering margins & gutter.
+ * Computes exact printable and designable Safe Margin boxes for Left Page and Right Page.
+ * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas.
  */
 export function getUsableAreas(params: TemplateParams): {
   spreadArea: RectBounds;
   leftPageArea: RectBounds;
   rightPageArea: RectBounds;
+  pageWidth: number;
+  gutterWidth: number;
 } {
   const { spreadWidth, spreadHeight, isSpread, safeMargin, gutterWidth } = params;
 
@@ -58,52 +58,75 @@ export function getUsableAreas(params: TemplateParams): {
     const singleArea: RectBounds = {
       x: safeMargin,
       y: safeMargin,
-      width: Math.max(10, spreadWidth - safeMargin * 2),
-      height: Math.max(10, spreadHeight - safeMargin * 2),
+      width: Math.max(10, round2(spreadWidth - safeMargin * 2)),
+      height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
     };
     return {
       spreadArea: singleArea,
       leftPageArea: singleArea,
       rightPageArea: singleArea,
+      pageWidth: spreadWidth,
+      gutterWidth: 0,
     };
   }
 
-  const pageWidth = spreadWidth / 2;
-  const halfGutter = gutterWidth / 2;
+  // On a 2-page spread: spreadWidth = leftPageWidth + gutterWidth + rightPageWidth
+  const pageWidth = round2((spreadWidth - gutterWidth) / 2);
 
+  // Left Page Safe Box (starts at safeMargin, ends safeMargin before spine gutter)
   const leftPageArea: RectBounds = {
     x: safeMargin,
     y: safeMargin,
-    width: Math.max(10, pageWidth - safeMargin - halfGutter),
-    height: Math.max(10, spreadHeight - safeMargin * 2),
+    width: Math.max(10, round2(pageWidth - safeMargin * 2)),
+    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
   };
 
+  // Right Page Safe Box (starts safeMargin after spine gutter, ends safeMargin before outer right edge)
   const rightPageArea: RectBounds = {
-    x: pageWidth + halfGutter,
+    x: round2(pageWidth + gutterWidth + safeMargin),
     y: safeMargin,
-    width: Math.max(10, pageWidth - safeMargin - halfGutter),
-    height: Math.max(10, spreadHeight - safeMargin * 2),
+    width: Math.max(10, round2(pageWidth - safeMargin * 2)),
+    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
   };
 
+  // Full Spread Safe Box (across both pages)
   const spreadArea: RectBounds = {
     x: safeMargin,
     y: safeMargin,
-    width: Math.max(10, spreadWidth - safeMargin * 2),
-    height: Math.max(10, spreadHeight - safeMargin * 2),
+    width: Math.max(10, round2(spreadWidth - safeMargin * 2)),
+    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
   };
 
-  return { spreadArea, leftPageArea, rightPageArea };
+  return { spreadArea, leftPageArea, rightPageArea, pageWidth, gutterWidth };
 }
 
-// ==========================================
-// 25+ CURATED PROFESSIONAL LAYOUT TEMPLATES
-// ==========================================
+// ==============================================================
+// 25+ CURATED PROFESSIONAL VISUAL GRID BLUEPRINTS
+// ==============================================================
 
 export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
-  // --- 1 PHOTO TEMPLATES ---
+  // --- 1 PHOTO ---
+  {
+    id: '1p_left_page_safe_hero',
+    name: 'Left Page Safe Hero',
+    photoCount: 1,
+    category: 'spread',
+    description: 'Perfect alignment within the left page blue safe margin box.',
+    tags: ['safe', 'hero', 'left'],
+    generateRects: (p) => [{ ...getUsableAreas(p).leftPageArea }],
+  },
+  {
+    id: '1p_right_page_safe_hero',
+    name: 'Right Page Safe Hero',
+    photoCount: 1,
+    category: 'spread',
+    description: 'Perfect alignment within the right page blue safe margin box.',
+    tags: ['safe', 'hero', 'right'],
+    generateRects: (p) => [{ ...getUsableAreas(p).rightPageArea }],
+  },
   {
     id: '1p_full_spread_bleed',
-    name: 'Full Bleed Spread Hero',
+    name: 'Full Bleed Panoramic Hero',
     photoCount: 1,
     category: 'spread',
     description: 'Panoramic edge-to-edge full spread statement photograph.',
@@ -121,8 +144,8 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['classic', 'minimal', 'fine-art'],
     generateRects: (p) => {
       const { spreadArea } = getUsableAreas(p);
-      const w = round2(spreadArea.width * 0.75);
-      const h = round2(spreadArea.height * 0.85);
+      const w = round2(spreadArea.width * 0.72);
+      const h = round2(spreadArea.height * 0.82);
       return [
         {
           x: round2(spreadArea.x + (spreadArea.width - w) / 2),
@@ -133,54 +156,46 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       ];
     },
   },
-  {
-    id: '1p_left_page_hero',
-    name: 'Left Page Hero',
-    photoCount: 1,
-    category: 'spread',
-    description: 'Large showcase photo occupying the left page with right page white breathing room.',
-    tags: ['asymmetric', 'editorial', 'left'],
-    generateRects: (p) => {
-      const { leftPageArea } = getUsableAreas(p);
-      return [{ ...leftPageArea }];
-    },
-  },
-  {
-    id: '1p_right_page_hero',
-    name: 'Right Page Hero',
-    photoCount: 1,
-    category: 'spread',
-    description: 'Large showcase photo occupying the right page with left page white breathing room.',
-    tags: ['asymmetric', 'editorial', 'right'],
-    generateRects: (p) => {
-      const { rightPageArea } = getUsableAreas(p);
-      return [{ ...rightPageArea }];
-    },
-  },
 
-  // --- 2 PHOTOS TEMPLATES ---
+  // --- 2 PHOTOS ---
   {
     id: '2p_facing_diptych',
-    name: 'Facing Page Diptych',
+    name: 'Facing Page Diptych (Left + Right)',
     photoCount: 2,
     category: 'spread',
-    description: 'Two balanced full-page photos side by side across the spine crease.',
-    tags: ['diptych', 'balanced', 'editorial'],
+    description: 'Symmetrical alignment hugging the safe margin boxes of both pages.',
+    tags: ['diptych', 'balanced', 'safe'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
       return [{ ...leftPageArea }, { ...rightPageArea }];
     },
   },
   {
-    id: '2p_left_hero_right_companion',
-    name: 'Hero & Side Companion',
+    id: '2p_right_page_stack',
+    name: 'Stacked Dual Photos (Right Page)',
     photoCount: 2,
     category: 'spread',
-    description: 'Large lead photo on left page with a centered elegant portrait on right page.',
+    description: 'Two horizontal photos stacked vertically inside the right page safe box.',
+    tags: ['stack', 'vertical', 'right'],
+    generateRects: (p) => {
+      const { rightPageArea } = getUsableAreas(p);
+      const h = round2((rightPageArea.height - p.spacing) / 2);
+      return [
+        { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: h },
+        { x: rightPageArea.x, y: round2(rightPageArea.y + h + p.spacing), width: rightPageArea.width, height: h },
+      ];
+    },
+  },
+  {
+    id: '2p_left_hero_right_companion',
+    name: 'Left Safe Hero + Right Fine-Art',
+    photoCount: 2,
+    category: 'spread',
+    description: 'Full left safe box hero with a centered fine-art portrait on the right page.',
     tags: ['hero', 'asymmetric', 'portrait'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const rightW = round2(rightPageArea.width * 0.8);
+      const rightW = round2(rightPageArea.width * 0.82);
       const rightH = round2(rightPageArea.height * 0.85);
       return [
         { ...leftPageArea },
@@ -193,63 +208,14 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       ];
     },
   },
-  {
-    id: '2p_horizontal_split',
-    name: 'Horizontal Landscape Split',
-    photoCount: 2,
-    category: 'both',
-    description: 'Two wide panoramic photos stacked vertically with exact project gap.',
-    tags: ['split', 'horizontal', 'panorama'],
-    generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const h = round2((spreadArea.height - p.spacing) / 2);
-      return [
-        { x: spreadArea.x, y: spreadArea.y, width: spreadArea.width, height: h },
-        { x: spreadArea.x, y: round2(spreadArea.y + h + p.spacing), width: spreadArea.width, height: h },
-      ];
-    },
-  },
-  {
-    id: '2p_single_page_stack',
-    name: 'Single Page Stack (Right)',
-    photoCount: 2,
-    category: 'spread',
-    description: 'Two photos stacked vertically on the right page with clean left breathing room.',
-    tags: ['stack', 'vertical', 'right'],
-    generateRects: (p) => {
-      const { rightPageArea } = getUsableAreas(p);
-      const h = round2((rightPageArea.height - p.spacing) / 2);
-      return [
-        { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: h },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + h + p.spacing), width: rightPageArea.width, height: h },
-      ];
-    },
-  },
 
-  // --- 3 PHOTOS TEMPLATES ---
-  {
-    id: '3p_symmetrical_triptych',
-    name: 'Symmetrical Triptych (3 Columns)',
-    photoCount: 3,
-    category: 'both',
-    description: 'Three equal vertical columns spanning the layout with consistent spacing.',
-    tags: ['triptych', 'columns', 'symmetrical'],
-    generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const w = round2((spreadArea.width - p.spacing * 2) / 3);
-      return [
-        { x: spreadArea.x, y: spreadArea.y, width: w, height: spreadArea.height },
-        { x: round2(spreadArea.x + w + p.spacing), y: spreadArea.y, width: w, height: spreadArea.height },
-        { x: round2(spreadArea.x + (w + p.spacing) * 2), y: spreadArea.y, width: w, height: spreadArea.height },
-      ];
-    },
-  },
+  // --- 3 PHOTOS ---
   {
     id: '3p_left_hero_right_stack',
-    name: '1 Left Hero + 2 Right Stack',
+    name: '1 Left Hero + 2 Right Stacked',
     photoCount: 3,
     category: 'spread',
-    description: 'Dominant full-height photo on the left page with 2 complementary stacked photos on the right page.',
+    description: 'Full left page hero with two stacked photos inside the right page safe box.',
     tags: ['hero', 'stack', 'popular'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
@@ -262,11 +228,11 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     },
   },
   {
-    id: '3p_right_hero_left_stack',
-    name: '2 Left Stack + 1 Right Hero',
+    id: '3p_2left_stack_1right_hero',
+    name: '2 Left Stacked + 1 Right Hero',
     photoCount: 3,
     category: 'spread',
-    description: '2 stacked detail photos on the left page leading into a major right page hero photo.',
+    description: 'Two stacked photos inside the left safe box leading into a full right hero.',
     tags: ['hero', 'stack', 'editorial'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
@@ -279,30 +245,67 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     },
   },
   {
-    id: '3p_horizontal_panoramic_trio',
-    name: '3-Row Panoramic Stack',
+    id: '3p_left_hero_right_2columns',
+    name: '1 Left Hero + 2 Right Portrait Columns',
     photoCount: 3,
-    category: 'both',
-    description: 'Three cinematic horizontal panorama stripes stacked across the layout.',
-    tags: ['panorama', 'stripes', 'cinematic'],
+    category: 'spread',
+    description: 'Left safe hero with two vertical portrait columns on the right page.',
+    tags: ['hero', 'columns', 'portraits'],
     generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const h = round2((spreadArea.height - p.spacing * 2) / 3);
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const colW = round2((rightPageArea.width - p.spacing) / 2);
       return [
-        { x: spreadArea.x, y: spreadArea.y, width: spreadArea.width, height: h },
-        { x: spreadArea.x, y: round2(spreadArea.y + h + p.spacing), width: spreadArea.width, height: h },
-        { x: spreadArea.x, y: round2(spreadArea.y + (h + p.spacing) * 2), width: spreadArea.width, height: h },
+        { ...leftPageArea },
+        { x: rightPageArea.x, y: rightPageArea.y, width: colW, height: rightPageArea.height },
+        { x: round2(rightPageArea.x + colW + p.spacing), y: rightPageArea.y, width: colW, height: rightPageArea.height },
       ];
     },
   },
 
-  // --- 4 PHOTOS TEMPLATES ---
+  // --- 4 PHOTOS ---
+  {
+    id: '4p_facing_2plus2_stacks',
+    name: 'Facing 2+2 Stacks (Both Pages)',
+    photoCount: 4,
+    category: 'spread',
+    description: 'Two stacked photos on left page and two stacked photos on right page.',
+    tags: ['diptych', 'grid', 'safe'],
+    generateRects: (p) => {
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const leftH = round2((leftPageArea.height - p.spacing) / 2);
+      const rightH = round2((rightPageArea.height - p.spacing) / 2);
+      return [
+        { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
+        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
+        { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightH },
+        { x: rightPageArea.x, y: round2(rightPageArea.y + rightH + p.spacing), width: rightPageArea.width, height: rightH },
+      ];
+    },
+  },
+  {
+    id: '4p_lead_hero_3_sidebar',
+    name: '1 Left Hero + 3 Right Strip Columns',
+    photoCount: 4,
+    category: 'spread',
+    description: 'Dominant left page safe hero with 3 vertical detail columns on right page.',
+    tags: ['hero', 'details', 'editorial'],
+    generateRects: (p) => {
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const stripW = round2((rightPageArea.width - p.spacing * 2) / 3);
+      return [
+        { ...leftPageArea },
+        { x: rightPageArea.x, y: rightPageArea.y, width: stripW, height: rightPageArea.height },
+        { x: round2(rightPageArea.x + stripW + p.spacing), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
+        { x: round2(rightPageArea.x + (stripW + p.spacing) * 2), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
+      ];
+    },
+  },
   {
     id: '4p_balanced_2x2_grid',
     name: 'Balanced 2x2 Grid',
     photoCount: 4,
     category: 'both',
-    description: 'Classic four-photo grid with mathematically equal rows and columns.',
+    description: 'Four equal quadrant frames respecting margin boundaries.',
     tags: ['grid', 'balanced', 'classic'],
     generateRects: (p) => {
       const { spreadArea } = getUsableAreas(p);
@@ -318,91 +321,54 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       ];
     },
   },
-  {
-    id: '4p_facing_2plus2_stacks',
-    name: 'Facing 2+2 Stacks (Both Pages)',
-    photoCount: 4,
-    category: 'spread',
-    description: 'Two stacked photos on the left page and two stacked photos on the right page.',
-    tags: ['diptych', 'grid', 'editorial'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftH = round2((leftPageArea.height - p.spacing) / 2);
-      const rightH = round2((rightPageArea.height - p.spacing) / 2);
-      return [
-        { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
-        { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightH + p.spacing), width: rightPageArea.width, height: rightH },
-      ];
-    },
-  },
-  {
-    id: '4p_lead_hero_3_sidebar',
-    name: '1 Lead Hero + 3 Side Strip',
-    photoCount: 4,
-    category: 'spread',
-    description: 'Dominant left page hero with 3 vertical detail strips on the right page.',
-    tags: ['hero', 'details', 'editorial'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const stripW = round2((rightPageArea.width - p.spacing * 2) / 3);
-      return [
-        { ...leftPageArea },
-        { x: rightPageArea.x, y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + stripW + p.spacing), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + (stripW + p.spacing) * 2), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-      ];
-    },
-  },
-  {
-    id: '4p_asymmetric_mosaic',
-    name: '4-Photo Asymmetric Mosaic',
-    photoCount: 4,
-    category: 'spread',
-    description: '1 large top hero, 1 bottom-left landscape, and 2 right-stacked details.',
-    tags: ['mosaic', 'collage', 'modern'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftH1 = round2((leftPageArea.height - p.spacing) * 0.6);
-      const leftH2 = round2(leftPageArea.height - p.spacing - leftH1);
-      const rightH = round2((rightPageArea.height - p.spacing) / 2);
-      return [
-        { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH1 },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH1 + p.spacing), width: leftPageArea.width, height: leftH2 },
-        { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightH + p.spacing), width: rightPageArea.width, height: rightH },
-      ];
-    },
-  },
 
-  // --- 5 PHOTOS TEMPLATES ---
+  // --- 5 PHOTOS ---
   {
-    id: '5p_center_hero_4_corners',
-    name: 'Center Feature + 4 Flanking Corners',
+    id: '5p_left_4grid_right_hero',
+    name: '4 Left 2x2 Grid + 1 Right Hero',
     photoCount: 5,
     category: 'spread',
-    description: 'Prominent portrait hero on right page with 4 equal corner grids on left page.',
+    description: 'Four corner detail grid photos on left page paired with 1 major right page hero.',
     tags: ['hero', 'grid', 'wedding'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
       const gridW = round2((leftPageArea.width - p.spacing) / 2);
       const gridH = round2((leftPageArea.height - p.spacing) / 2);
       return [
-        { ...rightPageArea }, // Main Hero
         { x: leftPageArea.x, y: leftPageArea.y, width: gridW, height: gridH },
         { x: round2(leftPageArea.x + gridW + p.spacing), y: leftPageArea.y, width: gridW, height: gridH },
         { x: leftPageArea.x, y: round2(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
         { x: round2(leftPageArea.x + gridW + p.spacing), y: round2(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { ...rightPageArea },
+      ];
+    },
+  },
+  {
+    id: '5p_left_hero_right_4grid',
+    name: '1 Left Hero + 4 Right 2x2 Grid',
+    photoCount: 5,
+    category: 'spread',
+    description: '1 major left page hero paired with four corner detail grid photos on right page.',
+    tags: ['hero', 'grid', 'wedding'],
+    generateRects: (p) => {
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const gridW = round2((rightPageArea.width - p.spacing) / 2);
+      const gridH = round2((rightPageArea.height - p.spacing) / 2);
+      return [
+        { ...leftPageArea },
+        { x: rightPageArea.x, y: rightPageArea.y, width: gridW, height: gridH },
+        { x: round2(rightPageArea.x + gridW + p.spacing), y: rightPageArea.y, width: gridW, height: gridH },
+        { x: rightPageArea.x, y: round2(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { x: round2(rightPageArea.x + gridW + p.spacing), y: round2(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
       ];
     },
   },
   {
     id: '5p_2left_3right_story',
-    name: '2 Left Stacks + 3 Right Triptych',
+    name: '2 Left Stacks + 3 Right Columns',
     photoCount: 5,
     category: 'spread',
-    description: 'Two large landscape photos on left page paired with 3 vertical portraits on right page.',
+    description: 'Two landscapes on left page accompanied by three portrait columns on right page.',
     tags: ['story', 'editorial', 'rich'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
@@ -418,38 +384,13 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     },
   },
 
-  // --- 6 PHOTOS TEMPLATES ---
-  {
-    id: '6p_classic_2x3_grid',
-    name: '2x3 Storyboard Grid (6 Equal)',
-    photoCount: 6,
-    category: 'both',
-    description: 'Six equal photographs in a balanced 2-row by 3-column configuration.',
-    tags: ['grid', 'storyboard', 'events'],
-    generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const colW = round2((spreadArea.width - p.spacing * 2) / 3);
-      const rowH = round2((spreadArea.height - p.spacing) / 2);
-      const rects: RectBounds[] = [];
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 3; col++) {
-          rects.push({
-            x: round2(spreadArea.x + col * (colW + p.spacing)),
-            y: round2(spreadArea.y + row * (rowH + p.spacing)),
-            width: colW,
-            height: rowH,
-          });
-        }
-      }
-      return rects;
-    },
-  },
+  // --- 6 PHOTOS ---
   {
     id: '6p_facing_3plus3_grids',
     name: 'Facing 3+3 Storyboard (Both Pages)',
     photoCount: 6,
     category: 'spread',
-    description: 'Three photos on the left page and three photos on the right page for detailed sequence storytelling.',
+    description: 'Three photos on left page and three photos on right page for detailed sequence storytelling.',
     tags: ['storyboard', 'narrative', 'detailed'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
@@ -462,12 +403,9 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       const rightBotW = round2((rightPageArea.width - p.spacing) / 2);
 
       return [
-        // Left Page: 1 Top wide, 2 Bottom grid
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftTopH },
         { x: leftPageArea.x, y: round2(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
         { x: round2(leftPageArea.x + leftBotW + p.spacing), y: round2(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
-
-        // Right Page: 1 Top wide, 2 Bottom grid
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightTopH },
         { x: rightPageArea.x, y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
         { x: round2(rightPageArea.x + rightBotW + p.spacing), y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
@@ -476,7 +414,7 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
   },
   {
     id: '6p_hero_plus_5_thumbnails',
-    name: '1 Major Hero + 5 Thumbnail Gallery',
+    name: '1 Left Hero + 5 Right Gallery Grid',
     photoCount: 6,
     category: 'spread',
     description: 'Major showcase hero on left page with 5 supporting gallery photos on right page.',
@@ -489,11 +427,9 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       const botW = round2((rightPageArea.width - p.spacing * 2) / 3);
 
       return [
-        { ...leftPageArea }, // Hero
-        // Right top (2 photos)
+        { ...leftPageArea },
         { x: rightPageArea.x, y: rightPageArea.y, width: topW, height: topH },
         { x: round2(rightPageArea.x + topW + p.spacing), y: rightPageArea.y, width: topW, height: topH },
-        // Right bottom (3 photos)
         { x: rightPageArea.x, y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
         { x: round2(rightPageArea.x + botW + p.spacing), y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
         { x: round2(rightPageArea.x + (botW + p.spacing) * 2), y: round2(rightPageArea.y + topH + p.spacing), width: botW, height: botH },
@@ -501,13 +437,13 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     },
   },
 
-  // --- 7 & 8 PHOTOS TEMPLATES ---
+  // --- 7 & 8 PHOTOS ---
   {
     id: '7p_editorial_feature',
-    name: '7-Photo Editorial Feature',
+    name: '3 Left Stacks + 4 Right 2x2 Grid',
     photoCount: 7,
     category: 'spread',
-    description: '1 full-height hero, 2 medium center stacks, and 4 corner detail grid tiles.',
+    description: '3 stacked landscape rows on left page and 4 corner detail grid tiles on right page.',
     tags: ['editorial', 'mosaic', 'large'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
@@ -516,11 +452,9 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       const rightGridH = round2((rightPageArea.height - p.spacing) / 2);
 
       return [
-        // Left 3 vertical stacks
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
         { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
         { x: leftPageArea.x, y: round2(leftPageArea.y + (leftH + p.spacing) * 2), width: leftPageArea.width, height: leftH },
-        // Right 2x2 grid
         { x: rightPageArea.x, y: rightPageArea.y, width: rightGridW, height: rightGridH },
         { x: round2(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
         { x: rightPageArea.x, y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
@@ -529,35 +463,35 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     },
   },
   {
-    id: '8p_balanced_2x4_grid',
-    name: '8-Photo Balanced Storyboard (2x4)',
+    id: '8p_facing_4plus4_grids',
+    name: 'Facing 4+4 Storyboard (Both Pages)',
     photoCount: 8,
-    category: 'both',
-    description: 'Eight photos organized across 4 columns and 2 rows for full event summaries.',
+    category: 'spread',
+    description: 'Four corner photos on left page and four corner photos on right page (2x2 each).',
     tags: ['grid', 'summary', 'reception'],
     generateRects: (p) => {
-      const { spreadArea } = getUsableAreas(p);
-      const colW = round2((spreadArea.width - p.spacing * 3) / 4);
-      const rowH = round2((spreadArea.height - p.spacing) / 2);
-      const rects: RectBounds[] = [];
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 4; col++) {
-          rects.push({
-            x: round2(spreadArea.x + col * (colW + p.spacing)),
-            y: round2(spreadArea.y + row * (rowH + p.spacing)),
-            width: colW,
-            height: rowH,
-          });
-        }
-      }
-      return rects;
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      const leftGridW = round2((leftPageArea.width - p.spacing) / 2);
+      const leftGridH = round2((leftPageArea.height - p.spacing) / 2);
+      const rightGridW = round2((rightPageArea.width - p.spacing) / 2);
+      const rightGridH = round2((rightPageArea.height - p.spacing) / 2);
+
+      return [
+        // Left 2x2
+        { x: leftPageArea.x, y: leftPageArea.y, width: leftGridW, height: leftGridH },
+        { x: round2(leftPageArea.x + leftGridW + p.spacing), y: leftPageArea.y, width: leftGridW, height: leftGridH },
+        { x: leftPageArea.x, y: round2(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
+        { x: round2(leftPageArea.x + leftGridW + p.spacing), y: round2(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
+        // Right 2x2
+        { x: rightPageArea.x, y: rightPageArea.y, width: rightGridW, height: rightGridH },
+        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
+        { x: rightPageArea.x, y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+      ];
     },
   },
 ];
 
-/**
- * Generates full PhotoFrameElements for a spread by merging layout bounds with current photos.
- */
 export function generateSpreadElementsFromTemplate(
   template: LayoutTemplate,
   params: TemplateParams,
@@ -601,20 +535,17 @@ export function generateSpreadElementsFromTemplate(
   });
 }
 
-/**
- * Generates an SVG wireframe string representation of a template for mini UI preview cards.
- */
 export function generateTemplateSvgPreview(
   template: LayoutTemplate,
-  viewWidth = 120,
-  viewHeight = 60
+  viewWidth = 140,
+  viewHeight = 70
 ): string {
   const params: TemplateParams = {
     spreadWidth: 200,
     spreadHeight: 100,
     isSpread: template.category !== 'single_page',
     safeMargin: 8,
-    gutterWidth: 4,
+    gutterWidth: 6,
     spacing: 4,
   };
 
@@ -631,7 +562,7 @@ export function generateTemplateSvgPreview(
 
   const spine =
     template.category !== 'single_page'
-      ? `<line x1="${(viewWidth / 2).toFixed(1)}" y1="4" x2="${(viewWidth / 2).toFixed(1)}" y2="${(viewHeight - 4).toFixed(1)}" stroke="rgba(255,255,255,0.15)" stroke-dasharray="2 2" stroke-width="1"/>`
+      ? `<line x1="${(viewWidth / 2).toFixed(1)}" y1="4" x2="${(viewWidth / 2).toFixed(1)}" y2="${(viewHeight - 4).toFixed(1)}" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2 2" stroke-width="1"/>`
       : '';
 
   return `<svg width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" xmlns="http://www.w3.org/2000/svg"><rect width="${viewWidth}" height="${viewHeight}" rx="4" fill="var(--color-bg-secondary, #18181b)"/>${spine}${rectElements}</svg>`;
