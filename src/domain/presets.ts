@@ -85,16 +85,20 @@ export const CUSTOM_PRESET_ID = 'custom';
 
 const CUSTOM_PRESETS_STORAGE_KEY = 'afsn_custom_album_presets';
 
+let memoryCustomPresets: AlbumPreset[] = [];
+
 export function loadCustomPresets(): AlbumPreset[] {
   try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+    return memoryCustomPresets;
   } catch (err) {
     console.warn('[AFSN] Failed to load custom presets:', err);
-    return [];
+    return memoryCustomPresets;
   }
 }
 
@@ -106,11 +110,11 @@ export function saveCustomPreset(preset: AlbumPreset): AlbumPreset[] {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updated));
     }
-    return updated;
+    memoryCustomPresets = updated;
   } catch (err) {
     console.warn('[AFSN] Failed to save custom preset:', err);
-    return loadCustomPresets();
   }
+  return getAllPresets();
 }
 
 export function deleteCustomPreset(id: string): AlbumPreset[] {
@@ -120,11 +124,11 @@ export function deleteCustomPreset(id: string): AlbumPreset[] {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updated));
     }
-    return updated;
+    memoryCustomPresets = updated;
   } catch (err) {
     console.warn('[AFSN] Failed to delete custom preset:', err);
-    return loadCustomPresets();
   }
+  return getAllPresets();
 }
 
 export function getAllPresets(): AlbumPreset[] {

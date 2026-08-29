@@ -30,14 +30,34 @@ assert.strictEqual(fromPixels(300, 'inch', 300), 1);
 assert.strictEqual(formatDimensions(210, 297, 'mm'), '210 × 297 mm');
 console.log('✓ Unit conversions passed.');
 
-// Test 2: Presets
+// Test 2: Presets & Custom Presets Lifecycle
 console.log('Testing Presets...');
 assert.ok(ALBUM_PRESETS.length > 0);
 const standardPreset = getPresetById('square-8x8');
 assert.ok(standardPreset !== undefined);
 assert.strictEqual(standardPreset?.width, 8);
 assert.strictEqual(standardPreset?.height, 8);
-console.log('✓ Presets passed.');
+
+// Test Custom Preset lifecycle
+const { saveCustomPreset, deleteCustomPreset, getAllPresets } = await import('../src/domain/presets');
+const mockCustom = {
+  id: 'test-custom-preset',
+  name: 'Test 10x10 Custom',
+  width: 10,
+  height: 10,
+  unit: 'inch' as const,
+  dpi: 300,
+  isCustom: true,
+};
+const allAfterSave = saveCustomPreset(mockCustom);
+assert.ok(allAfterSave.some((p) => p.id === 'test-custom-preset'));
+assert.ok(allAfterSave.some((p) => p.id === 'square-8x8'), 'Built-in presets must remain after saving custom preset');
+assert.ok(allAfterSave.some((p) => p.id === 'a4-portrait'), 'All built-ins must be preserved');
+
+const allAfterDelete = deleteCustomPreset('test-custom-preset');
+assert.ok(!allAfterDelete.some((p) => p.id === 'test-custom-preset'));
+assert.ok(allAfterDelete.some((p) => p.id === 'square-8x8'), 'Built-in presets must remain after deleting custom preset');
+console.log('✓ Presets and Custom Preset lifecycle passed.');
 
 // Test 3: Validation
 console.log('Testing Validation...');
