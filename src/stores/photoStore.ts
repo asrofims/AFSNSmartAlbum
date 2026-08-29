@@ -30,11 +30,8 @@ interface PhotoState {
   importPaths: (projectId: string, paths: string[]) => Promise<void>;
   cancelImport: () => Promise<void>;
   toggleFavorite: (photoId: string) => Promise<void>;
-  removePhoto: (photoId: string) => Promise<void>;
   checkMissing: (projectId: string) => Promise<void>;
   relinkFolder: (projectId: string) => Promise<void>;
-  syncThumbnails: (projectId: string) => Promise<{ total: number; regenerated: number; missing: number }>;
-  purgeMissingPhotos: (projectId: string) => Promise<string[]>;
   setupListeners: () => Promise<() => void>;
 
   // Selection actions
@@ -263,61 +260,6 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       }
     } catch (err) {
       console.error('[AFSN] relink_folder error:', err);
-    }
-  },
-
-  syncThumbnails: async (projectId: string) => {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const res = await invoke<{ total: number; regenerated: number; missing: number }>('sync_and_regenerate_thumbnails', { projectId });
-      await get().loadPhotos(projectId);
-      return res;
-    } catch (err) {
-      console.error('[AFSN] sync_and_regenerate_thumbnails error:', err);
-      throw err;
-    }
-  },
-
-  purgeMissingPhotos: async (projectId: string) => {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const res = await invoke<{ purgedCount: number; purgedPhotoIds: string[] }>('purge_missing_photos', { projectId });
-      
-      // Update photos in store
-      if (res.purgedPhotoIds && res.purgedPhotoIds.length > 0) {
-        const purgedSet = new Set(res.purgedPhotoIds);
-        set((state) => ({
-          photos: state.photos.filter((p) => !purgedSet.has(p.id)),
-          selectedPhotoIds: state.selectedPhotoIds.filter((id) => !purgedSet.has(id)),
-        }));
-
-        // Clean spreads from any purged photo elements
-        const { currentAlbum, saveAlbumToDb } = (await import('./albumStore')).useAlbumStore.getState();
-        if (currentAlbum) {
-          let modified = false;
-          const updatedSpreads = currentAlbum.spreads.map((spread) => {
-            const updatedElements = spread.elements.map((el) => {
-              if (el.photoId && purgedSet.has(el.photoId)) {
-                modified = true;
-                return { ...el, photoId: null, crop: undefined };
-              }
-              return el;
-            });
-            return { ...spread, elements: updatedElements };
-          });
-
-          if (modified) {
-            const updatedAlbum = { ...currentAlbum, spreads: updatedSpreads };
-            (await import('./albumStore')).useAlbumStore.setState({ currentAlbum: updatedAlbum });
-            saveAlbumToDb();
-          }
-        }
-      }
-
-      return res.purgedPhotoIds;
-    } catch (err) {
-      console.error('[AFSN] purge_missing_photos error:', err);
-      throw err;
     }
   },
 

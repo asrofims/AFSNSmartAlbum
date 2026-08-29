@@ -29,7 +29,7 @@ export function RelinkDialog() {
             The original files for <strong>{missingPhotos.length}</strong> photo(s) could not be found at their original locations.
           </p>
           <p className={styles.subtext}>
-            Please select the folder where these photos are now located. AFSNSmartAlbum will automatically reconnect matching files by filename.
+            Please select the folder where these photos are now located. AFSNSmartAlbum will automatically reconnect matching files by filename and rebuild their thumbnails.
           </p>
         </div>
 

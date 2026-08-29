@@ -27,52 +27,27 @@ export function SupportDonationModal() {
     <Dialog
       isOpen={isOpen}
       onClose={handleClose}
-      title="Support AFSNSmartAlbum Development"
-      width={460}
+      title="Support Development"
+      width={360}
       closeOnOverlayClick={true}
     >
       <div className={styles.container}>
-        <div className={styles.headerIcon}>☕</div>
-
-        <div className={styles.title}>Support Independent Development</div>
+        <div className={styles.title}>☕ Dukung Pengembangan</div>
 
         <div className={styles.description}>
-          AFSNSmartAlbum is 100% offline, privacy-first software built for photographers. Your voluntary contribution helps keep updates, performance features, and new album templates coming! 💖
+          Pindai dengan aplikasi mobile banking atau e-wallet apa saja untuk kontribusi sukarela pengembangan AFSNSmartAlbum.
         </div>
 
-        {/* Reconstructed Clean Vector QRIS Card */}
-        <div className={styles.qrisCard}>
-          <div className={styles.qrisTopBar}>
-            <div>
-              <div className={styles.qrisLogoText}>QRIS</div>
-              <div className={styles.qrisSubLogo}>QR Code Standar Pembayaran Nasional</div>
-            </div>
-            <div className={styles.gpnLogoBadge}>
-              <span>🇲🇨 GPN</span>
-            </div>
-          </div>
-
-          <div className={styles.merchantInfo}>
-            <div className={styles.merchantName}>AFSUNMEDIA</div>
-            <div className={styles.nmidText}>NMID : ID1026545399762</div>
-            <div className={styles.tagA01}>A01</div>
-          </div>
-
-          <div className={styles.qrVectorWrapper}>
-            <QRCodeSVG
-              value={QRIS_RAW_PAYLOAD}
-              size={210}
-              level="M"
-              marginSize={1}
-              fgColor="#000000"
-              bgColor="#ffffff"
-            />
-          </div>
-
-          <div className={styles.qrisBottomTag}>SATU QRIS UNTUK SEMUA</div>
-          <div className={styles.paymentList}>
-            BCA • Mandiri • BRI • BNI • GoPay • OVO • DANA • ShopeePay
-          </div>
+        {/* Pure Clean QR Code — Tanpa Teks / Embel-embel */}
+        <div className={styles.qrCard}>
+          <QRCodeSVG
+            value={QRIS_RAW_PAYLOAD}
+            size={220}
+            level="M"
+            marginSize={0}
+            fgColor="#000000"
+            bgColor="#ffffff"
+          />
         </div>
 
         <div className={styles.footer}>
@@ -82,12 +57,12 @@ export function SupportDonationModal() {
               checked={dontShowAgain}
               onChange={(e) => setDontShowAgain(e.target.checked)}
             />
-            <span>Don't show this popup on application startup again</span>
+            <span>Jangan tampilkan lagi saat aplikasi dibuka</span>
           </label>
 
           <div className={styles.btnRow}>
-            <Button variant="primary" onClick={handleClose} style={{ minWidth: '120px' }}>
-              Close
+            <Button variant="primary" onClick={handleClose} style={{ minWidth: '110px' }}>
+              Tutup
             </Button>
           </div>
         </div>

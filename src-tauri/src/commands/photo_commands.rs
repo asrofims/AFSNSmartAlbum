@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 use crate::db::{Database, PhotoFolderRow, PhotoRow};
-use crate::photo_engine::{is_supported_image, process_photo, scan_directory};
+use crate::photo_engine::{is_supported_image, process_photo, scan_directory, SUPPORTED_EXTENSIONS};
 
 #[derive(Clone, Default)]
 pub struct ImportState {
@@ -29,12 +29,6 @@ fn get_cache_dir(app: &AppHandle) -> PathBuf {
 }
 
 #[tauri::command]
-pub fn cancel_photo_import(state: State<'_, ImportState>) {
-    log::info!("User requested cancellation of photo import");
-    state.cancel_flag.store(true, Ordering::SeqCst);
-}
-
-#[tauri::command]
 pub async fn select_and_import_files(
     app: AppHandle,
     project_id: String,
@@ -43,10 +37,7 @@ pub async fn select_and_import_files(
     let files: Option<Vec<PathBuf>> = tauri::async_runtime::spawn_blocking(|| {
         rfd::FileDialog::new()
             .set_title("Select Photos to Import")
-            .add_filter(
-                "Image Files (*.jpg, *.jpeg, *.png, *.webp, *.bmp, *.tiff)",
-                &["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"],
-            )
+            .add_filter("Images", SUPPORTED_EXTENSIONS)
             .pick_files()
     })
     .await
@@ -54,7 +45,10 @@ pub async fn select_and_import_files(
 
     match files {
         Some(paths) => import_paths_internal(app, project_id, paths, folder_id).await,
-        None => Ok(Vec::new()),
+        None => {
+            let db = app.state::<Database>();
+            db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+        }
     }
 }
 
@@ -79,7 +73,10 @@ pub async fn select_and_import_folder(
                 .map_err(|e| e.to_string())?;
             import_paths_internal(app, project_id, paths, folder_id).await
         }
-        None => Ok(Vec::new()),
+        None => {
+            let db = app.state::<Database>();
+            db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+        }
     }
 }
 
@@ -90,22 +87,15 @@ pub async fn import_file_paths(
     paths: Vec<String>,
     folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
-    let path_bufs: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || {
-        let mut result = Vec::new();
-        for p in paths {
-            let path = PathBuf::from(p);
-            if path.is_dir() {
-                result.extend(scan_directory(&path));
-            } else if is_supported_image(&path) {
-                result.push(path);
-            }
-        }
-        result
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-
+    let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     import_paths_internal(app, project_id, path_bufs, folder_id).await
+}
+
+#[tauri::command]
+pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> {
+    state.cancel_flag.store(true, Ordering::SeqCst);
+    log::info!("Photo import cancellation requested by user");
+    Ok(())
 }
 
 async fn import_paths_internal(
@@ -115,7 +105,8 @@ async fn import_paths_internal(
     folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
     if paths.is_empty() {
-        return Ok(Vec::new());
+        let db = app.state::<Database>();
+        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
     }
 
     let import_state = app.state::<ImportState>();
@@ -125,14 +116,19 @@ async fn import_paths_internal(
     let db = app.state::<Database>();
     let _ = db.ensure_project_exists(&project_id, "Untitled Album");
 
+    let existing_photos = db.get_photos_for_project(&project_id).unwrap_or_default();
+
     let mut to_import: Vec<PathBuf> = Vec::new();
     for p in paths {
         let path_str = p.to_string_lossy().to_string();
-        if let Ok(exists) = db.check_photo_exists_in_project(&project_id, &path_str) {
-            if !exists {
-                to_import.push(p);
-            }
-        } else {
+        let file_name = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        
+        // If file already exists and is not missing, skip; otherwise allow re-importing / healing
+        let already_healthy = existing_photos.iter().any(|ep| {
+            (ep.file_path == path_str || ep.file_name.eq_ignore_ascii_case(&file_name)) && !ep.is_missing && ep.thumbnail_path.as_ref().map(|tp| Path::new(tp).exists()).unwrap_or(false)
+        });
+
+        if !already_healthy {
             to_import.push(p);
         }
     }
@@ -168,12 +164,18 @@ async fn import_paths_internal(
                     return None;
                 }
 
-                let photo_id = Uuid::new_v4().to_string();
                 let file_name = path
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("photo")
                     .to_string();
+
+                // Check if this matches a missing existing photo in the project
+                let existing_match = existing_photos.iter().find(|ep| ep.file_name.eq_ignore_ascii_case(&file_name));
+                let photo_id = match existing_match {
+                    Some(ep) => ep.id.clone(),
+                    None => Uuid::new_v4().to_string(),
+                };
 
                 match process_photo(&path, &cache_dir, &photo_id) {
                     Ok(processed) => {
@@ -182,7 +184,7 @@ async fn import_paths_internal(
                         }
 
                         let row = PhotoRow {
-                            id: photo_id,
+                            id: photo_id.clone(),
                             project_id: project_id_clone.clone(),
                             file_path: processed.file_path,
                             file_name: processed.file_name,
@@ -191,7 +193,7 @@ async fn import_paths_internal(
                             height: processed.height,
                             format: processed.format,
                             thumbnail_path: processed.thumbnail_path,
-                            thumbnail_base64: processed.thumbnail_base64,
+                            thumbnail_base64: None,
                             preview_path: None,
                             is_favorite: false,
                             used_count: 0,
@@ -200,26 +202,30 @@ async fn import_paths_internal(
                             updated_at: chrono_now(),
                         };
 
-                        if let Err(e) = db_thread.add_photo(&row) {
-                            log::error!("Failed to save photo to DB: {}", e);
-                            None
+                        if existing_match.is_some() {
+                            let _ = db_thread.relink_photo(&photo_id, &row.file_path);
+                            if let Some(tp) = &row.thumbnail_path {
+                                let _ = db_thread.update_photo_thumbnail(&photo_id, tp);
+                            }
                         } else {
-                            let curr = counter.fetch_add(1, Ordering::SeqCst) + 1;
-                            let percent = ((curr as f64 / total as f64) * 100.0).min(100.0) as u8;
-
-                            let _ = app_for_thread.emit("photo-imported", &row);
-                            let _ = app_for_thread.emit(
-                                "photo-import-progress",
-                                ImportProgressPayload {
-                                    current: curr,
-                                    total,
-                                    current_file: file_name,
-                                    percent,
-                                },
-                            );
-
-                            Some(row)
+                            let _ = db_thread.add_photo(&row);
                         }
+
+                        let curr = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                        let percent = ((curr as f64 / total as f64) * 100.0).min(100.0) as u8;
+
+                        let _ = app_for_thread.emit("photo-imported", &row);
+                        let _ = app_for_thread.emit(
+                            "photo-import-progress",
+                            ImportProgressPayload {
+                                current: curr,
+                                total,
+                                current_file: file_name,
+                                percent,
+                            },
+                        );
+
+                        Some(row)
                     }
                     Err(e) => {
                         log::warn!("Skipping file {:?}: {}", path, e);
@@ -246,7 +252,6 @@ async fn import_paths_internal(
 
     let db_final = app.state::<Database>();
 
-    // If a folder_id was specified, link all imported photos to that folder
     if let Some(fid) = folder_id {
         let imported_ids: Vec<String> = imported_rows.iter().map(|p| p.id.clone()).collect();
         if !imported_ids.is_empty() {
@@ -255,12 +260,6 @@ async fn import_paths_internal(
     }
 
     let is_cancelled = cancel_flag.load(Ordering::Relaxed);
-    log::info!(
-        "Import complete: {} photos added (cancelled: {})",
-        imported_rows.len(),
-        is_cancelled
-    );
-
     let _ = app.emit(
         "photo-import-complete",
         serde_json::json!({
@@ -304,14 +303,15 @@ pub fn check_missing_photos(
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<Vec<PhotoRow>, String> {
-    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-    for photo in &photos {
+    let mut photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+    for photo in &mut photos {
         let is_missing = !Path::new(&photo.file_path).exists();
         if is_missing != photo.is_missing {
             let _ = db.update_photo_missing(&photo.id, is_missing);
+            photo.is_missing = is_missing;
         }
     }
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+    Ok(photos)
 }
 
 #[tauri::command]
@@ -335,127 +335,43 @@ pub async fn relink_folder(
         }
     };
 
+    let cache_dir = get_cache_dir(&app);
     let db = app.state::<Database>();
     let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
     let candidates: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&folder_path))
         .await
         .map_err(|e| e.to_string())?;
 
-    for photo in photos {
-        if photo.is_missing {
-            if let Some(matching) = candidates.iter().find(|c| {
-                c.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(&photo.file_name))
-                    .unwrap_or(false)
-            }) {
-                let new_path = matching.to_string_lossy().to_string();
-                let _ = db.relink_photo(&photo.id, &new_path);
-                log::info!("Relinked photo {} to {:?}", photo.file_name, new_path);
-            }
-        }
-    }
-
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
-}
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ThumbnailSyncResult {
-    pub total: usize,
-    pub regenerated: usize,
-    pub missing: usize,
-}
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PurgeResult {
-    pub purged_count: usize,
-    pub purged_photo_ids: Vec<String>,
-}
-
-#[tauri::command]
-pub async fn sync_and_regenerate_thumbnails(
-    app: AppHandle,
-    project_id: String,
-) -> Result<ThumbnailSyncResult, String> {
-    let cache_dir = get_cache_dir(&app);
-    let thumbs_dir = cache_dir.join("thumbnails");
-    let _ = std::fs::create_dir_all(&thumbs_dir);
-
-    let db = app.state::<Database>();
-    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-    let total = photos.len();
-
     let app_clone = app.clone();
-    let (regenerated, missing) = tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
         let db_thread = app_clone.state::<Database>();
-        let mut regen_count = 0;
-        let mut miss_count = 0;
-
         for photo in photos {
-            let orig_path = Path::new(&photo.file_path);
-            if !orig_path.exists() {
-                miss_count += 1;
-                let _ = db_thread.update_photo_missing(&photo.id, true);
-                continue;
-            }
+            let is_currently_missing = !Path::new(&photo.file_path).exists() || photo.is_missing;
+            if is_currently_missing {
+                if let Some(matching) = candidates.iter().find(|c| {
+                    c.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.eq_ignore_ascii_case(&photo.file_name))
+                        .unwrap_or(false)
+                }) {
+                    let new_path = matching.to_string_lossy().to_string();
+                    let _ = db_thread.relink_photo(&photo.id, &new_path);
 
-            // Original exists; check if thumbnail is missing on disk
-            let thumb_missing = match &photo.thumbnail_path {
-                Some(tp) => !Path::new(tp).exists(),
-                None => true,
-            };
-
-            if thumb_missing {
-                let thumb_file_path = thumbs_dir.join(format!("{}.jpg", photo.id));
-                if let Ok(img) = image::open(orig_path) {
-                    let thumb = img.thumbnail(240, 240);
-                    let rgb_thumb = image::DynamicImage::ImageRgba8(thumb.to_rgba8()).to_rgb8();
-                    if rgb_thumb.save_with_format(&thumb_file_path, image::ImageFormat::Jpeg).is_ok() {
-                        let path_str = thumb_file_path.to_string_lossy().to_string();
-                        let _ = db_thread.update_photo_thumbnail(&photo.id, &path_str);
-                        regen_count += 1;
+                    if let Ok(processed) = process_photo(matching, &cache_dir, &photo.id) {
+                        if let Some(tp) = processed.thumbnail_path {
+                            let _ = db_thread.update_photo_thumbnail(&photo.id, &tp);
+                        }
                     }
+                    log::info!("Relinked photo {} to {:?}", photo.file_name, new_path);
                 }
             }
         }
-
-        (regen_count, miss_count)
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(ThumbnailSyncResult {
-        total,
-        regenerated,
-        missing,
-    })
-}
-
-#[tauri::command]
-pub async fn purge_missing_photos(
-    app: AppHandle,
-    project_id: String,
-) -> Result<PurgeResult, String> {
     let db = app.state::<Database>();
-    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-
-    let missing_ids: Vec<String> = photos
-        .into_iter()
-        .filter(|p| p.is_missing || !Path::new(&p.file_path).exists())
-        .map(|p| p.id)
-        .collect();
-
-    let purged_count = missing_ids.len();
-    if !missing_ids.is_empty() {
-        db.batch_delete_photos(&missing_ids).map_err(|e| e.to_string())?;
-    }
-
-    Ok(PurgeResult {
-        purged_count,
-        purged_photo_ids: missing_ids,
-    })
+    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
 
 // --- Batch Operations Commands ---
@@ -486,7 +402,6 @@ pub fn create_photo_folder(
     name: String,
 ) -> Result<PhotoFolderRow, String> {
     let folder_id = Uuid::new_v4().to_string();
-    log::info!("Creating photo folder '{}' (id: {}) for project {}", name, folder_id, project_id);
     let _ = db.ensure_project_exists(&project_id, "Untitled Album");
     db.create_folder(&folder_id, &project_id, &name).map_err(|e| e.to_string())
 }

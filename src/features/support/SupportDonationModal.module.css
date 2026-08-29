@@ -5,136 +5,50 @@
   text-align: center;
   gap: var(--space-3);
   padding: var(--space-1) 0;
+  animation: modalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.headerIcon {
-  font-size: 32px;
-  line-height: 1;
+@keyframes modalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .title {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin-top: -2px;
+  margin-bottom: 2px;
 }
 
 .description {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
-  line-height: 1.5;
-  max-width: 380px;
+  line-height: 1.4;
+  max-width: 280px;
 }
 
-/* Reconstructed Vector QRIS Card */
-.qrisCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #ffffff;
-  padding: 18px 16px 14px;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
-  border: 1px solid #e5e7eb;
-  width: 290px;
-  position: relative;
-  overflow: hidden;
-}
-
-.qrisTopBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #ef4444;
-  margin-bottom: 8px;
-}
-
-.qrisLogoText {
-  font-size: 16px;
-  font-weight: 900;
-  color: #111827;
-  letter-spacing: -0.5px;
-}
-
-.qrisSubLogo {
-  font-size: 8px;
-  font-weight: 700;
-  color: #6b7280;
-  line-height: 1;
-  text-align: left;
-}
-
-.gpnLogoBadge {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  font-weight: 900;
-  color: #dc2626;
-  letter-spacing: -0.5px;
-}
-
-.merchantInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.merchantName {
-  font-size: 15px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.5px;
-}
-
-.nmidText {
-  font-size: 10px;
-  font-weight: 600;
-  color: #4b5563;
-  margin-top: 1px;
-}
-
-.tagA01 {
-  font-size: 10px;
-  font-weight: 700;
-  color: #1f2937;
-  margin-top: 1px;
-}
-
-.qrVectorWrapper {
+/* Pure Clean QR Code Container — Zero Text & Zero Clutter */
+.qrCard {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
   background-color: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: var(--space-1) 0;
+  transition: transform 0.2s ease;
 }
 
-.qrisBottomTag {
-  font-size: 10px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.5px;
-  margin-top: 8px;
-  text-transform: uppercase;
-}
-
-.paymentList {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 9px;
-  font-weight: 600;
-  color: #6b7280;
-  margin-top: 2px;
-  max-width: 250px;
-  line-height: 1.3;
+.qrCard:hover {
+  transform: scale(1.02);
 }
 
 .footer {
@@ -143,7 +57,7 @@
   width: 100%;
   gap: var(--space-3);
   margin-top: var(--space-1);
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
 
@@ -161,5 +75,4 @@
 .btnRow {
   display: flex;
   justify-content: center;
-  gap: var(--space-3);
 }
