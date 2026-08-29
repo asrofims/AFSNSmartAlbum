@@ -13,6 +13,7 @@ import {
   SnappingConfig,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
+import { getAllAlbumSpreads } from '../domain/album';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
 import { usePhotoStore } from './photoStore';
@@ -60,6 +61,8 @@ export interface EditorState {
   bringToFront: (spreadId: string, frameId: string) => void;
   sendToBack: (spreadId: string, frameId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
+  groupSelectedFrames: (spreadId: string) => void;
+  ungroupSelectedFrames: (spreadId: string) => void;
 
   // Batch Alignment & Distribution
   alignSelectedFrames: (
@@ -118,14 +121,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   selectFrame: (frameId: string, multi = false) => {
     const { selectedFrameIds } = get();
+    const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
+    const spreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
+    const activeSpread = spreads.find((s) => s.id === activeSpreadId) || spreads[0];
+    const targetElement = activeSpread?.elements?.find((el) => el.id === frameId);
+
+    // If element belongs to a group, resolve all group sibling IDs
+    const targetGroupId = targetElement?.groupId;
+    const targetIds = targetGroupId
+      ? (activeSpread?.elements || []).filter((el) => el.groupId === targetGroupId).map((el) => el.id)
+      : [frameId];
+
     if (multi) {
-      if (selectedFrameIds.includes(frameId)) {
-        set({ selectedFrameIds: selectedFrameIds.filter((id) => id !== frameId) });
+      const allSelected = targetIds.every((id) => selectedFrameIds.includes(id));
+      if (allSelected) {
+        set({ selectedFrameIds: selectedFrameIds.filter((id) => !targetIds.includes(id)) });
       } else {
-        set({ selectedFrameIds: [...selectedFrameIds, frameId] });
+        const uniqueSet = new Set([...selectedFrameIds, ...targetIds]);
+        set({ selectedFrameIds: Array.from(uniqueSet) });
       }
     } else {
-      set({ selectedFrameIds: [frameId], editingCropFrameId: null });
+      set({ selectedFrameIds: targetIds, editingCropFrameId: null });
     }
   },
 
@@ -674,6 +690,101 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newRotation = (frame.rotation + delta + 360) % 360;
     updateFrameGeometry(spreadId, frameId, { rotation: newRotation });
+  },
+
+  groupSelectedFrames: (spreadId: string) => {
+    const { selectedFrameIds } = get();
+    if (selectedFrameIds.length < 2) return;
+
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const newGroupId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const updateElements = (elements: PhotoFrameElement[]) =>
+      elements.map((el) =>
+        selectedFrameIds.includes(el.id) ? { ...el, groupId: newGroupId } : el
+      );
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: updateElements(currentAlbum.coverSpread.elements || []),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+    );
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  ungroupSelectedFrames: (spreadId: string) => {
+    const { selectedFrameIds } = get();
+    if (selectedFrameIds.length === 0) return;
+
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const spreads = getAllAlbumSpreads(currentAlbum);
+    const targetSpread = spreads.find((s) => s.id === spreadId);
+    const targetElements = targetSpread?.elements || [];
+    const selectedGroupIds = new Set(
+      targetElements
+        .filter((el) => selectedFrameIds.includes(el.id) && el.groupId)
+        .map((el) => el.groupId as string)
+    );
+
+    if (selectedGroupIds.size === 0) return;
+
+    const updateElements = (elements: PhotoFrameElement[]) =>
+      elements.map((el) =>
+        el.groupId && selectedGroupIds.has(el.groupId) ? { ...el, groupId: null } : el
+      );
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: updateElements(currentAlbum.coverSpread.elements || []),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+    );
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
   },
 
   alignSelectedFrames: (spreadId, alignment) => {

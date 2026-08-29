@@ -20,6 +20,8 @@ export function FrameToolbar() {
     resetToOriginalRatio,
     resetCrop,
     swapFrames,
+    groupSelectedFrames,
+    ungroupSelectedFrames,
     updateFrameGeometry,
     updateCrop,
   } = useEditorStore();
@@ -186,6 +188,36 @@ export function FrameToolbar() {
                 <path d="M20 7H4" />
                 <path d="m8 21-4-4 4-4" />
                 <path d="M4 17h16" />
+              </svg>
+            </button>
+          )}
+
+          {/* Group Multiple Frames Button */}
+          {selectedFrameIds.length >= 2 && (
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => groupSelectedFrames(activeSpread.id)}
+              title={`Group ${selectedFrameIds.length} Frames (Ctrl+G)`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="9" height="9" x="2" y="2" rx="1.5" />
+                <rect width="9" height="9" x="13" y="13" rx="1.5" />
+              </svg>
+            </button>
+          )}
+
+          {/* Ungroup Frames Button */}
+          {(activeSpread.elements || []).some((f) => selectedFrameIds.includes(f.id) && Boolean(f.groupId)) && (
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => ungroupSelectedFrames(activeSpread.id)}
+              title="Ungroup Frames (Ctrl+Shift+G)"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="8" height="8" x="2" y="2" rx="1" strokeDasharray="2 2" />
+                <rect width="8" height="8" x="14" y="14" rx="1" strokeDasharray="2 2" />
               </svg>
             </button>
           )}

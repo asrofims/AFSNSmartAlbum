@@ -14,6 +14,7 @@ export interface PhotoFrameElement {
   height: number;
   rotation: number; // 0 - 360 degrees
   zIndex: number;
+  groupId?: string | null;
 
   // Original photo metadata for Aspect Ratio restoration
   photoAspect?: number; // width / height of original master photo

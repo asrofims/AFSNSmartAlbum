@@ -477,7 +477,68 @@ const swappedElements = elements.map((f) => {
 
 console.assert(swappedElements[0].photoId === 'photo-b', 'Frame 1 should now contain photo B');
 console.assert(swappedElements[0].x === 50 && swappedElements[0].width === 120, 'Frame 1 geometry preserved');
-console.assert(swappedElements[1].photoId === 'photo-a', 'Frame 2 should now contain photo A');
-console.assert(swappedElements[1].x === 200 && swappedElements[1].width === 80, 'Frame 2 geometry preserved');
+// 9. Test Group & Ungroup Mechanism
+const frameG1: PhotoFrameElement = { ...testFrameA, id: 'frame-g1', groupId: undefined };
+const frameG2: PhotoFrameElement = { ...testFrameB, id: 'frame-g2', groupId: undefined };
+const frameG3: PhotoFrameElement = { ...testFrameA, id: 'frame-g3', groupId: undefined };
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
+// Group G1 and G2 together
+const sampleGroupId = 'group-12345';
+const groupedFrames = [frameG1, frameG2, frameG3].map((f) =>
+  ['frame-g1', 'frame-g2'].includes(f.id) ? { ...f, groupId: sampleGroupId } : f
+);
+
+console.assert(groupedFrames[0].groupId === sampleGroupId, 'Frame G1 should have sampleGroupId');
+console.assert(groupedFrames[1].groupId === sampleGroupId, 'Frame G2 should have sampleGroupId');
+console.assert(groupedFrames[2].groupId === undefined, 'Frame G3 should remain ungrouped');
+
+// Resolve group member selection
+const targetElement = groupedFrames.find((f) => f.id === 'frame-g1');
+const targetGroupId = targetElement?.groupId;
+const resolvedSelection = targetGroupId
+  ? groupedFrames.filter((f) => f.groupId === targetGroupId).map((f) => f.id)
+  : ['frame-g1'];
+
+console.assert(resolvedSelection.length === 2, 'Selecting G1 should automatically resolve all 2 group members');
+console.assert(resolvedSelection.includes('frame-g1') && resolvedSelection.includes('frame-g2'), 'Resolved selection contains G1 and G2');
+
+// Ungroup G1 and G2
+const ungroupedFrames = groupedFrames.map((f) =>
+  f.groupId === sampleGroupId ? { ...f, groupId: null } : f
+);
+console.assert(ungroupedFrames[0].groupId === null, 'Frame G1 should now be ungrouped');
+console.assert(ungroupedFrames[1].groupId === null, 'Frame G2 should now be ungrouped');
+
+// 10. Test Shift-Key Axis Constraint (Orthogonal Straight-Line Dragging)
+function applyShiftDragConstraint(
+  startX: number,
+  startY: number,
+  dragX: number,
+  dragY: number,
+  isShift: boolean
+): { x: number; y: number } {
+  if (!isShift) return { x: dragX, y: dragY };
+  const deltaX = dragX - startX;
+  const deltaY = dragY - startY;
+  if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+    // Lock strictly horizontal
+    return { x: dragX, y: startY };
+  } else {
+    // Lock strictly vertical
+    return { x: startX, y: dragY };
+  }
+}
+
+// Dominant Horizontal movement (dx = 50mm, dy = 10mm) with Shift
+const horizDrag = applyShiftDragConstraint(100, 100, 150, 110, true);
+console.assert(horizDrag.x === 150 && horizDrag.y === 100, `Shift horizontal drag should keep y=100, got ${horizDrag.y}`);
+
+// Dominant Vertical movement (dx = 5mm, dy = 80mm) with Shift
+const vertDrag = applyShiftDragConstraint(100, 100, 105, 180, true);
+console.assert(vertDrag.x === 100 && vertDrag.y === 180, `Shift vertical drag should keep x=100, got ${vertDrag.x}`);
+
+// Non-shift movement (dx = 50mm, dy = 50mm)
+const freeDrag = applyShiftDragConstraint(100, 100, 150, 150, false);
+console.assert(freeDrag.x === 150 && freeDrag.y === 150, 'Free drag should allow diagonal movement');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');

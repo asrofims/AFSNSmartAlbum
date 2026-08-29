@@ -103,6 +103,7 @@ pub struct ElementPayload {
     pub z_index: i32,
     #[serde(default = "default_photo_aspect")]
     pub photo_aspect: f64,
+    pub group_id: Option<String>,
     pub original_width: Option<f64>,
     pub original_height: Option<f64>,
     #[serde(default)]

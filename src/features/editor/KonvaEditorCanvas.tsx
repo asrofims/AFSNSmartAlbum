@@ -524,6 +524,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     duplicateSelectedFrames,
     replacePhotoInFrame,
     swapFrames,
+    groupSelectedFrames,
+    ungroupSelectedFrames,
     bringToFront,
     sendToBack,
     rotateFrame90,
@@ -748,6 +750,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           duplicateSelectedFrames(activeSpread.id);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          ungroupSelectedFrames(activeSpread.id);
+        } else {
+          groupSelectedFrames(activeSpread.id);
         }
       } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1]) {
@@ -1144,6 +1153,31 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         onClick: () => duplicateSelectedFrames(activeSpread.id),
       },
     ];
+
+    const selectedElements = (activeSpread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const hasAnyGroup = selectedElements.some((f) => Boolean(f.groupId));
+
+    if (count >= 2) {
+      items.push({
+        id: 'group-photos',
+        label: `Group ${count} Photos`,
+        icon: '👥',
+        shortcut: 'Ctrl+G',
+        onClick: () => groupSelectedFrames(activeSpread.id),
+      });
+    }
+
+    if (hasAnyGroup) {
+      items.push({
+        id: 'ungroup-photos',
+        label: 'Ungroup Photos',
+        icon: '🔓',
+        shortcut: 'Ctrl+Shift+G',
+        onClick: () => ungroupSelectedFrames(activeSpread.id),
+      });
+    }
 
     if (count === 2) {
       items.push({
@@ -1624,10 +1658,23 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
                     if (!draggedNode) return;
 
-                    const currentPhysX = draggedNode.x() / scaleFactor;
-                    const currentPhysY = draggedNode.y() / scaleFactor;
-                    const deltaPhysX = currentPhysX - frame.x;
-                    const deltaPhysY = currentPhysY - frame.y;
+                    let currentPhysX = draggedNode.x() / scaleFactor;
+                    let currentPhysY = draggedNode.y() / scaleFactor;
+                    let deltaPhysX = currentPhysX - frame.x;
+                    let deltaPhysY = currentPhysY - frame.y;
+
+                    // Axis-Constrained Dragging with SHIFT Key (Straight horizontal or vertical constraint)
+                    if (e.evt?.shiftKey) {
+                      if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
+                        deltaPhysY = 0;
+                        currentPhysY = frame.y;
+                        draggedNode.y(frame.y * scaleFactor);
+                      } else {
+                        deltaPhysX = 0;
+                        currentPhysX = frame.x;
+                        draggedNode.x(frame.x * scaleFactor);
+                      }
+                    }
 
                     if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
                       clearSnapLines();
@@ -1689,8 +1736,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                     setHoveredDropFrameId(null);
                     const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
                     if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
-                      const finalCurrentPhysX = draggedNode.x() / scaleFactor;
-                      const finalCurrentPhysY = draggedNode.y() / scaleFactor;
+                      let finalCurrentPhysX = draggedNode.x() / scaleFactor;
+                      let finalCurrentPhysY = draggedNode.y() / scaleFactor;
+
+                      // Axis-Constrained Dragging with SHIFT Key on Drag End
+                      const isShiftConstrained = Boolean(e.evt?.shiftKey);
+                      let isHorizontalConstraint = true;
+                      if (isShiftConstrained) {
+                        const rawDeltaX = finalCurrentPhysX - frame.x;
+                        const rawDeltaY = finalCurrentPhysY - frame.y;
+                        if (Math.abs(rawDeltaX) >= Math.abs(rawDeltaY)) {
+                          finalCurrentPhysY = frame.y;
+                          draggedNode.y(frame.y * scaleFactor);
+                          isHorizontalConstraint = true;
+                        } else {
+                          finalCurrentPhysX = frame.x;
+                          draggedNode.x(frame.x * scaleFactor);
+                          isHorizontalConstraint = false;
+                        }
+                      }
 
                       // Check if dropped directly onto another frame on the canvas to SWAP
                       if (dragInitialPhysicalPositionsRef.current.size === 1) {
@@ -1730,8 +1794,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                             unit
                           );
 
-                      const deltaPhysX = snapRes.snappedX - frame.x;
-                      const deltaPhysY = snapRes.snappedY - frame.y;
+                      let deltaPhysX = snapRes.snappedX - frame.x;
+                      let deltaPhysY = snapRes.snappedY - frame.y;
+
+                      if (isShiftConstrained) {
+                        if (isHorizontalConstraint) {
+                          deltaPhysY = 0;
+                        } else {
+                          deltaPhysX = 0;
+                        }
+                      }
 
                       if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
                         const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
