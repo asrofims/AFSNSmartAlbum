@@ -7,6 +7,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { usePhotoStore } from '../../stores/photoStore';
 import { useHistoryStore } from '../../stores/historyStore';
 import { useAutoSave } from '../persistence/useAutoSave';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
@@ -199,6 +200,28 @@ export function WorkspaceLayout() {
               }
             }
           });
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+
+        e.preventDefault();
+
+        // If hovering over filmstrip, select all photos
+        const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
+        if (isHoveredOnFilmstrip) {
+          usePhotoStore.getState().selectAll();
+          useEditorStore.getState().clearSelection();
+        } else {
+          // Select all frames on active spread
+          const album = useAlbumStore.getState().currentAlbum;
+          const activeSpreadId = useAlbumStore.getState().activeSpreadId;
+          const spreads = album ? getAllAlbumSpreads(album) : [];
+          const activeSpread = spreads.find((s) => s.id === activeSpreadId) || spreads[0];
+          if (activeSpread && activeSpread.elements && activeSpread.elements.length > 0) {
+            useEditorStore.getState().selectFrames(activeSpread.elements.map((f) => f.id));
+            usePhotoStore.getState().clearSelection();
+          }
         }
       } else if (e.key === 'o' || e.key === 'O') {
         e.preventDefault();

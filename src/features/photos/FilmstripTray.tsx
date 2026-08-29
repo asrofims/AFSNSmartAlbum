@@ -127,6 +127,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const filtered = filterPhotos(currentPhotoPool, filter, searchQuery, usedPhotoIdSet);
   const sortedPhotos = sortPhotos(filtered, sortBy);
 
+  const isHoveredRef = useRef(false);
+
   // Global Keyboard Shortcuts for Lightroom-style photo interaction
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -136,7 +138,16 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        const isTargetInside = filmstripRef.current && (
+          filmstripRef.current.contains(e.target as Node) || isHoveredRef.current
+        );
+        if (isTargetInside) {
+          e.preventDefault();
+          selectAll(sortedPhotos);
+          useEditorStore.getState().clearSelection();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         clearSelection();
       } else if (e.key === 'Escape') {
@@ -148,7 +159,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, clearSelection]);
+  }, [currentProject, clearSelection, selectAll, sortedPhotos]);
 
   if (!currentProject) return null;
 
@@ -288,6 +299,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     <section
       ref={filmstripRef}
       className={`${styles.filmstrip} ${!isOpen ? styles.collapsed : ''} ${isDragOver ? styles.dragOver : ''}`}
+      onMouseEnter={() => { isHoveredRef.current = true; }}
+      onMouseLeave={() => { isHoveredRef.current = false; }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

@@ -726,6 +726,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         } else {
           clearSelection();
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
+        if (!isHoveredOnFilmstrip && activeSpread) {
+          e.preventDefault();
+          const allFrameIds = (activeSpread.elements || []).map((f) => f.id);
+          if (allFrameIds.length > 0) {
+            selectFrames(allFrameIds);
+            usePhotoStore.getState().clearSelection();
+          }
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
