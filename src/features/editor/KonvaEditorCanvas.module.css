@@ -4,10 +4,11 @@
   height: 100%;
   position: relative;
   overflow: auto;
-  padding: 40px;
+  padding: 32px;
   background-color: #080c14;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justifyContent: center;
   user-select: none;
 }
 

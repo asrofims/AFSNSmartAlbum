@@ -601,6 +601,43 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     };
   });
 
+  // Native non-passive Wheel/Touchpad gesture listener
+  // Enables smooth 2-finger pinch-to-zoom (e.ctrlKey) and natural 2-finger swipe pan
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      // 1. PINCH-TO-ZOOM GESTURE or CTRL + MOUSE WHEEL
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (onZoomChange) {
+          // Smooth continuous exponential zooming
+          const zoomFactor = Math.exp(-e.deltaY * 0.005);
+          onZoomChange((currentZoom) => {
+            const nextZoom = Math.round(currentZoom * zoomFactor);
+            return Math.max(25, Math.min(300, nextZoom));
+          });
+        }
+        return;
+      }
+
+      // 2. TWO-FINGER SWIPE TO PAN (when zoomed in > 100%)
+      if (zoomLevel > 100) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaX;
+        container.scrollTop += e.deltaY;
+      }
+    };
+
+    container.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [onZoomChange, zoomLevel]);
+
   // Marquee Selection State
   const [selectionRect, setSelectionRect] = useState<{
     x: number;
@@ -848,9 +885,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const totalSpreadPhysicalW = singlePageW * 2 + gutterPhysicalW;
   const totalSpreadPhysicalH = singlePageH;
 
-  // Dynamic responsive canvas scaling (Fills ~88% of container workspace)
-  const maxAvailableW = Math.max(300, containerSize.width - 60);
-  const maxAvailableH = Math.max(200, containerSize.height - 60);
+  // Dynamic responsive canvas scaling (Fills workspace comfortably with breathing margin)
+  const marginH = 80; // 32px padding + 8px breathing margin on each side
+  const marginV = 80;
+  const maxAvailableW = Math.max(200, containerSize.width - marginH);
+  const maxAvailableH = Math.max(150, containerSize.height - marginV);
   const aspect = totalSpreadPhysicalW / Math.max(0.001, totalSpreadPhysicalH);
 
   let baseW = maxAvailableW;
@@ -1375,21 +1414,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     <div
       ref={containerRef}
       className={`${styles.canvasContainer} ${isPanning ? styles.spacePanningActive : isSpacePressed ? styles.spacePanning : activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''}`}
+      style={{
+        overflow: zoomLevel > 100 ? 'auto' : 'hidden',
+      }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={(e) => {
         e.preventDefault();
         openContextMenuAt(e.clientX, e.clientY);
-      }}
-      onWheel={(e) => {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          if (onZoomChange) {
-            const delta = e.deltaY < 0 ? 10 : -10;
-            onZoomChange((z) => Math.max(25, Math.min(300, z + delta)));
-          }
-        }
       }}
       onMouseDown={(e) => {
         if (isSpacePressed || e.button === 1 || activeTool === 'pan') {
