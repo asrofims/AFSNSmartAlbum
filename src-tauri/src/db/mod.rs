@@ -209,7 +209,7 @@ pub struct Database {
 
 impl Database {
     pub fn expected_version() -> i32 {
-        6
+        7
     }
 
     /// Initialize the database at the given path.
@@ -281,6 +281,10 @@ impl Database {
 
         if current_version < 6 {
             Self::migrate_v6(conn)?;
+        }
+
+        if current_version < 7 {
+            Self::migrate_v7(conn)?;
         }
 
         Ok(())
@@ -502,6 +506,29 @@ impl Database {
         )?;
 
         log::info!("Applied database migration v6");
+        Ok(())
+    }
+
+    /// Schema version 7: Add group_id to spread_elements table.
+    fn migrate_v7(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"group_id".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE spread_elements ADD COLUMN group_id TEXT;
+                INSERT INTO schema_version (version) VALUES (7);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (7)", [])?;
+        }
+
+        log::info!("Applied database migration v7");
         Ok(())
     }
 
@@ -1153,18 +1180,18 @@ impl Database {
             for elem in &spread.elements {
                 tx.execute(
                     "INSERT INTO spread_elements (
-                        id, spread_id, element_type, photo_id, file_path, file_name,
+                        id, spread_id, element_type, photo_id, group_id, file_path, file_name,
                         preview_path, thumbnail_path, x, y, width, height,
                         rotation, z_index, photo_aspect, original_width, original_height,
                         crop_x, crop_y, crop_scale, crop_rotation,
                         border_enabled, border_width, border_color, opacity,
                         created_at, updated_at
                     ) VALUES (
-                        ?1, ?2, ?3, ?4, ?5, ?6,
-                        ?7, ?8, ?9, ?10, ?11, ?12,
-                        ?13, ?14, ?15, ?16, ?17,
-                        ?18, ?19, ?20, ?21,
-                        ?22, ?23, ?24, ?25,
+                        ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+                        ?8, ?9, ?10, ?11, ?12, ?13,
+                        ?14, ?15, ?16, ?17, ?18,
+                        ?19, ?20, ?21, ?22,
+                        ?23, ?24, ?25, ?26,
                         datetime('now'), datetime('now')
                     )",
                     rusqlite::params![
@@ -1172,6 +1199,7 @@ impl Database {
                         spread.id,
                         elem.r#type,
                         elem.photo_id,
+                        elem.group_id,
                         elem.file_path,
                         elem.file_name,
                         elem.preview_path,
@@ -1274,7 +1302,7 @@ impl Database {
                     rotation, z_index, photo_aspect, original_width, original_height,
                     crop_x, crop_y, crop_scale, crop_rotation,
                     border_enabled, border_width, border_color, opacity,
-                    created_at, updated_at
+                    group_id, created_at, updated_at
              FROM spread_elements
              WHERE spread_id = ?1
              ORDER BY z_index ASC",
@@ -1333,6 +1361,7 @@ impl Database {
                     border_width: er.get(22)?,
                     border_color: er.get(23)?,
                     opacity: er.get(24)?,
+                    group_id: er.get(25).ok(),
                 })
             })?;
 
@@ -1733,7 +1762,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 6);
+        assert_eq!(db.get_schema_version().unwrap(), 7);
 
         db.create_project(
             "test-id-1",
@@ -1935,6 +1964,7 @@ mod tests {
                     rotation: 0.0,
                     z_index: 1,
                     photo_aspect: 1.25,
+                    group_id: None,
                     original_width: Some(50.0),
                     original_height: Some(40.0),
                     crop_x: 0.0,
