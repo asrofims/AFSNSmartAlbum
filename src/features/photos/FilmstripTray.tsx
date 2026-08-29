@@ -65,6 +65,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
   const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
+  const isHoveredRef = useRef(false);
 
   // Lazy Thumbnail Healing & Broken Cache Fallback States
   const [brokenPhotoIds, setBrokenPhotoIds] = useState<Set<string>>(new Set());
@@ -184,6 +185,27 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         clearSelection();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        const { selectedFrameIds } = useEditorStore.getState();
+        const isTargetInside = filmstripRef.current && (
+          filmstripRef.current.contains(e.target as Node) || isHoveredRef.current
+        );
+
+        // If photos are selected in the filmstrip, and (filmstrip is hovered/focused OR no canvas frames are selected)
+        if (selectedPhotoIds.length > 0 && (isTargetInside || selectedFrameIds.length === 0)) {
+          e.preventDefault();
+          const targetPhotos = photos.filter((p) => selectedPhotoIds.includes(p.id));
+          if (targetPhotos.length > 0) {
+            const firstPhoto = targetPhotos[0];
+            setPhotoToDelete({
+              ids: selectedPhotoIds,
+              name:
+                selectedPhotoIds.length === 1 && firstPhoto
+                  ? firstPhoto.fileName
+                  : `${selectedPhotoIds.length} photos`,
+            });
+          }
+        }
       } else if (e.key === 'Escape') {
         clearSelection();
         setContextMenuState((s) => ({ ...s, isOpen: false }));
@@ -193,7 +215,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, clearSelection, selectAll, sortedPhotos]);
+  }, [currentProject, clearSelection, selectAll, sortedPhotos, selectedPhotoIds, photos]);
 
   if (!currentProject) return null;
 
@@ -269,6 +291,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   // Internal Card Click Handler (Lightroom Style)
   const handleCardClick = (e: React.MouseEvent, photo: Photo) => {
     e.stopPropagation();
+    useEditorStore.getState().clearSelection();
     if (e.ctrlKey || e.metaKey) {
       selectPhoto(photo.id, 'toggle', sortedPhotos);
     } else if (e.shiftKey) {
