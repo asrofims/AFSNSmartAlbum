@@ -18,7 +18,6 @@ import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
-import { LayoutCycleHUD } from '../editor/LayoutCycleHUD';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
 import appLogo from '../../assets/app-logo.png';
@@ -77,7 +76,7 @@ export function WorkspaceLayout() {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
-  const [inspectorTab, setInspectorTab] = useState<'properties' | 'templates'>('properties');
+  const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout'>('properties');
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -304,7 +303,7 @@ export function WorkspaceLayout() {
                         if (path) showToast(`✓ Complete package exported to: ${path}`);
                       }}
                     >
-                      <span>📦 Export Complete Package (with Photos .zip)...</span>
+                      <span>📦 Export Packaged...</span>
                     </button>
 
                     <div className={styles.menuDivider} />
@@ -401,7 +400,7 @@ export function WorkspaceLayout() {
                     const path = await exportCompleteProjectPackageWithPhotos();
                     if (path) showToast(`✓ Complete package exported to: ${path}`);
                   }}
-                  title="Export Complete Album Package with Photos (.zip)"
+                  title="Export Packaged (.zip)"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -528,7 +527,6 @@ export function WorkspaceLayout() {
             <WelcomeScreen />
           ) : (
             <>
-              <LayoutCycleHUD />
               <KonvaEditorCanvas
                 zoomLevel={zoomLevel}
                 onZoomChange={setZoomLevel}
@@ -542,7 +540,7 @@ export function WorkspaceLayout() {
         {currentProject && <PageNavigator />}
       </div>
 
-      {/* Right Panel: Collapsible Properties & Templates */}
+      {/* Right Panel: Collapsible Properties & Smart Layout */}
       {isPropertiesOpen && (
         <aside className={styles.rightPanel}>
           <div style={{
@@ -575,11 +573,11 @@ export function WorkspaceLayout() {
               </button>
               <button
                 type="button"
-                onClick={() => setInspectorTab('templates')}
+                onClick={() => setInspectorTab('smart_layout')}
                 style={{
-                  background: inspectorTab === 'templates' ? 'var(--color-bg-secondary)' : 'transparent',
-                  border: inspectorTab === 'templates' ? '1px solid var(--color-border)' : '1px solid transparent',
-                  color: inspectorTab === 'templates' ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  background: inspectorTab === 'smart_layout' ? 'var(--color-bg-secondary)' : 'transparent',
+                  border: inspectorTab === 'smart_layout' ? '1px solid var(--color-border)' : '1px solid transparent',
+                  color: inspectorTab === 'smart_layout' ? 'var(--color-accent)' : 'var(--color-text-muted)',
                   borderRadius: '4px',
                   padding: '4px 8px',
                   fontSize: '11px',
@@ -590,7 +588,7 @@ export function WorkspaceLayout() {
                   gap: '4px',
                 }}
               >
-                <span>📑 Templates</span>
+                <span>✨ Smart Layout</span>
               </button>
             </div>
             <button
@@ -614,7 +612,7 @@ export function WorkspaceLayout() {
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
               No project open
             </div>
-          ) : inspectorTab === 'templates' ? (
+          ) : inspectorTab === 'smart_layout' ? (
             <TemplatesPanel onApplyToast={(msg) => showToast(msg)} />
           ) : (
             <div className={styles.propertyList}>
