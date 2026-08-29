@@ -90,6 +90,13 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
     } catch (err) {
       console.error('Failed to request export cancellation:', err);
     }
+    setProgress((prev) => ({
+      ...prev,
+      spreadName: 'Cancelled',
+      status: 'Export was cancelled.',
+      isFinished: true,
+    }));
+    setIsCancelling(false);
   };
 
   const isCancelled = progress.status.toLowerCase().includes('cancelled');

@@ -256,7 +256,7 @@ pub fn render_spread_to_image_with_progress<F>(
     mut on_photo_progress: F,
 ) -> RgbaImage
 where
-    F: FnMut(usize, usize),
+    F: FnMut(usize, usize) -> bool,
 {
     let scale = unit_to_pixels(1.0, &project.canvas_unit, dpi);
     let single_page_w = project.canvas_width;
@@ -288,7 +288,10 @@ where
 
     let total_elements = sorted_elements.len();
     for (i, elem) in sorted_elements.iter().enumerate() {
-        on_photo_progress(i + 1, total_elements);
+        let keep_running = on_photo_progress(i + 1, total_elements);
+        if !keep_running {
+            break;
+        }
         render_photo_element(&mut canvas, elem, offset_x_px, offset_y_px, scale);
     }
 
@@ -302,7 +305,7 @@ pub fn render_spread_to_image(
     dpi: u32,
     include_bleed: bool,
 ) -> RgbaImage {
-    render_spread_to_image_with_progress(project, spread, dpi, include_bleed, |_, _| {})
+    render_spread_to_image_with_progress(project, spread, dpi, include_bleed, |_, _| true)
 }
 
 /// Slices a spread image into Left Page and Right Page

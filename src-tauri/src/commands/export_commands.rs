@@ -328,7 +328,7 @@ fn export_album_high_res_worker(
 
         let chunk_offset = chunk_idx * chunk_size;
 
-        spread_chunk
+        let chunk_res = spread_chunk
             .par_iter()
             .enumerate()
             .try_for_each(|(local_idx, spread)| -> Result<(), String> {
@@ -356,7 +356,7 @@ fn export_album_high_res_worker(
                     options.include_bleed,
                     |_photo_idx, _total_photos_in_spread| {
                         if cancel_flag_clone.load(Ordering::SeqCst) {
-                            return;
+                            return false;
                         }
                         let done = completed_photos_clone.fetch_add(1, Ordering::SeqCst) + 1;
                         let pct = if total_photos > 0 {
@@ -379,6 +379,8 @@ fn export_album_high_res_worker(
                                 output_files: Vec::new(),
                             },
                         );
+
+                        true
                     },
                 );
 
@@ -471,7 +473,26 @@ fn export_album_high_res_worker(
                 lock.push((global_idx, local_output_files, local_temp_jpegs));
 
                 Ok(())
-            })?;
+            });
+
+        if let Err(e) = chunk_res {
+            if cancel_flag.load(Ordering::SeqCst) || e.contains("cancelled") {
+                let cancel_event = ExportProgressEvent {
+                    current: 0,
+                    total: total_spreads,
+                    current_photos: 0,
+                    total_photos,
+                    percent: 0.0,
+                    spread_name: "Cancelled".to_string(),
+                    status: "Export was cancelled.".to_string(),
+                    is_finished: true,
+                    output_files: Vec::new(),
+                };
+                let _ = app.emit("export-progress", &cancel_event);
+                return Err("Export cancelled by user".to_string());
+            }
+            return Err(e);
+        }
     }
 
     if cancel_flag.load(Ordering::SeqCst) {
