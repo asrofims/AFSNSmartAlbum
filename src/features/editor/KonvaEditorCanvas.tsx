@@ -381,6 +381,7 @@ function PhotoFrameNode({
             height={Math.max(0, pixelH - strokePx)}
             stroke={frame.borderColor || '#FFFFFF'}
             strokeWidth={strokePx}
+            strokeScaleEnabled={false}
             listening={false}
           />
         );
@@ -396,6 +397,7 @@ function PhotoFrameNode({
           stroke="#3b82f6"
           strokeWidth={2}
           dash={[6, 3]}
+          strokeScaleEnabled={false}
           listening={false}
         />
       )}
@@ -409,12 +411,13 @@ function PhotoFrameNode({
             stroke="#f59e0b"
             strokeWidth={2}
             dash={[6, 4]}
+            strokeScaleEnabled={false}
           />
           {/* Rule of Thirds Lines */}
-          <Line points={[pixelW / 3, 0, pixelW / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
-          <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
-          <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
-          <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} />
+          <Line points={[pixelW / 3, 0, pixelW / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
+          <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
+          <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
+          <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
         </Group>
       )}
 
@@ -1738,6 +1741,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dash={[5, 3]}
+                strokeScaleEnabled={false}
                 listening={false}
               />
             )}
@@ -1754,6 +1758,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                 stroke="#06b6d4"
                 strokeWidth={1.5}
                 dash={[4, 2]}
+                strokeScaleEnabled={false}
                 listening={false}
               />
             ))}
