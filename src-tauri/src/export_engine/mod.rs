@@ -524,5 +524,36 @@ mod tests {
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
+
+    #[test]
+    fn test_generate_installer_graphics() {
+        let icons_dir = std::path::Path::new("icons");
+        let _ = fs::create_dir_all(icons_dir);
+
+        let logo_path = std::path::Path::new("../src/assets/app-logo.png");
+        let hero_path = std::path::Path::new("../src/assets/welcome-hero.jpg");
+
+        // 1. Generate Header Image (150x57) for NSIS (BMP Format)
+        let mut header: RgbaImage = ImageBuffer::from_pixel(150, 57, Rgba([24, 24, 27, 255]));
+        if let Ok(logo) = image::open(logo_path) {
+            let resized_logo = image::imageops::resize(&logo, 44, 44, image::imageops::FilterType::Lanczos3);
+            image::imageops::overlay(&mut header, &resized_logo, 150 - 44 - 8, (57 - 44) / 2);
+        }
+        let header_rgb = DynamicImage::ImageRgba8(header).to_rgb8();
+        let _ = header_rgb.save_with_format(icons_dir.join("header.bmp"), image::ImageFormat::Bmp);
+
+        // 2. Generate Sidebar Image (164x314) for NSIS (BMP Format)
+        let mut sidebar: RgbaImage = ImageBuffer::from_pixel(164, 314, Rgba([24, 24, 27, 255]));
+        if let Ok(hero) = image::open(hero_path) {
+            let resized_hero = image::imageops::resize(&hero, 164, 200, image::imageops::FilterType::Lanczos3);
+            image::imageops::overlay(&mut sidebar, &resized_hero, 0, 0);
+        }
+        if let Ok(logo) = image::open(logo_path) {
+            let resized_logo = image::imageops::resize(&logo, 72, 72, image::imageops::FilterType::Lanczos3);
+            image::imageops::overlay(&mut sidebar, &resized_logo, (164 - 72) / 2, 215);
+        }
+        let sidebar_rgb = DynamicImage::ImageRgba8(sidebar).to_rgb8();
+        let _ = sidebar_rgb.save_with_format(icons_dir.join("sidebar.bmp"), image::ImageFormat::Bmp);
+    }
 }
 

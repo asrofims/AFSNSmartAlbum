@@ -1,0 +1,50 @@
+====================================================================
+           AFSNSmartAlbum (v1.0.1-beta)
+   Professional Photo Album Layout Desktop Software
+====================================================================
+
+End User License Agreement (EULA) & Terms of Use
+
+Copyright (c) 2026 Afsunmedia - Asrofims.
+All rights reserved.
+
+1. LICENSE GRANT
+AFSNSmartAlbum ("Software") is proprietary commercial software developed 
+by Afsunmedia. You are granted a personal, non-exclusive, non-transferable 
+license to install and use this software for professional and personal 
+photo album designing, layout composition, and high-resolution exporting.
+
+2. 100% OFFLINE & PRIVACY GUARANTEE
+AFSNSmartAlbum is designed as an uncompromisingly offline desktop application. 
+All photos, album metadata, layouts, client databases, and exported files 
+remain strictly on your local computer storage. The software does not transmit, 
+upload, collect, or monitor your photos, albums, or personal data to any 
+external servers or cloud services.
+
+3. INTELLECTUAL PROPERTY & CREDITS
+The software, including its user interface, algorithms, graphic assets, 
+and documentation, is the intellectual property of Afsunmedia - Asrofims.
+- Lead Architect & Developer: Asrofims
+- Production Studio: Afsunmedia
+
+Open-source libraries and components utilized in this build:
+- React & Vite (MIT)
+- Tauri Desktop Runtime (MIT / Apache-2.0)
+- Konva.js Canvas Engine (MIT)
+- SQLite Database Engine (Public Domain)
+- Rayon Parallel Processing (MIT / Apache-2.0)
+- libvips Image Engine (LGPL-2.1)
+
+4. RESTRICTIONS
+You may not reverse-engineer, decompile, disassemble, or distribute 
+unauthorized modified copies of this software without explicit written 
+permission from Afsunmedia.
+
+5. DISCLAIMER OF WARRANTY
+This software is provided "AS IS" without warranties of any kind. 
+Always maintain local backup copies of your original high-resolution photos.
+
+====================================================================
+By clicking "I Agree" or proceeding with the installation, you accept 
+and agree to be bound by the terms and conditions above.
+====================================================================
