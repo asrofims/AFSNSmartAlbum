@@ -186,6 +186,9 @@ function PhotoFrameNode({
       }}
       onClick={(e) => {
         e.cancelBubble = true;
+        if ('button' in e.evt && e.evt.button === 2) {
+          return;
+        }
         const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
         if (!isCropMode && !isDraggingRef.current && isSelected && !isMulti) {
           onSelect(e);
@@ -1710,6 +1713,21 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
               visible={!editingCropFrameId}
               rotateEnabled
               keepRatio={true}
+              onContextMenu={(e) => {
+                e.evt.preventDefault();
+                e.cancelBubble = true;
+                openContextMenuAt(e.evt.clientX, e.evt.clientY);
+              }}
+              onMouseDown={(e) => {
+                if ('button' in e.evt && e.evt.button === 2) {
+                  e.cancelBubble = true;
+                }
+              }}
+              onClick={(e) => {
+                if ('button' in e.evt && e.evt.button === 2) {
+                  e.cancelBubble = true;
+                }
+              }}
               enabledAnchors={
                 selectedFrameIds.length > 1
                   ? ['top-left', 'top-right', 'bottom-right', 'bottom-left']
