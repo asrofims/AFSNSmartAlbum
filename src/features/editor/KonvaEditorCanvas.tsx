@@ -859,9 +859,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     }
   };
 
-  const handleDragLeave = () => {
-    setIsDragOverCanvas(false);
-    setHoveredDropFrameId(null);
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOverCanvas(false);
+      setHoveredDropFrameId(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1584,6 +1586,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       }
                     }
 
+                    // Check if hovering over another frame for canvas swap
+                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                      const draggedCenterPhysX = currentPhysX + frame.width / 2;
+                      const draggedCenterPhysY = currentPhysY + frame.height / 2;
+                      const hoverTarget = (activeSpread.elements || []).find((f) =>
+                        f.id !== frame.id &&
+                        draggedCenterPhysX >= f.x &&
+                        draggedCenterPhysX <= f.x + f.width &&
+                        draggedCenterPhysY >= f.y &&
+                        draggedCenterPhysY <= f.y + f.height
+                      );
+                      setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
+                    }
+
                     // Move all companion selected photo nodes synchronously in screen pixels
                     dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
                       if (id !== frame.id) {
@@ -1597,10 +1613,32 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                   }}
                   onDragEnd={(e) => {
                     clearSnapLines();
+                    setHoveredDropFrameId(null);
                     const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
                     if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
                       const finalCurrentPhysX = draggedNode.x() / scaleFactor;
                       const finalCurrentPhysY = draggedNode.y() / scaleFactor;
+
+                      // Check if dropped directly onto another frame on the canvas to SWAP
+                      if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                        const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
+                        const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
+                        const dropTarget = (activeSpread.elements || []).find((f) =>
+                          f.id !== frame.id &&
+                          draggedCenterPhysX >= f.x &&
+                          draggedCenterPhysX <= f.x + f.width &&
+                          draggedCenterPhysY >= f.y &&
+                          draggedCenterPhysY <= f.y + f.height
+                        );
+
+                        if (dropTarget) {
+                          draggedNode.x(frame.x * scaleFactor);
+                          draggedNode.y(frame.y * scaleFactor);
+                          swapFrames(activeSpread.id, frame.id, dropTarget.id);
+                          dragInitialPhysicalPositionsRef.current.clear();
+                          return;
+                        }
+                      }
 
                       const otherRects = (activeSpread.elements || [])
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))

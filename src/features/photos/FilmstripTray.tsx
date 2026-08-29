@@ -467,18 +467,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                       }
                     }}
                     onContextMenu={(e) => handleCardContextMenu(e, photo)}
-                    draggable={!isUsed}
+                    draggable={true}
                     onDragStart={(e) => {
-                      if (isUsed) {
-                        e.preventDefault();
-                        return;
-                      }
                       handleCardDragStart(e, photo);
                     }}
                     title={
                       isUsed
-                        ? `${photo.fileName}\n(Already placed in album spread — Locked from re-adding)`
-                        : `${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click or drag to place on canvas\nRight-click for options`
+                        ? `${photo.fileName}\n(Placed in album spread — Drag onto a canvas frame to replace or swap)`
+                        : `${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click to add or drag onto canvas to place/replace\nRight-click for options`
                     }
                   >
                     {/* Thumbnail Image */}
