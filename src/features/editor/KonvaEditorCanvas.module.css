@@ -121,11 +121,8 @@
   color: var(--color-warning);
 }
 
-.dragOverActive {
-  background-color: rgba(59, 130, 246, 0.06);
-  outline: 2px dashed var(--color-accent);
-  outline-offset: -4px;
-}
+
+
 
 .stageWrapper {
   position: relative;
@@ -202,17 +199,4 @@
   color: var(--color-text-muted);
 }
 
-.dropOverlay {
-  position: absolute;
-  inset: 0;
-  background-color: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-accent);
-  font-size: 14px;
-  font-weight: var(--font-weight-semibold);
-  pointer-events: none;
-  z-index: 30;
-}
+

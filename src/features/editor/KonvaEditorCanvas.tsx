@@ -529,7 +529,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const activeTransformAnchorRef = useRef<string | null>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
-  const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
 
   // Natural Pan Navigation State (Spacebar + Drag or Middle-Click Drag)
@@ -861,7 +860,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    setIsDragOverCanvas(true);
 
     if (stageRef.current && activeSpread?.elements) {
       const stageBox = stageRef.current.container().getBoundingClientRect();
@@ -882,7 +880,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
   const handleDragLeave = (e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOverCanvas(false);
       setHoveredDropFrameId(null);
     }
   };
@@ -890,7 +887,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOverCanvas(false);
     setHoveredDropFrameId(null);
 
     let photo: Photo | null = null;
@@ -1287,7 +1283,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   return (
     <div
       ref={containerRef}
-      className={`${styles.canvasContainer} ${isPanning ? styles.spacePanningActive : isSpacePressed ? styles.spacePanning : activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''} ${isDragOverCanvas ? styles.dragOverActive : ''}`}
+      className={`${styles.canvasContainer} ${isPanning ? styles.spacePanningActive : isSpacePressed ? styles.spacePanning : activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -2020,12 +2016,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
 
       </div>
 
-      {/* Drag & Drop Prompt Overlay when dragging from tray */}
-      {isDragOverCanvas && (
-        <div className={styles.dropOverlay}>
-          <span>+ Drop Photo to Place on {activeSpread.name}</span>
-        </div>
-      )}
+
+
 
       {/* Desktop Context Menu */}
       <ContextMenu
