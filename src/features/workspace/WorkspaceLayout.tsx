@@ -671,22 +671,24 @@ export function WorkspaceLayout() {
                       </div>
 
                       {/* Rotation Input & Quick Reset */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Rotation Angle</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '130px' }}>
-                          <NumberInput
-                            value={selectedFrame.rotation || 0}
-                            onChange={(newRot) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: ((newRot % 360) + 360) % 360 })}
-                            min={-360}
-                            max={360}
-                            step={1}
-                          />
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Rotation Angle</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={selectedFrame.rotation || 0}
+                              onChange={(newRot) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: ((newRot % 360) + 360) % 360 })}
+                              min={-360}
+                              max={360}
+                              step={1}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
+                          </div>
                           <button
                             type="button"
                             onClick={() => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: 0 })}
                             style={{
-                              padding: '3px 6px',
+                              padding: '4px 8px',
                               borderRadius: 'var(--radius-sm)',
                               backgroundColor: 'rgba(255,255,255,0.06)',
                               border: '1px solid var(--color-border)',
@@ -695,6 +697,7 @@ export function WorkspaceLayout() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              height: '24px',
                             }}
                             title="Reset rotation to 0°"
                           >
