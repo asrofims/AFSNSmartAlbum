@@ -1133,51 +1133,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
         shortcut: 'Ctrl+D',
         onClick: () => duplicateSelectedFrames(activeSpread.id),
       },
-      { divider: true, id: 'div-order', label: '' },
-      {
-        id: 'bring-to-front',
-        label: 'Bring to Front',
-        icon: '🔼',
-        onClick: () => {
-          selectedFrameIds.forEach((id) => bringToFront(activeSpread.id, id));
-        },
-      },
-      {
-        id: 'send-to-back',
-        label: 'Send to Back',
-        icon: '🔽',
-        onClick: () => {
-          selectedFrameIds.forEach((id) => sendToBack(activeSpread.id, id));
-        },
-      },
-      {
-        id: 'rotate-cw',
-        label: 'Rotate 90° Clockwise',
-        icon: '🔄',
-        onClick: () => {
-          selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
-        },
-      },
-      {
-        id: 'reset-ratio',
-        label: '↺ Reset Aspect Ratio',
-        icon: '⇱',
-        onClick: () => {
-          selectedFrameIds.forEach((id) => resetToOriginalRatio(activeSpread.id, id));
-        },
-      },
-      {
-        id: 'reset-crop',
-        label: '↺ Reset Crop & Center',
-        icon: '🎯',
-        onClick: () => {
-          selectedFrameIds.forEach((id) => resetCrop(activeSpread.id, id));
-        },
-      },
     ];
 
     if (count === 2) {
-      items.unshift({
+      items.push({
         id: 'swap-photos',
         label: 'Swap 2 Photos',
         icon: '⇄',
@@ -1193,100 +1152,165 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     if (count >= 2) {
       items.push(
         { divider: true, id: 'div-align', label: '' },
-        { header: true, id: 'hdr-align', label: 'ALIGNMENT' },
         {
-          id: 'align-left',
-          label: 'Align Left',
-          icon: '⇤',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'left'),
+          id: 'submenu-align',
+          label: 'Align',
+          icon: '📐',
+          children: [
+            {
+              id: 'align-left',
+              label: 'Align Left',
+              icon: '⇤',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'left'),
+            },
+            {
+              id: 'align-center',
+              label: 'Align Center Horizontal',
+              icon: '↔',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'center'),
+            },
+            {
+              id: 'align-right',
+              label: 'Align Right',
+              icon: '⇥',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'right'),
+            },
+            { divider: true, id: 'div-subalign', label: '' },
+            {
+              id: 'align-top',
+              label: 'Align Top',
+              icon: '⤒',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'top'),
+            },
+            {
+              id: 'align-middle',
+              label: 'Align Center Vertical',
+              icon: '↕',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'middle'),
+            },
+            {
+              id: 'align-bottom',
+              label: 'Align Bottom',
+              icon: '⤓',
+              onClick: () => alignSelectedFrames(activeSpread.id, 'bottom'),
+            },
+          ],
         },
         {
-          id: 'align-center',
-          label: 'Align Center Horizontal',
-          icon: '↔',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'center'),
-        },
-        {
-          id: 'align-right',
-          label: 'Align Right',
-          icon: '⇥',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'right'),
-        },
-        {
-          id: 'align-top',
-          label: 'Align Top',
-          icon: '⤒',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'top'),
-        },
-        {
-          id: 'align-middle',
-          label: 'Align Center Vertical',
-          icon: '↕',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'middle'),
-        },
-        {
-          id: 'align-bottom',
-          label: 'Align Bottom',
-          icon: '⤓',
-          onClick: () => alignSelectedFrames(activeSpread.id, 'bottom'),
-        },
-        { divider: true, id: 'div-size', label: '' },
-        { header: true, id: 'hdr-size', label: 'MATCH SIZE' },
-        {
-          id: 'match-width',
-          label: 'Match Width',
-          icon: '⬌',
-          onClick: () => matchSelectedDimensions(activeSpread.id, 'width'),
-        },
-        {
-          id: 'match-height',
-          label: 'Match Height',
-          icon: '⬍',
-          onClick: () => matchSelectedDimensions(activeSpread.id, 'height'),
-        },
-        {
-          id: 'match-both',
-          label: 'Match Both (Full Size)',
+          id: 'submenu-size',
+          label: 'Match Size',
           icon: '⬚',
-          onClick: () => matchSelectedDimensions(activeSpread.id, 'both'),
+          children: [
+            {
+              id: 'match-width',
+              label: 'Match Width',
+              icon: '⬌',
+              onClick: () => matchSelectedDimensions(activeSpread.id, 'width'),
+            },
+            {
+              id: 'match-height',
+              label: 'Match Height',
+              icon: '⬍',
+              onClick: () => matchSelectedDimensions(activeSpread.id, 'height'),
+            },
+            {
+              id: 'match-both',
+              label: 'Match Both (Full Size)',
+              icon: '⬚',
+              onClick: () => matchSelectedDimensions(activeSpread.id, 'both'),
+            },
+          ],
         },
-        { divider: true, id: 'div-gap', label: '' },
-        { header: true, id: 'hdr-gap', label: 'GAP SPACING' },
         {
-          id: 'gap-h',
-          label: `Set Horizontal Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
+          id: 'submenu-spacing',
+          label: 'Spacing & Distribution',
           icon: '⇿',
-          onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', currentProject.spacingValue),
-        },
-        {
-          id: 'gap-v',
-          label: `Set Vertical Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
-          icon: '⇳',
-          onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', currentProject.spacingValue),
+          children: [
+            {
+              id: 'gap-h',
+              label: `Set Horizontal Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
+              icon: '⇿',
+              onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', currentProject.spacingValue),
+            },
+            {
+              id: 'gap-v',
+              label: `Set Vertical Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
+              icon: '⇳',
+              onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', currentProject.spacingValue),
+            },
+            ...(count >= 3
+              ? [
+                  { divider: true, id: 'div-subdist', label: '' },
+                  {
+                    id: 'distribute-h',
+                    label: 'Distribute Horizontally',
+                    icon: '⇿',
+                    onClick: () => distributeSelectedFrames(activeSpread.id, 'horizontal'),
+                  },
+                  {
+                    id: 'distribute-v',
+                    label: 'Distribute Vertically',
+                    icon: '⇳',
+                    onClick: () => distributeSelectedFrames(activeSpread.id, 'vertical'),
+                  },
+                ]
+              : []),
+          ],
         }
       );
     }
 
-    if (count >= 3) {
-      items.push(
-        { divider: true, id: 'div-distribute', label: '' },
-        { header: true, id: 'hdr-distribute', label: 'DISTRIBUTE SPACING' },
-        {
-          id: 'distribute-h',
-          label: 'Distribute Horizontally',
-          icon: '⇿',
-          onClick: () => distributeSelectedFrames(activeSpread.id, 'horizontal'),
-        },
-        {
-          id: 'distribute-v',
-          label: 'Distribute Vertically',
-          icon: '⇳',
-          onClick: () => distributeSelectedFrames(activeSpread.id, 'vertical'),
-        }
-      );
-    }
-
+    // Submenu: Arrange & Transform
     items.push(
+      { divider: true, id: 'div-order', label: '' },
+      {
+        id: 'submenu-arrange',
+        label: 'Arrange & Transform',
+        icon: '🔄',
+        children: [
+          {
+            id: 'bring-to-front',
+            label: 'Bring to Front',
+            icon: '🔼',
+            onClick: () => {
+              selectedFrameIds.forEach((id) => bringToFront(activeSpread.id, id));
+            },
+          },
+          {
+            id: 'send-to-back',
+            label: 'Send to Back',
+            icon: '🔽',
+            onClick: () => {
+              selectedFrameIds.forEach((id) => sendToBack(activeSpread.id, id));
+            },
+          },
+          { divider: true, id: 'div-subrot', label: '' },
+          {
+            id: 'rotate-cw',
+            label: 'Rotate 90° Clockwise',
+            icon: '🔄',
+            onClick: () => {
+              selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
+            },
+          },
+          {
+            id: 'reset-ratio',
+            label: '↺ Reset Aspect Ratio',
+            icon: '⇱',
+            onClick: () => {
+              selectedFrameIds.forEach((id) => resetToOriginalRatio(activeSpread.id, id));
+            },
+          },
+          {
+            id: 'reset-crop',
+            label: '↺ Reset Crop & Center',
+            icon: '🎯',
+            onClick: () => {
+              selectedFrameIds.forEach((id) => resetCrop(activeSpread.id, id));
+            },
+          },
+        ],
+      },
       { divider: true, id: 'div-clear', label: '' },
       {
         id: 'clear-sel',

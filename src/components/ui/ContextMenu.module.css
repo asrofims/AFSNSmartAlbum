@@ -7,8 +7,11 @@
 
 .menu {
   position: fixed;
-  min-width: 200px;
+  min-width: 210px;
   max-width: 280px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  overflow-x: visible;
   background: rgba(15, 23, 42, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -23,6 +26,15 @@
   animation: menuAppear 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
 @keyframes menuAppear {
   from {
     opacity: 0;
@@ -32,6 +44,11 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.itemWrapper {
+  position: relative;
+  width: 100%;
 }
 
 .menuItem {
@@ -50,7 +67,8 @@
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.menuItem:hover:not(.disabled) {
+.menuItem:hover:not(.disabled),
+.menuItemActive {
   background-color: #2563eb;
   color: #ffffff;
 }
@@ -71,6 +89,12 @@
   gap: 8px;
 }
 
+.itemRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .itemIcon {
   font-size: 13px;
   width: 16px;
@@ -89,8 +113,45 @@
   margin-left: 12px;
 }
 
-.menuItem:hover .itemShortcut {
+.chevron {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1;
+  font-weight: bold;
+}
+
+.menuItem:hover .itemShortcut,
+.menuItem:hover .chevron,
+.menuItemActive .chevron {
   color: #e2e8f0;
+}
+
+.submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 4px;
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(15, 23, 42, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10001;
+  animation: menuAppear 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.submenuLeft {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 4px;
 }
 
 .divider {
