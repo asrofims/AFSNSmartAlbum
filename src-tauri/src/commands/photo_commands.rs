@@ -315,6 +315,42 @@ pub fn check_missing_photos(
 }
 
 #[tauri::command]
+pub async fn regenerate_single_thumbnail(
+    app: AppHandle,
+    photo_id: String,
+) -> Result<String, String> {
+    let db = app.state::<Database>();
+    let photo = db
+        .get_photo(&photo_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Photo not found: {}", photo_id))?;
+
+    let file_path = PathBuf::from(&photo.file_path);
+    if !file_path.exists() {
+        let _ = db.update_photo_missing(&photo_id, true);
+        return Err(format!("Source photo file does not exist on disk: {:?}", file_path));
+    }
+
+    let cache_dir = get_cache_dir(&app);
+    let app_clone = app.clone();
+    let photo_id_clone = photo_id.clone();
+
+    let new_thumb_path = tauri::async_runtime::spawn_blocking(move || {
+        let processed = process_photo(&file_path, &cache_dir, &photo_id_clone)?;
+        let thumb_path = processed.thumbnail_path.ok_or_else(|| "Failed to generate thumbnail".to_string())?;
+        
+        let db_thread = app_clone.state::<Database>();
+        let _ = db_thread.update_photo_thumbnail(&photo_id_clone, &thumb_path);
+        let _ = db_thread.update_photo_missing(&photo_id_clone, false);
+        Ok::<String, String>(thumb_path)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    Ok(new_thumb_path)
+}
+
+#[tauri::command]
 pub async fn relink_folder(
     app: AppHandle,
     project_id: String,

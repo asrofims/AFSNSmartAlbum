@@ -31,6 +31,7 @@ interface PhotoState {
   cancelImport: () => Promise<void>;
   toggleFavorite: (photoId: string) => Promise<void>;
   checkMissing: (projectId: string) => Promise<void>;
+  healThumbnail: (photoId: string) => Promise<string | null>;
   relinkFolder: (projectId: string) => Promise<void>;
   setupListeners: () => Promise<() => void>;
 
@@ -301,6 +302,25 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       }
     } catch (err) {
       console.warn('[AFSN] check_missing_photos error:', err);
+    }
+  },
+
+  healThumbnail: async (photoId: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const newPath = await invoke<string>('regenerate_single_thumbnail', { photoId });
+      if (newPath) {
+        set((s) => ({
+          photos: s.photos.map((p) =>
+            p.id === photoId ? { ...p, thumbnailPath: newPath, isMissing: false } : p
+          ),
+        }));
+        return newPath;
+      }
+      return null;
+    } catch (err) {
+      console.warn(`[AFSN] healThumbnail error for ${photoId}:`, err);
+      return null;
     }
   },
 

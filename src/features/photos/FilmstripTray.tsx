@@ -57,6 +57,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     setSortBy,
     setSearchQuery,
     openRelink,
+    healThumbnail,
   } = usePhotoStore();
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -64,6 +65,12 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
   const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
+
+  // Lazy Thumbnail Healing & Broken Cache Fallback States
+  const [brokenPhotoIds, setBrokenPhotoIds] = useState<Set<string>>(new Set());
+  const [healingPhotoIds, setHealingPhotoIds] = useState<Set<string>>(new Set());
+  const [photoVersions, setPhotoVersions] = useState<Record<string, number>>({});
+  const healingQueueRef = useRef<Set<string>>(new Set());
 
   // Context Menu State
   const [contextMenuState, setContextMenuState] = useState<{
@@ -76,6 +83,37 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   // Single / Target Photo Deletion Confirm State
   const [photoToDelete, setPhotoToDelete] = useState<{ ids: string[]; name: string } | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+
+  // On-Demand Thumbnail Healing Handler (Instant 0.2ms EXIF restoration)
+  const handleThumbnailError = (photo: Photo) => {
+    // 1. Immediately replace broken <img> with sleek skeleton placeholder
+    setBrokenPhotoIds((prev) => new Set(prev).add(photo.id));
+
+    // 2. Guard against duplicate healing requests
+    if (healingQueueRef.current.has(photo.id)) return;
+    healingQueueRef.current.add(photo.id);
+
+    setHealingPhotoIds((prev) => new Set(prev).add(photo.id));
+
+    // 3. Lazy background regeneration from original source file
+    healThumbnail(photo.id).then((newPath) => {
+      healingQueueRef.current.delete(photo.id);
+      setHealingPhotoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photo.id);
+        return next;
+      });
+
+      if (newPath) {
+        setPhotoVersions((prev) => ({ ...prev, [photo.id]: Date.now() }));
+        setBrokenPhotoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(photo.id);
+          return next;
+        });
+      }
+    });
+  };
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
@@ -486,29 +524,37 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         : `${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click to add or drag onto canvas to place/replace\nRight-click for options`
                     }
                   >
-                    {/* Thumbnail Image */}
+                    {/* Thumbnail Image with On-Demand Healing & Graceful Fallback */}
                     <div className={styles.thumbnailWrapper} draggable={false}>
-                      {photo.thumbnailPath ? (
-                        <img
-                          src={convertFileSrc(photo.thumbnailPath)}
-                          alt={photo.fileName}
-                          className={styles.thumbnailImg}
-                          loading="lazy"
-                          draggable={false}
-                        />
-                      ) : photo.thumbnailBase64 ? (
-                        <img
-                          src={photo.thumbnailBase64}
-                          alt={photo.fileName}
-                          className={styles.thumbnailImg}
-                          loading="lazy"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className={styles.thumbnailPlaceholder} draggable={false}>
-                          <span>{photo.format.toUpperCase()}</span>
-                        </div>
-                      )}
+                      {(() => {
+                        const isBroken = brokenPhotoIds.has(photo.id);
+                        const isHealing = healingPhotoIds.has(photo.id);
+                        const version = photoVersions[photo.id];
+                        const thumbSrc = photo.thumbnailPath
+                          ? `${convertFileSrc(photo.thumbnailPath)}${version ? `?v=${version}` : ''}`
+                          : photo.thumbnailBase64 || null;
+
+                        if (thumbSrc && !isBroken) {
+                          return (
+                            <img
+                              src={thumbSrc}
+                              alt={photo.fileName}
+                              className={styles.thumbnailImg}
+                              loading="lazy"
+                              draggable={false}
+                              onError={() => handleThumbnailError(photo)}
+                            />
+                          );
+                        }
+
+                        return (
+                          <div className={styles.thumbnailPlaceholder} draggable={false}>
+                            <div className={styles.placeholderShimmer} />
+                            <span className={styles.placeholderBadge}>{photo.format.toUpperCase()}</span>
+                            {isHealing && <span className={styles.placeholderStatus}>Restoring...</span>}
+                          </div>
+                        );
+                      })()}
 
                       {/* Used Protective Lock Badge */}
                       {isUsed && (
