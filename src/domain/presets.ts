@@ -7,9 +7,20 @@ export interface AlbumPreset {
   height: number;
   unit: Unit;
   dpi: number;
+  isCustom?: boolean;
+  spacingValue?: number;
+  spacingUnit?: Unit;
+  marginEnabled?: boolean;
+  marginValue?: number;
+  marginUnit?: Unit;
+  borderEnabled?: boolean;
+  borderWidth?: number;
+  borderUnit?: Unit;
+  borderColor?: string;
+  backgroundColor?: string;
 }
 
-export const ALBUM_PRESETS: AlbumPreset[] = [
+export const BUILTIN_ALBUM_PRESETS: AlbumPreset[] = [
   {
     id: 'square-8x8',
     name: 'Square 8×8 in',
@@ -68,12 +79,62 @@ export const ALBUM_PRESETS: AlbumPreset[] = [
   },
 ];
 
+export const ALBUM_PRESETS: AlbumPreset[] = BUILTIN_ALBUM_PRESETS;
+
 export const CUSTOM_PRESET_ID = 'custom';
 
+const CUSTOM_PRESETS_STORAGE_KEY = 'afsn_custom_album_presets';
+
+export function loadCustomPresets(): AlbumPreset[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.warn('[AFSN] Failed to load custom presets:', err);
+    return [];
+  }
+}
+
+export function saveCustomPreset(preset: AlbumPreset): AlbumPreset[] {
+  try {
+    const current = loadCustomPresets();
+    const filtered = current.filter((p) => p.id !== preset.id);
+    const updated = [preset, ...filtered];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updated));
+    }
+    return updated;
+  } catch (err) {
+    console.warn('[AFSN] Failed to save custom preset:', err);
+    return loadCustomPresets();
+  }
+}
+
+export function deleteCustomPreset(id: string): AlbumPreset[] {
+  try {
+    const current = loadCustomPresets();
+    const updated = current.filter((p) => p.id !== id);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updated));
+    }
+    return updated;
+  } catch (err) {
+    console.warn('[AFSN] Failed to delete custom preset:', err);
+    return loadCustomPresets();
+  }
+}
+
+export function getAllPresets(): AlbumPreset[] {
+  return [...loadCustomPresets(), ...BUILTIN_ALBUM_PRESETS];
+}
+
 export function getPresetById(id: string): AlbumPreset | undefined {
-  return ALBUM_PRESETS.find((p) => p.id === id);
+  return getAllPresets().find((p) => p.id === id);
 }
 
 export function findMatchingPreset(width: number, height: number, unit: Unit): AlbumPreset | undefined {
-  return ALBUM_PRESETS.find((p) => p.width === width && p.height === height && p.unit === unit);
+  return getAllPresets().find((p) => p.width === width && p.height === height && p.unit === unit);
 }

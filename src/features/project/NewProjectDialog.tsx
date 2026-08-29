@@ -7,19 +7,27 @@ import { ColorPicker } from '../../components/ui/ColorPicker';
 import { Switch } from '../../components/ui/Switch';
 import { useProjectStore } from '../../stores/projectStore';
 import { Unit, UNIT_OPTIONS, convertUnit, formatDimensions, toPixels } from '../../domain/units';
-import { ALBUM_PRESETS, CUSTOM_PRESET_ID, findMatchingPreset, getPresetById } from '../../domain/presets';
+import {
+  AlbumPreset,
+  CUSTOM_PRESET_ID,
+  findMatchingPreset,
+  getPresetById,
+  getAllPresets,
+  saveCustomPreset,
+  deleteCustomPreset,
+} from '../../domain/presets';
 import { validateProjectSettings } from '../../domain/project';
 import styles from './NewProjectDialog.module.css';
-
-const PRESET_OPTIONS = [
-  ...ALBUM_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-  { value: CUSTOM_PRESET_ID, label: 'Custom Dimensions' },
-];
 
 export function NewProjectDialog() {
   const isOpen = useProjectStore((s) => s.isNewProjectOpen);
   const closeNewProject = useProjectStore((s) => s.closeNewProject);
   const createNewProject = useProjectStore((s) => s.createNewProject);
+
+  const [allPresets, setAllPresets] = useState<AlbumPreset[]>([]);
+  const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
+  const [customPresetName, setCustomPresetName] = useState('');
+  const [presetSaveSuccess, setPresetSaveSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState('Untitled Album');
   const [presetId, setPresetId] = useState<string>('square-8x8');
@@ -58,6 +66,8 @@ export function NewProjectDialog() {
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
+      const presets = getAllPresets();
+      setAllPresets(presets);
       setName('Untitled Album');
       setPresetId('square-8x8');
       setCanvasWidth(8);
@@ -76,15 +86,18 @@ export function NewProjectDialog() {
       setBackgroundColor('#FFFFFF');
       setErrorMessage(null);
       setIsSubmitting(false);
+      setIsSavePresetOpen(false);
+      setCustomPresetName('');
+      setPresetSaveSuccess(null);
     }
   }, [isOpen]);
 
-  // Preset Selection with full unit synchronization
+  // Preset Selection with full unit synchronization and custom settings loading
   const handlePresetSelect = (id: string) => {
     setPresetId(id);
     if (id === CUSTOM_PRESET_ID) return;
 
-    const preset = getPresetById(id);
+    const preset = allPresets.find((p) => p.id === id) || getPresetById(id);
     if (preset) {
       setCanvasWidth(preset.width);
       setCanvasHeight(preset.height);
@@ -93,14 +106,72 @@ export function NewProjectDialog() {
       const targetUnit = preset.unit;
       if (targetUnit !== canvasUnit) {
         setCanvasUnit(targetUnit);
-        setMarginValue(roundUnit(convertUnit(marginValue, marginUnit, targetUnit, preset.dpi), targetUnit));
-        setMarginUnit(targetUnit);
-        setSpacingValue(roundUnit(convertUnit(spacingValue, spacingUnit, targetUnit, preset.dpi), targetUnit));
-        setSpacingUnit(targetUnit);
-        setBorderWidth(roundUnit(convertUnit(borderWidth, borderUnit, targetUnit, preset.dpi), targetUnit));
-        setBorderUnit(targetUnit);
+      }
+
+      if (preset.isCustom) {
+        if (preset.spacingValue !== undefined) setSpacingValue(preset.spacingValue);
+        if (preset.spacingUnit) setSpacingUnit(preset.spacingUnit);
+        if (preset.marginEnabled !== undefined) setMarginEnabled(preset.marginEnabled);
+        if (preset.marginValue !== undefined) setMarginValue(preset.marginValue);
+        if (preset.marginUnit) setMarginUnit(preset.marginUnit);
+        if (preset.borderEnabled !== undefined) setBorderEnabled(preset.borderEnabled);
+        if (preset.borderWidth !== undefined) setBorderWidth(preset.borderWidth);
+        if (preset.borderUnit) setBorderUnit(preset.borderUnit);
+        if (preset.borderColor) setBorderColor(preset.borderColor);
+        if (preset.backgroundColor) setBackgroundColor(preset.backgroundColor);
+      } else {
+        if (targetUnit !== canvasUnit) {
+          setMarginValue(roundUnit(convertUnit(marginValue, marginUnit, targetUnit, preset.dpi), targetUnit));
+          setMarginUnit(targetUnit);
+          setSpacingValue(roundUnit(convertUnit(spacingValue, spacingUnit, targetUnit, preset.dpi), targetUnit));
+          setSpacingUnit(targetUnit);
+          setBorderWidth(roundUnit(convertUnit(borderWidth, borderUnit, targetUnit, preset.dpi), targetUnit));
+          setBorderUnit(targetUnit);
+        }
       }
     }
+  };
+
+  // Save current settings as a reusable custom preset
+  const handleSaveCustomPreset = () => {
+    const trimmed = customPresetName.trim();
+    if (!trimmed) return;
+
+    const newPreset: AlbumPreset = {
+      id: `custom-${Date.now()}`,
+      name: trimmed,
+      width: canvasWidth,
+      height: canvasHeight,
+      unit: canvasUnit,
+      dpi: canvasDpi,
+      isCustom: true,
+      spacingValue,
+      spacingUnit,
+      marginEnabled,
+      marginValue,
+      marginUnit,
+      borderEnabled,
+      borderWidth,
+      borderUnit,
+      borderColor,
+      backgroundColor,
+    };
+
+    const updated = saveCustomPreset(newPreset);
+    setAllPresets(updated);
+    setPresetId(newPreset.id);
+    setIsSavePresetOpen(false);
+    setCustomPresetName('');
+    setPresetSaveSuccess(`Preset "${trimmed}" saved!`);
+    setTimeout(() => setPresetSaveSuccess(null), 3500);
+  };
+
+  // Delete a saved custom preset
+  const handleDeleteCustomPreset = (idToDelete: string) => {
+    const updated = deleteCustomPreset(idToDelete);
+    setAllPresets(updated);
+    setPresetId('square-8x8');
+    handlePresetSelect('square-8x8');
   };
 
   // Synchronize all units across the entire project dialog with automatic mathematical conversion
@@ -303,12 +374,140 @@ export function NewProjectDialog() {
             <div className={styles.section}>
               <div className={styles.sectionTitle}>Page Dimensions</div>
 
-              <Select
-                label="Album Preset"
-                value={presetId}
-                options={PRESET_OPTIONS}
-                onChange={handlePresetSelect}
-              />
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    label="Album Preset"
+                    value={presetId}
+                    options={[
+                      ...allPresets.map((p) => ({
+                        value: p.id,
+                        label: p.isCustom ? `★ ${p.name}` : p.name,
+                      })),
+                      { value: CUSTOM_PRESET_ID, label: 'Custom Dimensions' },
+                    ]}
+                    onChange={handlePresetSelect}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomPresetName(`${canvasWidth}×${canvasHeight} ${canvasUnit} Custom`);
+                    setIsSavePresetOpen(!isSavePresetOpen);
+                  }}
+                  title="Save current dimensions and settings as a reusable preset"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '0 10px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    borderRadius: '4px',
+                    border: '1px solid var(--color-border)',
+                    background: isSavePresetOpen ? 'var(--color-surface-hover)' : 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    height: '32px',
+                    marginBottom: '1px',
+                  }}
+                >
+                  ★ Save as Preset
+                </button>
+                {Boolean(allPresets.find((p) => p.id === presetId)?.isCustom) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCustomPreset(presetId)}
+                    title="Delete this custom preset"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: 'var(--color-danger, #ef4444)',
+                      cursor: 'pointer',
+                      height: '32px',
+                      marginBottom: '1px',
+                    }}
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+
+              {isSavePresetOpen && (
+                <div
+                  style={{
+                    background: 'var(--color-surface-hover, rgba(255,255,255,0.05))',
+                    border: '1px solid var(--color-accent)',
+                    borderRadius: '6px',
+                    padding: '10px',
+                    marginBottom: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)' }}>
+                    Save Current Configuration as Preset
+                  </div>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={customPresetName}
+                    onChange={(e) => setCustomPresetName(e.target.value)}
+                    placeholder="Enter preset name (e.g. 10x10 Wedding Standard)"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveCustomPreset();
+                      } else if (e.key === 'Escape') {
+                        setIsSavePresetOpen(false);
+                      }
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSavePresetOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSaveCustomPreset}
+                      disabled={!customPresetName.trim()}
+                    >
+                      Save Preset
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {presetSaveSuccess && (
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--color-success, #10b981)',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    marginBottom: '8px',
+                  }}
+                >
+                  {presetSaveSuccess}
+                </div>
+              )}
 
               {/* Orientation Switcher & Swap */}
               <div className={styles.formGroup}>
