@@ -705,14 +705,15 @@ return { snappedX, snappedY, snapLines, gapGuides };
 }
 
 /**
- * Calculates smart resize snapping to match neighbor frame dimensions and primary collinear edge alignments.
+ * Calculates smart resize snapping to match neighbor frame dimensions, primary collinear edge alignments,
+ * and Spread Safe Zone Margins (Blue Guides), Center Spine, and Spread Boundaries.
  */
 export function calculateResizeSnapping(
   current: RectBounds,
-  _spreadWidth: number,
-  _spreadHeight: number,
-  _safeArea: number,
-  _gutterWidth: number,
+  spreadWidth: number,
+  spreadHeight: number,
+  safeArea: number,
+  gutterWidth: number,
   otherFrames: RectBounds[],
   threshold: number = 2.0,
   unit: string = 'mm',
@@ -739,7 +740,12 @@ export function calculateResizeSnapping(
   // Aspect ratio of the frame
   const aspect = width > 0 && height > 0 ? width / height : 1;
 
-  // 1. Primary: Dimension Matching (Equal Width / Equal Height)
+  // Spine coordinates
+  const singlePageWidth = (spreadWidth - gutterWidth) / 2;
+  const spineLeft = singlePageWidth;
+  const spineRight = singlePageWidth + gutterWidth;
+
+  // 1. Primary: Dimension Matching (Equal Width / Equal Height against other frames)
   let bestWidthDiff = threshold + 1;
   let bestWidthMatch: { other: RectBounds; val: number } | null = null;
 
@@ -747,7 +753,6 @@ export function calculateResizeSnapping(
   let bestHeightMatch: { other: RectBounds; val: number } | null = null;
 
   for (const other of otherFrames) {
-    // Width matching (only if resizing width)
     if (isWidthResizable) {
       const wDiff = Math.abs(width - other.width);
       if (wDiff <= threshold && wDiff < bestWidthDiff) {
@@ -756,7 +761,6 @@ export function calculateResizeSnapping(
       }
     }
 
-    // Height matching (only if resizing height)
     if (isHeightResizable) {
       const hDiff = Math.abs(height - other.height);
       if (hDiff <= threshold && hDiff < bestHeightDiff) {
@@ -766,7 +770,7 @@ export function calculateResizeSnapping(
     }
   }
 
-  // Apply Height Snap (if resizing top or bottom or corner)
+  // Apply Dimension Snap
   if (bestHeightMatch && (!bestWidthMatch || bestHeightDiff <= bestWidthDiff)) {
     const o = bestHeightMatch.other;
     const targetH = bestHeightMatch.val;
@@ -804,9 +808,7 @@ export function calculateResizeSnapping(
         label: `Match Height (${roundToTenth(height)} ${unit})`,
       });
     }
-  }
-  // Apply Width Snap (if resizing left or right or corner)
-  else if (bestWidthMatch) {
+  } else if (bestWidthMatch) {
     const o = bestWidthMatch.other;
     const targetW = bestWidthMatch.val;
     const diffW = targetW - width;
@@ -845,102 +847,186 @@ export function calculateResizeSnapping(
     }
   }
 
-  // 2. Secondary: Primary Collinear Edge Alignment (Only for the active side being moved)
-  if (snapLines.length === 0 && !isCorner) {
-    let bestEdgeV: { line: SnapLine; snapX?: number; snapW?: number } | null = null;
-    let bestEdgeVDiff = threshold + 1;
+  // 2. Secondary & Edge Snapping: Safe Area Margins, Spine, Spread Boundaries, and Other Frames
+  // Build Vertical Targets (X lines)
+  const verticalTargets: { pos: number; label: string; start?: number; end?: number }[] = [];
+  if (safeArea > 0) {
+    verticalTargets.push(
+      { pos: safeArea, label: 'Safe Margin Left' },
+      { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
+      { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
+      { pos: spreadWidth - safeArea, label: 'Safe Margin Right' }
+    );
+  }
+  verticalTargets.push(
+    { pos: 0, label: 'Spread Left' },
+    { pos: spineLeft, label: 'Spine Left' },
+    { pos: spreadWidth / 2, label: 'Spread Center' },
+    { pos: spineRight, label: 'Spine Right' },
+    { pos: spreadWidth, label: 'Spread Right' }
+  );
+  for (const o of otherFrames) {
+    verticalTargets.push(
+      { pos: o.x, label: 'Align Left', start: o.y, end: o.y + o.height },
+      { pos: o.x + o.width, label: 'Align Right', start: o.y, end: o.y + o.height }
+    );
+  }
 
-    let bestEdgeH: { line: SnapLine; snapY?: number; snapH?: number } | null = null;
-    let bestEdgeHDiff = threshold + 1;
+  // Build Horizontal Targets (Y lines)
+  const horizontalTargets: { pos: number; label: string; start?: number; end?: number }[] = [];
+  if (safeArea > 0) {
+    horizontalTargets.push(
+      { pos: safeArea, label: 'Safe Margin Top' },
+      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' }
+    );
+  }
+  horizontalTargets.push(
+    { pos: 0, label: 'Spread Top' },
+    { pos: spreadHeight / 2, label: 'Spread Middle' },
+    { pos: spreadHeight, label: 'Spread Bottom' }
+  );
+  for (const o of otherFrames) {
+    horizontalTargets.push(
+      { pos: o.y, label: 'Align Top', start: o.x, end: o.x + o.width },
+      { pos: o.y + o.height, label: 'Align Bottom', start: o.x, end: o.x + o.width }
+    );
+  }
 
-    for (const other of otherFrames) {
-      const otherRight = other.x + other.width;
-      const otherBottom = other.y + other.height;
+  // Check Vertical Edge Snapping (if width is resizable and no conflicting dimension snap line)
+  if (snapLines.filter((l) => l.type === 'vertical').length === 0 && isWidthResizable) {
+    let bestVDiff = threshold + 1;
+    let bestVTarget: (typeof verticalTargets)[0] | null = null;
+    let isVLeft = false;
 
-      // Vertical (Left-to-Left or Right-to-Right only)
-      if (isLeftAnchor) {
-        const diffL = Math.abs(x - other.x);
-        if (diffL <= threshold && diffL < bestEdgeVDiff) {
-          bestEdgeVDiff = diffL;
-          const newX = other.x;
-          const newW = (x + width) - newX;
-          bestEdgeV = {
-            line: {
-              type: 'vertical',
-              position: other.x,
-              start: Math.min(y, other.y),
-              end: Math.max(y + height, otherBottom),
-              label: 'Rata Kiri',
-            },
-            snapX: newX,
-            snapW: newW,
-          };
-        }
-      } else if (isRightAnchor) {
-        const diffR = Math.abs(right - otherRight);
-        if (diffR <= threshold && diffR < bestEdgeVDiff) {
-          bestEdgeVDiff = diffR;
-          const newW = otherRight - x;
-          bestEdgeV = {
-            line: {
-              type: 'vertical',
-              position: otherRight,
-              start: Math.min(y, other.y),
-              end: Math.max(bottom, otherBottom),
-              label: 'Rata Kanan',
-            },
-            snapW: newW,
-          };
+    if (isLeftAnchor) {
+      for (const t of verticalTargets) {
+        const diff = Math.abs(x - t.pos);
+        if (diff <= threshold && diff < bestVDiff) {
+          bestVDiff = diff;
+          bestVTarget = t;
+          isVLeft = true;
         }
       }
-
-      // Horizontal (Top-to-Top or Bottom-to-Bottom only)
-      if (isTopAnchor) {
-        const diffT = Math.abs(y - other.y);
-        if (diffT <= threshold && diffT < bestEdgeHDiff) {
-          bestEdgeHDiff = diffT;
-          const newY = other.y;
-          const newH = (y + height) - newY;
-          bestEdgeH = {
-            line: {
-              type: 'horizontal',
-              position: other.y,
-              start: Math.min(x, other.x),
-              end: Math.max(x + width, otherRight),
-              label: 'Rata Atas',
-            },
-            snapY: newY,
-            snapH: newH,
-          };
-        }
-      } else if (isBottomAnchor) {
-        const diffB = Math.abs(bottom - otherBottom);
-        if (diffB <= threshold && diffB < bestEdgeHDiff) {
-          bestEdgeHDiff = diffB;
-          const newH = otherBottom - y;
-          bestEdgeH = {
-            line: {
-              type: 'horizontal',
-              position: otherBottom,
-              start: Math.min(x, other.x),
-              end: Math.max(bottom, otherBottom),
-              label: 'Rata Bawah',
-            },
-            snapH: newH,
-          };
+    } else if (isRightAnchor) {
+      for (const t of verticalTargets) {
+        const diff = Math.abs(right - t.pos);
+        if (diff <= threshold && diff < bestVDiff) {
+          bestVDiff = diff;
+          bestVTarget = t;
+          isVLeft = false;
         }
       }
     }
 
-    if (bestEdgeV) {
-      snapLines.push(bestEdgeV.line);
-      if (bestEdgeV.snapX !== undefined) x = bestEdgeV.snapX;
-      if (bestEdgeV.snapW !== undefined) width = bestEdgeV.snapW;
+    if (bestVTarget) {
+      if (isVLeft) {
+        const newX = bestVTarget.pos;
+        const newW = (x + width) - newX;
+        if (newW >= 4) {
+          x = newX;
+          width = newW;
+          if (isCorner) {
+            const newH = width / aspect;
+            const diffH = newH - height;
+            if (isTopAnchor) y = y - diffH;
+            height = newH;
+          }
+          snapLines.push({
+            type: 'vertical',
+            position: bestVTarget.pos,
+            start: Math.min(y, bestVTarget.start ?? 0),
+            end: Math.max(y + height, bestVTarget.end ?? spreadHeight),
+            label: bestVTarget.label,
+          });
+        }
+      } else {
+        const newW = bestVTarget.pos - x;
+        if (newW >= 4) {
+          width = newW;
+          if (isCorner) {
+            const newH = width / aspect;
+            const diffH = newH - height;
+            if (isTopAnchor) y = y - diffH;
+            height = newH;
+          }
+          snapLines.push({
+            type: 'vertical',
+            position: bestVTarget.pos,
+            start: Math.min(y, bestVTarget.start ?? 0),
+            end: Math.max(y + height, bestVTarget.end ?? spreadHeight),
+            label: bestVTarget.label,
+          });
+        }
+      }
     }
-    if (bestEdgeH) {
-      snapLines.push(bestEdgeH.line);
-      if (bestEdgeH.snapY !== undefined) y = bestEdgeH.snapY;
-      if (bestEdgeH.snapH !== undefined) height = bestEdgeH.snapH;
+  }
+
+  // Check Horizontal Edge Snapping (if height is resizable and no conflicting dimension snap line)
+  if (snapLines.filter((l) => l.type === 'horizontal').length === 0 && isHeightResizable) {
+    let bestHDiff = threshold + 1;
+    let bestHTarget: (typeof horizontalTargets)[0] | null = null;
+    let isHTop = false;
+
+    if (isTopAnchor) {
+      for (const t of horizontalTargets) {
+        const diff = Math.abs(y - t.pos);
+        if (diff <= threshold && diff < bestHDiff) {
+          bestHDiff = diff;
+          bestHTarget = t;
+          isHTop = true;
+        }
+      }
+    } else if (isBottomAnchor) {
+      for (const t of horizontalTargets) {
+        const diff = Math.abs(bottom - t.pos);
+        if (diff <= threshold && diff < bestHDiff) {
+          bestHDiff = diff;
+          bestHTarget = t;
+          isHTop = false;
+        }
+      }
+    }
+
+    if (bestHTarget) {
+      if (isHTop) {
+        const newY = bestHTarget.pos;
+        const newH = (y + height) - newY;
+        if (newH >= 4) {
+          y = newY;
+          height = newH;
+          if (isCorner) {
+            const newW = height * aspect;
+            const diffW = newW - width;
+            if (isLeftAnchor) x = x - diffW;
+            width = newW;
+          }
+          snapLines.push({
+            type: 'horizontal',
+            position: bestHTarget.pos,
+            start: Math.min(x, bestHTarget.start ?? 0),
+            end: Math.max(x + width, bestHTarget.end ?? spreadWidth),
+            label: bestHTarget.label,
+          });
+        }
+      } else {
+        const newH = bestHTarget.pos - y;
+        if (newH >= 4) {
+          height = newH;
+          if (isCorner) {
+            const newW = height * aspect;
+            const diffW = newW - width;
+            if (isLeftAnchor) x = x - diffW;
+            width = newW;
+          }
+          snapLines.push({
+            type: 'horizontal',
+            position: bestHTarget.pos,
+            start: Math.min(x, bestHTarget.start ?? 0),
+            end: Math.max(x + width, bestHTarget.end ?? spreadWidth),
+            label: bestHTarget.label,
+          });
+        }
+      }
     }
   }
 

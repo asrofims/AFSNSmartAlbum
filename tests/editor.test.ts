@@ -628,4 +628,30 @@ const grUpdatedX = new Map(groupAlignRightRes.map((u) => [u.id, u.geometry.x!]))
 console.assert(grUpdatedX.get('gl1') === 100, `Group GL1 should move to x=100, got ${grUpdatedX.get('gl1')}`);
 console.assert(grUpdatedX.get('gl2') === 150, `Group GL2 should move to x=150 (right edge at 190mm), got ${grUpdatedX.get('gl2')}`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
+// 13. Test Safe Margin Snapping During Frame Resize (calculateResizeSnapping)
+// 13.1 Drag left handle towards Left Blue Safe Margin (x = 10.8mm -> snaps to 10mm)
+const resizeLeftRes = calculateResizeSnapping(
+  { x: 10.8, y: 50, width: 80, height: 60 },
+  406, 300, 10, 6, [], 2.0, 'mm', 'middle-left'
+);
+console.assert(resizeLeftRes.snappedBounds.x === 10, `Resized frame x should snap to 10, got ${resizeLeftRes.snappedBounds.x}`);
+console.assert(resizeLeftRes.snappedBounds.width === 80.8, `Resized frame width should expand to 80.8, got ${resizeLeftRes.snappedBounds.width}`);
+console.assert(resizeLeftRes.snapLines.some((l) => l.label === 'Safe Margin Left'), 'Should generate Safe Margin Left snap line');
+
+// 13.2 Drag right handle towards Left Page Inner Blue Margin (x + width = 189.2mm -> snaps to 190mm)
+const resizeRightRes = calculateResizeSnapping(
+  { x: 20, y: 50, width: 169.2, height: 60 },
+  406, 300, 10, 6, [], 2.0, 'mm', 'middle-right'
+);
+console.assert(resizeRightRes.snappedBounds.width === 170, `Resized frame width should snap to 170 (right edge at 190), got ${resizeRightRes.snappedBounds.width}`);
+console.assert(resizeRightRes.snapLines.some((l) => l.label === 'Safe Margin Left Inner'), 'Should generate Safe Margin Left Inner snap line');
+
+// 13.3 Drag bottom handle towards Bottom Blue Margin (y + height = 289.4mm -> snaps to 290mm)
+const resizeBottomRes = calculateResizeSnapping(
+  { x: 20, y: 50, width: 80, height: 239.4 },
+  406, 300, 10, 6, [], 2.0, 'mm', 'bottom-center'
+);
+console.assert(resizeBottomRes.snappedBounds.height === 240, `Resized frame height should snap to 240 (bottom edge at 290), got ${resizeBottomRes.snappedBounds.height}`);
+console.assert(resizeBottomRes.snapLines.some((l) => l.label === 'Safe Margin Bottom'), 'Should generate Safe Margin Bottom snap line');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
