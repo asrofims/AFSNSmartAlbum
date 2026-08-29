@@ -171,8 +171,11 @@ function PhotoFrameNode({
       draggable={!isCropMode}
       onMouseDown={(e) => {
         e.cancelBubble = true;
-        // Ignore right-clicks on mouse down
-        if ('button' in e.evt && e.evt.button === 2) {
+        // Ignore right-clicks & middle-clicks on mouse down
+        if ('button' in e.evt && (e.evt.button === 2 || e.evt.button === 1)) {
+          return;
+        }
+        if ('which' in e.evt && (e.evt.which === 3 || e.evt.which === 2)) {
           return;
         }
         if (!isCropMode) {
@@ -186,7 +189,10 @@ function PhotoFrameNode({
       }}
       onClick={(e) => {
         e.cancelBubble = true;
-        if ('button' in e.evt && e.evt.button === 2) {
+        if ('button' in e.evt && e.evt.button !== 0) {
+          return;
+        }
+        if ('which' in e.evt && e.evt.which !== 1) {
           return;
         }
         const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
@@ -203,6 +209,16 @@ function PhotoFrameNode({
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
+        // Double-click to crop MUST ONLY trigger on primary left button and NEVER during multi-select
+        if ('button' in e.evt && e.evt.button !== 0) {
+          return;
+        }
+        if ('which' in e.evt && e.evt.which !== 1) {
+          return;
+        }
+        if (isMultiSelectActive) {
+          return;
+        }
         onDoubleClick();
       }}
       onContextMenu={(e) => {
@@ -210,7 +226,7 @@ function PhotoFrameNode({
         e.cancelBubble = true;
         if (!isCropMode) {
           if (!isSelected) {
-            onSelect(e);
+            onSelect();
           }
           onContextMenu?.(e);
         }
