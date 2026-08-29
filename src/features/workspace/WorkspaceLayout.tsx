@@ -254,11 +254,12 @@ export function WorkspaceLayout() {
                   onClick={() => {
                     setIsFileMenuOpen(false);
                     confirmSafeAction(async () => {
-                      await importProjectFromAfsn();
+                      const ok = await importProjectFromAfsn();
+                      if (ok) showToast('✓ Project opened successfully');
                     });
                   }}
                 >
-                  <span>📂 Open .afsn Project...</span>
+                  <span>📂 Open Project</span>
                   <span className={styles.shortcutText}>Ctrl+O</span>
                 </button>
 
@@ -304,19 +305,6 @@ export function WorkspaceLayout() {
                       }}
                     >
                       <span>📦 Export Packaged...</span>
-                    </button>
-
-                    <div className={styles.menuDivider} />
-
-                    <button
-                      type="button"
-                      className={styles.menuItem}
-                      onClick={() => {
-                        setIsFileMenuOpen(false);
-                        confirmSafeAction(() => closeProject());
-                      }}
-                    >
-                      <span>✕ Close Project</span>
                     </button>
                   </>
                 )}
