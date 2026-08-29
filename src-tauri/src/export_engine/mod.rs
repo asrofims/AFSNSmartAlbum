@@ -16,12 +16,20 @@ pub struct ExportOptions {
     pub include_bleed: bool,
     #[serde(default)]
     pub split_pages: bool, // split spread into Left & Right page images
+    #[serde(default)]
+    pub sharpen_enabled: bool,
+    #[serde(default = "default_sharpen_amount")]
+    pub sharpen_amount: String, // "standard", "high"
     pub output_dir: String,
     pub selected_spread_ids: Option<Vec<String>>,
 }
 
 fn default_jpeg_quality() -> u8 {
     95
+}
+
+fn default_sharpen_amount() -> String {
+    "standard".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -333,6 +341,15 @@ pub fn split_spread_into_pages(
     (left_page, right_page)
 }
 
+/// Applies print output unsharp masking to enhance micro-detail for physical printing
+pub fn apply_print_sharpening(img: &RgbaImage, amount: &str) -> RgbaImage {
+    let (sigma, threshold) = match amount.to_lowercase().as_str() {
+        "high" => (1.5f32, 2i32),
+        _ => (1.0f32, 2i32), // "standard" or default
+    };
+    image::imageops::unsharpen(img, sigma, threshold)
+}
+
 /// Assembles JPEG image files into a multi-page PDF document
 pub fn assemble_pdf_from_jpegs(
     jpeg_files: &[(PathBuf, u32, u32)], // (file_path, width_px, height_px)
@@ -554,6 +571,16 @@ mod tests {
         }
         let sidebar_rgb = DynamicImage::ImageRgba8(sidebar).to_rgb8();
         let _ = sidebar_rgb.save_with_format(icons_dir.join("sidebar.bmp"), image::ImageFormat::Bmp);
+    }
+
+    #[test]
+    fn test_apply_print_sharpening() {
+        let test_img: RgbaImage = ImageBuffer::from_pixel(100, 100, Rgba([128, 128, 128, 255]));
+        let standard_sharp = apply_print_sharpening(&test_img, "standard");
+        assert_eq!(standard_sharp.dimensions(), (100, 100));
+
+        let high_sharp = apply_print_sharpening(&test_img, "high");
+        assert_eq!(high_sharp.dimensions(), (100, 100));
     }
 }
 

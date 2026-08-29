@@ -15,6 +15,8 @@ export interface ExportOptions {
   jpegQuality: number;
   includeBleed: boolean;
   splitPages: boolean;
+  sharpenEnabled?: boolean;
+  sharpenAmount?: 'standard' | 'high';
   outputDir: string;
   selectedSpreadIds?: string[];
 }
@@ -84,6 +86,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [jpegQuality, setJpegQuality] = useState<number>(95);
   const [includeBleed, setIncludeBleed] = useState<boolean>(true);
   const [splitPages, setSplitPages] = useState<boolean>(false);
+  const [sharpenEnabled, setSharpenEnabled] = useState<boolean>(true);
+  const [sharpenAmount, setSharpenAmount] = useState<'standard' | 'high'>('standard');
 
   const [scope, setScope] = useState<'all' | 'current' | 'custom'>('all');
   const [customRange, setCustomRange] = useState<string>('1-2');
@@ -192,6 +196,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       jpegQuality,
       includeBleed,
       splitPages,
+      sharpenEnabled,
+      sharpenAmount,
       outputDir: trimmedDir,
       selectedSpreadIds,
     };
@@ -246,6 +252,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       jpegQuality,
       includeBleed,
       splitPages,
+      sharpenEnabled,
+      sharpenAmount,
       outputDir: trimmedDir,
       selectedSpreadIds,
     });
@@ -486,7 +494,50 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           )}
         </div>
 
-        {/* 4. Scope (All / Current / Custom Range) */}
+        {/* 4. Print Output Sharpening */}
+        <div className={styles.section}>
+          <label className={styles.sectionTitle}>Print Output Sharpening</label>
+          <div className={styles.sharpenBox}>
+            <label className={styles.sharpenToggle}>
+              <input
+                type="checkbox"
+                checked={sharpenEnabled}
+                onChange={(e) => setSharpenEnabled(e.target.checked)}
+              />
+              <span>Enhance Micro-Detail for Print (Unsharp Masking)</span>
+            </label>
+            <div className={styles.sharpenHelp}>
+              Compensates for downscale pixel softening and printer dot gain, giving extra crispness to hair, eyes, jewelry, and textures.
+            </div>
+
+            {sharpenEnabled && (
+              <div className={styles.sharpenSubGroup}>
+                <label className={styles.radioItem} style={{ cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="sharpenAmount"
+                    value="standard"
+                    checked={sharpenAmount === 'standard'}
+                    onChange={() => setSharpenAmount('standard')}
+                  />
+                  <span>Standard (Glossy / Luster Photo Lab)</span>
+                </label>
+                <label className={styles.radioItem} style={{ cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="sharpenAmount"
+                    value="high"
+                    checked={sharpenAmount === 'high'}
+                    onChange={() => setSharpenAmount('high')}
+                  />
+                  <span>High (Matte / Velvet / Canvas)</span>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 5. Scope (All / Current / Custom Range) */}
         <div className={styles.section}>
           <label className={styles.sectionTitle}>Export Scope</label>
           <div className={styles.radioGroup}>

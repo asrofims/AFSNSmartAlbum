@@ -6,8 +6,8 @@ use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
 use crate::db::{AlbumPayload, Database, ProjectRow, SpreadPayload};
 use crate::export_engine::{
-    assemble_pdf_from_jpegs, render_spread_to_image_with_progress, split_spread_into_pages,
-    ExportOptions, ExportProgressEvent,
+    apply_print_sharpening, assemble_pdf_from_jpegs, render_spread_to_image_with_progress,
+    split_spread_into_pages, ExportOptions, ExportProgressEvent,
 };
 
 #[derive(Default)]
@@ -387,6 +387,13 @@ fn export_album_high_res_worker(
                 if cancel_flag.load(Ordering::SeqCst) {
                     return Err("Export cancelled by user".to_string());
                 }
+
+                // Apply Print Output Sharpening if enabled
+                let spread_img = if options.sharpen_enabled {
+                    apply_print_sharpening(&spread_img, &options.sharpen_amount)
+                } else {
+                    spread_img
+                };
 
                 let mut local_output_files = Vec::new();
                 let mut local_temp_jpegs = Vec::new();
