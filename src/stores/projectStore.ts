@@ -19,6 +19,7 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
   openProjectById: (id: string) => Promise<void>;
+  saveProject: () => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean }>;
   exportProjectAsAfsn: () => Promise<string | null>;
   exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
   importProjectFromAfsn: () => Promise<boolean>;
@@ -270,6 +271,51 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
+  saveProject: async (): Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean }> => {
+    const current = get().currentProject;
+    if (!current) return { success: false, filePath: null, isSaveAs: false };
+
+    // 1. Flush latest album state to SQLite and crash snapshot
+    const { useAlbumStore } = await import('./albumStore');
+    await useAlbumStore.getState().saveAlbumToDb();
+
+    // 2. If project already has an assigned .afsn file on disk, overwrite directly!
+    if (current.filePath) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('export_afsn_package', {
+          projectId: current.id,
+          targetPath: current.filePath,
+        });
+
+        const updatedProject: Project = {
+          ...current,
+          updatedAt: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          currentProject: updatedProject,
+          recentProjects: [
+            updatedProject,
+            ...state.recentProjects.filter((p) => p.id !== current.id),
+          ].slice(0, 10),
+        }));
+
+        try {
+          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
+        } catch {}
+
+        return { success: true, filePath: current.filePath, isSaveAs: false };
+      } catch (err) {
+        console.warn('[AFSN] Direct save to filePath failed, fallback to dialog:', err);
+      }
+    }
+
+    // 3. If no filePath exists yet (first save), prompt Save As (.afsn) dialog
+    const savedPath = await get().exportProjectAsAfsn();
+    return { success: Boolean(savedPath), filePath: savedPath, isSaveAs: true };
+  },
+
   exportProjectAsAfsn: async (): Promise<string | null> => {
     const current = get().currentProject;
     if (!current) return null;
@@ -285,7 +331,29 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectId: current.id,
         suggestedName: current.name,
       });
-      return savedPath;
+
+      if (savedPath) {
+        const updatedProject: Project = {
+          ...current,
+          filePath: savedPath,
+          updatedAt: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          currentProject: updatedProject,
+          recentProjects: [
+            updatedProject,
+            ...state.recentProjects.filter((p) => p.id !== current.id),
+          ].slice(0, 10),
+        }));
+
+        try {
+          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
+        } catch {}
+
+        return savedPath;
+      }
+      return null;
     } catch (err) {
       console.error('[AFSN] export_afsn_with_dialog failed:', err);
       return null;
@@ -325,6 +393,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           recentProjects: [project, ...state.recentProjects.filter((p) => p.id !== project.id)].slice(0, 10),
           error: null,
         }));
+
+        try {
+          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
+        } catch {}
 
         // Load imported photos, folders, and album structure
         const { usePhotoStore } = await import('./photoStore');

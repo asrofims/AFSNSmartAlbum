@@ -1475,6 +1475,12 @@ impl Database {
             rusqlite::Error::InvalidPath(format!("Failed to write .afsn file: {}", e).into())
         })?;
 
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute(
+            "UPDATE projects SET file_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![target_path, project_id],
+        );
+
         Ok(())
     }
 
@@ -1683,6 +1689,13 @@ impl Database {
         if let Some(album) = &package.album {
             self.save_album_structure(album)?;
         }
+
+        package.project.file_path = Some(source_path.to_string());
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute(
+            "UPDATE projects SET file_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![source_path, &package.project.id],
+        );
 
         Ok(package)
     }

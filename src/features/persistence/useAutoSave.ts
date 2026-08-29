@@ -41,6 +41,15 @@ export function useAutoSave() {
 
     debounceTimerRef.current = window.setTimeout(async () => {
       await saveAlbumToDb();
+      if (currentProject?.filePath) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('export_afsn_package', {
+            projectId: currentProject.id,
+            targetPath: currentProject.filePath,
+          });
+        } catch {}
+      }
     }, 8000);
 
     return () => {
@@ -48,14 +57,24 @@ export function useAutoSave() {
         window.clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [currentAlbum, saveStatus, saveAlbumToDb]);
+  }, [currentAlbum, saveStatus, saveAlbumToDb, currentProject]);
 
   // 3. Periodic Background Timer (60 seconds interval fallback)
   useEffect(() => {
     const interval = window.setInterval(async () => {
       const { saveStatus: currentStatus, currentAlbum: album } = useAlbumStore.getState();
-      if (currentStatus === 'unsaved' && album) {
+      const project = useProjectStore.getState().currentProject;
+      if (currentStatus === 'unsaved' && album && project) {
         await useAlbumStore.getState().saveAlbumToDb();
+        if (project.filePath) {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('export_afsn_package', {
+              projectId: project.id,
+              targetPath: project.filePath,
+            });
+          } catch {}
+        }
       }
     }, 60000);
 

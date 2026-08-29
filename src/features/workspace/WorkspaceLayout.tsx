@@ -35,6 +35,7 @@ export function WorkspaceLayout() {
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
   const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
   const updateProjectPhotoInset = useProjectStore((s) => s.updateProjectPhotoInset);
+  const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
   const exportCompleteProjectPackageWithPhotos = useProjectStore((s) => s.exportCompleteProjectPackageWithPhotos);
   const importProjectFromAfsn = useProjectStore((s) => s.importProjectFromAfsn);
@@ -184,11 +185,19 @@ export function WorkspaceLayout() {
         e.preventDefault();
         if (e.shiftKey) {
           // Save As (.afsn)
-          exportProjectAsAfsn();
+          exportProjectAsAfsn().then((path) => {
+            if (path) showToast(`✓ Project saved to: ${path.split(/[\\/]/).pop() || path}`);
+          });
         } else {
           // Save
-          saveAlbumToDb().then((ok) => {
-            if (ok) showToast('✓ Project saved to database');
+          saveProject().then((res) => {
+            if (res.success) {
+              if (res.filePath) {
+                showToast(`✓ Project saved to: ${res.filePath.split(/[\\/]/).pop() || res.filePath}`);
+              } else {
+                showToast('✓ Project saved to database');
+              }
+            }
           });
         }
       } else if (e.key === 'o' || e.key === 'O') {
@@ -201,7 +210,7 @@ export function WorkspaceLayout() {
         confirmSafeAction(() => openNewProject());
       }
     },
-    [undo, redo, saveAlbumToDb, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast]
+    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast]
   );
 
   useEffect(() => {
@@ -279,8 +288,14 @@ export function WorkspaceLayout() {
                       className={styles.menuItem}
                       onClick={async () => {
                         setIsFileMenuOpen(false);
-                        const ok = await saveAlbumToDb();
-                        if (ok) showToast('✓ Project saved to database');
+                        const res = await saveProject();
+                        if (res.success) {
+                          if (res.filePath) {
+                            showToast(`✓ Project saved to: ${res.filePath.split(/[\\/]/).pop() || res.filePath}`);
+                          } else {
+                            showToast('✓ Project saved to database');
+                          }
+                        }
                       }}
                     >
                       <span>💾 Save</span>
@@ -293,7 +308,7 @@ export function WorkspaceLayout() {
                       onClick={async () => {
                         setIsFileMenuOpen(false);
                         const path = await exportProjectAsAfsn();
-                        if (path) showToast(`✓ Project saved to: ${path}`);
+                        if (path) showToast(`✓ Project saved to: ${path.split(/[\\/]/).pop() || path}`);
                       }}
                     >
                       <span>📑 Save As (.afsn)...</span>
@@ -377,8 +392,14 @@ export function WorkspaceLayout() {
                   type="button"
                   className={styles.historyBtn}
                   onClick={async () => {
-                    const ok = await saveAlbumToDb();
-                    if (ok) showToast('✓ Project saved to database');
+                    const res = await saveProject();
+                    if (res.success) {
+                      if (res.filePath) {
+                        showToast(`✓ Project saved to: ${res.filePath.split(/[\\/]/).pop() || res.filePath}`);
+                      } else {
+                        showToast('✓ Project saved to database');
+                      }
+                    }
                   }}
                   title="Save Project (Ctrl+S)"
                 >
