@@ -38,14 +38,20 @@ Applying a uniform affine transform $(x' = x_0 + (x - x_0) \cdot s)$ to a multi-
 
 ---
 
-## 2. Smart Magnetic Snapping Math
+## 2. Smart Magnetic Snapping & Granular Targets
 
-### Guidelines Calculation (`calculateSnapLines`)
-When dragging or single-frame resizing:
-1. Candidate snap lines are generated from spread boundaries (left, center crease, right, margins) and all inactive frame edges/centers.
-2. Snap threshold is typically $5\text{px}$ to $8\text{px}$ in screen coordinates.
-3. Dimension matching (`"Match Width"`, `"Match Height"`) detects when a frame's width or height matches a nearby frame within $\pm 0.5\text{mm}$.
-4. Distance dimension lines with cyan pill badges display the exact physical gap between aligned frames.
+### Guidelines Calculation (`calculateSnapping`)
+When dragging or multi-selecting frames:
+1. Candidate snap lines are generated conditionally based on active `SnappingConfig`:
+   - `snapToPageEdges`: Outer spread boundary edges (0, spreadWidth, 0, spreadHeight) and center gutter / spine crease lines.
+   - `snapToPageCenters`: Facing page optical centerlines (left page center, right page center, spread center).
+   - `snapToMargins`: Safe area cut allowance guides (`safeArea` offset from outer edges and spine).
+   - `snapToFrames`: Neighboring frame collinear edges (`Align Left`, `Align Right`, `Align Top`, `Align Bottom`) and centerlines (`Align Center X`, `Align Center Y`).
+   - `snapToEqualGaps`: Real-time equidistant gap snapping and dynamic distance guide HUD indicators.
+2. Snap threshold is configurable (default: 2.0mm; presets: Soft 1.0mm, Standard 2.0mm, Strong 4.0mm).
+3. Snapping can be configured in the dedicated **Settings** modal (`SettingsDialog.tsx`) and toggled via master switch or bypassed in real-time by holding <kbd>Alt</kbd>.
+4. Dimension matching (`"Match Width"`, `"Match Height"`) detects when a frame's width or height matches a nearby frame within $\pm 0.5\text{mm}$.
+5. Distance dimension lines with cyan pill badges display the exact physical gap between aligned frames.
 
 ---
 

@@ -268,6 +268,26 @@ export interface GapGuide {
   label: string; // Formatted label (e.g. "10.0 mm")
 }
 
+export interface SnappingConfig {
+  enabled: boolean;
+  threshold: number; // in physical mm/unit (default: 2.0)
+  snapToPageEdges: boolean; // outer spread borders & center gutter/spine crease
+  snapToPageCenters: boolean; // optical centerlines of left page, right page, and full spread
+  snapToMargins: boolean; // safe zone margin boundaries
+  snapToFrames: boolean; // collinear edges and centers of other photo frames
+  snapToEqualGaps: boolean; // equidistant spacing between 3+ frames and dynamic gap HUD
+}
+
+export const DEFAULT_SNAPPING_CONFIG: SnappingConfig = {
+  enabled: true,
+  threshold: 2.0,
+  snapToPageEdges: true,
+  snapToPageCenters: true,
+  snapToMargins: true,
+  snapToFrames: true,
+  snapToEqualGaps: true,
+};
+
 export interface ResizeSnapResult {
   snappedBounds: RectBounds;
   snapLines: SnapLine[];
@@ -284,9 +304,19 @@ export function calculateSnapping(
   safeArea: number,
   gutterWidth: number,
   otherFrames: RectBounds[],
-  threshold: number = 3.0, // snap distance in physical units (e.g. 3mm)
+  thresholdOrConfig: number | SnappingConfig = DEFAULT_SNAPPING_CONFIG,
   unit: string = 'mm'
 ): { snappedX: number; snappedY: number; snapLines: SnapLine[]; gapGuides: GapGuide[] } {
+  const config: SnappingConfig =
+    typeof thresholdOrConfig === 'number'
+      ? { ...DEFAULT_SNAPPING_CONFIG, threshold: thresholdOrConfig }
+      : { ...DEFAULT_SNAPPING_CONFIG, ...thresholdOrConfig };
+
+  if (!config.enabled) {
+    return { snappedX: dragged.x, snappedY: dragged.y, snapLines: [], gapGuides: [] };
+  }
+
+  const threshold = config.threshold || 2.0;
   let snappedX = dragged.x;
   let snappedY = dragged.y;
   const snapLines: SnapLine[] = [];
@@ -299,50 +329,71 @@ export function calculateSnapping(
   const spineRight = singlePageW + gutterWidth;
   const rightPageCenter = spineRight + singlePageW / 2;
 
-  // Key vertical reference points on spread (Page Centers and Spines are Fixed physical targets)
-  const vTargets = [
-    { pos: 0, label: 'Left Outer Edge' },
-    { pos: leftPageCenter, label: 'Left Page Center' },
-    { pos: spineLeft, label: 'Left Page Inner Edge' },
-    { pos: spineCenter, label: 'Center Spine' },
-    { pos: spineRight, label: 'Right Page Inner Edge' },
-    { pos: rightPageCenter, label: 'Right Page Center' },
-    { pos: spreadWidth, label: 'Right Outer Edge' },
-    ...(safeArea > 0
-      ? [
-          { pos: safeArea, label: 'Safe Margin Left' },
-          { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
-          { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
-          { pos: spreadWidth - safeArea, label: 'Safe Margin Right' },
-        ]
-      : []),
-  ];
+  // Key vertical reference points on spread
+  const vTargets: { pos: number; label: string }[] = [];
+
+  if (config.snapToPageEdges) {
+    vTargets.push(
+      { pos: 0, label: 'Left Outer Edge' },
+      { pos: spineLeft, label: 'Left Page Inner Edge' },
+      { pos: spineCenter, label: 'Center Spine' },
+      { pos: spineRight, label: 'Right Page Inner Edge' },
+      { pos: spreadWidth, label: 'Right Outer Edge' }
+    );
+  }
+
+  if (config.snapToPageCenters) {
+    vTargets.push(
+      { pos: leftPageCenter, label: 'Left Page Center' },
+      { pos: spineCenter, label: 'Spread Center X' },
+      { pos: rightPageCenter, label: 'Right Page Center' }
+    );
+  }
+
+  if (config.snapToMargins && safeArea > 0) {
+    vTargets.push(
+      { pos: safeArea, label: 'Safe Margin Left' },
+      { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
+      { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
+      { pos: spreadWidth - safeArea, label: 'Safe Margin Right' }
+    );
+  }
 
   // Key horizontal reference points on spread
-  const hTargets = [
-    { pos: 0, label: 'Top Edge' },
-    { pos: spreadHeight / 2, label: 'Center Horizontal' },
-    { pos: spreadHeight, label: 'Bottom Edge' },
-    ...(safeArea > 0
-      ? [
-          { pos: safeArea, label: 'Safe Margin Top' },
-          { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' },
-        ]
-      : []),
-  ];
+  const hTargets: { pos: number; label: string }[] = [];
+
+  if (config.snapToPageEdges) {
+    hTargets.push(
+      { pos: 0, label: 'Top Edge' },
+      { pos: spreadHeight, label: 'Bottom Edge' }
+    );
+  }
+
+  if (config.snapToPageCenters) {
+    hTargets.push({ pos: spreadHeight / 2, label: 'Center Horizontal' });
+  }
+
+  if (config.snapToMargins && safeArea > 0) {
+    hTargets.push(
+      { pos: safeArea, label: 'Safe Margin Top' },
+      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' }
+    );
+  }
 
   // Add points from other frames
-  for (const other of otherFrames) {
-    vTargets.push(
-      { pos: other.x, label: 'Align Left' },
-      { pos: other.x + other.width / 2, label: 'Align Center X' },
-      { pos: other.x + other.width, label: 'Align Right' }
-    );
-    hTargets.push(
-      { pos: other.y, label: 'Align Top' },
-      { pos: other.y + other.height / 2, label: 'Align Center Y' },
-      { pos: other.y + other.height, label: 'Align Bottom' }
-    );
+  if (config.snapToFrames) {
+    for (const other of otherFrames) {
+      vTargets.push(
+        { pos: other.x, label: 'Align Left' },
+        { pos: other.x + other.width / 2, label: 'Align Center X' },
+        { pos: other.x + other.width, label: 'Align Right' }
+      );
+      hTargets.push(
+        { pos: other.y, label: 'Align Top' },
+        { pos: other.y + other.height / 2, label: 'Align Center Y' },
+        { pos: other.y + other.height, label: 'Align Bottom' }
+      );
+    }
   }
 
   // Check X snapping (left edge, center, right edge of dragged frame)
@@ -462,11 +513,12 @@ export function calculateSnapping(
   }
 
   // --- EQUAL SPACING & GAP DETECTION ---
-  // 1. Horizontal Gaps (frames nearby in Y)
-  const yNearbyFrames = otherFrames.filter((f) => {
-    const verticalDistance = Math.max(0, Math.max(dragged.y, f.y) - Math.min(dragged.y + dragged.height, f.y + f.height));
-    return verticalDistance <= Math.max(dragged.height, f.height) * 0.5 + 25;
-  });
+  if (config.snapToEqualGaps) {
+    // 1. Horizontal Gaps (frames nearby in Y)
+    const yNearbyFrames = otherFrames.filter((f) => {
+      const verticalDistance = Math.max(0, Math.max(dragged.y, f.y) - Math.min(dragged.y + dragged.height, f.y + f.height));
+      return verticalDistance <= Math.max(dragged.height, f.height) * 0.5 + 25;
+    });
 
   const leftFrames = yNearbyFrames.filter((f) => f.x + f.width <= dragged.x + threshold).sort((a, b) => (b.x + b.width) - (a.x + a.width));
   const rightFrames = yNearbyFrames.filter((f) => f.x >= dragged.x + dragged.width - threshold).sort((a, b) => a.x - b.x);
@@ -646,6 +698,8 @@ export function calculateSnapping(
       });
     }
   }
+}
+
 return { snappedX, snappedY, snapLines, gapGuides };
 }
 

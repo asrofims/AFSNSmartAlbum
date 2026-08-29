@@ -20,6 +20,7 @@ import styles from './WorkspaceLayout.module.css';
 
 export function WorkspaceLayout() {
   const openAbout = useAppStore((s) => s.openAbout);
+  const openSettings = useAppStore((s) => s.openSettings);
 
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
@@ -206,6 +207,19 @@ export function WorkspaceLayout() {
               </Button>
             </>
           )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openSettings()}
+            title="Application & Tool Settings"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Settings
+          </Button>
 
           <Button
             variant="ghost"
@@ -948,10 +962,33 @@ export function WorkspaceLayout() {
                   </div>
                 </div>
 
-                {/* Smart Snapping Switch */}
-                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
-                  <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
+                {/* Smart Snapping Switch & Granular Config Link */}
+                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
+                    <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
+                  </div>
+                  <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => openSettings('snapping')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-accent)',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        padding: '2px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        textDecoration: 'none',
+                      }}
+                      title="Configure Granular Snapping Targets in Settings"
+                    >
+                      <span>⚙ Configure Snapping Targets...</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

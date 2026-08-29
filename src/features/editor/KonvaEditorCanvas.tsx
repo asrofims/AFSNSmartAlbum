@@ -441,6 +441,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     activeSnapLines,
     activeGapGuides,
     snapEnabled,
+    snappingConfig,
     selectFrame,
     selectFrames,
     clearSelection,
@@ -1395,7 +1396,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       .filter((f) => f.id !== frame.id)
                       .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+                    const thresholdUnits = snappingConfig.threshold || Math.max(0.8, 5 / scaleFactor);
 
                     const snapRes = calculateSnapping(
                       { x: physicalX, y: physicalY, width: frame.width, height: frame.height },
@@ -1404,7 +1405,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       activeSpread.safeArea,
                       gutterPhysicalW,
                       otherRects,
-                      thresholdUnits,
+                      { ...snappingConfig, threshold: thresholdUnits },
                       unit
                     );
 
@@ -1485,7 +1486,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       .filter((f) => !selectedFrameIds.includes(f.id))
                       .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-                    const thresholdUnits = Math.max(0.8, 5 / scaleFactor);
+                    const thresholdUnits = snappingConfig.threshold || Math.max(0.8, 5 / scaleFactor);
 
                     const snapRes = calculateSnapping(
                       { x: currentGroupX, y: currentGroupY, width: group.width, height: group.height },
@@ -1494,7 +1495,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       activeSpread.safeArea,
                       gutterPhysicalW,
                       otherRects,
-                      thresholdUnits,
+                      { ...snappingConfig, threshold: thresholdUnits },
                       unit
                     );
 

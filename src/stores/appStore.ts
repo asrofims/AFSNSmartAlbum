@@ -13,11 +13,16 @@ interface AppState {
   
   // Dialog states
   isAboutOpen: boolean;
+  isSettingsOpen: boolean;
+  settingsActiveTab: string;
   
   // Actions
   setAppInfo: (info: AppInfo) => void;
   openAbout: () => void;
   closeAbout: () => void;
+  openSettings: (tab?: string) => void;
+  closeSettings: () => void;
+  setSettingsActiveTab: (tab: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -28,8 +33,13 @@ export const useAppStore = create<AppState>((set) => ({
   },
   isAppInfoLoaded: false,
   isAboutOpen: false,
+  isSettingsOpen: false,
+  settingsActiveTab: 'snapping',
   
   setAppInfo: (info) => set({ appInfo: info, isAppInfoLoaded: true }),
   openAbout: () => set({ isAboutOpen: true }),
   closeAbout: () => set({ isAboutOpen: false }),
+  openSettings: (tab = 'snapping') => set({ isSettingsOpen: true, settingsActiveTab: tab }),
+  closeSettings: () => set({ isSettingsOpen: false }),
+  setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
 }));

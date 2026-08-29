@@ -3,12 +3,14 @@ import {
   alignFrames,
   applyFixedGap,
   clampCropTransform,
+  DEFAULT_SNAPPING_CONFIG,
   distributeFrames,
   GapGuide,
   getPhotoAspect,
   matchFrameDimensions,
   PhotoFrameElement,
   SnapLine,
+  SnappingConfig,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { useAlbumStore } from './albumStore';
@@ -22,6 +24,7 @@ export interface EditorState {
   activeGapGuides: GapGuide[];
   clipboardFrames: PhotoFrameElement[];
   snapEnabled: boolean;
+  snappingConfig: SnappingConfig;
   isDragging: boolean;
   isResizing: boolean;
 
@@ -88,6 +91,7 @@ export interface EditorState {
   setSnapLines: (lines: SnapLine[], gaps?: GapGuide[]) => void;
   clearSnapLines: () => void;
   toggleSnap: () => void;
+  updateSnappingConfig: (updates: Partial<SnappingConfig>) => void;
   setDragging: (isDragging: boolean) => void;
   setResizing: (isResizing: boolean) => void;
   nudgeSelected: (spreadId: string, dx: number, dy: number) => void;
@@ -100,6 +104,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeGapGuides: [],
   clipboardFrames: [],
   snapEnabled: true,
+  snappingConfig: { ...DEFAULT_SNAPPING_CONFIG },
   isDragging: false,
   isResizing: false,
 
@@ -646,7 +651,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   toggleSnap: () => {
-    set((s) => ({ snapEnabled: !s.snapEnabled }));
+    set((s) => {
+      const next = !s.snapEnabled;
+      return {
+        snapEnabled: next,
+        snappingConfig: { ...s.snappingConfig, enabled: next },
+      };
+    });
+  },
+
+  updateSnappingConfig: (updates) => {
+    set((s) => {
+      const nextConfig = { ...s.snappingConfig, ...updates };
+      return {
+        snappingConfig: nextConfig,
+        snapEnabled: nextConfig.enabled,
+      };
+    });
   },
 
   setDragging: (isDragging: boolean) => {

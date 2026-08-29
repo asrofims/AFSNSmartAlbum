@@ -281,4 +281,76 @@ console.assert(pastedTarget.x === 120 && pastedTarget.y === 90, 'Pasted frame mu
 console.assert(pastedTarget.width === 100 && pastedTarget.height === 80, 'Pasted frame must retain exact geometry');
 console.assert(pastedTarget.photoId === 'photo-xyz', 'Pasted frame must retain photoId');
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Snapping, and Copy-Paste tests passed successfully!');
+// 15. Test Granular Snapping Configurations
+const testSpreadW = 600;
+const testSpreadH = 300;
+const testSafeArea = 10;
+const testGutter = 0;
+const neighborFrame: RectBounds = { x: 50, y: 50, width: 100, height: 80 };
+
+// 15a. Disabled master switch
+const disabledRes = calculateSnapping(
+  { x: 1.5, y: 50, width: 100, height: 80 },
+  testSpreadW,
+  testSpreadH,
+  testSafeArea,
+  testGutter,
+  [neighborFrame],
+  { enabled: false, threshold: 3.0, snapToPageEdges: true, snapToPageCenters: true, snapToMargins: true, snapToFrames: true, snapToEqualGaps: true }
+);
+console.assert(disabledRes.snappedX === 1.5, `Disabled snapping should preserve raw X (1.5), got ${disabledRes.snappedX}`);
+console.assert(disabledRes.snapLines.length === 0, 'Disabled snapping should produce 0 snap lines');
+
+// 15b. snapToPageCenters = false
+const disabledPageCenterRes = calculateSnapping(
+  { x: 99, y: 50, width: 100, height: 80 }, // centerX = 149 near page center 150
+  testSpreadW,
+  testSpreadH,
+  testSafeArea,
+  testGutter,
+  [],
+  { enabled: true, threshold: 3.0, snapToPageEdges: true, snapToPageCenters: false, snapToMargins: true, snapToFrames: true, snapToEqualGaps: true }
+);
+console.assert(disabledPageCenterRes.snappedX === 99, `Disabled page centers should not snap to page center, got ${disabledPageCenterRes.snappedX}`);
+
+// 15c. snapToMargins = false
+const disabledMarginsRes = calculateSnapping(
+  { x: 9.2, y: 50, width: 100, height: 80 }, // near safe area 10
+  testSpreadW,
+  testSpreadH,
+  testSafeArea,
+  testGutter,
+  [],
+  { enabled: true, threshold: 3.0, snapToPageEdges: true, snapToPageCenters: true, snapToMargins: false, snapToFrames: true, snapToEqualGaps: true }
+);
+console.assert(disabledMarginsRes.snappedX === 9.2, `Disabled safe margin snap should not snap to 10, got ${disabledMarginsRes.snappedX}`);
+
+// 15d. snapToFrames = false
+const neighborFrame70: RectBounds = { x: 70, y: 50, width: 100, height: 80 };
+const disabledFramesRes = calculateSnapping(
+  { x: 70.8, y: 160, width: 100, height: 80 }, // near neighbor x=70 (nowhere near page edges or centers)
+  testSpreadW,
+  testSpreadH,
+  testSafeArea,
+  testGutter,
+  [neighborFrame70],
+  { enabled: true, threshold: 3.0, snapToPageEdges: true, snapToPageCenters: true, snapToMargins: true, snapToFrames: false, snapToEqualGaps: true }
+);
+console.assert(disabledFramesRes.snappedX === 70.8, `Disabled frame snap should not snap to neighbor frame, got ${disabledFramesRes.snappedX}`);
+
+// 15e. snapToEqualGaps = false
+const leftF: RectBounds = { x: 50, y: 50, width: 100, height: 80 };
+const rightF: RectBounds = { x: 270, y: 50, width: 100, height: 80 };
+const betweenF: RectBounds = { x: 159.5, y: 50, width: 100, height: 80 };
+const disabledGapsRes = calculateSnapping(
+  betweenF,
+  testSpreadW,
+  testSpreadH,
+  testSafeArea,
+  testGutter,
+  [leftF, rightF],
+  { enabled: true, threshold: 3.0, snapToPageEdges: false, snapToPageCenters: false, snapToMargins: false, snapToFrames: false, snapToEqualGaps: false }
+);
+console.assert(disabledGapsRes.gapGuides.length === 0, 'Disabled equal gaps should produce 0 gap guides');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, and Copy-Paste tests passed successfully!');
