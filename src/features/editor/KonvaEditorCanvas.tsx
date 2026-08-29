@@ -467,6 +467,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     setSnapLines,
     clearSnapLines,
     nudgeSelected,
+    multiResizeGapMode,
   } = useEditorStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1709,7 +1710,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
                       initialFrames,
                       initialBounds,
                       newGroupBounds,
-                      activeAnchor || undefined
+                      activeAnchor || undefined,
+                      multiResizeGapMode
                     );
                     if (updates.length > 0) {
                       batchUpdateFrames(activeSpread.id, updates);

@@ -208,7 +208,7 @@ const initialGroup = [
 ];
 const initialBounds = { x: 0, y: 0, width: 205, height: 80 };
 const newBounds = { x: 0, y: 0, width: 265, height: 104 };
-const multiResizeUpdates = calculateMultiFrameResize(initialGroup, initialBounds, newBounds);
+const multiResizeUpdates = calculateMultiFrameResize(initialGroup, initialBounds, newBounds, undefined, 'fixed_gap');
 
 console.assert(multiResizeUpdates[0].geometry.width === 130, `Frame A new width should be 130, got ${multiResizeUpdates[0].geometry.width}`);
 console.assert(multiResizeUpdates[0].geometry.x === 0, `Frame A new x should be 0, got ${multiResizeUpdates[0].geometry.x}`);
@@ -233,19 +233,29 @@ const asymGroup = [
 ];
 const asymInitialBounds = { x: 0, y: 0, width: 205, height: 165 };
 const asymNewBounds = { x: 0, y: 0, width: 245, height: 197 };
-const asymUpdates = calculateMultiFrameResize(asymGroup, asymInitialBounds, asymNewBounds);
 
-const leftU = asymUpdates.find((u) => u.id === 'left')!;
-const topU = asymUpdates.find((u) => u.id === 'topRight')!;
-const bottomU = asymUpdates.find((u) => u.id === 'bottomRight')!;
+// 13a. Test Fixed Gap Mode (2D Spatial Neighbor Graph)
+const asymFixedUpdates = calculateMultiFrameResize(asymGroup, asymInitialBounds, asymNewBounds, undefined, 'fixed_gap');
+const leftU = asymFixedUpdates.find((u) => u.id === 'left')!;
+const topU = asymFixedUpdates.find((u) => u.id === 'topRight')!;
+const bottomU = asymFixedUpdates.find((u) => u.id === 'bottomRight')!;
 
 // Check Horizontal Gap between left and right (100 -> 120, right starts at 125 -> gap = 5mm)
 const hGap = (topU.geometry.x ?? 0) - ((leftU.geometry.x ?? 0) + (leftU.geometry.width ?? 0));
-console.assert(Math.abs(hGap - 5) < 0.01, `Horizontal gap must remain 5mm, got ${hGap}mm`);
+console.assert(Math.abs(hGap - 5) < 0.01, `Fixed mode horizontal gap must remain 5mm, got ${hGap}mm`);
 
 // Check Vertical Gap between topRight and bottomRight (top ends at 96, bottom starts at 101 -> gap = 5mm)
 const vGap = (bottomU.geometry.y ?? 0) - ((topU.geometry.y ?? 0) + (topU.geometry.height ?? 0));
-console.assert(Math.abs(vGap - 5) < 0.01, `Vertical gap must remain 5mm, got ${vGap}mm`);
+console.assert(Math.abs(vGap - 5) < 0.01, `Fixed mode vertical gap must remain 5mm, got ${vGap}mm`);
+
+// 13b. Test Proportional Gap Mode (Visual Harmony)
+const asymPropUpdates = calculateMultiFrameResize(asymGroup, asymInitialBounds, asymNewBounds, undefined, 'proportional');
+const leftPropU = asymPropUpdates.find((u) => u.id === 'left')!;
+const topPropU = asymPropUpdates.find((u) => u.id === 'topRight')!;
+const scaleFactor = 245 / 205;
+const expectedPropHGap = 5 * scaleFactor;
+const propHGap = (topPropU.geometry.x ?? 0) - ((leftPropU.geometry.x ?? 0) + (leftPropU.geometry.width ?? 0));
+console.assert(Math.abs(propHGap - expectedPropHGap) < 0.05, `Proportional gap must scale proportionally, got ${propHGap}mm`);
 
 // 14. Test Copy-Paste Frame Clones with Physical Units
 const testFrameToCopy: PhotoFrameElement = {

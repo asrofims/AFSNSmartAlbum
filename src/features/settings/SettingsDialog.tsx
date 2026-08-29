@@ -12,7 +12,12 @@ export function SettingsDialog() {
   const activeTab = useAppStore((s) => s.settingsActiveTab);
   const setActiveTab = useAppStore((s) => s.setSettingsActiveTab);
 
-  const { snappingConfig, updateSnappingConfig } = useEditorStore();
+  const {
+    snappingConfig,
+    updateSnappingConfig,
+    multiResizeGapMode,
+    setMultiResizeGapMode,
+  } = useEditorStore();
   const { currentProject, updateProjectSpacing } = useProjectStore();
 
   return (
@@ -255,6 +260,50 @@ export function SettingsDialog() {
                     Open or create a project to configure active spacing rules.
                   </div>
                 )}
+              </div>
+
+              {/* Multi-Frame Resize Gap Scaling Mode */}
+              <div className={styles.card}>
+                <div className={styles.cardTitle} style={{ marginBottom: '8px' }}>
+                  Multi-Frame Resize Gap Behavior
+                </div>
+                <div className={styles.cardSubtitle} style={{ marginBottom: '14px' }}>
+                  Determines how the inter-frame gaps behave when resizing a multi-selection group of photos.
+                </div>
+
+                <div className={styles.checkboxList}>
+                  <label className={styles.checkboxItem}>
+                    <input
+                      type="radio"
+                      name="multiResizeGapMode"
+                      value="proportional"
+                      checked={multiResizeGapMode === 'proportional'}
+                      onChange={() => setMultiResizeGapMode('proportional')}
+                    />
+                    <div className={styles.checkboxLabel}>
+                      <span className={styles.checkboxTitle}>Proportional Visual Gap (Recommended)</span>
+                      <span className={styles.checkboxDesc}>
+                        Scales inter-frame gaps proportionally with photo dimensions so the white space always looks harmonious and identical in proportion at any size.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className={styles.checkboxItem}>
+                    <input
+                      type="radio"
+                      name="multiResizeGapMode"
+                      value="fixed_gap"
+                      checked={multiResizeGapMode === 'fixed_gap'}
+                      onChange={() => setMultiResizeGapMode('fixed_gap')}
+                    />
+                    <div className={styles.checkboxLabel}>
+                      <span className={styles.checkboxTitle}>Strict Fixed Physical Gap</span>
+                      <span className={styles.checkboxDesc}>
+                        Preserves the exact physical millimeter gap spacing between adjacent frames using 2D Topological Neighbor Graph math.
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           )}

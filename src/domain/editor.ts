@@ -1100,7 +1100,8 @@ export function calculateMultiFrameResize(
   initialFrames: FrameBounds[],
   initialGroupBounds: RectBounds,
   newGroupBounds: RectBounds,
-  anchor?: string
+  anchor?: string,
+  mode: 'proportional' | 'fixed_gap' = 'proportional'
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
   if (initialFrames.length === 0) return [];
   if (initialFrames.length === 1) {
@@ -1124,6 +1125,47 @@ export function calculateMultiFrameResize(
   const maxGroupY = Math.max(...initialFrames.map((f) => f.y + f.height));
   const initW = maxGroupX - minGroupX;
   const initH = maxGroupY - minGroupY;
+
+  // --- PROPORTIONAL VISUAL GAP MODE (Preserves constant visual proportion of gaps & frames) ---
+  if (mode === 'proportional') {
+    const scaleX = initW > 0 ? newGroupBounds.width / initW : 1;
+    const scaleY = initH > 0 ? newGroupBounds.height / initH : 1;
+    const scale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
+
+    const newTotalW = initW * scale;
+    const newTotalH = initH * scale;
+
+    let finalOriginX: number;
+    let finalOriginY: number;
+
+    if (anchor) {
+      if (anchor.includes('left')) {
+        finalOriginX = (minGroupX + initW) - newTotalW;
+      } else {
+        finalOriginX = minGroupX;
+      }
+      if (anchor.includes('top')) {
+        finalOriginY = (minGroupY + initH) - newTotalH;
+      } else {
+        finalOriginY = minGroupY;
+      }
+    } else {
+      const isLeftDragged = newGroupBounds.x < minGroupX - 0.5 || newGroupBounds.x > minGroupX + 0.5;
+      const isTopDragged = newGroupBounds.y < minGroupY - 0.5 || newGroupBounds.y > minGroupY + 0.5;
+      finalOriginX = isLeftDragged ? minGroupX + initW - newTotalW : newGroupBounds.x;
+      finalOriginY = isTopDragged ? minGroupY + initH - newTotalH : newGroupBounds.y;
+    }
+
+    return initialFrames.map((f) => ({
+      id: f.id,
+      geometry: {
+        x: roundToHundredth(finalOriginX + (f.x - minGroupX) * scale),
+        y: roundToHundredth(finalOriginY + (f.y - minGroupY) * scale),
+        width: roundToHundredth(Math.max(1, f.width * scale)),
+        height: roundToHundredth(Math.max(1, f.height * scale)),
+      },
+    }));
+  }
 
   // --- 1. Build 2D Spatial Neighbor Relations & Extract Invariant Gaps ---
   // Horizontal neighbor: A is immediate left neighbor of B if A is to the left of B and their Y spans overlap

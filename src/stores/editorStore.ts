@@ -25,6 +25,7 @@ export interface EditorState {
   clipboardFrames: PhotoFrameElement[];
   snapEnabled: boolean;
   snappingConfig: SnappingConfig;
+  multiResizeGapMode: 'proportional' | 'fixed_gap';
   isDragging: boolean;
   isResizing: boolean;
 
@@ -92,6 +93,7 @@ export interface EditorState {
   clearSnapLines: () => void;
   toggleSnap: () => void;
   updateSnappingConfig: (updates: Partial<SnappingConfig>) => void;
+  setMultiResizeGapMode: (mode: 'proportional' | 'fixed_gap') => void;
   setDragging: (isDragging: boolean) => void;
   setResizing: (isResizing: boolean) => void;
   nudgeSelected: (spreadId: string, dx: number, dy: number) => void;
@@ -105,8 +107,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipboardFrames: [],
   snapEnabled: true,
   snappingConfig: { ...DEFAULT_SNAPPING_CONFIG },
+  multiResizeGapMode: 'proportional',
   isDragging: false,
   isResizing: false,
+
+  setMultiResizeGapMode: (mode: 'proportional' | 'fixed_gap') => set({ multiResizeGapMode: mode }),
 
   selectFrame: (frameId: string, multi = false) => {
     const { selectedFrameIds } = get();
