@@ -7,6 +7,65 @@
   user-select: none;
 }
 
+.modeToggleRow {
+  display: flex;
+  background: var(--color-bg-secondary, #121214);
+  padding: 6px 12px;
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border, #27272a);
+}
+
+.modeBtn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--color-border, #27272a);
+  color: var(--color-text-secondary, #a1a1aa);
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.modeBtn:hover {
+  background: var(--color-surface, #27272a);
+  color: var(--color-text-primary, #ffffff);
+}
+
+.modeBtnActive {
+  background: var(--color-accent, #3b82f6);
+  border-color: var(--color-accent, #3b82f6);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.actionBtn {
+  background: var(--color-surface, #27272a);
+  border: 1px solid var(--color-border, #3f3f46);
+  color: var(--color-text-secondary, #a1a1aa);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.actionBtn:hover {
+  background: var(--color-border, #3f3f46);
+  color: var(--color-text-primary, #ffffff);
+}
+
+.activeCard {
+  border-color: var(--color-accent, #3b82f6) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25) !important;
+}
+
 .filterHeader {
   padding: 12px;
   border-bottom: 1px solid var(--color-border, #27272a);

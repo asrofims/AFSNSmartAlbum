@@ -11,6 +11,12 @@ import {
   getAllAlbumSpreads,
 } from '../domain/album';
 import { LayoutTemplate, generateSpreadElementsFromTemplate } from '../domain/templates';
+import {
+  AdaptivePhoto,
+  generateAdaptiveLayoutVariations,
+  buildSpreadElementsFromVariation,
+  shuffleElementsPhotos,
+} from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
 
 export interface AlbumState {
@@ -52,6 +58,11 @@ export interface AlbumState {
   selectPage: (pageId: string | null) => void;
   setSpreadDrawerOpen: (isOpen: boolean) => void;
   toggleSpreadDrawer: () => void;
+  // Adaptive Smart Layout State
+  spreadLayoutIndices: Record<string, number>;
+  cycleSpreadLayout: (spreadId: string, direction: 'next' | 'prev', project: Project) => void;
+  shuffleSpreadPhotos: (spreadId: string) => void;
+  applyAdaptiveLayoutByIndex: (spreadId: string, index: number, project: Project) => void;
   applyLayoutTemplate: (spreadId: string, template: LayoutTemplate, project: Project) => void;
 }
 
@@ -68,6 +79,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   showBleedGuide: true,
   showSafeAreaGuide: true,
   isSpreadDrawerOpen: false,
+  spreadLayoutIndices: {},
 
   setSpreadDrawerOpen: (isOpen: boolean) => set({ isSpreadDrawerOpen: isOpen }),
   toggleSpreadDrawer: () => set((s) => ({ isSpreadDrawerOpen: !s.isSpreadDrawerOpen })),
@@ -481,6 +493,209 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           ...currentAlbum,
           spreads: updatedSpreads,
         },
+        saveStatus: 'unsaved',
+      });
+    }
+  },
+
+  cycleSpreadLayout: (spreadId: string, direction: 'next' | 'prev', project: Project) => {
+    const { currentAlbum, spreadLayoutIndices } = get();
+    if (!currentAlbum) return;
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!targetSpread || targetSpread.elements.length === 0) return;
+
+    const currentPhotos: AdaptivePhoto[] = targetSpread.elements.map((el) => ({
+      id: el.id,
+      photoId: el.photoId,
+      filePath: el.filePath,
+      fileName: el.fileName,
+      previewPath: el.previewPath,
+      thumbnailPath: el.thumbnailPath,
+      photoAspect: el.photoAspect,
+    }));
+
+    const isSpread = !isCover;
+    const spreadWidth = isCover
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+        (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
+        targetSpread.gutterWidth
+      : project.canvasWidth * 2 + targetSpread.gutterWidth;
+    const spreadHeight = project.canvasHeight;
+
+    const variations = generateAdaptiveLayoutVariations(
+      {
+        spreadWidth,
+        spreadHeight,
+        isSpread,
+        safeMargin: targetSpread.safeArea || project.marginValue || 10,
+        gutterWidth: targetSpread.gutterWidth || 0,
+        spacing: project.spacingValue || 4,
+      },
+      currentPhotos
+    );
+
+    if (variations.length === 0) return;
+
+    const currentIndex = spreadLayoutIndices[spreadId] || 0;
+    const nextIndex =
+      direction === 'next'
+        ? (currentIndex + 1) % variations.length
+        : (currentIndex - 1 + variations.length) % variations.length;
+
+    const chosenVariation = variations[nextIndex];
+    if (!chosenVariation) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const newElements = buildSpreadElementsFromVariation(
+      chosenVariation,
+      currentPhotos,
+      project.borderEnabled,
+      project.borderWidth,
+      project.borderColor
+    );
+
+    if (isCover) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: { ...currentAlbum.coverSpread, elements: newElements },
+        },
+        spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: nextIndex },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: newElements } : s
+      );
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: updatedSpreads,
+        },
+        spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: nextIndex },
+        saveStatus: 'unsaved',
+      });
+    }
+  },
+
+  shuffleSpreadPhotos: (spreadId: string) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!targetSpread || targetSpread.elements.length <= 1) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const shuffledElements = shuffleElementsPhotos(targetSpread.elements);
+
+    if (isCover) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: { ...currentAlbum.coverSpread, elements: shuffledElements },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: shuffledElements } : s
+      );
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: updatedSpreads,
+        },
+        saveStatus: 'unsaved',
+      });
+    }
+  },
+
+  applyAdaptiveLayoutByIndex: (spreadId: string, index: number, project: Project) => {
+    const { currentAlbum, spreadLayoutIndices } = get();
+    if (!currentAlbum) return;
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!targetSpread || targetSpread.elements.length === 0) return;
+
+    const currentPhotos: AdaptivePhoto[] = targetSpread.elements.map((el) => ({
+      id: el.id,
+      photoId: el.photoId,
+      filePath: el.filePath,
+      fileName: el.fileName,
+      previewPath: el.previewPath,
+      thumbnailPath: el.thumbnailPath,
+      photoAspect: el.photoAspect,
+    }));
+
+    const isSpread = !isCover;
+    const spreadWidth = isCover
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+        (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
+        targetSpread.gutterWidth
+      : project.canvasWidth * 2 + targetSpread.gutterWidth;
+    const spreadHeight = project.canvasHeight;
+
+    const variations = generateAdaptiveLayoutVariations(
+      {
+        spreadWidth,
+        spreadHeight,
+        isSpread,
+        safeMargin: targetSpread.safeArea || project.marginValue || 10,
+        gutterWidth: targetSpread.gutterWidth || 0,
+        spacing: project.spacingValue || 4,
+      },
+      currentPhotos
+    );
+
+    if (variations.length === 0 || index < 0 || index >= variations.length) return;
+
+    const chosenVariation = variations[index];
+    if (!chosenVariation) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const newElements = buildSpreadElementsFromVariation(
+      chosenVariation,
+      currentPhotos,
+      project.borderEnabled,
+      project.borderWidth,
+      project.borderColor
+    );
+
+    if (isCover) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: { ...currentAlbum.coverSpread, elements: newElements },
+        },
+        spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: index },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: newElements } : s
+      );
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: updatedSpreads,
+        },
+        spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: index },
         saveStatus: 'unsaved',
       });
     }

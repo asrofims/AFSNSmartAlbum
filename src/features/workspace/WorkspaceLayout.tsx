@@ -18,6 +18,7 @@ import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
+import { LayoutCycleHUD } from '../editor/LayoutCycleHUD';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
 import appLogo from '../../assets/app-logo.png';
@@ -523,6 +524,7 @@ export function WorkspaceLayout() {
             <WelcomeScreen />
           ) : (
             <>
+              <LayoutCycleHUD />
               <KonvaEditorCanvas
                 zoomLevel={zoomLevel}
                 onZoomChange={setZoomLevel}
