@@ -491,7 +491,7 @@ function PhotoFrameNode({
   );
 }
 
-export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: KonvaEditorCanvasProps) {
+export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoomChange }: KonvaEditorCanvasProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     currentAlbum,
@@ -600,43 +600,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       canvasContainer.removeEventListener('dragover', nativeDragOver);
     };
   });
-
-  // Native non-passive Wheel/Touchpad gesture listener
-  // Enables smooth 2-finger pinch-to-zoom (e.ctrlKey) and natural 2-finger swipe pan
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      // 1. PINCH-TO-ZOOM GESTURE or CTRL + MOUSE WHEEL
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (onZoomChange) {
-          // Smooth continuous exponential zooming
-          const zoomFactor = Math.exp(-e.deltaY * 0.005);
-          onZoomChange((currentZoom) => {
-            const nextZoom = Math.round(currentZoom * zoomFactor);
-            return Math.max(25, Math.min(300, nextZoom));
-          });
-        }
-        return;
-      }
-
-      // 2. TWO-FINGER SWIPE TO PAN (when zoomed in > 100%)
-      if (zoomLevel > 100) {
-        e.preventDefault();
-        container.scrollLeft += e.deltaX;
-        container.scrollTop += e.deltaY;
-      }
-    };
-
-    container.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleNativeWheel);
-    };
-  }, [onZoomChange, zoomLevel]);
 
   // Marquee Selection State
   const [selectionRect, setSelectionRect] = useState<{
