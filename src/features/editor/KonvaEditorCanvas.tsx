@@ -264,6 +264,9 @@ function PhotoFrameNode({
         });
       }}
     >
+      {/* Base Solid Hit Rect for robust selection & drag events */}
+      <Rect width={pixelW} height={pixelH} fill="rgba(0, 0, 0, 0.001)" listening={!isCropMode} />
+
       {/* Ghost Reveal: Semi-transparent uncropped original image outside the frame in Crop Mode */}
       {isCropMode && imageObj && (
         <Group listening={false}>
@@ -302,7 +305,6 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             draggable={isCropMode}
-            listening={isCropMode}
             onMouseDown={(e) => {
               if (isCropMode) {
                 e.cancelBubble = true;
