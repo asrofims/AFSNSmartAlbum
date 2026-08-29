@@ -1,4 +1,7 @@
 import { PhotoFrameElement } from './editor';
+import { Unit, convertUnit } from './units';
+import { Project } from './project';
+import { Spread } from './album';
 
 export type TemplateCategory = 'all' | '1_photo' | '2_photos' | '3_photos' | '4_photos' | '5+_photos' | 'custom';
 
@@ -13,9 +16,9 @@ export interface TemplateParams {
   spreadWidth: number;
   spreadHeight: number;
   isSpread: boolean; // true for 2-page spread, false for single-page cover
-  safeMargin: number;
-  gutterWidth: number;
-  spacing: number;
+  safeMargin: number; // in canvasUnit
+  gutterWidth: number; // in canvasUnit
+  spacing: number; // in canvasUnit
   currentPhotos?: Array<{
     id?: string;
     photoId?: string | null;
@@ -37,8 +40,63 @@ export interface LayoutTemplate {
   generateRects: (params: TemplateParams) => RectBounds[];
 }
 
+export function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Extracts and unifies all project & spread physical dimensions into the project's native canvasUnit.
+ * This completely prevents unit mismatch bugs (e.g. 10mm margin on an 8 inch canvas).
+ */
+export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spread | null): {
+  pageWidth: number;
+  pageHeight: number;
+  unit: Unit;
+  dpi: number;
+  safeMargin: number;
+  gutterWidth: number;
+  spacing: number;
+  bleed: number;
+} {
+  const unit = project.canvasUnit;
+  const dpi = project.canvasDpi || 300;
+
+  const pageWidth = project.canvasWidth;
+  const pageHeight = project.canvasHeight;
+
+  // Margin: convert from project.marginUnit (or 'mm') to project.canvasUnit
+  const rawMargin = spread?.safeArea ?? project.marginValue ?? 10;
+  const marginUnit = project.marginUnit || 'mm';
+  const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));
+
+  // Spacing: convert from project.spacingUnit (or 'mm') to project.canvasUnit
+  const rawSpacing = project.spacingValue ?? 4;
+  const spacingUnit = project.spacingUnit || 'mm';
+  const spacing = round4(convertUnit(rawSpacing, spacingUnit, unit, dpi, 4));
+
+  // Gutter: convert from spread.gutterUnit (or project.canvasUnit) to project.canvasUnit
+  const rawGutter = spread?.gutterWidth ?? 0;
+  const gutterUnit = spread?.gutterUnit || unit;
+  const gutterWidth = round4(convertUnit(rawGutter, gutterUnit, unit, dpi, 4));
+
+  // Bleed: convert from spread.bleed (or 3mm) to project.canvasUnit
+  const rawBleed = spread?.bleed ?? 3;
+  const bleed = round4(convertUnit(rawBleed, 'mm', unit, dpi, 4));
+
+  return {
+    pageWidth,
+    pageHeight,
+    unit,
+    dpi,
+    safeMargin,
+    gutterWidth,
+    spacing,
+    bleed,
+  };
 }
 
 /**
@@ -51,7 +109,7 @@ export function fitInsideBoxCentered(
 ): RectBounds {
   const maxW = container.width * coverage;
   const maxH = container.height * coverage;
-  const boxAspect = maxW / Math.max(1, maxH);
+  const boxAspect = maxW / Math.max(0.001, maxH);
 
   let w: number;
   let h: number;
@@ -64,11 +122,11 @@ export function fitInsideBoxCentered(
     w = h * photoAspect;
   }
 
-  w = round2(w);
-  h = round2(h);
+  w = round4(w);
+  h = round4(h);
 
-  const x = round2(container.x + (container.width - w) / 2);
-  const y = round2(container.y + (container.height - h) / 2);
+  const x = round4(container.x + (container.width - w) / 2);
+  const y = round4(container.y + (container.height - h) / 2);
 
   return { x, y, width: w, height: h };
 }
@@ -90,8 +148,8 @@ export function getUsableAreas(params: TemplateParams): {
     const singleArea: RectBounds = {
       x: safeMargin,
       y: safeMargin,
-      width: Math.max(10, round2(spreadWidth - safeMargin * 2)),
-      height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
+      width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
+      height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
     };
     return {
       spreadArea: singleArea,
@@ -103,30 +161,30 @@ export function getUsableAreas(params: TemplateParams): {
   }
 
   // On a 2-page spread: spreadWidth = leftPageWidth + gutterWidth + rightPageWidth
-  const pageWidth = round2((spreadWidth - gutterWidth) / 2);
+  const pageWidth = round4((spreadWidth - gutterWidth) / 2);
 
   // Left Page Safe Box (starts at safeMargin, ends safeMargin before spine gutter)
   const leftPageArea: RectBounds = {
     x: safeMargin,
     y: safeMargin,
-    width: Math.max(10, round2(pageWidth - safeMargin * 2)),
-    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
+    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
   // Right Page Safe Box (starts safeMargin after spine gutter, ends safeMargin before outer right edge)
   const rightPageArea: RectBounds = {
-    x: round2(pageWidth + gutterWidth + safeMargin),
+    x: round4(pageWidth + gutterWidth + safeMargin),
     y: safeMargin,
-    width: Math.max(10, round2(pageWidth - safeMargin * 2)),
-    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
+    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
   // Full Spread Safe Box (across both pages)
   const spreadArea: RectBounds = {
     x: safeMargin,
     y: safeMargin,
-    width: Math.max(10, round2(spreadWidth - safeMargin * 2)),
-    height: Math.max(10, round2(spreadHeight - safeMargin * 2)),
+    width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
   return { spreadArea, leftPageArea, rightPageArea, pageWidth, gutterWidth };
@@ -193,7 +251,7 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
       const { spreadArea, rightPageArea } = getUsableAreas(p);
       const targetBox = p.isSpread ? rightPageArea : spreadArea;
       const aspect = p.currentPhotos?.[0]?.photoAspect || 1.5;
-      return [fitInsideBoxCentered(targetBox, aspect, 0.78)];
+      return [fitInsideBoxCentered(targetBox, aspect, 0.82)];
     },
   },
   {
@@ -204,38 +262,38 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     description: 'Panoramic edge-to-edge full spread statement photograph.',
     tags: ['hero', 'panorama', 'full-bleed'],
     generateRects: (p) => [
-      { x: 0, y: 0, width: round2(p.spreadWidth), height: round2(p.spreadHeight) },
+      { x: 0, y: 0, width: round4(p.spreadWidth), height: round4(p.spreadHeight) },
     ],
   },
 
   // --- 2 PHOTOS ---
   {
-    id: '2p_facing_diptych',
-    name: 'Facing Page Diptych (Left + Right)',
-    photoCount: 2,
-    category: 'spread',
-    description: 'Symmetrical alignment hugging the safe margin boxes of both pages.',
-    tags: ['diptych', 'balanced', 'safe'],
-    generateRects: (p) => {
-      const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      return [{ ...leftPageArea }, { ...rightPageArea }];
-    },
-  },
-  {
     id: '2p_facing_diptych_fit',
-    name: 'Facing Diptych (Native Ratio Centered)',
+    name: 'Facing Diptych (Centered in Safe Boxes)',
     photoCount: 2,
     category: 'spread',
-    description: 'Two centered focal photographs respecting native aspect ratios inside blue safe boxes.',
+    description: 'Two balanced photographs centered in middle of left & right safe margin boxes.',
     tags: ['diptych', 'centered', 'fit'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
       const aspect0 = p.currentPhotos?.[0]?.photoAspect || 1.5;
       const aspect1 = p.currentPhotos?.[1]?.photoAspect || 1.5;
       return [
-        fitInsideBoxCentered(leftPageArea, aspect0, 0.95),
-        fitInsideBoxCentered(rightPageArea, aspect1, 0.95),
+        fitInsideBoxCentered(leftPageArea, aspect0, 1.0),
+        fitInsideBoxCentered(rightPageArea, aspect1, 1.0),
       ];
+    },
+  },
+  {
+    id: '2p_facing_diptych',
+    name: 'Facing Page Diptych (Full Safe Boxes)',
+    photoCount: 2,
+    category: 'spread',
+    description: 'Symmetrical alignment filling the safe margin boxes of both pages.',
+    tags: ['diptych', 'balanced', 'safe'],
+    generateRects: (p) => {
+      const { leftPageArea, rightPageArea } = getUsableAreas(p);
+      return [{ ...leftPageArea }, { ...rightPageArea }];
     },
   },
   {
@@ -247,10 +305,10 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['stack', 'vertical', 'right'],
     generateRects: (p) => {
       const { rightPageArea } = getUsableAreas(p);
-      const h = round2((rightPageArea.height - p.spacing) / 2);
+      const h = round4((rightPageArea.height - p.spacing) / 2);
       return [
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: h },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + h + p.spacing), width: rightPageArea.width, height: h },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + h + p.spacing), width: rightPageArea.width, height: h },
       ];
     },
   },
@@ -281,11 +339,11 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'stack', 'popular'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const stackH = round2((rightPageArea.height - p.spacing) / 2);
+      const stackH = round4((rightPageArea.height - p.spacing) / 2);
       return [
         { ...leftPageArea },
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: stackH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + stackH + p.spacing), width: rightPageArea.width, height: stackH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + stackH + p.spacing), width: rightPageArea.width, height: stackH },
       ];
     },
   },
@@ -298,10 +356,10 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'stack', 'editorial'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const stackH = round2((leftPageArea.height - p.spacing) / 2);
+      const stackH = round4((leftPageArea.height - p.spacing) / 2);
       return [
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: stackH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + stackH + p.spacing), width: leftPageArea.width, height: stackH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + stackH + p.spacing), width: leftPageArea.width, height: stackH },
         { ...rightPageArea },
       ];
     },
@@ -315,11 +373,11 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'columns', 'portraits'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const colW = round2((rightPageArea.width - p.spacing) / 2);
+      const colW = round4((rightPageArea.width - p.spacing) / 2);
       return [
         { ...leftPageArea },
         { x: rightPageArea.x, y: rightPageArea.y, width: colW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + colW + p.spacing), y: rightPageArea.y, width: colW, height: rightPageArea.height },
+        { x: round4(rightPageArea.x + colW + p.spacing), y: rightPageArea.y, width: colW, height: rightPageArea.height },
       ];
     },
   },
@@ -334,13 +392,13 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['diptych', 'grid', 'safe'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftH = round2((leftPageArea.height - p.spacing) / 2);
-      const rightH = round2((rightPageArea.height - p.spacing) / 2);
+      const leftH = round4((leftPageArea.height - p.spacing) / 2);
+      const rightH = round4((rightPageArea.height - p.spacing) / 2);
       return [
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightH + p.spacing), width: rightPageArea.width, height: rightH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + rightH + p.spacing), width: rightPageArea.width, height: rightH },
       ];
     },
   },
@@ -353,12 +411,12 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'details', 'editorial'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const stripW = round2((rightPageArea.width - p.spacing * 2) / 3);
+      const stripW = round4((rightPageArea.width - p.spacing * 2) / 3);
       return [
         { ...leftPageArea },
         { x: rightPageArea.x, y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + stripW + p.spacing), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
-        { x: round2(rightPageArea.x + (stripW + p.spacing) * 2), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
+        { x: round4(rightPageArea.x + stripW + p.spacing), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
+        { x: round4(rightPageArea.x + (stripW + p.spacing) * 2), y: rightPageArea.y, width: stripW, height: rightPageArea.height },
       ];
     },
   },
@@ -371,10 +429,10 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['grid', 'balanced', 'classic'],
     generateRects: (p) => {
       const { spreadArea } = getUsableAreas(p);
-      const w = round2((spreadArea.width - p.spacing) / 2);
-      const h = round2((spreadArea.height - p.spacing) / 2);
-      const x2 = round2(spreadArea.x + w + p.spacing);
-      const y2 = round2(spreadArea.y + h + p.spacing);
+      const w = round4((spreadArea.width - p.spacing) / 2);
+      const h = round4((spreadArea.height - p.spacing) / 2);
+      const x2 = round4(spreadArea.x + w + p.spacing);
+      const y2 = round4(spreadArea.y + h + p.spacing);
       return [
         { x: spreadArea.x, y: spreadArea.y, width: w, height: h },
         { x: x2, y: spreadArea.y, width: w, height: h },
@@ -394,13 +452,13 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'grid', 'wedding'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const gridW = round2((leftPageArea.width - p.spacing) / 2);
-      const gridH = round2((leftPageArea.height - p.spacing) / 2);
+      const gridW = round4((leftPageArea.width - p.spacing) / 2);
+      const gridH = round4((leftPageArea.height - p.spacing) / 2);
       return [
         { x: leftPageArea.x, y: leftPageArea.y, width: gridW, height: gridH },
-        { x: round2(leftPageArea.x + gridW + p.spacing), y: leftPageArea.y, width: gridW, height: gridH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
-        { x: round2(leftPageArea.x + gridW + p.spacing), y: round2(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { x: round4(leftPageArea.x + gridW + p.spacing), y: leftPageArea.y, width: gridW, height: gridH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { x: round4(leftPageArea.x + gridW + p.spacing), y: round4(leftPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
         { ...rightPageArea },
       ];
     },
@@ -414,14 +472,14 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['hero', 'grid', 'wedding'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const gridW = round2((rightPageArea.width - p.spacing) / 2);
-      const gridH = round2((rightPageArea.height - p.spacing) / 2);
+      const gridW = round4((rightPageArea.width - p.spacing) / 2);
+      const gridH = round4((rightPageArea.height - p.spacing) / 2);
       return [
         { ...leftPageArea },
         { x: rightPageArea.x, y: rightPageArea.y, width: gridW, height: gridH },
-        { x: round2(rightPageArea.x + gridW + p.spacing), y: rightPageArea.y, width: gridW, height: gridH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
-        { x: round2(rightPageArea.x + gridW + p.spacing), y: round2(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { x: round4(rightPageArea.x + gridW + p.spacing), y: rightPageArea.y, width: gridW, height: gridH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
+        { x: round4(rightPageArea.x + gridW + p.spacing), y: round4(rightPageArea.y + gridH + p.spacing), width: gridW, height: gridH },
       ];
     },
   },
@@ -436,21 +494,21 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['storyboard', 'narrative', 'detailed'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftTopH = round2((leftPageArea.height - p.spacing) * 0.55);
-      const leftBotH = round2(leftPageArea.height - p.spacing - leftTopH);
-      const leftBotW = round2((leftPageArea.width - p.spacing) / 2);
+      const leftTopH = round4((leftPageArea.height - p.spacing) * 0.55);
+      const leftBotH = round4(leftPageArea.height - p.spacing - leftTopH);
+      const leftBotW = round4((leftPageArea.width - p.spacing) / 2);
 
-      const rightTopH = round2((rightPageArea.height - p.spacing) * 0.55);
-      const rightBotH = round2(rightPageArea.height - p.spacing - rightTopH);
-      const rightBotW = round2((rightPageArea.width - p.spacing) / 2);
+      const rightTopH = round4((rightPageArea.height - p.spacing) * 0.55);
+      const rightBotH = round4(rightPageArea.height - p.spacing - rightTopH);
+      const rightBotW = round4((rightPageArea.width - p.spacing) / 2);
 
       return [
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftTopH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
-        { x: round2(leftPageArea.x + leftBotW + p.spacing), y: round2(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
+        { x: round4(leftPageArea.x + leftBotW + p.spacing), y: round4(leftPageArea.y + leftTopH + p.spacing), width: leftBotW, height: leftBotH },
         { x: rightPageArea.x, y: rightPageArea.y, width: rightPageArea.width, height: rightTopH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
-        { x: round2(rightPageArea.x + rightBotW + p.spacing), y: round2(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
+        { x: round4(rightPageArea.x + rightBotW + p.spacing), y: round4(rightPageArea.y + rightTopH + p.spacing), width: rightBotW, height: rightBotH },
       ];
     },
   },
@@ -465,18 +523,18 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['editorial', 'mosaic', 'large'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftH = round2((leftPageArea.height - p.spacing * 2) / 3);
-      const rightGridW = round2((rightPageArea.width - p.spacing) / 2);
-      const rightGridH = round2((rightPageArea.height - p.spacing) / 2);
+      const leftH = round4((leftPageArea.height - p.spacing * 2) / 3);
+      const rightGridW = round4((rightPageArea.width - p.spacing) / 2);
+      const rightGridH = round4((rightPageArea.height - p.spacing) / 2);
 
       return [
         { x: leftPageArea.x, y: leftPageArea.y, width: leftPageArea.width, height: leftH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + (leftH + p.spacing) * 2), width: leftPageArea.width, height: leftH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + leftH + p.spacing), width: leftPageArea.width, height: leftH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + (leftH + p.spacing) * 2), width: leftPageArea.width, height: leftH },
         { x: rightPageArea.x, y: rightPageArea.y, width: rightGridW, height: rightGridH },
-        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
-        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+        { x: round4(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+        { x: round4(rightPageArea.x + rightGridW + p.spacing), y: round4(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
       ];
     },
   },
@@ -489,22 +547,22 @@ export const BUILTIN_LAYOUT_TEMPLATES: LayoutTemplate[] = [
     tags: ['grid', 'summary', 'reception'],
     generateRects: (p) => {
       const { leftPageArea, rightPageArea } = getUsableAreas(p);
-      const leftGridW = round2((leftPageArea.width - p.spacing) / 2);
-      const leftGridH = round2((leftPageArea.height - p.spacing) / 2);
-      const rightGridW = round2((rightPageArea.width - p.spacing) / 2);
-      const rightGridH = round2((rightPageArea.height - p.spacing) / 2);
+      const leftGridW = round4((leftPageArea.width - p.spacing) / 2);
+      const leftGridH = round4((leftPageArea.height - p.spacing) / 2);
+      const rightGridW = round4((rightPageArea.width - p.spacing) / 2);
+      const rightGridH = round4((rightPageArea.height - p.spacing) / 2);
 
       return [
         // Left 2x2
         { x: leftPageArea.x, y: leftPageArea.y, width: leftGridW, height: leftGridH },
-        { x: round2(leftPageArea.x + leftGridW + p.spacing), y: leftPageArea.y, width: leftGridW, height: leftGridH },
-        { x: leftPageArea.x, y: round2(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
-        { x: round2(leftPageArea.x + leftGridW + p.spacing), y: round2(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
+        { x: round4(leftPageArea.x + leftGridW + p.spacing), y: leftPageArea.y, width: leftGridW, height: leftGridH },
+        { x: leftPageArea.x, y: round4(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
+        { x: round4(leftPageArea.x + leftGridW + p.spacing), y: round4(leftPageArea.y + leftGridH + p.spacing), width: leftGridW, height: leftGridH },
         // Right 2x2
         { x: rightPageArea.x, y: rightPageArea.y, width: rightGridW, height: rightGridH },
-        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
-        { x: rightPageArea.x, y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
-        { x: round2(rightPageArea.x + rightGridW + p.spacing), y: round2(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+        { x: round4(rightPageArea.x + rightGridW + p.spacing), y: rightPageArea.y, width: rightGridW, height: rightGridH },
+        { x: rightPageArea.x, y: round4(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
+        { x: round4(rightPageArea.x + rightGridW + p.spacing), y: round4(rightPageArea.y + rightGridH + p.spacing), width: rightGridW, height: rightGridH },
       ];
     },
   },

@@ -10,7 +10,11 @@ import {
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
 } from '../domain/album';
-import { LayoutTemplate, generateSpreadElementsFromTemplate } from '../domain/templates';
+import {
+  LayoutTemplate,
+  generateSpreadElementsFromTemplate,
+  getProjectDimensionsInCanvasUnit,
+} from '../domain/templates';
 import {
   AdaptivePhoto,
   generateAdaptiveLayoutVariations,
@@ -450,12 +454,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }));
 
     const isSpread = !isCover;
+    const dims = getProjectDimensionsInCanvasUnit(project, targetSpread);
     const spreadWidth = isCover
-      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : dims.pageWidth) +
         (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
-        targetSpread.gutterWidth
-      : project.canvasWidth * 2 + targetSpread.gutterWidth;
-    const spreadHeight = project.canvasHeight;
+        dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadHeight = dims.pageHeight;
 
     const newElements = generateSpreadElementsFromTemplate(
       template,
@@ -463,9 +468,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         spreadWidth,
         spreadHeight,
         isSpread,
-        safeMargin: targetSpread.safeArea || project.marginValue || 10,
-        gutterWidth: targetSpread.gutterWidth || 0,
-        spacing: project.spacingValue || 4,
+        safeMargin: dims.safeMargin,
+        gutterWidth: dims.gutterWidth,
+        spacing: dims.spacing,
         currentPhotos,
       },
       project.borderEnabled,
@@ -520,21 +525,22 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }));
 
     const isSpread = !isCover;
+    const dims = getProjectDimensionsInCanvasUnit(project, targetSpread);
     const spreadWidth = isCover
-      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : dims.pageWidth) +
         (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
-        targetSpread.gutterWidth
-      : project.canvasWidth * 2 + targetSpread.gutterWidth;
-    const spreadHeight = project.canvasHeight;
+        dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadHeight = dims.pageHeight;
 
     const variations = generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
         isSpread,
-        safeMargin: targetSpread.safeArea || project.marginValue || 10,
-        gutterWidth: targetSpread.gutterWidth || 0,
-        spacing: project.spacingValue || 4,
+        safeMargin: dims.safeMargin,
+        gutterWidth: dims.gutterWidth,
+        spacing: dims.spacing,
       },
       currentPhotos
     );
@@ -643,21 +649,22 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }));
 
     const isSpread = !isCover;
+    const dims = getProjectDimensionsInCanvasUnit(project, targetSpread);
     const spreadWidth = isCover
-      ? (targetSpread.leftPage ? targetSpread.leftPage.width : project.canvasWidth) +
+      ? (targetSpread.leftPage ? targetSpread.leftPage.width : dims.pageWidth) +
         (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
-        targetSpread.gutterWidth
-      : project.canvasWidth * 2 + targetSpread.gutterWidth;
-    const spreadHeight = project.canvasHeight;
+        dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadHeight = dims.pageHeight;
 
     const variations = generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
         isSpread,
-        safeMargin: targetSpread.safeArea || project.marginValue || 10,
-        gutterWidth: targetSpread.gutterWidth || 0,
-        spacing: project.spacingValue || 4,
+        safeMargin: dims.safeMargin,
+        gutterWidth: dims.gutterWidth,
+        spacing: dims.spacing,
       },
       currentPhotos
     );

@@ -6,6 +6,7 @@ import {
   generateAdaptiveLayoutVariations,
   AdaptivePhoto,
 } from '../../domain/adaptiveLayout';
+import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import styles from './LayoutCycleHUD.module.css';
 
 export function LayoutCycleHUD() {
@@ -46,21 +47,22 @@ export function LayoutCycleHUD() {
   const variations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
     const isSpread = !isCover;
+    const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
     const spreadWidth = isCover
-      ? (activeSpread.leftPage ? activeSpread.leftPage.width : currentProject.canvasWidth) +
+      ? (activeSpread.leftPage ? activeSpread.leftPage.width : dims.pageWidth) +
         (activeSpread.rightPage ? activeSpread.rightPage.width : 0) +
-        activeSpread.gutterWidth
-      : currentProject.canvasWidth * 2 + activeSpread.gutterWidth;
-    const spreadHeight = currentProject.canvasHeight;
+        dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
         isSpread,
-        safeMargin: activeSpread.safeArea || currentProject.marginValue || 10,
-        gutterWidth: activeSpread.gutterWidth || 0,
-        spacing: currentProject.spacingValue || 4,
+        safeMargin: dims.safeMargin,
+        gutterWidth: dims.gutterWidth,
+        spacing: dims.spacing,
       },
       photos
     );

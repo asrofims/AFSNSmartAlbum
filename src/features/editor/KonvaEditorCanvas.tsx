@@ -21,6 +21,7 @@ import {
 } from '../../domain/editor';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { convertUnit } from '../../domain/units';
+import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
@@ -724,26 +725,22 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
     );
   }
 
-  const unit = currentProject.canvasUnit;
+  const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
+  const unit = dims.unit;
 
-  // Single page physical dimensions
-  const singlePageW = currentProject.canvasWidth;
-  const singlePageH = currentProject.canvasHeight;
-  const gutterPhysicalW = activeSpread.gutterWidth || 0;
+  // Single page physical dimensions (strictly in canvasUnit)
+  const singlePageW = dims.pageWidth;
+  const singlePageH = dims.pageHeight;
+  const gutterPhysicalW = dims.gutterWidth;
 
   // Total spread physical dimensions
   const totalSpreadPhysicalW = singlePageW * 2 + gutterPhysicalW;
   const totalSpreadPhysicalH = singlePageH;
 
-  // Physical bleed and safe area in mm
-  const bleedInMm = convertUnit(activeSpread.bleed ?? 3, unit, 'mm');
-  const safeAreaInMm = convertUnit(activeSpread.safeArea ?? 10, unit, 'mm');
-  const pageWInMm = convertUnit(singlePageW, unit, 'mm');
-
   // Dynamic responsive canvas scaling (Fills ~88% of container workspace)
   const maxAvailableW = Math.max(300, containerSize.width - 60);
   const maxAvailableH = Math.max(200, containerSize.height - 60);
-  const aspect = totalSpreadPhysicalW / Math.max(1, totalSpreadPhysicalH);
+  const aspect = totalSpreadPhysicalW / Math.max(0.001, totalSpreadPhysicalH);
 
   let baseW = maxAvailableW;
   let baseH = Math.round(baseW / aspect);
@@ -757,15 +754,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
   const screenSpreadW = Math.round(baseW * zoomScale);
   const screenSpreadH = Math.round(baseH * zoomScale);
 
-  // Conversion factor: multiply physical units (mm/cm/inch) by this to get screen pixels
+  // Conversion factor: multiply physical units (in canvasUnit) by this to get screen pixels
   const scaleFactor = screenSpreadW / totalSpreadPhysicalW;
 
-  const leftPagePixelW = Math.round((singlePageW / totalSpreadPhysicalW) * screenSpreadW);
+  const leftPagePixelW = Math.round(singlePageW * scaleFactor);
   const rightPagePixelW = leftPagePixelW;
-  const gutterPixelW = screenSpreadW - leftPagePixelW - rightPagePixelW;
+  const gutterPixelW = Math.round(gutterPhysicalW * scaleFactor);
 
-  const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
-  const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
+  const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
+  const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
   const activeCropFrame = editingCropFrameId
     ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
     : null;
