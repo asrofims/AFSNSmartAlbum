@@ -104,6 +104,11 @@ export function WorkspaceLayout() {
         options,
       });
     } catch (err: any) {
+      const errStr = String(err?.message || err || '');
+      if (errStr.toLowerCase().includes('cancel')) {
+        // User intentionally cancelled; modal displays cancellation state
+        return;
+      }
       console.error('Export failed:', err);
       setIsExportProgressOpen(false);
       alert(`Export could not be completed: ${err?.message || err}`);

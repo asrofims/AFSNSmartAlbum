@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
@@ -9,6 +9,18 @@ use crate::export_engine::{
     assemble_pdf_from_jpegs, render_spread_to_image_with_progress, split_spread_into_pages,
     ExportOptions, ExportProgressEvent,
 };
+
+#[derive(Default)]
+pub struct ExportState {
+    pub cancel_requested: Arc<AtomicBool>,
+}
+
+#[tauri::command]
+pub fn cancel_export(state: State<'_, ExportState>) -> Result<(), String> {
+    log::info!("cancel_export requested by user");
+    state.cancel_requested.store(true, Ordering::SeqCst);
+    Ok(())
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -231,6 +243,7 @@ fn export_album_high_res_worker(
     project: ProjectRow,
     album: AlbumPayload,
     options: ExportOptions,
+    cancel_flag: Arc<AtomicBool>,
 ) -> Result<ExportProgressEvent, String> {
     let output_path = PathBuf::from(&options.output_dir);
     if !output_path.exists() {
@@ -296,12 +309,33 @@ fn export_album_high_res_worker(
 
     // Process in bounded chunks to protect peak RAM while keeping 100% CPU core utilization
     for (chunk_idx, spread_chunk) in spreads.chunks(chunk_size).enumerate() {
+        if cancel_flag.load(Ordering::SeqCst) {
+            log::info!("Export worker cancelled before chunk {}", chunk_idx);
+            let cancel_event = ExportProgressEvent {
+                current: 0,
+                total: total_spreads,
+                current_photos: 0,
+                total_photos,
+                percent: 0.0,
+                spread_name: "Cancelled".to_string(),
+                status: "Export cancelled by user.".to_string(),
+                is_finished: true,
+                output_files: Vec::new(),
+            };
+            let _ = app.emit("export-progress", &cancel_event);
+            return Err("Export cancelled by user".to_string());
+        }
+
         let chunk_offset = chunk_idx * chunk_size;
 
         spread_chunk
             .par_iter()
             .enumerate()
             .try_for_each(|(local_idx, spread)| -> Result<(), String> {
+                if cancel_flag.load(Ordering::SeqCst) {
+                    return Err("Export cancelled by user".to_string());
+                }
+
                 let global_idx = chunk_offset + local_idx;
                 let current_num = global_idx + 1;
                 let spread_name = if spread.r#type == "cover" {
@@ -312,6 +346,7 @@ fn export_album_high_res_worker(
 
                 let completed_photos_clone = completed_photos.clone();
                 let app_handle = app.clone();
+                let cancel_flag_clone = cancel_flag.clone();
 
                 // Render spread to high resolution bitmap with live photo-by-photo atomic progress
                 let spread_img = render_spread_to_image_with_progress(
@@ -320,6 +355,9 @@ fn export_album_high_res_worker(
                     options.dpi,
                     options.include_bleed,
                     |_photo_idx, _total_photos_in_spread| {
+                        if cancel_flag_clone.load(Ordering::SeqCst) {
+                            return;
+                        }
                         let done = completed_photos_clone.fetch_add(1, Ordering::SeqCst) + 1;
                         let pct = if total_photos > 0 {
                             ((done as f64 / total_photos as f64) * 92.0).clamp(1.0, 95.0)
@@ -343,6 +381,10 @@ fn export_album_high_res_worker(
                         );
                     },
                 );
+
+                if cancel_flag.load(Ordering::SeqCst) {
+                    return Err("Export cancelled by user".to_string());
+                }
 
                 let mut local_output_files = Vec::new();
                 let mut local_temp_jpegs = Vec::new();
@@ -432,6 +474,23 @@ fn export_album_high_res_worker(
             })?;
     }
 
+    if cancel_flag.load(Ordering::SeqCst) {
+        log::info!("Export worker detected cancel_flag before finalization");
+        let cancel_event = ExportProgressEvent {
+            current: 0,
+            total: total_spreads,
+            current_photos: 0,
+            total_photos,
+            percent: 0.0,
+            spread_name: "Cancelled".to_string(),
+            status: "Export cancelled by user.".to_string(),
+            is_finished: true,
+            output_files: Vec::new(),
+        };
+        let _ = app.emit("export-progress", &cancel_event);
+        return Err("Export cancelled by user".to_string());
+    }
+
     // Sort results by original spread index to guarantee exact sequential order
     let mut lock = results.lock().unwrap();
     lock.sort_by_key(|(idx, _, _)| *idx);
@@ -446,6 +505,10 @@ fn export_album_high_res_worker(
 
     // If PDF format requested, assemble the rendered JPEGs into a single multi-page PDF document
     if options.format == "pdf" && !temp_jpegs_for_pdf.is_empty() {
+        if cancel_flag.load(Ordering::SeqCst) {
+            return Err("Export cancelled by user".to_string());
+        }
+
         let _ = app.emit(
             "export-progress",
             &ExportProgressEvent {
@@ -492,6 +555,7 @@ fn export_album_high_res_worker(
 pub async fn export_album_high_res(
     app: AppHandle,
     db: State<'_, Database>,
+    export_state: State<'_, ExportState>,
     project_id: String,
     options: ExportOptions,
 ) -> Result<ExportProgressEvent, String> {
@@ -513,8 +577,12 @@ pub async fn export_album_high_res(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No album structure found for project".to_string())?;
 
+    // Reset cancel flag before starting
+    export_state.cancel_requested.store(false, Ordering::SeqCst);
+    let cancel_flag = export_state.cancel_requested.clone();
+
     tauri::async_runtime::spawn_blocking(move || {
-        export_album_high_res_worker(app, project, album, options)
+        export_album_high_res_worker(app, project, album, options, cancel_flag)
     })
     .await
     .map_err(|e| format!("Export worker execution failed: {}", e))?

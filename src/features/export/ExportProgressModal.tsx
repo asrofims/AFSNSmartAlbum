@@ -36,6 +36,8 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
     outputFiles: [],
   });
 
+  const [isCancelling, setIsCancelling] = useState(false);
+
   useEffect(() => {
     if (!isOpen) {
       setProgress({
@@ -49,11 +51,15 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
         isFinished: false,
         outputFiles: [],
       });
+      setIsCancelling(false);
       return;
     }
 
     const unlisten = listen<ExportProgressPayload>('export-progress', (event) => {
       setProgress(event.payload);
+      if (event.payload.isFinished) {
+        setIsCancelling(false);
+      }
     });
 
     return () => {
@@ -62,7 +68,7 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
   }, [isOpen]);
 
   const rawPercent = progress.isFinished
-    ? 100
+    ? (progress.status.includes('cancelled') ? 0 : 100)
     : progress.percent !== undefined
     ? progress.percent
     : (progress.current / Math.max(1, progress.total)) * 100;
@@ -77,40 +83,73 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
     }
   };
 
+  const handleCancelExport = async () => {
+    setIsCancelling(true);
+    try {
+      await invoke('cancel_export');
+    } catch (err) {
+      console.error('Failed to request export cancellation:', err);
+    }
+  };
+
+  const isCancelled = progress.status.toLowerCase().includes('cancelled');
+
   return (
     <Dialog
       isOpen={isOpen}
-      onClose={progress.isFinished ? onClose : () => {}}
-      title={progress.isFinished ? 'Export Complete' : 'Exporting Album'}
+      onClose={progress.isFinished ? onClose : handleCancelExport}
+      title={
+        progress.isFinished
+          ? isCancelled
+            ? 'Export Cancelled'
+            : 'Export Complete'
+          : 'Exporting Album'
+      }
       width={460}
       closeOnOverlayClick={progress.isFinished}
     >
       <div className={styles.container}>
         {progress.isFinished ? (
-          <div className={styles.successIcon}>🎉</div>
+          isCancelled ? (
+            <div className={styles.iconWrapper} style={{ fontSize: '28px' }}>⏹️</div>
+          ) : (
+            <div className={styles.successIcon}>🎉</div>
+          )
         ) : (
           <div className={styles.iconWrapper}>⚙️</div>
         )}
 
         <div className={styles.title}>
-          {progress.isFinished ? 'Album Export Complete!' : 'Rendering High-Resolution Layout'}
+          {progress.isFinished
+            ? isCancelled
+              ? 'Export Was Cancelled'
+              : 'Album Export Complete!'
+            : 'Rendering High-Resolution Layout'}
         </div>
 
         <div className={styles.statusText} title={progress.status}>
-          {progress.status}
+          {isCancelling ? 'Cancelling export safely...' : progress.status}
         </div>
 
         <div className={styles.progressTrack}>
-          <div className={styles.progressBar} style={{ width: `${percent}%` }} />
+          <div
+            className={styles.progressBar}
+            style={{
+              width: `${percent}%`,
+              backgroundColor: isCancelled ? 'var(--color-danger, #ef4444)' : undefined,
+            }}
+          />
         </div>
 
         <div className={styles.percentLabel}>
-          {progress.totalPhotos && progress.totalPhotos > 0
+          {isCancelled
+            ? 'Cancelled'
+            : progress.totalPhotos && progress.totalPhotos > 0
             ? `${progress.currentPhotos || 0} of ${progress.totalPhotos} Photos (${percent}%)`
             : `${progress.current} of ${progress.total} Spreads (${percent}%)`}
         </div>
 
-        {progress.isFinished && progress.outputFiles.length > 0 && (
+        {progress.isFinished && !isCancelled && progress.outputFiles.length > 0 && (
           <div className={styles.filesBox}>
             {progress.outputFiles.map((file, i) => (
               <div key={i} className={styles.fileItem} title={file}>
@@ -123,17 +162,30 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
         <div className={styles.footer}>
           {progress.isFinished ? (
             <>
-              <Button variant="secondary" onClick={handleOpenFolder}>
-                📂 Open Export Folder
-              </Button>
+              {!isCancelled && (
+                <Button variant="secondary" onClick={handleOpenFolder}>
+                  📂 Open Export Folder
+                </Button>
+              )}
               <Button variant="primary" onClick={onClose}>
-                Done
+                Close
               </Button>
             </>
           ) : (
-            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-              Please wait while photos are composited at full print DPI...
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                {isCancelling ? 'Stopping background workers...' : 'Rendering at full print DPI...'}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCancelExport}
+                disabled={isCancelling}
+                style={{ color: 'var(--color-danger, #ef4444)' }}
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Export'}
+              </Button>
+            </div>
           )}
         </div>
       </div>
