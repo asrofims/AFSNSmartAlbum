@@ -54,6 +54,8 @@ function parseRange(input: string, maxVal: number): number[] {
   return Array.from(result).sort((a, b) => a - b);
 }
 
+const LAST_EXPORT_DIR_KEY = 'afsn_last_export_dir';
+
 export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbumDialogProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
@@ -69,7 +71,13 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [customRange, setCustomRange] = useState<string>('1-2');
   const [rangeMode, setRangeMode] = useState<'spreads' | 'pages'>('spreads');
 
-  const [outputDir, setOutputDir] = useState<string>('');
+  const [outputDir, setOutputDir] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LAST_EXPORT_DIR_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const allSpreads: Spread[] = useMemo(() => {
@@ -129,6 +137,9 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       const selected = await invoke<string | null>('select_export_directory');
       if (selected) {
         setOutputDir(selected);
+        try {
+          localStorage.setItem(LAST_EXPORT_DIR_KEY, selected);
+        } catch {}
         setErrorMsg(null);
       }
     } catch (err) {
@@ -137,7 +148,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   };
 
   const handleExport = () => {
-    if (!outputDir.trim()) {
+    const trimmedDir = outputDir.trim();
+    if (!trimmedDir) {
       setErrorMsg('Please select a destination folder.');
       return;
     }
@@ -145,6 +157,10 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       setErrorMsg('No spreads match the selected range. Please check your range settings.');
       return;
     }
+
+    try {
+      localStorage.setItem(LAST_EXPORT_DIR_KEY, trimmedDir);
+    } catch {}
 
     const selectedSpreadIds = targetSpreads.map((s) => s.id);
 
@@ -154,7 +170,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       jpegQuality,
       includeBleed,
       splitPages,
-      outputDir: outputDir.trim(),
+      outputDir: trimmedDir,
       selectedSpreadIds,
     });
     onClose();
