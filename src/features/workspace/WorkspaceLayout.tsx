@@ -281,209 +281,7 @@ export function WorkspaceLayout() {
             </div>
           ) : (
             <div className={styles.propertyList}>
-              {/* Project Overview */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Album Project</div>
-                <div className={styles.propRow}>
-                  <span>Name</span>
-                  <span className={styles.propValue}>{currentProject.name}</span>
-                </div>
-                <div className={styles.propRow}>
-                  <span>Created</span>
-                  <span className={styles.propValue}>
-                    {new Date(currentProject.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Dimensions */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Dimensions</div>
-                <div className={styles.propRow}>
-                  <span>Single Page</span>
-                  <span className={styles.propValue}>
-                    {formatDimensions(currentProject.canvasWidth, currentProject.canvasHeight, currentProject.canvasUnit)}
-                  </span>
-                </div>
-                <div className={styles.propRow}>
-                  <span>Open Spread</span>
-                  <span className={styles.propValue}>
-                    {formatDimensions(spreadW, spreadH, currentProject.canvasUnit)}
-                  </span>
-                </div>
-                <div className={styles.propRow}>
-                  <span>Resolution</span>
-                  <span className={styles.propValue}>{currentProject.canvasDpi} DPI</span>
-                </div>
-              </div>
-
-              {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Photo Spacing</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Default Gap</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '120px' }}>
-                      <NumberInput
-                        value={currentProject.spacingValue}
-                        onChange={(val) => {
-                          const num = Math.max(0, val);
-                          updateProjectSpacing(num, currentProject.spacingUnit);
-                          setCustomGapValue(num);
-                        }}
-                        min={0}
-                        max={100}
-                        step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : 0.5}
-                      />
-                      <select
-                        value={currentProject.spacingUnit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as Unit;
-                          updateProjectSpacing(currentProject.spacingValue, newUnit);
-                        }}
-                        style={{
-                          fontSize: '10px',
-                          backgroundColor: 'var(--color-bg-secondary)',
-                          color: 'var(--color-text-primary)',
-                          border: '1px solid var(--color-border)',
-                          borderRadius: 'var(--radius-sm)',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <option value="mm">mm</option>
-                        <option value="cm">cm</option>
-                        <option value="inch">in</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Quick Action to apply project spacing to currently selected frames */}
-                  {selectedFrameIds.length >= 2 && activeSpread && (
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
-                      <button
-                        type="button"
-                        className={styles.toolBtn}
-                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
-                        onClick={() => {
-                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
-                          applyFixedGapToSelected(activeSpread.id, 'horizontal', gapInMm);
-                        }}
-                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) horizontally`}
-                      >
-                        ⇿ Apply Gap H
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.toolBtn}
-                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
-                        onClick={() => {
-                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
-                          applyFixedGapToSelected(activeSpread.id, 'vertical', gapInMm);
-                        }}
-                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) vertically`}
-                      >
-                        ⇳ Apply Gap V
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Safe Margins & Guides Section */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Margins & Guides</div>
-
-                {/* Guide Toggles */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showSafeAreaGuide}
-                      onChange={() => toggleGuide('safeArea')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Safe Zone Margin (Blue)</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showBleedGuide}
-                      onChange={() => toggleGuide('bleed')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Bleed Cut Line (Red)</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showGutterGuide}
-                      onChange={() => toggleGuide('gutter')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Center Gutter Crease</span>
-                  </label>
-                </div>
-
-                {/* Safe Margins & Spine Inputs */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                        onChange={(val) => updateSafeArea(val)}
-                        min={0.1}
-                        max={50}
-                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Bleed Allowance</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.bleed ?? 3}
-                        onChange={(val) => updateBleed(val)}
-                        min={0}
-                        max={20}
-                        step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {activeSpread?.type === 'cover' ? 'Spine Width' : 'Gutter Width'}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.gutterWidth ?? 0}
-                        onChange={(val) => updateGutterWidth(val)}
-                        min={0}
-                        max={50}
-                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Smart Snapping Switch */}
-                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
-                  <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
-                </div>
-              </div>
-
-              {/* Selected Photo Frame Properties / Multi-Selection Controls */}
+              {/* Selected Photo Frame Properties / Multi-Selection Controls (Placed at TOP when active) */}
               {(() => {
                 const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
                 if (!activeSpread || selectedFrameIds.length === 0) return null;
@@ -947,6 +745,208 @@ export function WorkspaceLayout() {
                   </div>
                 );
               })()}
+
+              {/* Project Overview */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Album Project</div>
+                <div className={styles.propRow}>
+                  <span>Name</span>
+                  <span className={styles.propValue}>{currentProject.name}</span>
+                </div>
+                <div className={styles.propRow}>
+                  <span>Created</span>
+                  <span className={styles.propValue}>
+                    {new Date(currentProject.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Dimensions */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Dimensions</div>
+                <div className={styles.propRow}>
+                  <span>Single Page</span>
+                  <span className={styles.propValue}>
+                    {formatDimensions(currentProject.canvasWidth, currentProject.canvasHeight, currentProject.canvasUnit)}
+                  </span>
+                </div>
+                <div className={styles.propRow}>
+                  <span>Open Spread</span>
+                  <span className={styles.propValue}>
+                    {formatDimensions(spreadW, spreadH, currentProject.canvasUnit)}
+                  </span>
+                </div>
+                <div className={styles.propRow}>
+                  <span>Resolution</span>
+                  <span className={styles.propValue}>{currentProject.canvasDpi} DPI</span>
+                </div>
+              </div>
+
+              {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Photo Spacing</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Default Gap</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '120px' }}>
+                      <NumberInput
+                        value={currentProject.spacingValue}
+                        onChange={(val) => {
+                          const num = Math.max(0, val);
+                          updateProjectSpacing(num, currentProject.spacingUnit);
+                          setCustomGapValue(num);
+                        }}
+                        min={0}
+                        max={100}
+                        step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <select
+                        value={currentProject.spacingUnit}
+                        onChange={(e) => {
+                          const newUnit = e.target.value as Unit;
+                          updateProjectSpacing(currentProject.spacingValue, newUnit);
+                        }}
+                        style={{
+                          fontSize: '10px',
+                          backgroundColor: 'var(--color-bg-secondary)',
+                          color: 'var(--color-text-primary)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                        <option value="inch">in</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Quick Action to apply project spacing to currently selected frames */}
+                  {selectedFrameIds.length >= 2 && activeSpread && (
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        onClick={() => {
+                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          applyFixedGapToSelected(activeSpread.id, 'horizontal', gapInMm);
+                        }}
+                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) horizontally`}
+                      >
+                        ⇿ Apply Gap H
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        onClick={() => {
+                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          applyFixedGapToSelected(activeSpread.id, 'vertical', gapInMm);
+                        }}
+                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) vertically`}
+                      >
+                        ⇳ Apply Gap V
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Safe Margins & Guides Section */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Margins & Guides</div>
+
+                {/* Guide Toggles */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showSafeAreaGuide}
+                      onChange={() => toggleGuide('safeArea')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Safe Zone Margin (Blue)</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showBleedGuide}
+                      onChange={() => toggleGuide('bleed')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Bleed Cut Line (Red)</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showGutterGuide}
+                      onChange={() => toggleGuide('gutter')}
+                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+                    />
+                    <span>Center Gutter Crease</span>
+                  </label>
+                </div>
+
+                {/* Safe Margins & Spine Inputs */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
+                        onChange={(val) => updateSafeArea(val)}
+                        min={0.1}
+                        max={50}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Bleed Allowance</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.bleed ?? 3}
+                        onChange={(val) => updateBleed(val)}
+                        min={0}
+                        max={20}
+                        step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                      {activeSpread?.type === 'cover' ? 'Spine Width' : 'Gutter Width'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.gutterWidth ?? 0}
+                        onChange={(val) => updateGutterWidth(val)}
+                        min={0}
+                        max={50}
+                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Smart Snapping Switch */}
+                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
+                  <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
+                </div>
+              </div>
 
               {/* Project Default Border */}
               <div className={styles.propSection}>
