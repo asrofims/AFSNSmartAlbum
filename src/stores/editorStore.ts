@@ -278,79 +278,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  batchUpdateFrames: (spreadId, updates) => {
+  batchUpdateFrames: (_spreadId, updates) => {
     const { currentAlbum } = useAlbumStore.getState();
-    if (!currentAlbum) return;
+    if (!currentAlbum || updates.length === 0) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
     const updateMap = new Map(updates.map((u) => [u.id, u.geometry]));
 
-    if (currentAlbum.coverSpread.id === spreadId) {
-      const updatedCover = {
-        ...currentAlbum.coverSpread,
-        elements: (currentAlbum.coverSpread.elements || []).map((f) =>
-          updateMap.has(f.id) ? { ...f, ...updateMap.get(f.id) } : f
-        ),
-      };
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
-        saveStatus: 'unsaved',
-      });
-    } else {
-      const updatedSpreads = currentAlbum.spreads.map((spread) => {
-        if (spread.id === spreadId) {
-          return {
-            ...spread,
-            elements: (spread.elements || []).map((f) =>
-              updateMap.has(f.id) ? { ...f, ...updateMap.get(f.id) } : f
-            ),
-          };
-        }
-        return spread;
-      });
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
-        saveStatus: 'unsaved',
-      });
-    }
+    const updatedCover = {
+      ...currentAlbum.coverSpread,
+      elements: (currentAlbum.coverSpread.elements || []).map((f) =>
+        updateMap.has(f.id) ? { ...f, ...updateMap.get(f.id) } : f
+      ),
+    };
+
+    const updatedSpreads = currentAlbum.spreads.map((spread) => ({
+      ...spread,
+      elements: (spread.elements || []).map((f) =>
+        updateMap.has(f.id) ? { ...f, ...updateMap.get(f.id) } : f
+      ),
+    }));
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
   },
 
-  deleteSelectedFrames: (spreadId) => {
+  deleteSelectedFrames: (_spreadId) => {
     const { selectedFrameIds } = get();
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length === 0) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    if (currentAlbum.coverSpread.id === spreadId) {
-      const updatedCover = {
-        ...currentAlbum.coverSpread,
-        elements: (currentAlbum.coverSpread.elements || []).filter(
-          (f) => !selectedFrameIds.includes(f.id)
-        ),
-      };
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
-        saveStatus: 'unsaved',
-      });
-    } else {
-      const updatedSpreads = currentAlbum.spreads.map((spread) => {
-        if (spread.id === spreadId) {
-          return {
-            ...spread,
-            elements: (spread.elements || []).filter(
-              (f) => !selectedFrameIds.includes(f.id)
-            ),
-          };
-        }
-        return spread;
-      });
-      useAlbumStore.setState({
-        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
-        saveStatus: 'unsaved',
-      });
-    }
+    const idsToDelete = new Set(selectedFrameIds);
+
+    const updatedCover = {
+      ...currentAlbum.coverSpread,
+      elements: (currentAlbum.coverSpread.elements || []).filter(
+        (f) => !idsToDelete.has(f.id)
+      ),
+    };
+
+    const updatedSpreads = currentAlbum.spreads.map((spread) => ({
+      ...spread,
+      elements: (spread.elements || []).filter(
+        (f) => !idsToDelete.has(f.id)
+      ),
+    }));
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
 
     set({ selectedFrameIds: [], editingCropFrameId: null });
   },
