@@ -26,10 +26,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
   const activeSpread = useMemo(() => {
     if (!currentAlbum || !activeSpreadId) return null;
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
-      return currentAlbum.coverSpread;
-    }
-    return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || null;
+    return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
   const photos: AdaptivePhoto[] = useMemo(() => {
@@ -46,18 +43,12 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
   }, [activeSpread]);
 
   const currentPhotoCount = photos.length;
-  const isCover = activeSpread ? currentAlbum?.coverSpread.id === activeSpread.id : false;
 
   // Dynamic Adaptive Variations calculated specifically for the current spread's photos
   const adaptiveVariations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
-    const isSpread = !isCover;
     const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
-    const spreadWidth = isCover
-      ? (activeSpread.leftPage ? activeSpread.leftPage.width : dims.pageWidth) +
-        (activeSpread.rightPage ? activeSpread.rightPage.width : 0) +
-        dims.gutterWidth
-      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadWidth = dims.pageWidth * 2 + dims.gutterWidth;
     const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(

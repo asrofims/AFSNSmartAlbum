@@ -104,10 +104,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     const set = new Set<string>();
     if (!currentAlbum) return set;
 
-    (currentAlbum.coverSpread.elements || []).forEach((el) => {
-      if (el.photoId) set.add(el.photoId);
-    });
-
     (currentAlbum.spreads || []).forEach((spread) => {
       (spread.elements || []).forEach((el) => {
         if (el.photoId) set.add(el.photoId);

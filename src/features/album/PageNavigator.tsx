@@ -21,10 +21,7 @@ interface MiniSpreadPreviewProps {
 }
 
 function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
-  const isCover = spread.spreadIndex === 0;
-  const totalPhysicalW = isCover
-    ? (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || 0) + (spread.gutterWidth || 0)
-    : (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || project.canvasWidth) + (spread.gutterWidth || 0);
+  const totalPhysicalW = (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || project.canvasWidth) + (spread.gutterWidth || 0);
   const totalPhysicalH = spread.leftPage?.height || project.canvasHeight || 200;
 
   // Mini thumbnail box dimensions
@@ -48,19 +45,17 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       }}
     >
       {/* Spine / Gutter Line */}
-      {!isCover && (
-        <div
-          style={{
-            position: 'absolute',
-            left: `${spineX}px`,
-            top: 0,
-            bottom: 0,
-            width: '1px',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)',
-            zIndex: 1,
-          }}
-        />
-      )}
+      <div
+        style={{
+          position: 'absolute',
+          left: `${spineX}px`,
+          top: 0,
+          bottom: 0,
+          width: '1px',
+          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          zIndex: 1,
+        }}
+      />
 
       {/* Real-time Rendered Photo Elements */}
       {(spread.elements || []).map((el) => {
@@ -68,7 +63,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         const y = el.y * scaleY;
         const w = Math.max(3, el.width * scaleX);
         const h = Math.max(3, el.height * scaleY);
-        const imgSrc = el.thumbnailPath || el.previewPath;
+        const imgSrc = el.photoId ? (el.thumbnailPath || el.previewPath || el.filePath) : null;
 
         return (
           <div

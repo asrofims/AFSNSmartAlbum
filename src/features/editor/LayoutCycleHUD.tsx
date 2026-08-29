@@ -23,10 +23,7 @@ export function LayoutCycleHUD() {
 
   const activeSpread = useMemo(() => {
     if (!currentAlbum || !activeSpreadId) return null;
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
-      return currentAlbum.coverSpread;
-    }
-    return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || null;
+    return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
   const photos: AdaptivePhoto[] = useMemo(() => {
@@ -42,17 +39,10 @@ export function LayoutCycleHUD() {
     }));
   }, [activeSpread]);
 
-  const isCover = activeSpread ? currentAlbum?.coverSpread.id === activeSpread.id : false;
-
   const variations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
-    const isSpread = !isCover;
     const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
-    const spreadWidth = isCover
-      ? (activeSpread.leftPage ? activeSpread.leftPage.width : dims.pageWidth) +
-        (activeSpread.rightPage ? activeSpread.rightPage.width : 0) +
-        dims.gutterWidth
-      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadWidth = dims.pageWidth * 2 + dims.gutterWidth;
     const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(

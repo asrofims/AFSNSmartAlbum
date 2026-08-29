@@ -71,13 +71,23 @@ function PhotoFrameNode({
 
   // Load preview or thumbnail image
   useEffect(() => {
-    const imgPath = frame.previewPath || frame.filePath || frame.thumbnailPath;
-    if (!imgPath) return;
+    if (!frame.photoId) {
+      setImageObj(null);
+      return;
+    }
 
+    const imgPath = frame.previewPath || frame.filePath || frame.thumbnailPath;
+    if (!imgPath) {
+      setImageObj(null);
+      return;
+    }
+
+    let isMounted = true;
     const img = new window.Image();
     img.crossOrigin = 'Anonymous';
     img.src = convertFileSrc(imgPath);
     img.onload = () => {
+      if (!isMounted) return;
       setImageObj(img);
       if (img.naturalWidth > 0 && img.naturalHeight > 0) {
         const aspect = Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000;
@@ -86,7 +96,16 @@ function PhotoFrameNode({
         }
       }
     };
-  }, [frame.previewPath, frame.thumbnailPath, frame.filePath]);
+    img.onerror = () => {
+      if (isMounted) {
+        setImageObj(null);
+      }
+    };
+
+    return () => {
+      isMounted = false;
+    };
+  }, [frame.photoId, frame.previewPath, frame.thumbnailPath, frame.filePath]);
 
   // Convert physical geometry (mm/cm) to screen pixels (px)
   const pixelX = frame.x * scaleFactor;

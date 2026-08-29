@@ -242,7 +242,19 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
           elements.map((el) => {
             if (el.photoId === photoId) {
               modified = true;
-              return { ...el, photoId: null, crop: undefined };
+              return {
+                ...el,
+                photoId: null,
+                filePath: '',
+                previewPath: '',
+                thumbnailPath: '',
+                fileName: '',
+                crop: undefined,
+                cropScale: 1.0,
+                cropX: 0,
+                cropY: 0,
+                photoAspect: undefined,
+              };
             }
             return el;
           });
@@ -372,7 +384,19 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
           elements.map((el) => {
             if (el.photoId && deletedSet.has(el.photoId)) {
               modified = true;
-              return { ...el, photoId: null, crop: undefined };
+              return {
+                ...el,
+                photoId: null,
+                filePath: '',
+                previewPath: '',
+                thumbnailPath: '',
+                fileName: '',
+                crop: undefined,
+                cropScale: 1.0,
+                cropX: 0,
+                cropY: 0,
+                photoAspect: undefined,
+              };
             }
             return el;
           });
