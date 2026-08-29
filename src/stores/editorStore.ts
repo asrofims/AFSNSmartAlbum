@@ -9,11 +9,13 @@ import {
   getPhotoAspect,
   matchFrameDimensions,
   PhotoFrameElement,
+  SafeMarginBounds,
   SnapLine,
   SnappingConfig,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { getAllAlbumSpreads } from '../domain/album';
+import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
 import { usePhotoStore } from './photoStore';
@@ -804,7 +806,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   alignSelectedFrames: (spreadId, alignment) => {
     const { selectedFrameIds, batchUpdateFrames } = get();
     const { currentAlbum } = useAlbumStore.getState();
-    if (!currentAlbum || selectedFrameIds.length < 2) return;
+    const currentProject = useProjectStore.getState().currentProject;
+    if (!currentAlbum || selectedFrameIds.length === 0) return;
 
     const spread =
       currentAlbum.coverSpread.id === spreadId
@@ -815,7 +818,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selectedFrames = (spread.elements || []).filter((f) =>
       selectedFrameIds.includes(f.id)
     );
-    const updates = alignFrames(selectedFrames, alignment);
+    if (selectedFrames.length === 0) return;
+
+    let safeMarginBounds: SafeMarginBounds | undefined;
+    if (currentProject) {
+      const dims = getProjectDimensionsInCanvasUnit(currentProject, spread);
+      safeMarginBounds = {
+        singlePageWidth: dims.pageWidth,
+        spreadHeight: dims.pageHeight,
+        gutterWidth: dims.gutterWidth,
+        safeMargin: dims.safeMargin,
+      };
+    }
+
+    const updates = alignFrames(selectedFrames, alignment, safeMarginBounds);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);
     }

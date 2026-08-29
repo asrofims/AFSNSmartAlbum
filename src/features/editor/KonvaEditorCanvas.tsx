@@ -1196,12 +1196,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange }: Konva
       });
     }
 
-    if (count >= 2) {
+    if (count >= 1) {
+      const alignLabel = count === 1 || (!canGroup && canUngroup) ? 'Align to Safe Margin' : 'Align';
       items.push(
         { divider: true, id: 'div-align', label: '' },
         {
           id: 'submenu-align',
-          label: 'Align',
+          label: alignLabel,
           icon: '📐',
           children: [
             {

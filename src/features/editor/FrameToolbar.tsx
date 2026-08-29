@@ -22,6 +22,7 @@ export function FrameToolbar() {
     swapFrames,
     groupSelectedFrames,
     ungroupSelectedFrames,
+    alignSelectedFrames,
     updateFrameGeometry,
     updateCrop,
   } = useEditorStore();
@@ -229,6 +230,36 @@ export function FrameToolbar() {
               </svg>
             </button>
           )}
+
+          <div className={styles.divider} />
+
+          {/* Align Center Horizontal (Safe Margin Center / Spread Center) */}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => alignSelectedFrames(activeSpread.id, 'center')}
+            title="Align Center Horizontal (to Page / Safe Margin Center)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" x2="12" y1="2" y2="22" strokeDasharray="2 2" />
+              <rect width="12" height="6" x="6" y="6" rx="1" />
+              <rect width="8" height="6" x="8" y="14" rx="1" />
+            </svg>
+          </button>
+
+          {/* Align Middle Vertical (Safe Margin Middle / Spread Middle) */}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => alignSelectedFrames(activeSpread.id, 'middle')}
+            title="Align Middle Vertical (to Page / Safe Margin Middle)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="2" x2="22" y1="12" y2="12" strokeDasharray="2 2" />
+              <rect width="6" height="12" x="6" y="6" rx="1" />
+              <rect width="6" height="8" x="14" y="8" rx="1" />
+            </svg>
+          </button>
 
           <div className={styles.divider} />
 

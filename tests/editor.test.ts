@@ -18,6 +18,7 @@ import {
   calculateMultiFrameResize,
   matchFrameDimensions,
   clusterFramesIntoEntities,
+  SafeMarginBounds,
 } from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
@@ -574,4 +575,57 @@ console.assert(updatedY.get('ga1') === 60, `GA1 should align to y=60, got ${upda
 console.assert(updatedY.get('ga2') === 60, `GA2 should align to y=60, got ${updatedY.get('ga2')}`);
 console.assert(updatedY.get('sTall') === 20, `sTall should stay at y=20 (maxY=140), got ${updatedY.get('sTall')}`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
+// 12. Test Single Object and Single Group Alignment to Blue Safe Margin Box
+const testSafeMarginBounds: SafeMarginBounds = {
+  singlePageWidth: 200, // 200mm page width
+  spreadHeight: 300,    // 300mm spread height
+  gutterWidth: 6,       // 6mm spine
+  safeMargin: 10,       // 10mm blue safe area box
+};
+
+// 12.1 Single Standalone Frame on Left Page (x=50, y=50, w=80, h=60)
+const singleLeftFrame: PhotoFrameElement = { ...testFrameA, id: 'sl1', x: 50, y: 50, width: 80, height: 60, groupId: undefined };
+
+// Align Left -> should align to x = 10mm (Left Blue Margin)
+const alignLeftRes = alignFrames([singleLeftFrame], 'left', testSafeMarginBounds);
+console.assert(alignLeftRes[0].geometry.x === 10, `Single Left frame should align left to 10, got ${alignLeftRes[0].geometry.x}`);
+
+// Align Center -> should align to x = 100 - 40 = 60mm (Center of Left Page)
+const alignCenterRes = alignFrames([singleLeftFrame], 'center', testSafeMarginBounds);
+console.assert(alignCenterRes[0].geometry.x === 60, `Single Left frame should align center to 60, got ${alignCenterRes[0].geometry.x}`);
+
+// Align Right -> should align to x = 190 - 80 = 110mm (Right Blue Margin of Left Page)
+const alignRightRes = alignFrames([singleLeftFrame], 'right', testSafeMarginBounds);
+console.assert(alignRightRes[0].geometry.x === 110, `Single Left frame should align right to 110, got ${alignRightRes[0].geometry.x}`);
+
+// Align Top -> should align to y = 10mm (Top Blue Margin)
+const alignTopRes = alignFrames([singleLeftFrame], 'top', testSafeMarginBounds);
+console.assert(alignTopRes[0].geometry.y === 10, `Single Left frame should align top to 10, got ${alignTopRes[0].geometry.y}`);
+
+// Align Middle -> should align to y = 150 - 30 = 120mm (Middle of Page)
+const alignMiddleRes = alignFrames([singleLeftFrame], 'middle', testSafeMarginBounds);
+console.assert(alignMiddleRes[0].geometry.y === 120, `Single Left frame should align middle to 120, got ${alignMiddleRes[0].geometry.y}`);
+
+// Align Bottom -> should align to y = 290 - 60 = 230mm (Bottom Blue Margin)
+const alignBottomRes = alignFrames([singleLeftFrame], 'bottom', testSafeMarginBounds);
+console.assert(alignBottomRes[0].geometry.y === 230, `Single Left frame should align bottom to 230, got ${alignBottomRes[0].geometry.y}`);
+
+// 12.2 Single Group of 2 frames on Left Page (GA1 at x=20, w=40; GA2 at x=70, w=40 -> group width = 90, internal gap = 10)
+const groupLeftOnly = [
+  { ...testFrameA, id: 'gl1', x: 20, y: 50, width: 40, height: 60, groupId: 'grp-L' },
+  { ...testFrameB, id: 'gl2', x: 70, y: 50, width: 40, height: 60, groupId: 'grp-L' },
+];
+
+// Align Group Left to Safe Margin (x = 10mm)
+const groupAlignLeftRes = alignFrames(groupLeftOnly, 'left', testSafeMarginBounds);
+const glUpdatedX = new Map(groupAlignLeftRes.map((u) => [u.id, u.geometry.x!]));
+console.assert(glUpdatedX.get('gl1') === 10, `Group GL1 should move to x=10, got ${glUpdatedX.get('gl1')}`);
+console.assert(glUpdatedX.get('gl2') === 60, `Group GL2 should move to x=60 (gap preserved), got ${glUpdatedX.get('gl2')}`);
+
+// Align Group Right to Safe Margin (group right at 190mm -> deltaX = 190 - 90 - 20 = 80mm)
+const groupAlignRightRes = alignFrames(groupLeftOnly, 'right', testSafeMarginBounds);
+const grUpdatedX = new Map(groupAlignRightRes.map((u) => [u.id, u.geometry.x!]));
+console.assert(grUpdatedX.get('gl1') === 100, `Group GL1 should move to x=100, got ${grUpdatedX.get('gl1')}`);
+console.assert(grUpdatedX.get('gl2') === 150, `Group GL2 should move to x=150 (right edge at 190mm), got ${grUpdatedX.get('gl2')}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');

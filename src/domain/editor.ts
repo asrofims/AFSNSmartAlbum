@@ -1036,15 +1036,111 @@ export function clusterFramesIntoEntities(frames: PhotoFrameElement[]): LayoutEn
   return entities;
 }
 
+export interface SafeMarginBounds {
+  singlePageWidth: number;
+  spreadHeight: number;
+  gutterWidth: number;
+  safeMargin: number;
+}
+
 /**
- * Calculates batch alignment updates for multiple selected frames.
- * Groups of frames are treated as single rigid entities, preserving their internal relative layout.
+ * Calculates batch alignment updates for selected frames.
+ * - When 2+ independent entities are selected: Aligns entities relative to their composite bounding box.
+ * - When a single entity (single standalone frame OR single group) is selected:
+ *   Aligns the entity to the active page's Blue Safe Margin Box (or spread safe margins if spanning both pages).
+ * Groups of frames are always treated as single rigid entities, preserving their internal relative layout.
  */
 export function alignFrames(
   frames: PhotoFrameElement[],
-  alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
+  alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom',
+  safeMarginBounds?: SafeMarginBounds
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
   const entities = clusterFramesIntoEntities(frames);
+  if (entities.length === 0) return [];
+
+  const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
+
+  // SINGLE ENTITY (Single Frame OR Single Group): Align against Blue Safe Margin Box
+  if (entities.length === 1 && safeMarginBounds) {
+    const entity = entities[0];
+    if (!entity) return [];
+    const { singlePageWidth, spreadHeight, gutterWidth, safeMargin } = safeMarginBounds;
+    const totalSpreadWidth = singlePageWidth * 2 + gutterWidth;
+    const spineLeft = singlePageWidth;
+    const spineRight = singlePageWidth + gutterWidth;
+    const spineCenter = singlePageWidth + gutterWidth / 2;
+
+    const entityCenterX = entity.x + entity.width / 2;
+    const spansBothPages = entity.x < spineLeft && entity.x + entity.width > spineRight;
+
+    let refMinX: number;
+    let refMaxX: number;
+    let refCenterX: number;
+
+    if (spansBothPages) {
+      // Panoramic / Full Spread Safe Margin Box
+      refMinX = safeMargin;
+      refMaxX = totalSpreadWidth - safeMargin;
+      refCenterX = totalSpreadWidth / 2;
+    } else if (entityCenterX < spineCenter) {
+      // Left Page Blue Safe Margin Box
+      refMinX = safeMargin;
+      refMaxX = singlePageWidth - safeMargin;
+      refCenterX = (refMinX + refMaxX) / 2;
+    } else {
+      // Right Page Blue Safe Margin Box
+      refMinX = singlePageWidth + gutterWidth + safeMargin;
+      refMaxX = totalSpreadWidth - safeMargin;
+      refCenterX = (refMinX + refMaxX) / 2;
+    }
+
+    const refMinY = safeMargin;
+    const refMaxY = spreadHeight - safeMargin;
+    const refMiddleY = spreadHeight / 2;
+
+    let deltaX = 0;
+    let deltaY = 0;
+    let applyX = false;
+    let applyY = false;
+
+    switch (alignment) {
+      case 'left':
+        deltaX = refMinX - entity.x;
+        applyX = true;
+        break;
+      case 'center':
+        deltaX = refCenterX - entity.width / 2 - entity.x;
+        applyX = true;
+        break;
+      case 'right':
+        deltaX = refMaxX - entity.width - entity.x;
+        applyX = true;
+        break;
+      case 'top':
+        deltaY = refMinY - entity.y;
+        applyY = true;
+        break;
+      case 'middle':
+        deltaY = refMiddleY - entity.height / 2 - entity.y;
+        applyY = true;
+        break;
+      case 'bottom':
+        deltaY = refMaxY - entity.height - entity.y;
+        applyY = true;
+        break;
+    }
+
+    for (const f of entity.frames) {
+      const geometry: Partial<PhotoFrameElement> = {};
+      if (applyX) geometry.x = roundToTenth(f.x + deltaX);
+      if (applyY) geometry.y = roundToTenth(f.y + deltaY);
+      updates.push({ id: f.id, geometry });
+    }
+
+    return updates;
+  }
+
+  // MULTIPLE ENTITIES (2+ Standalone Frames or Groups): Align relative to selection bounds
   if (entities.length < 2) return [];
 
   const minX = Math.min(...entities.map((e) => e.x));
@@ -1053,8 +1149,6 @@ export function alignFrames(
   const maxY = Math.max(...entities.map((e) => e.y + e.height));
   const centerX = (minX + maxX) / 2;
   const middleY = (minY + maxY) / 2;
-
-  const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
 
   for (const entity of entities) {
     let deltaX = 0;
