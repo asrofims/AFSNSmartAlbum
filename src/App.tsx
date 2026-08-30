@@ -26,16 +26,14 @@ export default function App() {
     return () => window.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
-  // Trigger QRIS support popup on initial app launch session (non-intrusive)
+  // Trigger QRIS support popup on initial app launch session (clean & reliable)
   useEffect(() => {
     try {
       const isSuppressed = localStorage.getItem('afsn_suppress_support_popup') === 'true';
-      const isShownSession = sessionStorage.getItem('afsn_shown_support_session') === 'true';
-      if (!isSuppressed && !isShownSession) {
-        sessionStorage.setItem('afsn_shown_support_session', 'true');
+      if (!isSuppressed) {
         const timer = setTimeout(() => {
           useAppStore.getState().openSupportModal();
-        }, 800);
+        }, 900);
         return () => clearTimeout(timer);
       }
     } catch {}
