@@ -55,7 +55,7 @@
   border: 1px solid var(--color-border);
   padding: 2px var(--space-2);
   border-radius: var(--radius-md);
-  max-width: 240px;
+  max-width: 280px;
 }
 
 .projectNameText {
@@ -63,6 +63,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.projectNameText:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.projectNameInput {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 2px 6px;
+  outline: none;
+  width: 150px;
 }
 
 .toolButton {

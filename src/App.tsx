@@ -9,6 +9,23 @@ import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
 
 export default function App() {
+  // Disable default browser context menu globally for a native desktop application experience,
+  // allowing only standard editable input/textarea fields or custom app context menus.
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable;
+      if (!isInput) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => window.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
+
   // Trigger QRIS support popup on initial app launch session (non-intrusive)
   useEffect(() => {
     try {

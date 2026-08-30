@@ -702,6 +702,24 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_project_name(&self, id: &str, name: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE projects SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![name, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_project_name_and_path(&self, id: &str, name: &str, file_path: Option<&str>) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE projects SET name = ?1, file_path = ?2, updated_at = datetime('now') WHERE id = ?3",
+            rusqlite::params![name, file_path, id],
+        )?;
+        Ok(())
+    }
+
     pub fn list_recent_projects(&self, limit: i32) -> SqliteResult<Vec<ProjectRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

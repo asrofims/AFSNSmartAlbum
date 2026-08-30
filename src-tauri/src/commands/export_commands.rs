@@ -42,6 +42,38 @@ pub struct MissingPhotoInfo {
     pub has_preview: bool,
 }
 
+pub fn resolve_export_filename(
+    prefix: Option<&str>,
+    spread_type: &str,
+    spread_index: i32,
+    split_page_num: Option<i32>,
+    ext: &str,
+) -> String {
+    let clean_prefix = prefix
+        .map(|p| p.trim().replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"))
+        .filter(|p| !p.is_empty());
+
+    if let Some(page_num) = split_page_num {
+        if let Some(ref pref) = clean_prefix {
+            format!("{}_Page_{:03}.{}", pref, page_num, ext)
+        } else {
+            format!("Page_{:03}.{}", page_num, ext)
+        }
+    } else if spread_type == "cover" {
+        if let Some(ref pref) = clean_prefix {
+            format!("{}_Spread_00_Cover.{}", pref, ext)
+        } else {
+            format!("Spread_00_Cover.{}", ext)
+        }
+    } else {
+        if let Some(ref pref) = clean_prefix {
+            format!("{}_Spread_{:02}.{}", pref, spread_index, ext)
+        } else {
+            format!("Spread_{:02}.{}", spread_index, ext)
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn preflight_check_export(
     db: State<'_, Database>,
@@ -135,27 +167,37 @@ pub async fn preflight_check_export(
     // Check if any output files already exist in destination directory
     let mut existing_files = Vec::new();
     let ext = if options.format == "png" { "png" } else { "jpg" };
+    let prefix = options.file_prefix.as_deref();
 
     if options.format == "pdf" {
-        let project = db.get_project(&project_id).ok().flatten();
-        let project_name = project.map(|p| p.name).unwrap_or_else(|| "Album".to_string());
-        let safe_name = project_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
-        let pdf_filename = format!("{}_Print_Ready.pdf", safe_name);
+        let pdf_filename = if let Some(pref) = prefix.map(|p| p.trim()).filter(|p| !p.is_empty()) {
+            if pref.to_lowercase().ends_with(".pdf") {
+                pref.to_string()
+            } else {
+                format!("{}.pdf", pref)
+            }
+        } else {
+            let project = db.get_project(&project_id).ok().flatten();
+            let project_name = project.map(|p| p.name).unwrap_or_else(|| "Album".to_string());
+            let safe_name = project_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
+            format!("{}_Print_Ready.pdf", safe_name)
+        };
+
         if out_dir.join(&pdf_filename).exists() {
             existing_files.push(pdf_filename);
         }
     } else if options.split_pages {
         for spread in &spreads {
             if spread.r#type == "cover" {
-                let filename = format!("Spread_00_Cover.{}", ext);
+                let filename = resolve_export_filename(prefix, "cover", 0, None, ext);
                 if out_dir.join(&filename).exists() {
                     existing_files.push(filename);
                 }
             } else {
                 let left_num = (spread.spread_index - 1) * 2 + 1;
                 let right_num = left_num + 1;
-                let left_filename = format!("Page_{:03}.{}", left_num, ext);
-                let right_filename = format!("Page_{:03}.{}", right_num, ext);
+                let left_filename = resolve_export_filename(prefix, &spread.r#type, spread.spread_index, Some(left_num), ext);
+                let right_filename = resolve_export_filename(prefix, &spread.r#type, spread.spread_index, Some(right_num), ext);
                 if out_dir.join(&left_filename).exists() {
                     existing_files.push(left_filename);
                 }
@@ -166,11 +208,7 @@ pub async fn preflight_check_export(
         }
     } else {
         for spread in &spreads {
-            let filename = if spread.r#type == "cover" {
-                format!("Spread_00_Cover.{}", ext)
-            } else {
-                format!("Spread_{:02}.{}", spread.spread_index, ext)
-            };
+            let filename = resolve_export_filename(prefix, &spread.r#type, spread.spread_index, None, ext);
             if out_dir.join(&filename).exists() {
                 existing_files.push(filename);
             }
@@ -425,8 +463,8 @@ fn export_album_high_res_worker(
                     let right_num = left_num + 1;
 
                     let ext = if options.format == "png" { "png" } else { "jpg" };
-                    let left_filename = format!("Page_{:03}.{}", left_num, ext);
-                    let right_filename = format!("Page_{:03}.{}", right_num, ext);
+                    let left_filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, Some(left_num), ext);
+                    let right_filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, Some(right_num), ext);
 
                     let left_path = output_path.join(&left_filename);
                     let right_path = output_path.join(&right_filename);
@@ -467,11 +505,7 @@ fn export_album_high_res_worker(
                 } else {
                     // Full Spread
                     let ext = if options.format == "png" { "png" } else { "jpg" };
-                    let filename = if spread.r#type == "cover" {
-                        format!("Spread_00_Cover.{}", ext)
-                    } else {
-                        format!("Spread_{:02}.{}", spread.spread_index, ext)
-                    };
+                    let filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, None, ext);
 
                     let file_dest = output_path.join(&filename);
 
@@ -572,8 +606,16 @@ fn export_album_high_res_worker(
             },
         );
 
-        let safe_name = project.name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
-        let pdf_filename = format!("{}_Print_Ready.pdf", safe_name);
+        let pdf_filename = if let Some(pref) = options.file_prefix.as_deref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+            if pref.to_lowercase().ends_with(".pdf") {
+                pref.to_string()
+            } else {
+                format!("{}.pdf", pref)
+            }
+        } else {
+            let safe_name = project.name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|', ' '], "_");
+            format!("{}_Print_Ready.pdf", safe_name)
+        };
         let pdf_dest = output_path.join(&pdf_filename);
 
         assemble_pdf_from_jpegs(&temp_jpegs_for_pdf, &pdf_dest, options.dpi)

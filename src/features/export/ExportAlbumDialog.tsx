@@ -19,6 +19,7 @@ export interface ExportOptions {
   sharpenAmount?: 'standard' | 'high';
   outputDir: string;
   selectedSpreadIds?: string[];
+  filePrefix?: string;
 }
 
 export interface MissingPhotoInfo {
@@ -92,6 +93,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [scope, setScope] = useState<'all' | 'current' | 'custom'>('all');
   const [customRange, setCustomRange] = useState<string>('1-2');
   const [rangeMode, setRangeMode] = useState<'spreads' | 'pages'>('spreads');
+  const [filePrefix, setFilePrefix] = useState<string>('');
 
   const [outputDir, setOutputDir] = useState<string>(() => {
     try {
@@ -202,6 +204,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       sharpenAmount,
       outputDir: trimmedDir,
       selectedSpreadIds,
+      filePrefix: filePrefix.trim() || undefined,
     };
 
     setIsVerifyingPreflight(true);
@@ -260,6 +263,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
       sharpenAmount,
       outputDir: trimmedDir,
       selectedSpreadIds,
+      filePrefix: filePrefix.trim() || undefined,
     });
     setPreflightReport(null);
     setIsOverwriteModalOpen(false);
@@ -539,7 +543,66 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           </div>
         </div>
 
-        {/* 5. Destination Folder */}
+        {/* 5. File Naming & Custom Prefix */}
+        <div className={styles.section}>
+          <label className={styles.sectionTitle}>File Naming & Custom Prefix</label>
+          <div className={styles.namingRow}>
+            <input
+              type="text"
+              className={styles.pathInput}
+              placeholder="e.g. Wedding_Budi_Ani (Optional prefix)"
+              value={filePrefix}
+              onChange={(e) => {
+                setFilePrefix(e.target.value);
+                setPreflightReport(null);
+              }}
+            />
+            {currentProject?.name && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFilePrefix(currentProject.name.replace(/[^a-zA-Z0-9_-]/g, '_'));
+                  setPreflightReport(null);
+                }}
+                title="Use current project name as prefix"
+              >
+                Use Project Name
+              </Button>
+            )}
+            {filePrefix && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilePrefix('');
+                  setPreflightReport(null);
+                }}
+                title="Reset to default naming"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          <div className={styles.namingPreview}>
+            <span className={styles.previewLabel}>Example Output:</span>
+            <span className={styles.previewFilename}>
+              {(() => {
+                const ext = format === 'png' ? 'png' : format === 'pdf' ? 'pdf' : 'jpg';
+                const clean = filePrefix.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                if (format === 'pdf') {
+                  return clean ? (clean.toLowerCase().endsWith('.pdf') ? clean : `${clean}.pdf`) : `${currentProject?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Album'}_Print_Ready.pdf`;
+                }
+                if (splitPages) {
+                  return clean ? `${clean}_Page_001.${ext}, ${clean}_Page_002.${ext}` : `Page_001.${ext}, Page_002.${ext}`;
+                }
+                return clean ? `${clean}_Spread_01.${ext}` : `Spread_01.${ext}`;
+              })()}
+            </span>
+          </div>
+        </div>
+
+        {/* 6. Destination Folder */}
         <div className={styles.section}>
           <label className={styles.sectionTitle}>Destination Folder</label>
           <div className={styles.pathRow}>

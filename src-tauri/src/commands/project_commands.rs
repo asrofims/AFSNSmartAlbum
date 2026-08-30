@@ -126,6 +126,37 @@ pub fn update_project_spacing(
 }
 
 #[tauri::command]
+pub fn update_project_name(
+    db: State<'_, Database>,
+    id: String,
+    name: String,
+) -> Result<(), String> {
+    let clean_name = name.trim();
+    if clean_name.is_empty() {
+        return Err("Project name cannot be empty".to_string());
+    }
+    log::info!("update_project_name: id={}, name={}", id, clean_name);
+    db.update_project_name(&id, clean_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_project_name_and_path(
+    db: State<'_, Database>,
+    id: String,
+    name: String,
+    file_path: Option<String>,
+) -> Result<(), String> {
+    let clean_name = name.trim();
+    if clean_name.is_empty() {
+        return Err("Project name cannot be empty".to_string());
+    }
+    log::info!("update_project_name_and_path: id={}, name={}, path={:?}", id, clean_name, file_path);
+    db.update_project_name_and_path(&id, clean_name, file_path.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn save_album_structure(
     db: State<'_, Database>,
     album: AlbumPayload,
@@ -185,6 +216,7 @@ pub async fn export_afsn_with_dialog(
     suggested_name: Option<String>,
 ) -> Result<Option<String>, String> {
     let default_name = suggested_name.unwrap_or_else(|| "Album-Project".to_string());
+    let fallback_name = default_name.clone();
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
             .set_title("Export AFSNSmartAlbum Project (.afsn)")
@@ -200,7 +232,15 @@ pub async fn export_afsn_with_dialog(
             path.set_extension("afsn");
         }
         let path_str = path.to_string_lossy().to_string();
-        log::info!("export_afsn_with_dialog: exporting project {} to {}", project_id, path_str);
+        let new_name = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| fallback_name);
+
+        // Automatically update the project name and file path in database!
+        let _ = db.update_project_name_and_path(&project_id, &new_name, Some(&path_str));
+
+        log::info!("export_afsn_with_dialog: exporting project {} ({}) to {}", project_id, new_name, path_str);
         db.export_project_package(&project_id, &path_str)
             .map_err(|e| {
                 log::error!("Failed export_project_package: {:?}", e);

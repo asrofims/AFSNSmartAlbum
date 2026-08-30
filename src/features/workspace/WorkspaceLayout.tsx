@@ -36,6 +36,7 @@ export function WorkspaceLayout() {
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
+  const updateProjectName = useProjectStore((s) => s.updateProjectName);
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
   const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
   const updateProjectPhotoInset = useProjectStore((s) => s.updateProjectPhotoInset);
@@ -87,6 +88,19 @@ export function WorkspaceLayout() {
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+
+  // Inline Project Rename State
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [editingProjectName, setEditingProjectName] = useState('');
+
+  const handleCommitProjectName = async () => {
+    const clean = editingProjectName.trim();
+    if (clean && currentProject && clean !== currentProject.name) {
+      await updateProjectName(clean);
+      showToast(`Renamed project to: ${clean}`);
+    }
+    setIsEditingProjectName(false);
+  };
 
   // Export Dialog & Progress Modal State
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -414,8 +428,32 @@ export function WorkspaceLayout() {
           </Button>
 
           {currentProject && (
-            <div className={styles.activeProjectBadge} title={currentProject.name}>
-              <span className={styles.projectNameText}>{currentProject.name}</span>
+            <div className={styles.activeProjectBadge}>
+              {isEditingProjectName ? (
+                <input
+                  type="text"
+                  className={styles.projectNameInput}
+                  value={editingProjectName}
+                  autoFocus
+                  onChange={(e) => setEditingProjectName(e.target.value)}
+                  onBlur={handleCommitProjectName}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCommitProjectName();
+                    if (e.key === 'Escape') setIsEditingProjectName(false);
+                  }}
+                />
+              ) : (
+                <span
+                  className={styles.projectNameText}
+                  onClick={() => {
+                    setEditingProjectName(currentProject.name);
+                    setIsEditingProjectName(true);
+                  }}
+                  title="Click to rename project"
+                >
+                  {currentProject.name} <span style={{ fontSize: '10px', opacity: 0.6 }}>✏️</span>
+                </span>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -1220,7 +1258,25 @@ export function WorkspaceLayout() {
                 <div className={styles.propTitle}>Album Project</div>
                 <div className={styles.propRow}>
                   <span>Name</span>
-                  <span className={styles.propValue}>{currentProject.name}</span>
+                  <input
+                    type="text"
+                    className={styles.propInput}
+                    defaultValue={currentProject.name}
+                    key={currentProject.name}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (val && val !== currentProject.name) {
+                        updateProjectName(val);
+                        showToast(`Renamed project to: ${val}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    title="Click to edit project name"
+                  />
                 </div>
                 <div className={styles.propRow}>
                   <span>Created</span>

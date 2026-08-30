@@ -12,6 +12,7 @@ interface ProjectState {
   openNewProject: () => void;
   closeNewProject: () => void;
   setCurrentProject: (project: Project | null) => void;
+  updateProjectName: (name: string) => Promise<void>;
   updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
   updateProjectMargin: (marginValue: number, marginUnit?: Unit) => Promise<void>;
   updateProjectPhotoInset: (photoInset: number, photoInsetUnit?: Unit) => Promise<void>;
@@ -39,6 +40,44 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   closeNewProject: () => set({ isNewProjectOpen: false, error: null }),
 
   setCurrentProject: (project) => set({ currentProject: project }),
+
+  updateProjectName: async (name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    const current = get().currentProject;
+    if (!current) return;
+
+    const updatedProject: Project = {
+      ...current,
+      name: clean,
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      currentProject: updatedProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+    }));
+
+    // Update in Tauri DB
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('update_project_name', {
+        id: current.id,
+        name: clean,
+      });
+    } catch (err) {
+      console.warn('[AFSN] update_project_name via Tauri failed:', err);
+    }
+
+    // Update in localStorage
+    try {
+      const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
+      const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
+      localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
+    } catch (e) {
+      console.warn('[AFSN] localStorage write error:', e);
+    }
+  },
 
   updateProjectSpacing: async (spacingValue: number, spacingUnit?: Unit) => {
     const current = get().currentProject;
@@ -334,8 +373,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       });
 
       if (savedPath) {
+        const fileStem = savedPath.replace(/^.*[\\/]/, '').replace(/\.afsn$/i, '');
         const updatedProject: Project = {
           ...current,
+          name: fileStem || current.name,
           filePath: savedPath,
           updatedAt: new Date().toISOString(),
         };

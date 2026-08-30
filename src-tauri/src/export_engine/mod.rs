@@ -22,6 +22,8 @@ pub struct ExportOptions {
     pub sharpen_amount: String, // "standard", "high"
     pub output_dir: String,
     pub selected_spread_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub file_prefix: Option<String>,
 }
 
 fn default_jpeg_quality() -> u8 {
