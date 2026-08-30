@@ -87,22 +87,20 @@ export async function checkForAppUpdates(currentVersion: string): Promise<Update
       signal: controller.signal,
       headers: {
         Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'AFSNSmartAlbum-UpdateChecker',
       },
     });
 
-    // If no latest release found (e.g. only pre-releases exist), query all releases
-    if (res.status === 404) {
+    // If latest release is 404 (e.g. only pre-releases exist), query all releases
+    if (!res.ok && (res.status === 404 || res.status === 403)) {
       res = await fetch(GITHUB_ALL_RELEASES_URL, {
         signal: controller.signal,
         headers: {
           Accept: 'application/vnd.github.v3+json',
-          'User-Agent': 'AFSNSmartAlbum-UpdateChecker',
         },
       });
       if (res.ok) {
         const allReleases: GitHubRelease[] = await res.json();
-        if (allReleases && allReleases.length > 0 && allReleases[0]) {
+        if (Array.isArray(allReleases) && allReleases.length > 0 && allReleases[0]) {
           clearTimeout(timeoutId);
           return processRelease(allReleases[0], currentVersion);
         }

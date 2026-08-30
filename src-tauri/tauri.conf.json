@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob:;",
+      "csp": "default-src 'self'; connect-src 'self' https://api.github.com https://github.com https://objects.githubusercontent.com; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob: https://avatars.githubusercontent.com;",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useProjectStore } from '../../stores/projectStore';
+import { useAppStore } from '../../stores/appStore';
 import { Project } from '../../domain/project';
 import { formatDimensions } from '../../domain/units';
 import welcomeHero from '../../assets/welcome-hero.jpg';
@@ -15,6 +16,7 @@ export function WelcomeScreen() {
   const openProjectById = useProjectStore((s) => s.openProjectById);
   const removeRecentProject = useProjectStore((s) => s.removeRecentProject);
   const clearAllRecentProjects = useProjectStore((s) => s.clearAllRecentProjects);
+  const appInfo = useAppStore((s) => s.appInfo);
 
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -49,7 +51,7 @@ export function WelcomeScreen() {
             </div>
 
             <div className={styles.heroFooter}>
-              <span>v1.0.1-beta - Afsunmedia - Asrofims</span>
+              <span>{appInfo.version} — Afsunmedia - Asrofims</span>
             </div>
           </div>
         </div>
