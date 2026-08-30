@@ -591,8 +591,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         saveStatus: 'unsaved',
       });
     }
-
-    set({ selectedFrameIds: [frameIdA, frameIdB] });
   },
 
   bringToFront: (spreadId, frameId) => {

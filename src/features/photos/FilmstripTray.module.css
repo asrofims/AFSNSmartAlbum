@@ -432,7 +432,6 @@
 .cardUsed {
   opacity: 0.42;
   filter: grayscale(85%) brightness(0.75);
-  cursor: not-allowed !important;
 }
 
 .cardUsed:hover .thumbnailWrapper {

@@ -1838,6 +1838,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           draggedNode.x(frame.x * scaleFactor);
                           draggedNode.y(frame.y * scaleFactor);
                           swapFrames(activeSpread.id, frame.id, dropTarget.id);
+                          clearSelection();
+                          justDroppedRef.current = true;
+                          setTimeout(() => {
+                            justDroppedRef.current = false;
+                          }, 250);
                           dragInitialPhysicalPositionsRef.current.clear();
                           return;
                         }
