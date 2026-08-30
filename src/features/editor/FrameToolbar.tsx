@@ -9,12 +9,8 @@ export function FrameToolbar() {
   const {
     selectedFrameIds,
     editingCropFrameId,
-    snapEnabled,
-    toggleSnap,
     deleteSelectedFrames,
     rotateFrame90,
-    bringToFront,
-    sendToBack,
     enterCropMode,
     exitCropMode,
     resetToOriginalRatio,
@@ -22,7 +18,6 @@ export function FrameToolbar() {
     swapFrames,
     groupSelectedFrames,
     ungroupSelectedFrames,
-    alignSelectedFrames,
     updateFrameGeometry,
     updateCrop,
   } = useEditorStore();
@@ -57,7 +52,7 @@ export function FrameToolbar() {
 
   return (
     <div className={styles.verticalDockContainer}>
-      {/* Crop / Done (Icon only) */}
+      {/* 1. Crop / Done */}
       <button
         type="button"
         className={`${styles.toolBtn} ${isCrop ? styles.toolBtnCropActive : ''}`}
@@ -76,7 +71,7 @@ export function FrameToolbar() {
         )}
       </button>
 
-      {/* When in Crop Mode: Zoom in, Zoom out, Reset */}
+      {/* When in Crop Mode: Zoom In, Zoom Out, Reset Crop */}
       {isCrop && (
         <>
           <button
@@ -120,11 +115,12 @@ export function FrameToolbar() {
         </>
       )}
 
+      {/* When in Standard Selection Mode: Core 5 Tools */}
       {!isCrop && (
         <>
           <div className={styles.divider} />
 
-          {/* Reset to Original Aspect Ratio (1-Click Restore) */}
+          {/* 2. Reset to Original Aspect Ratio (1-Click Restore) */}
           <button
             type="button"
             className={styles.toolBtn}
@@ -138,27 +134,12 @@ export function FrameToolbar() {
             </svg>
           </button>
 
-          <div className={styles.divider} />
-
-          {/* Rotate CCW (Icon only) */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => rotateFrame90(activeSpread.id, frame.id, 'ccw')}
-            title="Rotate Left 90°"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-          </button>
-
-          {/* Rotate CW (Icon only) */}
+          {/* 3. Rotate 90° */}
           <button
             type="button"
             className={styles.toolBtn}
             onClick={() => rotateFrame90(activeSpread.id, frame.id, 'cw')}
-            title="Rotate Right 90°"
+            title="Rotate 90° (R)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.6L21 8" />
@@ -166,9 +147,7 @@ export function FrameToolbar() {
             </svg>
           </button>
 
-          <div className={styles.divider} />
-
-          {/* Border Toggle (Icon only, no text, no dot) */}
+          {/* 4. Border Toggle */}
           <button
             type="button"
             className={`${styles.toolBtn} ${frame.borderEnabled ? styles.toolBtnActive : ''}`}
@@ -184,7 +163,7 @@ export function FrameToolbar() {
             </svg>
           </button>
 
-          {/* Swap 2 Photos Button (When 2 frames are selected) */}
+          {/* Contextual: Swap 2 Photos Button (When 2 frames are selected) */}
           {selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1] && (
             <button
               type="button"
@@ -201,7 +180,7 @@ export function FrameToolbar() {
             </button>
           )}
 
-          {/* Group Multiple Frames Button */}
+          {/* Contextual: Group Frames Button */}
           {canGroup && (
             <button
               type="button"
@@ -216,7 +195,7 @@ export function FrameToolbar() {
             </button>
           )}
 
-          {/* Ungroup Frames Button */}
+          {/* Contextual: Ungroup Frames Button */}
           {canUngroup && (
             <button
               type="button"
@@ -233,84 +212,7 @@ export function FrameToolbar() {
 
           <div className={styles.divider} />
 
-          {/* Align Center Horizontal (Safe Margin Center / Spread Center) */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => alignSelectedFrames(activeSpread.id, 'center')}
-            title="Align Center Horizontal (to Page / Safe Margin Center)"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" x2="12" y1="2" y2="22" strokeDasharray="2 2" />
-              <rect width="12" height="6" x="6" y="6" rx="1" />
-              <rect width="8" height="6" x="8" y="14" rx="1" />
-            </svg>
-          </button>
-
-          {/* Align Middle Vertical (Safe Margin Middle / Spread Middle) */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => alignSelectedFrames(activeSpread.id, 'middle')}
-            title="Align Middle Vertical (to Page / Safe Margin Middle)"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="2" x2="22" y1="12" y2="12" strokeDasharray="2 2" />
-              <rect width="6" height="12" x="6" y="6" rx="1" />
-              <rect width="6" height="8" x="14" y="8" rx="1" />
-            </svg>
-          </button>
-
-          <div className={styles.divider} />
-
-          {/* Magnet Snapping Toggle (Icon only) */}
-          <button
-            type="button"
-            className={`${styles.toolBtn} ${snapEnabled ? styles.toolBtnActive : ''}`}
-            onClick={toggleSnap}
-            title={snapEnabled ? 'Magnet Snapping: ON (Hold Alt to bypass)' : 'Magnet Snapping: OFF'}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 3v6a6 6 0 0 0 12 0V3" />
-              <line x1="6" y1="3" x2="6" y2="7" />
-              <line x1="18" y1="3" x2="18" y2="7" />
-              <line x1="4" y1="7" x2="8" y2="7" />
-              <line x1="16" y1="7" x2="20" y2="7" />
-            </svg>
-          </button>
-
-          <div className={styles.divider} />
-
-          {/* Layer Ordering: Bring to Front */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => bringToFront(activeSpread.id, frame.id)}
-            title="Bring to Front"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-          </button>
-
-          {/* Layer Ordering: Send to Back */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => sendToBack(activeSpread.id, frame.id)}
-            title="Send to Back"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 12 17 2 12" />
-              <polyline points="22 7 12 12 2 7" />
-            </svg>
-          </button>
-
-          <div className={styles.divider} />
-
-          {/* Delete Frame from Canvas */}
+          {/* 5. Delete Frame */}
           <button
             type="button"
             className={`${styles.toolBtn} ${styles.toolBtnDanger}`}
