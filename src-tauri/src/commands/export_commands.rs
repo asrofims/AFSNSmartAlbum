@@ -334,6 +334,8 @@ fn export_album_high_res_worker(
     // Count total photos across all selected spreads for exact monotonic percentage
     let total_photos: usize = spreads.iter().map(|s| s.elements.len()).sum();
     let completed_photos = Arc::new(AtomicUsize::new(0));
+    let completed_sharpening = Arc::new(AtomicUsize::new(0));
+    let completed_encoding = Arc::new(AtomicUsize::new(0));
 
     // Emit initial progress
     let _ = app.emit(
@@ -401,6 +403,8 @@ fn export_album_high_res_worker(
                 };
 
                 let completed_photos_clone = completed_photos.clone();
+                let completed_sharpening_clone = completed_sharpening.clone();
+                let completed_encoding_clone = completed_encoding.clone();
                 let app_handle = app.clone();
                 let cancel_flag_clone = cancel_flag.clone();
 
@@ -414,23 +418,25 @@ fn export_album_high_res_worker(
                         if cancel_flag_clone.load(Ordering::SeqCst) {
                             return false;
                         }
-                        let done = completed_photos_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                        let pct = if total_photos > 0 {
-                            ((done as f64 / total_photos as f64) * 92.0).clamp(1.0, 95.0)
-                        } else {
-                            ((current_num as f64 / total_spreads as f64) * 92.0).clamp(1.0, 95.0)
-                        };
+                        let done_p = completed_photos_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                        let done_s = completed_sharpening_clone.load(Ordering::SeqCst);
+                        let done_e = completed_encoding_clone.load(Ordering::SeqCst);
+
+                        let p_contrib = if total_photos > 0 { (done_p as f64 / total_photos as f64) * 45.0 } else { 45.0 };
+                        let s_contrib = (done_s as f64 / total_spreads as f64) * 25.0;
+                        let e_contrib = (done_e as f64 / total_spreads as f64) * 25.0;
+                        let pct = (p_contrib + s_contrib + e_contrib).clamp(1.0, 95.0);
 
                         let _ = app_handle.emit(
                             "export-progress",
                             &ExportProgressEvent {
                                 current: current_num,
                                 total: total_spreads,
-                                current_photos: done,
+                                current_photos: done_p,
                                 total_photos,
                                 percent: pct,
                                 spread_name: spread_name.clone(),
-                                status: format!("Processing photo {} of {}...", done, total_photos),
+                                status: format!("Rendering {} (photo {} of {})...", spread_name, done_p, total_photos),
                                 is_finished: false,
                                 output_files: Vec::new(),
                             },
@@ -444,32 +450,60 @@ fn export_album_high_res_worker(
                     return Err("Export cancelled by user".to_string());
                 }
 
-                // Emit status for sharpening & disk encoding
-                let _ = app_handle.emit(
-                    "export-progress",
-                    &ExportProgressEvent {
-                        current: current_num,
-                        total: total_spreads,
-                        current_photos: total_photos,
-                        total_photos,
-                        percent: 94.0,
-                        spread_name: spread_name.clone(),
-                        status: if options.sharpen_enabled {
-                            format!("Applying print output sharpening to {}...", spread_name)
-                        } else {
-                            format!("Encoding high-resolution {}...", spread_name)
-                        },
-                        is_finished: false,
-                        output_files: Vec::new(),
-                    },
-                );
+                // Apply Print Output Sharpening with realtime status
+                if options.sharpen_enabled {
+                    let done_p = completed_photos_clone.load(Ordering::SeqCst);
+                    let done_s = completed_sharpening_clone.load(Ordering::SeqCst);
+                    let done_e = completed_encoding_clone.load(Ordering::SeqCst);
+                    let p_contrib = if total_photos > 0 { (done_p as f64 / total_photos as f64) * 45.0 } else { 45.0 };
+                    let s_contrib = (done_s as f64 / total_spreads as f64) * 25.0;
+                    let e_contrib = (done_e as f64 / total_spreads as f64) * 25.0;
+                    let pct = (p_contrib + s_contrib + e_contrib).clamp(1.0, 95.0);
 
-                // Apply Print Output Sharpening if enabled
+                    let _ = app_handle.emit(
+                        "export-progress",
+                        &ExportProgressEvent {
+                            current: current_num,
+                            total: total_spreads,
+                            current_photos: done_p,
+                            total_photos,
+                            percent: pct,
+                            spread_name: spread_name.clone(),
+                            status: format!("Enhancing print clarity for {}...", spread_name),
+                            is_finished: false,
+                            output_files: Vec::new(),
+                        },
+                    );
+                }
+
                 let spread_img = if options.sharpen_enabled {
                     apply_print_sharpening(&spread_img, &options.sharpen_amount)
                 } else {
                     spread_img
                 };
+
+                let done_s = completed_sharpening_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                let done_p = completed_photos_clone.load(Ordering::SeqCst);
+                let done_e = completed_encoding_clone.load(Ordering::SeqCst);
+                let p_contrib = if total_photos > 0 { (done_p as f64 / total_photos as f64) * 45.0 } else { 45.0 };
+                let s_contrib = (done_s as f64 / total_spreads as f64) * 25.0;
+                let e_contrib = (done_e as f64 / total_spreads as f64) * 25.0;
+                let pct = (p_contrib + s_contrib + e_contrib).clamp(1.0, 95.0);
+
+                let _ = app_handle.emit(
+                    "export-progress",
+                    &ExportProgressEvent {
+                        current: current_num,
+                        total: total_spreads,
+                        current_photos: done_p,
+                        total_photos,
+                        percent: pct,
+                        spread_name: spread_name.clone(),
+                        status: format!("Saving high-resolution {}...", spread_name),
+                        is_finished: false,
+                        output_files: Vec::new(),
+                    },
+                );
 
                 let mut local_output_files = Vec::new();
                 let mut local_temp_jpegs = Vec::new();
@@ -547,6 +581,8 @@ fn export_album_high_res_worker(
 
                     local_output_files.push(file_dest.to_string_lossy().to_string());
                 }
+
+                let _ = completed_encoding_clone.fetch_add(1, Ordering::SeqCst);
 
                 let mut lock = results.lock().unwrap();
                 lock.push((global_idx, local_output_files, local_temp_jpegs));
@@ -660,7 +696,7 @@ fn export_album_high_res_worker(
         assemble_pdf_from_jpegs(&temp_jpegs_for_pdf, &pdf_dest, options.dpi)
             .map_err(|e| format!("Failed to assemble PDF: {}", e))?;
 
-        output_files.insert(0, pdf_dest.to_string_lossy().to_string());
+        output_files = vec![pdf_dest.to_string_lossy().to_string()];
     }
 
     let final_event = ExportProgressEvent {

@@ -344,13 +344,60 @@ pub fn split_spread_into_pages(
     (left_page, right_page)
 }
 
-/// Applies print output unsharp masking to enhance micro-detail for physical printing
+/// Applies fast multi-threaded print output unsharp masking to enhance micro-detail for physical printing
 pub fn apply_print_sharpening(img: &RgbaImage, amount: &str) -> RgbaImage {
-    let (sigma, threshold) = match amount.to_lowercase().as_str() {
-        "high" => (1.5f32, 2i32),
-        _ => (1.0f32, 2i32), // "standard" or default
+    let (alpha, threshold): (f32, i32) = match amount.to_lowercase().as_str() {
+        "none" | "disabled" | "off" => return img.clone(),
+        "high" => (0.55f32, 2),
+        _ => (0.35f32, 2), // "standard" or default
     };
-    image::imageops::unsharpen(img, sigma, threshold)
+
+    let (width, height) = img.dimensions();
+    if width < 3 || height < 3 {
+        return img.clone();
+    }
+
+    let mut raw_vec = vec![0u8; (width * height * 4) as usize];
+    let src_raw = img.as_raw();
+    let row_stride = (width * 4) as usize;
+
+    use rayon::prelude::*;
+    raw_vec
+        .par_chunks_exact_mut(row_stride)
+        .enumerate()
+        .for_each(|(y, row_slice)| {
+            let y_u32 = y as u32;
+            let prev_row_offset = if y_u32 == 0 { 0 } else { (y - 1) * row_stride };
+            let curr_row_offset = y * row_stride;
+            let next_row_offset = if y_u32 == height - 1 { curr_row_offset } else { (y + 1) * row_stride };
+
+            for x in 0..(width as usize) {
+                let px_idx = x * 4;
+                let left_idx = if x == 0 { 0 } else { (x - 1) * 4 };
+                let right_idx = if x == (width as usize) - 1 { px_idx } else { (x + 1) * 4 };
+
+                // Process RGB channels
+                for c in 0..3 {
+                    let center = src_raw[curr_row_offset + px_idx + c] as i32;
+                    let top = src_raw[prev_row_offset + px_idx + c] as i32;
+                    let bottom = src_raw[next_row_offset + px_idx + c] as i32;
+                    let left = src_raw[curr_row_offset + left_idx + c] as i32;
+                    let right = src_raw[curr_row_offset + right_idx + c] as i32;
+
+                    let laplacian = (center * 4) - (top + bottom + left + right);
+                    if laplacian.abs() >= threshold {
+                        let sharpened = center as f32 + (laplacian as f32 * alpha);
+                        row_slice[px_idx + c] = sharpened.clamp(0.0, 255.0) as u8;
+                    } else {
+                        row_slice[px_idx + c] = center as u8;
+                    }
+                }
+                // Preserve original Alpha channel
+                row_slice[px_idx + 3] = src_raw[curr_row_offset + px_idx + 3];
+            }
+        });
+
+    RgbaImage::from_raw(width, height, raw_vec).unwrap_or_else(|| img.clone())
 }
 
 /// Assembles JPEG image files into a multi-page PDF document
@@ -508,6 +555,7 @@ mod tests {
 
     #[test]
     fn test_render_spread_and_pdf_generation() {
+        use image::DynamicImage;
         let project = ProjectRow {
             id: "test-proj".to_string(),
             name: "Test Project".to_string(),
@@ -573,6 +621,7 @@ mod tests {
 
     #[test]
     fn test_generate_installer_graphics() {
+        use image::DynamicImage;
         let icons_dir = std::path::Path::new("icons");
         let _ = fs::create_dir_all(icons_dir);
 

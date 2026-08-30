@@ -204,12 +204,31 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
         </div>
 
         {progress.isFinished && !isCancelled && progress.outputFiles.length > 0 && (
-          <div className={styles.filesBox}>
-            {progress.outputFiles.map((file, i) => (
-              <div key={i} className={styles.fileItem} title={file}>
-                📄 {file.split(/[\\/]/).pop()}
-              </div>
-            ))}
+          <div className={styles.filesSection}>
+            <div className={styles.filesHeader}>
+              <span>Exported Files ({progress.outputFiles.length})</span>
+              <span className={styles.filesLocationHint}>Saved to export directory</span>
+            </div>
+            <div className={styles.filesBox}>
+              {progress.outputFiles.map((file, i) => {
+                const filename = file.split(/[\\/]/).pop() || file;
+                const isPdf = filename.toLowerCase().endsWith('.pdf');
+                const isPng = filename.toLowerCase().endsWith('.png');
+                return (
+                  <div key={i} className={styles.fileItem} title={file}>
+                    <div className={styles.fileItemLeft}>
+                      <span className={styles.fileIcon}>
+                        {isPdf ? '📕' : isPng ? '🖼️' : '📸'}
+                      </span>
+                      <span className={styles.fileName}>{filename}</span>
+                    </div>
+                    <span className={styles.fileBadge}>
+                      {isPdf ? 'PDF Document' : isPng ? 'PNG' : 'JPEG'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
