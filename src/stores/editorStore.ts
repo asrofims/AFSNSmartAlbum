@@ -519,8 +519,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         saveStatus: 'unsaved',
       });
     }
-
-    set({ selectedFrameIds: [frameId] });
   },
 
   swapFrames: (spreadId, frameIdA, frameIdB) => {

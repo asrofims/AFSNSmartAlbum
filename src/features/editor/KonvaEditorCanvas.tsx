@@ -581,7 +581,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     actionType: 'replace' | 'overlay' | 'add';
   } | null>(null);
 
-  // Global Alt key listener for instant reactive drag feedback
+  // Global Alt key listener and Window / Drag lifecycle safety guards
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Alt' || e.altKey) {
@@ -593,11 +593,28 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         setIsAltKeyDown(false);
       }
     };
+
+    // Safety cleanup when window loses focus or drag operation ends anywhere
+    const handleResetDragState = () => {
+      setIsAltKeyDown(false);
+      setHoveredDropFrameId(null);
+      setDragDropHud(null);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleResetDragState);
+    window.addEventListener('dragend', handleResetDragState);
+    window.addEventListener('drop', handleResetDragState);
+    document.addEventListener('visibilitychange', handleResetDragState);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleResetDragState);
+      window.removeEventListener('dragend', handleResetDragState);
+      window.removeEventListener('drop', handleResetDragState);
+      document.removeEventListener('visibilitychange', handleResetDragState);
     };
   }, []);
 
