@@ -15,6 +15,7 @@ interface AppState {
   isAboutOpen: boolean;
   isSettingsOpen: boolean;
   isSupportModalOpen: boolean;
+  isUpdateModalOpen: boolean;
   settingsActiveTab: string;
   
   // Actions
@@ -25,12 +26,14 @@ interface AppState {
   closeSettings: () => void;
   openSupportModal: () => void;
   closeSupportModal: () => void;
+  openUpdateModal: () => void;
+  closeUpdateModal: () => void;
   setSettingsActiveTab: (tab: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   appInfo: {
-    version: 'v1.0.1-beta',
+    version: 'v1.0.2-beta',
     buildNumber: '1',
     platform: 'unknown',
   },
@@ -38,6 +41,7 @@ export const useAppStore = create<AppState>((set) => ({
   isAboutOpen: false,
   isSettingsOpen: false,
   isSupportModalOpen: false,
+  isUpdateModalOpen: false,
   settingsActiveTab: 'snapping',
   
   setAppInfo: (info) => set({ appInfo: info, isAppInfoLoaded: true }),
@@ -47,5 +51,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeSettings: () => set({ isSettingsOpen: false }),
   openSupportModal: () => set({ isSupportModalOpen: true }),
   closeSupportModal: () => set({ isSupportModalOpen: false }),
+  openUpdateModal: () => set({ isUpdateModalOpen: true }),
+  closeUpdateModal: () => set({ isUpdateModalOpen: false }),
   setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
 }));

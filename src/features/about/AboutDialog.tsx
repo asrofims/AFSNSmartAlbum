@@ -26,7 +26,30 @@ export function AboutDialog() {
 
         <div className={styles.infoGrid}>
           <span className={styles.infoLabel}>Version:</span>
-          <span className={styles.infoValue}>{appInfo.version}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={styles.infoValue}>{appInfo.version}</span>
+            <button
+              type="button"
+              style={{
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                color: '#818cf8',
+                fontSize: '10.5px',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onClick={() => {
+                closeAbout();
+                useAppStore.getState().openUpdateModal();
+              }}
+              title="Check for software updates on GitHub"
+            >
+              🔄 Check Updates
+            </button>
+          </div>
 
           <span className={styles.infoLabel}>Build:</span>
           <span className={styles.infoValue}>{appInfo.buildNumber}</span>
