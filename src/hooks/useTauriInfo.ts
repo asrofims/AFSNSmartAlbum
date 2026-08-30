@@ -17,7 +17,7 @@ export function useTauriInfo(): void {
         const version = await getVersion();
         const platformName = platform();
         
-        const formattedVersion = version.startsWith('v') ? version : `v${version}-beta`;
+        const formattedVersion = version.startsWith('v') ? version : `v${version}`;
         
         setAppInfo({
           version: formattedVersion,
@@ -27,7 +27,7 @@ export function useTauriInfo(): void {
       } catch {
         // Fallback for browser development
         setAppInfo({
-          version: 'v1.0.2-beta',
+          version: 'v1.0.3',
           buildNumber: '1',
           platform: 'browser',
         });
