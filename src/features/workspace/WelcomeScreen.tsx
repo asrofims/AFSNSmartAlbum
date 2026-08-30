@@ -44,7 +44,7 @@ export function WelcomeScreen() {
             <div className={styles.heroTextGroup}>
               <h1 className={styles.heroTitle}>AFSNSmartAlbum</h1>
               <p className={styles.heroSubtitle}>
-                Hey awesome creator! Ready to build killer photo albums with zero lag drama and no awkwardly chopped heads? Grab your warm coffee, kick back, and let's turn thousands of photos into pure visual magic! ✨🚀
+                Every photograph captures a moment, but a great album preserves a legacy. Unleash your creative vision and transform cherished memories into timeless works of art.
               </p>
             </div>
 
