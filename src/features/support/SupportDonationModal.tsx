@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
@@ -12,14 +11,7 @@ export function SupportDonationModal() {
   const isOpen = useAppStore((s) => s.isSupportModalOpen);
   const closeSupportModal = useAppStore((s) => s.closeSupportModal);
 
-  const [dontShowAgain, setDontShowAgain] = useState(false);
-
   const handleClose = () => {
-    if (dontShowAgain) {
-      try {
-        localStorage.setItem('afsn_suppress_support_popup', 'true');
-      } catch {}
-    }
     closeSupportModal();
   };
 
@@ -51,20 +43,9 @@ export function SupportDonationModal() {
         </div>
 
         <div className={styles.footer}>
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              checked={dontShowAgain}
-              onChange={(e) => setDontShowAgain(e.target.checked)}
-            />
-            <span>Jangan tampilkan lagi saat aplikasi dibuka</span>
-          </label>
-
-          <div className={styles.btnRow}>
-            <Button variant="primary" onClick={handleClose} style={{ minWidth: '110px' }}>
-              Tutup
-            </Button>
-          </div>
+          <Button variant="primary" onClick={handleClose} style={{ minWidth: '120px' }}>
+            Tutup
+          </Button>
         </div>
       </div>
     </Dialog>
