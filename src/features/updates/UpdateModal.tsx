@@ -15,8 +15,17 @@ export function UpdateModal() {
   const runCheck = async () => {
     setStatus('checking');
     setResult(null);
+    const startTime = Date.now();
     try {
       const res = await checkForAppUpdates(appInfo.version);
+      
+      // Natural pacing: ensure spinner displays for at least 600ms so transition is pleasant
+      const elapsed = Date.now() - startTime;
+      const minWait = 600;
+      if (elapsed < minWait) {
+        await new Promise((resolve) => setTimeout(resolve, minWait - elapsed));
+      }
+
       setResult(res);
       if (res.isError) {
         setStatus('error');
