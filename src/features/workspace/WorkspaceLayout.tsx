@@ -52,7 +52,6 @@ export function WorkspaceLayout() {
   const showBleedGuide = useAlbumStore((s) => s.showBleedGuide);
   const showSafeAreaGuide = useAlbumStore((s) => s.showSafeAreaGuide);
   const toggleGuide = useAlbumStore((s) => s.toggleGuide);
-  const updateGutterWidth = useAlbumStore((s) => s.updateGutterWidth);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
   const updatePhotoInset = useAlbumStore((s) => s.updatePhotoInset);
@@ -1440,7 +1439,7 @@ export function WorkspaceLayout() {
                       onChange={() => toggleGuide('gutter')}
                       style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                     />
-                    <span>Center Gutter Crease</span>
+                    <span>Center Spine Crease Line</span>
                   </label>
                 </div>
 
@@ -1563,22 +1562,6 @@ export function WorkspaceLayout() {
                         min={0}
                         max={999}
                         step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {activeSpread?.type === 'cover' ? 'Spine Width' : 'Gutter Width'}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.gutterWidth ?? 0}
-                        onChange={(val) => updateGutterWidth(val)}
-                        min={0}
-                        max={50}
-                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
                       />
                       <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                     </div>

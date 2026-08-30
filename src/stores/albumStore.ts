@@ -57,7 +57,6 @@ export interface AlbumState {
   addSpread: (project: Project, afterIndex?: number) => void;
   deleteSpread: (spreadId: string) => void;
   duplicateSpread: (spreadId: string, project: Project) => void;
-  updateGutterWidth: (width: number) => void;
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
   updatePhotoInset: (photoInset: number, side?: 'all' | 'top' | 'bottom' | 'left' | 'right') => void;
@@ -476,89 +475,6 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       activeSpreadId: result.newSpreadId,
       activeSpreadIndex: result.newSpreadIndex,
       selectedPageId: null,
-      saveStatus: 'unsaved',
-    });
-  },
-
-  updateGutterWidth: (width: number) => {
-    const { currentAlbum, activeSpreadId } = get();
-    if (!currentAlbum || !activeSpreadId) return;
-
-    useHistoryStore.getState().pushState(currentAlbum);
-
-    const currentProject = useProjectStore.getState().currentProject;
-    const singlePageW = currentProject ? getProjectDimensionsInCanvasUnit(currentProject).pageWidth : 200;
-
-    const shiftElementsOnGutterChange = (
-      elements: PhotoFrameElement[],
-      oldGutter: number,
-      newGutter: number
-    ): PhotoFrameElement[] => {
-      const delta = newGutter - oldGutter;
-      if (Math.abs(delta) < 0.0001) return elements;
-
-      const spineThreshold = singlePageW + oldGutter / 2;
-
-      return elements.map((el) => {
-        // Case 1: Photo is strictly on the Right Page (starts at or past the center spine threshold)
-        if (el.x >= spineThreshold) {
-          return {
-            ...el,
-            x: Math.round((el.x + delta) * 100) / 100,
-          };
-        }
-
-        // Case 2: Photo spans across the center spine (panoramic full-spread image)
-        if (el.x < singlePageW && el.x + el.width > spineThreshold) {
-          return {
-            ...el,
-            width: Math.round((el.width + delta) * 100) / 100,
-          };
-        }
-
-        // Case 3: Photo is strictly on the Left Page
-        return el;
-      });
-    };
-
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
-      const oldGutter = currentAlbum.coverSpread.gutterWidth || 0;
-      const updatedCover = {
-        ...currentAlbum.coverSpread,
-        gutterWidth: width,
-        elements: shiftElementsOnGutterChange(
-          currentAlbum.coverSpread.elements || [],
-          oldGutter,
-          width
-        ),
-      };
-      set({
-        currentAlbum: {
-          ...currentAlbum,
-          coverSpread: updatedCover,
-        },
-        saveStatus: 'unsaved',
-      });
-      return;
-    }
-
-    const updatedSpreads = currentAlbum.spreads.map((s) => {
-      if (s.id === activeSpreadId) {
-        const oldGutter = s.gutterWidth || 0;
-        return {
-          ...s,
-          gutterWidth: width,
-          elements: shiftElementsOnGutterChange(s.elements || [], oldGutter, width),
-        };
-      }
-      return s;
-    });
-
-    set({
-      currentAlbum: {
-        ...currentAlbum,
-        spreads: updatedSpreads,
-      },
       saveStatus: 'unsaved',
     });
   },
