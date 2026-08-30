@@ -11,6 +11,7 @@ pub struct ProcessedPhoto {
     pub height: u32,
     pub format: String,
     pub thumbnail_path: Option<String>,
+    #[allow(dead_code)]
     pub thumbnail_base64: Option<String>,
 }
 

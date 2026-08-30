@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 use crate::db::{Database, PhotoFolderRow, PhotoRow};
-use crate::photo_engine::{is_supported_image, process_photo, scan_directory, SUPPORTED_EXTENSIONS};
+use crate::photo_engine::{process_photo, scan_directory, SUPPORTED_EXTENSIONS};
 
 #[derive(Clone, Default)]
 pub struct ImportState {

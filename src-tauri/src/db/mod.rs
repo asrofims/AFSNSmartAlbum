@@ -542,6 +542,7 @@ impl Database {
         Ok(version)
     }
 
+    #[allow(dead_code)]
     pub fn get_setting(&self, key: &str) -> SqliteResult<Option<String>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
@@ -555,6 +556,7 @@ impl Database {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_setting(&self, key: &str, value: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -702,6 +704,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn update_project_name(&self, id: &str, name: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -937,6 +940,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn check_photo_exists_in_project(&self, project_id: &str, file_path: &str) -> SqliteResult<bool> {
         let conn = self.conn.lock().unwrap();
         let count: i32 = conn.query_row(

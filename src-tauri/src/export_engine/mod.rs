@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use image::{GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use crate::db::{ElementPayload, ProjectRow, SpreadPayload};
 
@@ -309,6 +309,7 @@ where
 }
 
 /// Renders an entire spread to high-res RgbaImage
+#[allow(dead_code)]
 pub fn render_spread_to_image(
     project: &ProjectRow,
     spread: &SpreadPayload,
