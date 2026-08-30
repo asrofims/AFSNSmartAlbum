@@ -89,9 +89,11 @@ export function WorkspaceLayout() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
 
-  // Inline Project Rename State
+  // Inline Project Rename State (Top Bar & Inspector)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editingProjectName, setEditingProjectName] = useState('');
+  const [isEditingInspectorName, setIsEditingInspectorName] = useState(false);
+  const [editingInspectorName, setEditingInspectorName] = useState('');
 
   const handleCommitProjectName = async () => {
     const clean = editingProjectName.trim();
@@ -100,6 +102,15 @@ export function WorkspaceLayout() {
       showToast(`Renamed project to: ${clean}`);
     }
     setIsEditingProjectName(false);
+  };
+
+  const handleCommitInspectorName = async () => {
+    const clean = editingInspectorName.trim();
+    if (clean && currentProject && clean !== currentProject.name) {
+      await updateProjectName(clean);
+      showToast(`Renamed project to: ${clean}`);
+    }
+    setIsEditingInspectorName(false);
   };
 
   // Export Dialog & Progress Modal State
@@ -1258,25 +1269,46 @@ export function WorkspaceLayout() {
                 <div className={styles.propTitle}>Album Project</div>
                 <div className={styles.propRow}>
                   <span>Name</span>
-                  <input
-                    type="text"
-                    className={styles.propInput}
-                    defaultValue={currentProject.name}
-                    key={currentProject.name}
-                    onBlur={(e) => {
-                      const val = e.target.value.trim();
-                      if (val && val !== currentProject.name) {
-                        updateProjectName(val);
-                        showToast(`Renamed project to: ${val}`);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    title="Click to edit project name"
-                  />
+                  {isEditingInspectorName ? (
+                    <input
+                      type="text"
+                      className={styles.projectNameInput}
+                      style={{ width: '130px', textAlign: 'right' }}
+                      value={editingInspectorName}
+                      autoFocus
+                      onChange={(e) => setEditingInspectorName(e.target.value)}
+                      onBlur={handleCommitInspectorName}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCommitInspectorName();
+                        if (e.key === 'Escape') setIsEditingInspectorName(false);
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={styles.propNameRow}
+                      onClick={() => {
+                        setEditingInspectorName(currentProject.name);
+                        setIsEditingInspectorName(true);
+                      }}
+                      title="Click to edit project name"
+                    >
+                      <span className={styles.propValue} style={{ cursor: 'pointer' }}>
+                        {currentProject.name}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.propEditBtn}
+                        title="Edit project name"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingInspectorName(currentProject.name);
+                          setIsEditingInspectorName(true);
+                        }}
+                      >
+                        ✏️
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className={styles.propRow}>
                   <span>Created</span>

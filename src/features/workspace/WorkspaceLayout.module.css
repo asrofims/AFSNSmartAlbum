@@ -201,6 +201,40 @@
   font-weight: var(--font-weight-medium);
 }
 
+.propNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  max-width: 160px;
+}
+
+.propNameRow:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.propEditBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.propEditBtn:hover {
+  color: var(--color-text-primary);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
 .colorSwatchSmall {
   display: inline-block;
   width: 12px;
