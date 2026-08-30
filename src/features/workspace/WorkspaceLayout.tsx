@@ -12,7 +12,7 @@ import { useHistoryStore } from '../../stores/historyStore';
 import { useAutoSave } from '../persistence/useAutoSave';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
-import { formatDimensions, convertUnit, Unit } from '../../domain/units';
+import { formatDimensions, convertUnit } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
 import { FilmstripTray } from '../photos/FilmstripTray';
