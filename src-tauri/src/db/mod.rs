@@ -1708,29 +1708,63 @@ impl Database {
             package = serde_json::from_str(&json_str).map_err(|e| {
                 rusqlite::Error::InvalidPath(format!("Invalid .afsn package format: {}", e).into())
             })?;
+
+            // If the .afsn file has a valid custom name on disk, sync the project name with it
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()).filter(|s| !s.is_empty()) {
+                package.project.name = stem.to_string();
+            }
         }
 
-        // Import project into SQLite
+        package.project.file_path = Some(source_path.to_string());
+
+        // Upsert project into SQLite database
         let p = &package.project;
-        let _ = self.create_project(
-            &p.id,
-            &p.name,
-            p.canvas_width,
-            p.canvas_height,
-            &p.canvas_unit,
-            p.canvas_dpi,
-            p.spacing_value,
-            &p.spacing_unit,
-            p.margin_enabled,
-            p.margin_value,
-            &p.margin_unit,
-            p.border_enabled,
-            p.border_width,
-            &p.border_unit,
-            &p.border_color,
-            &p.background_type,
-            &p.background_color,
-        );
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO projects (
+                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
+                    spacing_value, spacing_unit,
+                    margin_enabled, margin_value, margin_unit,
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, file_path,
+                    created_at, updated_at
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6,
+                    ?7, ?8,
+                    ?9, ?10, ?11,
+                    ?12, ?13, ?14, ?15,
+                    ?16, ?17, ?18,
+                    datetime('now'), datetime('now')
+                )
+                ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
+                    canvas_width = excluded.canvas_width,
+                    canvas_height = excluded.canvas_height,
+                    canvas_unit = excluded.canvas_unit,
+                    canvas_dpi = excluded.canvas_dpi,
+                    spacing_value = excluded.spacing_value,
+                    spacing_unit = excluded.spacing_unit,
+                    margin_enabled = excluded.margin_enabled,
+                    margin_value = excluded.margin_value,
+                    margin_unit = excluded.margin_unit,
+                    border_enabled = excluded.border_enabled,
+                    border_width = excluded.border_width,
+                    border_unit = excluded.border_unit,
+                    border_color = excluded.border_color,
+                    background_type = excluded.background_type,
+                    background_color = excluded.background_color,
+                    file_path = excluded.file_path,
+                    updated_at = datetime('now')",
+                rusqlite::params![
+                    p.id, p.name, p.canvas_width, p.canvas_height, p.canvas_unit, p.canvas_dpi,
+                    p.spacing_value, p.spacing_unit,
+                    p.margin_enabled as i32, p.margin_value, p.margin_unit,
+                    p.border_enabled as i32, p.border_width, p.border_unit, p.border_color,
+                    p.background_type, p.background_color, source_path,
+                ],
+            )?;
+        }
 
         // Import photos
         for photo in &package.photos {
@@ -1746,13 +1780,6 @@ impl Database {
         if let Some(album) = &package.album {
             self.save_album_structure(album)?;
         }
-
-        package.project.file_path = Some(source_path.to_string());
-        let conn = self.conn.lock().unwrap();
-        let _ = conn.execute(
-            "UPDATE projects SET file_path = ?1, updated_at = datetime('now') WHERE id = ?2",
-            rusqlite::params![source_path, &package.project.id],
-        );
 
         Ok(package)
     }

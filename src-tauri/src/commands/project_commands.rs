@@ -176,6 +176,13 @@ pub fn update_project_name(
     db.update_project_name_and_path(&id, clean_name, new_file_path.as_deref())
         .map_err(|e| e.to_string())?;
 
+    // If an associated .afsn file exists, rewrite its internal JSON package with the updated project name!
+    if let Some(ref path_str) = new_file_path {
+        if std::path::Path::new(path_str).exists() {
+            let _ = db.export_project_package(&id, path_str);
+        }
+    }
+
     db.get_project(&id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Failed to reload updated project".to_string())
