@@ -126,7 +126,7 @@ export async function checkForAppUpdates(currentVersion: string): Promise<Update
     return {
       ...defaultResult,
       isError: true,
-      errorMessage: err?.message || 'Unable to connect to GitHub. Please check your internet connection.',
+      errorMessage: err?.message || 'Unable to connect to update service. Please check your internet connection.',
     };
   }
 }

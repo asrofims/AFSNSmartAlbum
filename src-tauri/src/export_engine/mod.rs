@@ -442,8 +442,34 @@ pub fn assemble_pdf_from_jpegs(
     );
     pdf_data.extend_from_slice(trailer.as_bytes());
 
-    let mut out = File::create(pdf_dest).map_err(|e| format!("Failed to create PDF file: {}", e))?;
-    out.write_all(&pdf_data).map_err(|e| format!("Failed to write PDF data: {}", e))?;
+    let tmp_pdf = pdf_dest.with_extension(format!("tmp_pdf_{}", uuid::Uuid::new_v4().simple()));
+    let write_res = (|| -> Result<(), String> {
+        let mut out = File::create(&tmp_pdf).map_err(|e| format!("Failed to create temp PDF file: {}", e))?;
+        out.write_all(&pdf_data).map_err(|e| format!("Failed to write PDF data: {}", e))?;
+        out.sync_all().map_err(|e| format!("Failed to flush PDF data: {}", e))?;
+        Ok(())
+    })();
+
+    if let Err(e) = write_res {
+        if tmp_pdf.exists() {
+            let _ = fs::remove_file(&tmp_pdf);
+        }
+        return Err(e);
+    }
+
+    if pdf_dest.exists() {
+        let _ = fs::remove_file(pdf_dest);
+    }
+
+    if let Err(e) = fs::rename(&tmp_pdf, pdf_dest) {
+        if let Err(copy_err) = fs::copy(&tmp_pdf, pdf_dest) {
+            if tmp_pdf.exists() {
+                let _ = fs::remove_file(&tmp_pdf);
+            }
+            return Err(format!("Failed to finalize PDF {}: {} (copy fallback: {})", pdf_dest.display(), e, copy_err));
+        }
+        let _ = fs::remove_file(&tmp_pdf);
+    }
 
     Ok(())
 }

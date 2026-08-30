@@ -81,15 +81,15 @@ export function UpdateModal() {
             <div>
               <h3 className={styles.titleText}>
                 {status === 'checking' && 'Checking for Updates'}
-                {status === 'available' && 'New Update Available!'}
-                {status === 'uptodate' && "You're Up to Date"}
-                {status === 'error' && 'Check for Updates Failed'}
+                {status === 'available' && 'Software Update Available'}
+                {status === 'uptodate' && 'Your Software is Up to Date'}
+                {status === 'error' && 'Could Not Check for Updates'}
               </h3>
               <p className={styles.subtitleText}>
-                {status === 'checking' && 'Connecting to GitHub repository...'}
-                {status === 'available' && `A new version of AFSNSmartAlbum is ready to install.`}
+                {status === 'checking' && 'Looking for the latest software version...'}
+                {status === 'available' && `A new version of AFSNSmartAlbum is ready to download and install.`}
                 {status === 'uptodate' && `AFSNSmartAlbum ${appInfo.version} is currently the newest version.`}
-                {status === 'error' && 'Unable to retrieve release data from GitHub.'}
+                {status === 'error' && 'The update service is temporarily unreachable.'}
               </p>
             </div>
           </div>
@@ -103,16 +103,16 @@ export function UpdateModal() {
           {status === 'checking' && (
             <div className={styles.statusCard}>
               <div className={styles.statusSpinner} />
-              <div className={styles.statusTitle}>Checking GitHub Releases...</div>
+              <div className={styles.statusTitle}>Checking for Updates...</div>
               <div className={styles.statusDesc}>
-                Looking for the latest software updates and release notes.
+                Connecting to update service...
               </div>
             </div>
           )}
 
           {status === 'uptodate' && (
             <div className={styles.statusCard}>
-              <div className={styles.statusTitle}>No Updates Available</div>
+              <div className={styles.statusTitle}>You're Up to Date</div>
               <div className={styles.statusDesc}>
                 You have the latest version (<strong>{appInfo.version}</strong>) of AFSNSmartAlbum installed.
               </div>
@@ -126,7 +126,7 @@ export function UpdateModal() {
               </div>
               <div className={styles.statusDesc}>
                 {result?.errorMessage ||
-                  'Could not connect to GitHub. Please check your internet connection and try again.'}
+                  'Could not connect to update service. Please check your internet connection and try again.'}
               </div>
             </div>
           )}
@@ -188,7 +188,7 @@ export function UpdateModal() {
           {status === 'available' && result && (
             <>
               <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
-                Remind Me Later
+                Later
               </button>
               {result.releaseUrl && (
                 <button
@@ -196,7 +196,7 @@ export function UpdateModal() {
                   className={styles.btnSecondary}
                   onClick={() => handleOpenUrl(result.releaseUrl)}
                 >
-                  🌐 View on GitHub
+                  🌐 What's New
                 </button>
               )}
               <button
@@ -204,7 +204,7 @@ export function UpdateModal() {
                 className={styles.btnPrimary}
                 onClick={() => handleOpenUrl(result.downloadUrl)}
               >
-                📥 Download Installer (.exe)
+                📥 Install Update
               </button>
             </>
           )}

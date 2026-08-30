@@ -13,6 +13,7 @@ use crate::export_engine::{
 #[derive(Default)]
 pub struct ExportState {
     pub cancel_requested: Arc<AtomicBool>,
+    pub is_exporting: Arc<AtomicBool>,
 }
 
 #[tauri::command]
@@ -267,12 +268,29 @@ fn safe_write_image<F>(dest: &PathBuf, write_fn: F) -> Result<(), String>
 where
     F: FnOnce(&PathBuf) -> Result<(), String>,
 {
-    let tmp_dest = dest.with_extension("tmp_export");
-    write_fn(&tmp_dest)?;
+    let tmp_dest = dest.with_extension(format!("tmp_{}", uuid::Uuid::new_v4().simple()));
+    let write_res = write_fn(&tmp_dest);
+    if let Err(e) = write_res {
+        if tmp_dest.exists() {
+            let _ = fs::remove_file(&tmp_dest);
+        }
+        return Err(e);
+    }
+    if !tmp_dest.exists() {
+        return Err(format!("Temp export file was not generated: {}", tmp_dest.display()));
+    }
     if dest.exists() {
         let _ = fs::remove_file(dest);
     }
-    fs::rename(&tmp_dest, dest).map_err(|e| format!("Failed to finalize {}: {}", dest.display(), e))?;
+    if let Err(e) = fs::rename(&tmp_dest, dest) {
+        if let Err(copy_err) = fs::copy(&tmp_dest, dest) {
+            if tmp_dest.exists() {
+                let _ = fs::remove_file(&tmp_dest);
+            }
+            return Err(format!("Failed to finalize {}: {} (copy fallback: {})", dest.display(), e, copy_err));
+        }
+        let _ = fs::remove_file(&tmp_dest);
+    }
     Ok(())
 }
 
@@ -538,6 +556,17 @@ fn export_album_high_res_worker(
 
         if let Err(e) = chunk_res {
             if cancel_flag.load(Ordering::SeqCst) || e.contains("cancelled") {
+                log::info!("Export worker chunk cancelled, cleaning up partial files...");
+                if let Ok(mut guard) = results.lock() {
+                    for (_, files, _) in guard.drain(..) {
+                        for f in files {
+                            let p = PathBuf::from(&f);
+                            if p.exists() {
+                                let _ = fs::remove_file(p);
+                            }
+                        }
+                    }
+                }
                 let cancel_event = ExportProgressEvent {
                     current: 0,
                     total: total_spreads,
@@ -557,7 +586,17 @@ fn export_album_high_res_worker(
     }
 
     if cancel_flag.load(Ordering::SeqCst) {
-        log::info!("Export worker detected cancel_flag before finalization");
+        log::info!("Export worker detected cancel_flag before finalization, cleaning up...");
+        if let Ok(mut guard) = results.lock() {
+            for (_, files, _) in guard.drain(..) {
+                for f in files {
+                    let p = PathBuf::from(&f);
+                    if p.exists() {
+                        let _ = fs::remove_file(p);
+                    }
+                }
+            }
+        }
         let cancel_event = ExportProgressEvent {
             current: 0,
             total: total_spreads,
@@ -667,13 +706,30 @@ pub async fn export_album_high_res(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No album structure found for project".to_string())?;
 
-    // Reset cancel flag before starting
+    // Wait if previous worker is finishing its cleanup / winding down
+    if export_state.is_exporting.load(Ordering::SeqCst) {
+        export_state.cancel_requested.store(true, Ordering::SeqCst);
+        let mut waited = 0;
+        while export_state.is_exporting.load(Ordering::SeqCst) && waited < 30 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+    }
+
+    export_state.is_exporting.store(true, Ordering::SeqCst);
     export_state.cancel_requested.store(false, Ordering::SeqCst);
     let cancel_flag = export_state.cancel_requested.clone();
+    let is_exporting = export_state.is_exporting.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         export_album_high_res_worker(app, project, album, options, cancel_flag)
     })
-    .await
-    .map_err(|e| format!("Export worker execution failed: {}", e))?
+    .await;
+
+    is_exporting.store(false, Ordering::SeqCst);
+
+    match res {
+        Ok(worker_res) => worker_res,
+        Err(e) => Err(format!("Export worker execution failed: {}", e)),
+    }
 }

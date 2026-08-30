@@ -136,19 +136,14 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
   };
 
   const handleCancelExport = async () => {
+    if (isCancelling) return;
     setIsCancelling(true);
     try {
       await invoke('cancel_export');
     } catch (err) {
       console.error('Failed to request export cancellation:', err);
+      setIsCancelling(false);
     }
-    setProgress((prev) => ({
-      ...prev,
-      spreadName: 'Cancelled',
-      status: 'Export was cancelled.',
-      isFinished: true,
-    }));
-    setIsCancelling(false);
   };
 
   const isCancelled = progress.status.toLowerCase().includes('cancelled');

@@ -42,10 +42,10 @@ export function AboutDialog() {
                 transition: 'all 0.15s ease',
               }}
               onClick={() => {
-                closeAbout();
                 useAppStore.getState().openUpdateModal();
+                closeAbout();
               }}
-              title="Check for software updates on GitHub"
+              title="Check for software updates"
             >
               🔄 Check Updates
             </button>
