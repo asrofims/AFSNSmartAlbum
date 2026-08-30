@@ -30,14 +30,15 @@ export function SupportDonationModal() {
           Pindai dengan aplikasi mobile banking atau e-wallet apa saja untuk kontribusi sukarela pengembangan AFSNSmartAlbum.
         </div>
 
-        {/* Clean QR Code Card with QRIS header */}
+        <div className={styles.qrisBadge}>
+          <span>QRIS</span>
+        </div>
+
+        {/* Pure Clean QR Code Card */}
         <div className={styles.qrCard}>
-          <div className={styles.qrisHeader}>
-            <span className={styles.qrisTitle}>QRIS</span>
-          </div>
           <QRCodeSVG
             value={QRIS_RAW_PAYLOAD}
-            size={210}
+            size={220}
             level="M"
             marginSize={0}
             fgColor="#000000"
