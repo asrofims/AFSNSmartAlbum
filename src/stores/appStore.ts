@@ -33,7 +33,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   appInfo: {
-    version: 'v1.0.8',
+    version: 'v1.0.9',
     buildNumber: '1',
     platform: 'unknown',
   },
