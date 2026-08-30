@@ -910,60 +910,188 @@ export function WorkspaceLayout() {
                       <span>Selected Photo Frame</span>
                     </div>
 
+                    {/* Photo Crop Section */}
                     <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: isEditingCrop ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>
-                        Photo Crop
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: isEditingCrop ? '#818cf8' : 'var(--color-text-secondary)' }}>
+                          <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                          <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                        </svg>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: isEditingCrop ? '#818cf8' : 'var(--color-text-primary)' }}>
+                          Photo Crop
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => (isEditingCrop ? exitCropMode() : enterCropMode(selectedFrame.id))}
                         style={{
-                          padding: '4px 8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 10px',
                           fontSize: '10px',
                           fontWeight: 700,
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: isEditingCrop ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
-                          border: isEditingCrop ? '1px solid rgba(245, 158, 11, 0.55)' : '1px solid var(--color-border)',
-                          color: isEditingCrop ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+                          borderRadius: '999px',
+                          background: isEditingCrop ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'rgba(255, 255, 255, 0.06)',
+                          border: isEditingCrop ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid var(--color-border)',
+                          color: isEditingCrop ? '#ffffff' : 'var(--color-text-secondary)',
                           cursor: 'pointer',
+                          boxShadow: isEditingCrop ? '0 2px 8px rgba(99, 102, 241, 0.35)' : 'none',
+                          transition: 'all 0.15s ease',
                         }}
-                        title={isEditingCrop ? 'Finish crop mode' : 'Edit photo crop'}
+                        title={isEditingCrop ? 'Finish Crop Mode (Enter / Esc)' : 'Edit photo crop'}
                       >
-                        {isEditingCrop ? 'Done' : 'Edit'}
+                        {isEditingCrop ? (
+                          <>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Done</span>
+                          </>
+                        ) : (
+                          <span>Edit</span>
+                        )}
                       </button>
                     </div>
 
                     {isEditingCrop && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(245, 158, 11, 0.28)', backgroundColor: 'rgba(245, 158, 11, 0.06)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                          <span>Zoom</span>
-                          <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{Math.round(cropTransform.cropScale * 100)}%</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          marginBottom: '10px',
+                          padding: '10px',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid rgba(99, 102, 241, 0.25)',
+                          backgroundColor: 'rgba(99, 102, 241, 0.06)',
+                        }}
+                      >
+                        {/* Zoom Header with % Pill */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                          <span style={{ fontWeight: 600 }}>Zoom</span>
+                          <span
+                            style={{
+                              padding: '2px 6px',
+                              background: 'rgba(0, 0, 0, 0.35)',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: '4px',
+                              color: '#f1f5f9',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {Math.round(cropTransform.cropScale * 100)}%
+                          </span>
                         </div>
-                        <input
-                          type="range"
-                          min={1}
-                          max={3.5}
-                          step={0.05}
-                          value={cropTransform.cropScale}
-                          onChange={(e) =>
-                            updateCrop(
-                              activeSpread.id,
-                              selectedFrame.id,
-                              zoomCropAtPoint(
-                                selectedFrame,
-                                { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
-                                Number(e.target.value)
+
+                        {/* Interactive Zoom Controls: [-] Slider [+] */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateCrop(
+                                activeSpread.id,
+                                selectedFrame.id,
+                                zoomCropAtPoint(
+                                  selectedFrame,
+                                  { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
+                                  cropTransform.cropScale - 0.1
+                                )
                               )
-                            )
-                          }
-                          style={{ width: '100%', accentColor: 'var(--color-warning)' }}
-                        />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                            }
+                            disabled={cropTransform.cropScale <= 1.0}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '50%',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                              color: '#cbd5e1',
+                              cursor: cropTransform.cropScale <= 1.0 ? 'not-allowed' : 'pointer',
+                              opacity: cropTransform.cropScale <= 1.0 ? 0.35 : 1,
+                              padding: 0,
+                            }}
+                            title="Zoom Out (−10%)"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                          </button>
+
+                          <input
+                            type="range"
+                            min={1}
+                            max={3.5}
+                            step={0.05}
+                            value={cropTransform.cropScale}
+                            onChange={(e) =>
+                              updateCrop(
+                                activeSpread.id,
+                                selectedFrame.id,
+                                zoomCropAtPoint(
+                                  selectedFrame,
+                                  { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
+                                  Number(e.target.value)
+                                )
+                              )
+                            }
+                            style={{ flex: 1, accentColor: '#6366f1', cursor: 'pointer' }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateCrop(
+                                activeSpread.id,
+                                selectedFrame.id,
+                                zoomCropAtPoint(
+                                  selectedFrame,
+                                  { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
+                                  cropTransform.cropScale + 0.1
+                                )
+                              )
+                            }
+                            disabled={cropTransform.cropScale >= 3.5}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '50%',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                              color: '#cbd5e1',
+                              cursor: cropTransform.cropScale >= 3.5 ? 'not-allowed' : 'pointer',
+                              opacity: cropTransform.cropScale >= 3.5 ? 0.35 : 1,
+                              padding: 0,
+                            }}
+                            title="Zoom In (+10%)"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {/* Reset Action Button */}
+                        <div style={{ marginTop: '2px' }}>
                           <button
                             type="button"
                             onClick={() => resetCrop(activeSpread.id, selectedFrame.id)}
                             style={{
-                              padding: '4px 6px',
+                              width: '100%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              padding: '5px 8px',
                               fontSize: '10px',
                               fontWeight: 600,
                               borderRadius: 'var(--radius-sm)',
@@ -971,25 +1099,15 @@ export function WorkspaceLayout() {
                               border: '1px solid var(--color-border)',
                               color: 'var(--color-text-secondary)',
                               cursor: 'pointer',
+                              transition: 'all 0.15s ease',
                             }}
+                            title="Reset Crop Position & Scale (Center Fit)"
                           >
-                            Reset
-                          </button>
-                          <button
-                            type="button"
-                            onClick={exitCropMode}
-                            style={{
-                              padding: '4px 6px',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: 'rgba(245, 158, 11, 0.18)',
-                              border: '1px solid rgba(245, 158, 11, 0.55)',
-                              color: 'var(--color-warning)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Done
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                              <path d="M3 3v5h5" />
+                            </svg>
+                            <span>Reset Position & Scale</span>
                           </button>
                         </div>
                       </div>

@@ -1748,6 +1748,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                       if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                         setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                        // Live magnetic snapping: lock frame position directly to the guideline
+                        const snappedPhysX = snapRes.snappedX;
+                        const snappedPhysY = snapRes.snappedY;
+                        deltaPhysX = snappedPhysX - frame.x;
+                        deltaPhysY = snappedPhysY - frame.y;
+                        draggedNode.x(snappedPhysX * scaleFactor);
+                        draggedNode.y(snappedPhysY * scaleFactor);
                       } else {
                         clearSnapLines();
                       }
@@ -2087,22 +2094,59 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               />
             )}
 
-            {/* Magnetic Snap Lines overlay */}
-            {activeSnapLines.map((line, idx) => (
-              <Line
-                key={`snap-${idx}`}
-                points={
-                  line.type === 'vertical'
-                    ? [line.position * scaleFactor, 0, line.position * scaleFactor, screenSpreadH]
-                    : [0, line.position * scaleFactor, screenSpreadW, line.position * scaleFactor]
-                }
-                stroke="#06b6d4"
-                strokeWidth={1.5}
-                dash={[4, 2]}
-                strokeScaleEnabled={false}
-                listening={false}
-              />
-            ))}
+            {/* Magnetic Snap Lines overlay with color-coded guidelines & HUD position badges */}
+            {activeSnapLines.map((line, idx) => {
+              const isCenter = line.kind === 'center' || line.label?.includes('Center') || line.label?.includes('Spine');
+              const isMargin = line.kind === 'margin' || line.label?.includes('Safe Margin');
+              const isFrame = line.kind === 'frame' || line.label?.includes('Align');
+
+              const strokeColor = isCenter ? '#ec4899' : isMargin ? '#06b6d4' : isFrame ? '#f59e0b' : '#94a3b8';
+              const tagFill = isCenter ? '#831843' : isMargin ? '#082f49' : isFrame ? '#451a03' : '#1e293b';
+              const tagText = isCenter ? '#fce7f3' : isMargin ? '#e0f2fe' : isFrame ? '#fef3c7' : '#f1f5f9';
+
+              const isVert = line.type === 'vertical';
+              const linePx = line.position * scaleFactor;
+              const badgeX = isVert ? linePx : screenSpreadW / 2;
+              const badgeY = isVert ? screenSpreadH / 2 : linePx;
+
+              return (
+                <Group key={`snap-${idx}`} listening={false}>
+                  <Line
+                    points={
+                      isVert
+                        ? [linePx, 0, linePx, screenSpreadH]
+                        : [0, linePx, screenSpreadW, linePx]
+                    }
+                    stroke={strokeColor}
+                    strokeWidth={isCenter ? 2 : 1.5}
+                    dash={isCenter ? [6, 3] : [4, 2]}
+                    strokeScaleEnabled={false}
+                  />
+                  {line.label && (
+                    <Group x={badgeX} y={badgeY}>
+                      <Label offsetX={isVert ? -8 : 36} offsetY={isVert ? 12 : -8}>
+                        <Tag
+                          fill={tagFill}
+                          stroke={strokeColor}
+                          strokeWidth={1}
+                          cornerRadius={3}
+                          shadowColor="rgba(0,0,0,0.6)"
+                          shadowBlur={4}
+                          shadowOffset={{ x: 0, y: 1 }}
+                        />
+                        <KonvaText
+                          text={`${line.label} (${Math.round(line.position * 10) / 10} ${unit})`}
+                          fill={tagText}
+                          fontSize={9.5}
+                          fontStyle="bold"
+                          padding={4}
+                        />
+                      </Label>
+                    </Group>
+                  )}
+                </Group>
+              );
+            })}
 
             {/* Gap Guides & Equal Distance Indicators */}
             {activeGapGuides.map((gap, idx) => {

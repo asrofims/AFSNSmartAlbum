@@ -44,6 +44,7 @@ export interface SnapLine {
   start: number;
   end: number;
   label?: string;
+  kind?: 'center' | 'margin' | 'frame' | 'edge';
 }
 
 export interface RectBounds {
@@ -331,53 +332,53 @@ export function calculateSnapping(
   const rightPageCenter = spineRight + singlePageW / 2;
 
   // Key vertical reference points on spread
-  const vTargets: { pos: number; label: string }[] = [];
+  const vTargets: { pos: number; label: string; kind: 'center' | 'margin' | 'frame' | 'edge' }[] = [];
 
   if (config.snapToPageEdges) {
     vTargets.push(
-      { pos: 0, label: 'Left Outer Edge' },
-      { pos: spineLeft, label: 'Left Page Inner Edge' },
-      { pos: spineCenter, label: 'Center Spine' },
-      { pos: spineRight, label: 'Right Page Inner Edge' },
-      { pos: spreadWidth, label: 'Right Outer Edge' }
+      { pos: 0, label: 'Spread Left Edge', kind: 'edge' },
+      { pos: spineLeft, label: 'Left Page Inner Edge', kind: 'edge' },
+      { pos: spineCenter, label: 'Center Spine', kind: 'center' },
+      { pos: spineRight, label: 'Right Page Inner Edge', kind: 'edge' },
+      { pos: spreadWidth, label: 'Spread Right Edge', kind: 'edge' }
     );
   }
 
   if (config.snapToPageCenters) {
     vTargets.push(
-      { pos: leftPageCenter, label: 'Left Page Center' },
-      { pos: spineCenter, label: 'Spread Center X' },
-      { pos: rightPageCenter, label: 'Right Page Center' }
+      { pos: leftPageCenter, label: 'Left Page Center', kind: 'center' },
+      { pos: spineCenter, label: 'Spread Center X', kind: 'center' },
+      { pos: rightPageCenter, label: 'Right Page Center', kind: 'center' }
     );
   }
 
   if (config.snapToMargins && safeArea > 0) {
     vTargets.push(
-      { pos: safeArea, label: 'Safe Margin Left' },
-      { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
-      { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
-      { pos: spreadWidth - safeArea, label: 'Safe Margin Right' }
+      { pos: safeArea, label: 'Safe Margin Left', kind: 'margin' },
+      { pos: spineLeft - safeArea, label: 'Safe Margin Spine Left', kind: 'margin' },
+      { pos: spineRight + safeArea, label: 'Safe Margin Spine Right', kind: 'margin' },
+      { pos: spreadWidth - safeArea, label: 'Safe Margin Right', kind: 'margin' }
     );
   }
 
   // Key horizontal reference points on spread
-  const hTargets: { pos: number; label: string }[] = [];
+  const hTargets: { pos: number; label: string; kind: 'center' | 'margin' | 'frame' | 'edge' }[] = [];
 
   if (config.snapToPageEdges) {
     hTargets.push(
-      { pos: 0, label: 'Top Edge' },
-      { pos: spreadHeight, label: 'Bottom Edge' }
+      { pos: 0, label: 'Spread Top Edge', kind: 'edge' },
+      { pos: spreadHeight, label: 'Spread Bottom Edge', kind: 'edge' }
     );
   }
 
   if (config.snapToPageCenters) {
-    hTargets.push({ pos: spreadHeight / 2, label: 'Center Horizontal' });
+    hTargets.push({ pos: spreadHeight / 2, label: 'Vertical Center', kind: 'center' });
   }
 
   if (config.snapToMargins && safeArea > 0) {
     hTargets.push(
-      { pos: safeArea, label: 'Safe Margin Top' },
-      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' }
+      { pos: safeArea, label: 'Safe Margin Top', kind: 'margin' },
+      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom', kind: 'margin' }
     );
   }
 
@@ -385,14 +386,14 @@ export function calculateSnapping(
   if (config.snapToFrames) {
     for (const other of otherFrames) {
       vTargets.push(
-        { pos: other.x, label: 'Align Left' },
-        { pos: other.x + other.width / 2, label: 'Align Center X' },
-        { pos: other.x + other.width, label: 'Align Right' }
+        { pos: other.x, label: 'Align Left', kind: 'frame' },
+        { pos: other.x + other.width / 2, label: 'Align Center X', kind: 'center' },
+        { pos: other.x + other.width, label: 'Align Right', kind: 'frame' }
       );
       hTargets.push(
-        { pos: other.y, label: 'Align Top' },
-        { pos: other.y + other.height / 2, label: 'Align Center Y' },
-        { pos: other.y + other.height, label: 'Align Bottom' }
+        { pos: other.y, label: 'Align Top', kind: 'frame' },
+        { pos: other.y + other.height / 2, label: 'Align Center Y', kind: 'center' },
+        { pos: other.y + other.height, label: 'Align Bottom', kind: 'frame' }
       );
     }
   }
@@ -406,10 +407,30 @@ export function calculateSnapping(
   let bestSnapX: number | null = null;
   let bestVLine: SnapLine | null = null;
 
+  // 1. First priority: Center-to-Center Magnetic Attraction
+  for (const target of vTargets) {
+    if (target.kind === 'center') {
+      const diffCenter = Math.abs(draggedCenterX - target.pos);
+      if (diffCenter <= threshold && diffCenter < minDiffX) {
+        minDiffX = diffCenter;
+        bestSnapX = target.pos - dragged.width / 2;
+        bestVLine = {
+          type: 'vertical',
+          position: target.pos,
+          start: 0,
+          end: spreadHeight,
+          label: target.label,
+          kind: 'center',
+        };
+      }
+    }
+  }
+
+  // 2. Second priority: Edges, Margins, and Neighbor Alignment
   for (const target of vTargets) {
     // Snap dragged left edge
     const diffLeft = Math.abs(draggedLeft - target.pos);
-    if (diffLeft < threshold && diffLeft < minDiffX) {
+    if (diffLeft <= threshold && diffLeft < minDiffX) {
       minDiffX = diffLeft;
       bestSnapX = target.pos;
       bestVLine = {
@@ -418,26 +439,13 @@ export function calculateSnapping(
         start: 0,
         end: spreadHeight,
         label: target.label,
-      };
-    }
-
-    // Snap dragged center
-    const diffCenter = Math.abs(draggedCenterX - target.pos);
-    if (diffCenter < threshold && diffCenter < minDiffX) {
-      minDiffX = diffCenter;
-      bestSnapX = target.pos - dragged.width / 2;
-      bestVLine = {
-        type: 'vertical',
-        position: target.pos,
-        start: 0,
-        end: spreadHeight,
-        label: target.label,
+        kind: target.kind,
       };
     }
 
     // Snap dragged right edge
     const diffRight = Math.abs(draggedRight - target.pos);
-    if (diffRight < threshold && diffRight < minDiffX) {
+    if (diffRight <= threshold && diffRight < minDiffX) {
       minDiffX = diffRight;
       bestSnapX = target.pos - dragged.width;
       bestVLine = {
@@ -446,7 +454,25 @@ export function calculateSnapping(
         start: 0,
         end: spreadHeight,
         label: target.label,
+        kind: target.kind,
       };
+    }
+
+    // Non-center target matching center if not already snapped
+    if (target.kind !== 'center') {
+      const diffCenter = Math.abs(draggedCenterX - target.pos);
+      if (diffCenter <= threshold && diffCenter < minDiffX) {
+        minDiffX = diffCenter;
+        bestSnapX = target.pos - dragged.width / 2;
+        bestVLine = {
+          type: 'vertical',
+          position: target.pos,
+          start: 0,
+          end: spreadHeight,
+          label: target.label,
+          kind: target.kind,
+        };
+      }
     }
   }
 
@@ -464,10 +490,30 @@ export function calculateSnapping(
   let bestSnapY: number | null = null;
   let bestHLine: SnapLine | null = null;
 
+  // 1. First priority: Center-to-Center Magnetic Attraction
+  for (const target of hTargets) {
+    if (target.kind === 'center') {
+      const diffCenter = Math.abs(draggedCenterY - target.pos);
+      if (diffCenter <= threshold && diffCenter < minDiffY) {
+        minDiffY = diffCenter;
+        bestSnapY = target.pos - dragged.height / 2;
+        bestHLine = {
+          type: 'horizontal',
+          position: target.pos,
+          start: 0,
+          end: spreadWidth,
+          label: target.label,
+          kind: 'center',
+        };
+      }
+    }
+  }
+
+  // 2. Second priority: Edges, Margins, and Neighbor Alignment
   for (const target of hTargets) {
     // Snap dragged top edge
     const diffTop = Math.abs(draggedTop - target.pos);
-    if (diffTop < threshold && diffTop < minDiffY) {
+    if (diffTop <= threshold && diffTop < minDiffY) {
       minDiffY = diffTop;
       bestSnapY = target.pos;
       bestHLine = {
@@ -476,26 +522,13 @@ export function calculateSnapping(
         start: 0,
         end: spreadWidth,
         label: target.label,
-      };
-    }
-
-    // Snap dragged center
-    const diffCenter = Math.abs(draggedCenterY - target.pos);
-    if (diffCenter < threshold && diffCenter < minDiffY) {
-      minDiffY = diffCenter;
-      bestSnapY = target.pos - dragged.height / 2;
-      bestHLine = {
-        type: 'horizontal',
-        position: target.pos,
-        start: 0,
-        end: spreadWidth,
-        label: target.label,
+        kind: target.kind,
       };
     }
 
     // Snap dragged bottom edge
     const diffBottom = Math.abs(draggedBottom - target.pos);
-    if (diffBottom < threshold && diffBottom < minDiffY) {
+    if (diffBottom <= threshold && diffBottom < minDiffY) {
       minDiffY = diffBottom;
       bestSnapY = target.pos - dragged.height;
       bestHLine = {
@@ -504,7 +537,25 @@ export function calculateSnapping(
         start: 0,
         end: spreadWidth,
         label: target.label,
+        kind: target.kind,
       };
+    }
+
+    // Non-center target matching center if not already snapped
+    if (target.kind !== 'center') {
+      const diffCenter = Math.abs(draggedCenterY - target.pos);
+      if (diffCenter <= threshold && diffCenter < minDiffY) {
+        minDiffY = diffCenter;
+        bestSnapY = target.pos - dragged.height / 2;
+        bestHLine = {
+          type: 'horizontal',
+          position: target.pos,
+          start: 0,
+          end: spreadWidth,
+          label: target.label,
+          kind: target.kind,
+        };
+      }
     }
   }
 
