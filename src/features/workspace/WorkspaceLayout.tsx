@@ -24,7 +24,6 @@ import { TemplatesPanel } from '../templates/TemplatesPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
-import { UpdateModal } from '../updates/UpdateModal';
 import appLogo from '../../assets/app-logo.png';
 import styles from './WorkspaceLayout.module.css';
 
@@ -1682,9 +1681,6 @@ export function WorkspaceLayout() {
         outputDir={activeExportDir}
         onClose={() => setIsExportProgressOpen(false)}
       />
-
-      {/* Check for Software Updates Modal */}
-      <UpdateModal />
     </div>
   );
 }
