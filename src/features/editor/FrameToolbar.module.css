@@ -55,6 +55,28 @@
   border-color: var(--color-warning) !important;
 }
 
+.toolBtnCropDone {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.toolBtnCropDone:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+  transform: scale(1.06);
+}
+
+.zoomPercentPill {
+  font-size: 9px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 1px 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  letter-spacing: -0.2px;
+}
+
 .toolBtnDanger:hover {
   background-color: rgba(239, 68, 68, 0.2) !important;
   color: var(--color-danger) !important;

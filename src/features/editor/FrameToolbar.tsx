@@ -52,35 +52,32 @@ export function FrameToolbar() {
 
   return (
     <div className={styles.verticalDockContainer}>
-      {/* 1. Crop / Done */}
-      <button
-        type="button"
-        className={`${styles.toolBtn} ${isCrop ? styles.toolBtnCropActive : ''}`}
-        onClick={() => (isCrop ? exitCropMode() : enterCropMode(frame.id))}
-        title={isCrop ? 'Finish Crop Mode (Esc)' : 'Crop Image (Double Click)'}
-      >
-        {isCrop ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-          </svg>
-        )}
-      </button>
-
-      {/* When in Crop Mode: Zoom In, Zoom Out, Reset Crop */}
-      {isCrop && (
+      {/* When in Crop Mode: Clean Pure Icon Dock */}
+      {isCrop ? (
         <>
+          {/* 1. Finish Crop (Done Checkmark) */}
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${styles.toolBtnCropDone}`}
+            onClick={exitCropMode}
+            title="Finish Crop Mode (Enter / Esc)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+
+          <div className={styles.divider} />
+
+          {/* 2. Zoom In (+) */}
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => updateCropZoom(0.15)}
-            title="Zoom In Inside Frame"
+            onClick={() => updateCropZoom(0.1)}
+            disabled={(frame.cropScale || 1.0) >= 3.5}
+            title="Zoom In Inside Frame (+10%)"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
               <line x1="11" y1="8" x2="11" y2="14" />
@@ -88,19 +85,29 @@ export function FrameToolbar() {
             </svg>
           </button>
 
+          {/* Zoom % Pill */}
+          <div className={styles.zoomPercentPill} title="Current Zoom Scale">
+            {Math.round((frame.cropScale || 1.0) * 100)}%
+          </div>
+
+          {/* 3. Zoom Out (-) */}
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => updateCropZoom(-0.15)}
-            title="Zoom Out Inside Frame"
+            onClick={() => updateCropZoom(-0.1)}
+            disabled={(frame.cropScale || 1.0) <= 1.0}
+            title="Zoom Out Inside Frame (−10%)"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
               <line x1="8" y1="11" x2="14" y2="11" />
             </svg>
           </button>
 
+          <div className={styles.divider} />
+
+          {/* 4. Reset Crop */}
           <button
             type="button"
             className={styles.toolBtn}
@@ -113,11 +120,20 @@ export function FrameToolbar() {
             </svg>
           </button>
         </>
-      )}
-
-      {/* When in Standard Selection Mode: Core 5 Tools */}
-      {!isCrop && (
+      ) : (
         <>
+          {/* 1. Crop Image (Double Click) */}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => enterCropMode(frame.id)}
+            title="Crop Image (Double Click)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+              <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+            </svg>
+          </button>
           <div className={styles.divider} />
 
           {/* 2. Reset to Original Aspect Ratio (1-Click Restore) */}

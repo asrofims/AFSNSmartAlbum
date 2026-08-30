@@ -919,19 +919,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
   const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
-  const activeCropFrame = editingCropFrameId
-    ? (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId)
-    : null;
-  const currentCropZoom = activeCropFrame?.cropScale || 1.0;
-  const updateActiveCropZoom = (nextZoom: number) => {
-    if (!activeCropFrame) return;
-    const clampedZoom = clamp(Math.round(nextZoom * 100) / 100, 1.0, 3.5);
-    updateCrop(activeSpread.id, activeCropFrame.id, {
-      cropScale: clampedZoom,
-      cropX: activeCropFrame.cropX || 0,
-      cropY: activeCropFrame.cropY || 0,
-    });
-  };
 
   // Multi-selection status
   const selectedElements = (activeSpread.elements || []).filter((f) =>
@@ -2187,108 +2174,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             })}
           </Layer>
         </Stage>
-
-        {activeCropFrame && (
-          <div
-            className={styles.cropHudContainer}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.cropHudCapsule}>
-              {/* 1. Mode Badge */}
-              <div className={styles.cropBadge}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-                  <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-                </svg>
-                <span>Crop & Pan</span>
-              </div>
-
-              <div className={styles.cropDivider} />
-
-              {/* 2. Zoom Controls: Minus + Slider + Plus + Pill Badge */}
-              <div className={styles.cropZoomGroup}>
-                <button
-                  type="button"
-                  className={styles.cropZoomBtn}
-                  onClick={() => updateActiveCropZoom(currentCropZoom - 0.1)}
-                  disabled={currentCropZoom <= 1.0}
-                  title="Zoom Out (−10%)"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-
-                <div className={styles.cropSliderTrackWrapper}>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="3.5"
-                    step="0.05"
-                    value={currentCropZoom}
-                    onChange={(e) => updateActiveCropZoom(parseFloat(e.target.value))}
-                    className={styles.cropHudSlider}
-                    title={`Zoom: ${Math.round(currentCropZoom * 100)}%`}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className={styles.cropZoomBtn}
-                  onClick={() => updateActiveCropZoom(currentCropZoom + 0.1)}
-                  disabled={currentCropZoom >= 3.5}
-                  title="Zoom In (+10%)"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-
-                <div className={styles.cropPercentPill} title="Current Zoom Scale">
-                  {Math.round(currentCropZoom * 100)}%
-                </div>
-              </div>
-
-              <div className={styles.cropDivider} />
-
-              {/* 3. Reset Button */}
-              <button
-                type="button"
-                className={styles.cropActionBtn}
-                onClick={() => resetCrop(activeSpread.id, activeCropFrame.id)}
-                title="Reset Crop Position & Zoom (Center Fit)"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
-                <span>Reset</span>
-              </button>
-
-              {/* 4. Done Button */}
-              <button
-                type="button"
-                className={styles.cropDoneBtn}
-                onClick={exitCropMode}
-                title="Done & Apply Crop (Enter / Esc)"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Done</span>
-                <kbd className={styles.cropKbdHint}>↵</kbd>
-              </button>
-            </div>
-
-            {/* Micro Keyboard Hint */}
-            <div className={styles.cropMicroHint}>
-              Drag photo inside frame to pan • Scroll wheel to zoom
-            </div>
-          </div>
-        )}
-
       </div>
 
 
