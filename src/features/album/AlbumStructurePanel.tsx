@@ -15,7 +15,6 @@ export function AlbumStructurePanel() {
     showBleedGuide,
     showSafeAreaGuide,
     toggleGuide,
-    updateGutterWidth,
     updateBleed,
     updateSafeArea,
   } = useAlbumStore();
@@ -82,9 +81,9 @@ export function AlbumStructurePanel() {
         </div>
 
         <div className={styles.guideToggles}>
-          {/* Gutter Guide */}
+          {/* Gutter / Center Spine Crease Guide */}
           <div className={styles.toggleRow}>
-            <span className={styles.toggleText}>Center Gutter Crease</span>
+            <span className={styles.toggleText}>Center Spine Crease Guide</span>
             <Switch
               checked={showGutterGuide}
               onChange={() => toggleGuide('gutter')}
@@ -121,22 +120,6 @@ export function AlbumStructurePanel() {
         </div>
 
         <div className={styles.inputGroup}>
-          {/* Gutter Width */}
-          <div className={styles.inputRow}>
-            <span className={styles.inputLabel}>Gutter Crease</span>
-            <div className={styles.inputWrapper}>
-              <NumberInput
-                value={activeSpread.gutterWidth}
-                onChange={updateGutterWidth}
-                min={0}
-                max={50}
-                step={unit === 'inch' ? 0.05 : 1}
-                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
-              />
-              <span className={styles.unitText}>{unit}</span>
-            </div>
-          </div>
-
           {/* Bleed Margin */}
           <div className={styles.inputRow}>
             <span className={styles.inputLabel}>Bleed Cut Margin</span>

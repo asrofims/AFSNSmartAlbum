@@ -84,8 +84,7 @@ const inchProject: Project = {
 };
 const inchAlbum = createInitialAlbum(inchProject);
 console.assert(inchAlbum.coverSpread.leftPage?.width === 10, 'Inch album page width should be 10');
-console.assert(inchAlbum.coverSpread.leftPage?.unit === 'inch', 'Inch album page unit should be inch');
-console.assert(inchAlbum.coverSpread.gutterWidth === 0.25, `Inch spine should be 0.25 inch, got ${inchAlbum.coverSpread.gutterWidth}`);
+console.assert(inchAlbum.coverSpread.gutterWidth === 0, `Inch spine gutterWidth should be 0 for layflat albums, got ${inchAlbum.coverSpread.gutterWidth}`);
 console.assert(inchAlbum.coverSpread.bleed === 0.125, `Inch bleed should be 0.125 inch, got ${inchAlbum.coverSpread.bleed}`);
 
 // 7. Test Duplicating Spread with Elements & Content

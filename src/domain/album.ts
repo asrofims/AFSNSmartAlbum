@@ -101,7 +101,7 @@ export function createInitialAlbum(project: Project): Album {
     name: 'Cover Spread',
     leftPage: coverBackPage,
     rightPage: coverFrontPage,
-    gutterWidth: project.canvasUnit === 'inch' ? 0.25 : project.canvasUnit === 'cm' ? 0.6 : 6.0, // Spine width
+    gutterWidth: 0,
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,

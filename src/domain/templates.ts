@@ -102,10 +102,8 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const spacingUnit = project.spacingUnit || 'mm';
   const spacing = round4(convertUnit(rawSpacing, spacingUnit, unit, dpi, 4));
 
-  // Gutter: convert from spread.gutterUnit (or project.canvasUnit) to project.canvasUnit
-  const rawGutter = spread?.gutterWidth ?? 0;
-  const gutterUnit = spread?.gutterUnit || unit;
-  const gutterWidth = round4(convertUnit(rawGutter, gutterUnit, unit, dpi, 4));
+  // Gutter: In layflat photobooks, physical spread width is strictly 2 * pageWidth without spine expansion
+  const gutterWidth = 0;
 
   // Bleed: convert from spread.bleed (or 3mm) to project.canvasUnit
   const rawBleed = spread?.bleed ?? 3;

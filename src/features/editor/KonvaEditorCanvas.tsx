@@ -885,10 +885,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   // Single page physical dimensions (strictly in canvasUnit)
   const singlePageW = dims.pageWidth;
   const singlePageH = dims.pageHeight;
-  const gutterPhysicalW = dims.gutterWidth;
+  const gutterPhysicalW = 0; // Pure layflat spread (strictly 2 * singlePageW)
 
-  // Total spread physical dimensions
-  const totalSpreadPhysicalW = singlePageW * 2 + gutterPhysicalW;
+  // Total spread physical dimensions (strictly 2 * singlePageW)
+  const totalSpreadPhysicalW = singlePageW * 2;
   const totalSpreadPhysicalH = singlePageH;
 
   // Dynamic responsive canvas scaling (Fills workspace comfortably with breathing margin)
@@ -913,9 +913,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   // Conversion factor: multiply physical units (in canvasUnit) by this to get screen pixels
   const scaleFactor = screenSpreadW / totalSpreadPhysicalW;
 
-  const leftPagePixelW = Math.round(singlePageW * scaleFactor);
-  const rightPagePixelW = leftPagePixelW;
-  const gutterPixelW = Math.round(gutterPhysicalW * scaleFactor);
+  const leftPagePixelW = Math.round(screenSpreadW / 2);
+  const rightPagePixelW = screenSpreadW - leftPagePixelW;
+  const gutterPixelW = 0;
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
   const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
