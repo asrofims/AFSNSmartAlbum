@@ -40,6 +40,7 @@ function PhotoFrameNode({
   isCropMode,
   isMultiSelectActive,
   isHoveredForDrop,
+  isAltDrop,
   scaleFactor,
   onSelect,
   onDragStart,
@@ -56,6 +57,7 @@ function PhotoFrameNode({
   isCropMode: boolean;
   isMultiSelectActive?: boolean;
   isHoveredForDrop?: boolean;
+  isAltDrop?: boolean;
   scaleFactor: number;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -448,7 +450,7 @@ function PhotoFrameNode({
         />
       )}
 
-      {/* Drag & Drop Replace Visual Feedback Glow & Badge */}
+      {/* Drag & Drop Replace / Overlay Visual Feedback Glow & Badge */}
       {isHoveredForDrop && (
         <Group listening={false}>
           <Rect
@@ -456,33 +458,33 @@ function PhotoFrameNode({
             y={0}
             width={pixelW}
             height={pixelH}
-            fill="rgba(16, 185, 129, 0.22)"
-            stroke="#10b981"
-            strokeWidth={3}
-            dash={[8, 4]}
+            fill={isAltDrop ? "rgba(16, 185, 129, 0.22)" : "rgba(59, 130, 246, 0.12)"}
+            stroke={isAltDrop ? "#10b981" : "#3b82f6"}
+            strokeWidth={isAltDrop ? 3 : 2}
+            dash={isAltDrop ? [8, 4] : [6, 4]}
             strokeScaleEnabled={false}
           />
           <Rect
-            x={Math.max(0, (pixelW - 130) / 2)}
+            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 190)) / 2)}
             y={Math.max(0, (pixelH - 28) / 2)}
-            width={130}
+            width={isAltDrop ? 130 : 190}
             height={28}
-            fill="rgba(6, 78, 59, 0.92)"
+            fill={isAltDrop ? "rgba(6, 78, 59, 0.94)" : "rgba(15, 23, 42, 0.94)"}
             cornerRadius={6}
-            stroke="#10b981"
+            stroke={isAltDrop ? "#10b981" : "#3b82f6"}
             strokeWidth={1}
             strokeScaleEnabled={false}
           />
           <KonvaText
-            x={Math.max(0, (pixelW - 130) / 2)}
+            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 190)) / 2)}
             y={Math.max(0, (pixelH - 28) / 2) + 7}
-            width={130}
+            width={isAltDrop ? 130 : 190}
             align="center"
-            text="⇄ Replace Photo"
-            fontSize={12}
+            text={isAltDrop ? "🔄 Replace Photo" : "➕ Overlay (Hold Alt to Replace)"}
+            fontSize={11}
             fontStyle="bold"
-            fill="#ffffff"
-            fontFamily="system-ui, -apple-system, sans-serif"
+            fill={isAltDrop ? "#ffffff" : "#93c5fd"}
+            fontFamily="Inter, system-ui, -apple-system, sans-serif"
           />
         </Group>
       )}
@@ -570,6 +572,34 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
+  const [isAltKeyDown, setIsAltKeyDown] = useState(false);
+  const [dragDropHud, setDragDropHud] = useState<{
+    x: number;
+    y: number;
+    isOverFrame: boolean;
+    isAlt: boolean;
+    actionType: 'replace' | 'overlay' | 'add';
+  } | null>(null);
+
+  // Global Alt key listener for instant reactive drag feedback
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || e.altKey) {
+        setIsAltKeyDown(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || !e.altKey) {
+        setIsAltKeyDown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Natural Pan Navigation State (Spacebar + Drag or Middle-Click Drag)
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -927,24 +957,29 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const physicalX = dropX / scaleFactor;
       const physicalY = dropY / scaleFactor;
 
-      // Only show replace target highlight if ALT key is held
-      if (e.altKey) {
-        const targetFrame = [...activeSpread.elements].reverse().find((f) =>
-          physicalX >= f.x &&
-          physicalX <= f.x + f.width &&
-          physicalY >= f.y &&
-          physicalY <= f.y + f.height
-        );
-        setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
-      } else {
-        setHoveredDropFrameId(null);
-      }
+      const targetFrame = [...activeSpread.elements].reverse().find((f) =>
+        physicalX >= f.x &&
+        physicalX <= f.x + f.width &&
+        physicalY >= f.y &&
+        physicalY <= f.y + f.height
+      );
+
+      const isAlt = Boolean(e.altKey || isAltKeyDown);
+      setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
+      setDragDropHud({
+        x: e.clientX,
+        y: e.clientY,
+        isOverFrame: Boolean(targetFrame),
+        isAlt,
+        actionType: targetFrame ? (isAlt ? 'replace' : 'overlay') : 'add',
+      });
     }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setHoveredDropFrameId(null);
+      setDragDropHud(null);
     }
   };
 
@@ -952,6 +987,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     e.preventDefault();
     e.stopPropagation();
     setHoveredDropFrameId(null);
+    setDragDropHud(null);
 
     let photo: Photo | null = null;
     try {
@@ -990,8 +1026,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropX / scaleFactor));
       const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropY / scaleFactor));
 
+      const isAlt = Boolean(e.altKey || isAltKeyDown);
       // Replace photo only if ALT key was held during drop
-      if (e.altKey) {
+      if (isAlt) {
         const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
           physicalX >= f.x &&
           physicalX <= f.x + f.width &&
@@ -1654,6 +1691,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   isCropMode={isCrop}
                   isMultiSelectActive={isMultiSelected}
                   isHoveredForDrop={hoveredDropFrameId === frame.id}
+                  isAltDrop={Boolean(isAltKeyDown)}
                   scaleFactor={scaleFactor}
                   onSelect={(e) => {
                     if (e) {
@@ -1734,9 +1772,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
                     }
 
-                    // Check if hovering over another frame for canvas swap (Only highlight when ALT is held)
-                    const isAltPressed = Boolean(e.evt?.altKey);
-                    if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
+                    // Check if hovering over another frame for canvas swap
+                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
                       const draggedCenterPhysX = currentPhysX + frame.width / 2;
                       const draggedCenterPhysY = currentPhysY + frame.height / 2;
                       const hoverTarget = (activeSpread.elements || []).find((f) =>
@@ -1788,7 +1825,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
 
                       // Check if dropped directly onto another frame on the canvas to SWAP (Requires ALT key)
-                      const isAltPressed = Boolean(e.evt?.altKey);
+                      const isAltPressed = Boolean(e.evt?.altKey || isAltKeyDown);
                       if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
                         const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
                         const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
@@ -2183,6 +2220,36 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             >
               ✓ Done
             </button>
+          </div>
+        )}
+
+        {/* Floating Smart Drag & Drop HUD Indicator */}
+        {dragDropHud && (
+          <div
+            className={
+              dragDropHud.actionType === 'replace'
+                ? styles.dragHudReplace
+                : dragDropHud.actionType === 'overlay'
+                ? styles.dragHudOverlay
+                : styles.dragHudAdd
+            }
+            style={{
+              position: 'fixed',
+              left: `${dragDropHud.x + 16}px`,
+              top: `${dragDropHud.y + 16}px`,
+              pointerEvents: 'none',
+              zIndex: 9999,
+            }}
+          >
+            {dragDropHud.actionType === 'replace' && (
+              <span>🔄 <strong>Replace Photo</strong> in Frame</span>
+            )}
+            {dragDropHud.actionType === 'overlay' && (
+              <span>➕ <strong>Add as Overlay</strong> <span className={styles.hudKeyHint}>(Hold Alt to Replace)</span></span>
+            )}
+            {dragDropHud.actionType === 'add' && (
+              <span>➕ Add Photo to Spread</span>
+            )}
           </div>
         )}
 
