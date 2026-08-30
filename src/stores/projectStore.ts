@@ -47,36 +47,48 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const current = get().currentProject;
     if (!current) return;
 
-    const updatedProject: Project = {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const updatedRow = await invoke<Project>('update_project_name', {
+        id: current.id,
+        name: clean,
+      });
+
+      if (updatedRow) {
+        const updatedProject: Project = {
+          ...current,
+          name: updatedRow.name,
+          filePath: updatedRow.filePath ?? current.filePath,
+          updatedAt: updatedRow.updatedAt || new Date().toISOString(),
+        };
+
+        set((state) => ({
+          currentProject: updatedProject,
+          recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+        }));
+
+        try {
+          const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
+          const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
+          localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
+        } catch {}
+        return;
+      }
+    } catch (err: any) {
+      console.warn('[AFSN] update_project_name via Tauri error:', err);
+      throw err;
+    }
+
+    // Local fallback
+    const fallbackProject: Project = {
       ...current,
       name: clean,
       updatedAt: new Date().toISOString(),
     };
-
     set((state) => ({
-      currentProject: updatedProject,
-      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+      currentProject: fallbackProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? fallbackProject : p)),
     }));
-
-    // Update in Tauri DB
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('update_project_name', {
-        id: current.id,
-        name: clean,
-      });
-    } catch (err) {
-      console.warn('[AFSN] update_project_name via Tauri failed:', err);
-    }
-
-    // Update in localStorage
-    try {
-      const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
-      const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
-      localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
-    } catch (e) {
-      console.warn('[AFSN] localStorage write error:', e);
-    }
   },
 
   updateProjectSpacing: async (spacingValue: number, spacingUnit?: Unit) => {

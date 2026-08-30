@@ -98,8 +98,12 @@ export function WorkspaceLayout() {
   const handleCommitProjectName = async () => {
     const clean = editingProjectName.trim();
     if (clean && currentProject && clean !== currentProject.name) {
-      await updateProjectName(clean);
-      showToast(`Renamed project to: ${clean}`);
+      try {
+        await updateProjectName(clean);
+        showToast(`Renamed project to: ${clean}`);
+      } catch (err: any) {
+        showToast(`⚠️ ${err?.message || err || 'Failed to rename project'}`);
+      }
     }
     setIsEditingProjectName(false);
   };
@@ -107,8 +111,12 @@ export function WorkspaceLayout() {
   const handleCommitInspectorName = async () => {
     const clean = editingInspectorName.trim();
     if (clean && currentProject && clean !== currentProject.name) {
-      await updateProjectName(clean);
-      showToast(`Renamed project to: ${clean}`);
+      try {
+        await updateProjectName(clean);
+        showToast(`Renamed project to: ${clean}`);
+      } catch (err: any) {
+        showToast(`⚠️ ${err?.message || err || 'Failed to rename project'}`);
+      }
     }
     setIsEditingInspectorName(false);
   };

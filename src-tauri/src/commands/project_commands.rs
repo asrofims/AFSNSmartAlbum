@@ -130,14 +130,55 @@ pub fn update_project_name(
     db: State<'_, Database>,
     id: String,
     name: String,
-) -> Result<(), String> {
+) -> Result<ProjectRow, String> {
     let clean_name = name.trim();
     if clean_name.is_empty() {
         return Err("Project name cannot be empty".to_string());
     }
     log::info!("update_project_name: id={}, name={}", id, clean_name);
-    db.update_project_name(&id, clean_name)
-        .map_err(|e| e.to_string())
+
+    let existing_proj = db.get_project(&id).map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let mut new_file_path = existing_proj.file_path.clone();
+
+    // If an associated .afsn file exists on disk, rename it automatically (Option 1)
+    if let Some(ref old_path_str) = existing_proj.file_path {
+        let old_path = std::path::Path::new(old_path_str);
+        if old_path.exists() {
+            let parent_dir = old_path.parent().unwrap_or_else(|| std::path::Path::new(""));
+            let safe_file_stem = clean_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+            let target_file_name = format!("{}.afsn", safe_file_stem);
+            let target_path = parent_dir.join(&target_file_name);
+
+            if target_path != old_path {
+                if target_path.exists() {
+                    return Err(format!(
+                        "Cannot rename file on disk: A file named '{}' already exists in the folder.",
+                        target_file_name
+                    ));
+                }
+
+                log::info!(
+                    "Renaming .afsn file on disk from {:?} to {:?}",
+                    old_path,
+                    target_path
+                );
+                std::fs::rename(old_path, &target_path).map_err(|e| {
+                    format!("Failed to rename file on disk (it may be open or locked): {}", e)
+                })?;
+
+                new_file_path = Some(target_path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    db.update_project_name_and_path(&id, clean_name, new_file_path.as_deref())
+        .map_err(|e| e.to_string())?;
+
+    db.get_project(&id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Failed to reload updated project".to_string())
 }
 
 #[tauri::command]
