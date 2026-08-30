@@ -927,13 +927,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const physicalX = dropX / scaleFactor;
       const physicalY = dropY / scaleFactor;
 
-      const targetFrame = [...activeSpread.elements].reverse().find((f) =>
-        physicalX >= f.x &&
-        physicalX <= f.x + f.width &&
-        physicalY >= f.y &&
-        physicalY <= f.y + f.height
-      );
-      setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
+      // Only show replace target highlight if ALT key is held
+      if (e.altKey) {
+        const targetFrame = [...activeSpread.elements].reverse().find((f) =>
+          physicalX >= f.x &&
+          physicalX <= f.x + f.width &&
+          physicalY >= f.y &&
+          physicalY <= f.y + f.height
+        );
+        setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
+      } else {
+        setHoveredDropFrameId(null);
+      }
     }
   };
 
@@ -985,19 +990,23 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropX / scaleFactor));
       const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropY / scaleFactor));
 
-      // Check if dropped directly onto an existing frame
-      const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
-        physicalX >= f.x &&
-        physicalX <= f.x + f.width &&
-        physicalY >= f.y &&
-        physicalY <= f.y + f.height
-      );
+      // Replace photo only if ALT key was held during drop
+      if (e.altKey) {
+        const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
+          physicalX >= f.x &&
+          physicalX <= f.x + f.width &&
+          physicalY >= f.y &&
+          physicalY <= f.y + f.height
+        );
 
-      if (targetFrame) {
-        replacePhotoInFrame(activeSpread.id, targetFrame.id, photo);
-      } else {
-        addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
+        if (targetFrame) {
+          replacePhotoInFrame(activeSpread.id, targetFrame.id, photo);
+          return;
+        }
       }
+
+      // Default: Add as new frame at drop position (stacking / overlaying freely)
+      addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
     } else {
       addPhotoToSpread(activeSpread.id, photo);
     }
@@ -1725,8 +1734,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
                     }
 
-                    // Check if hovering over another frame for canvas swap
-                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                    // Check if hovering over another frame for canvas swap (Only highlight when ALT is held)
+                    const isAltPressed = Boolean(e.evt?.altKey);
+                    if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
                       const draggedCenterPhysX = currentPhysX + frame.width / 2;
                       const draggedCenterPhysY = currentPhysY + frame.height / 2;
                       const hoverTarget = (activeSpread.elements || []).find((f) =>
@@ -1737,6 +1747,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         draggedCenterPhysY <= f.y + f.height
                       );
                       setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
+                    } else {
+                      setHoveredDropFrameId(null);
                     }
 
                     // Move all companion selected photo nodes synchronously in screen pixels
@@ -1775,8 +1787,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         }
                       }
 
-                      // Check if dropped directly onto another frame on the canvas to SWAP
-                      if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                      // Check if dropped directly onto another frame on the canvas to SWAP (Requires ALT key)
+                      const isAltPressed = Boolean(e.evt?.altKey);
+                      if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
                         const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
                         const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
                         const dropTarget = (activeSpread.elements || []).find((f) =>
