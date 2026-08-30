@@ -465,9 +465,9 @@ function PhotoFrameNode({
             strokeScaleEnabled={false}
           />
           <Rect
-            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 190)) / 2)}
+            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 145)) / 2)}
             y={Math.max(0, (pixelH - 28) / 2)}
-            width={isAltDrop ? 130 : 190}
+            width={isAltDrop ? 130 : 145}
             height={28}
             fill={isAltDrop ? "rgba(6, 78, 59, 0.94)" : "rgba(15, 23, 42, 0.94)"}
             cornerRadius={6}
@@ -476,11 +476,11 @@ function PhotoFrameNode({
             strokeScaleEnabled={false}
           />
           <KonvaText
-            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 190)) / 2)}
+            x={Math.max(0, (pixelW - (isAltDrop ? 130 : 145)) / 2)}
             y={Math.max(0, (pixelH - 28) / 2) + 7}
-            width={isAltDrop ? 130 : 190}
+            width={isAltDrop ? 130 : 145}
             align="center"
-            text={isAltDrop ? "🔄 Replace Photo" : "➕ Overlay (Hold Alt to Replace)"}
+            text={isAltDrop ? "🔄 Replace Photo" : "Hold Alt to Replace"}
             fontSize={11}
             fontStyle="bold"
             fill={isAltDrop ? "#ffffff" : "#93c5fd"}
@@ -2242,13 +2242,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             }}
           >
             {dragDropHud.actionType === 'replace' && (
-              <span>🔄 <strong>Replace Photo</strong> in Frame</span>
+              <span>🔄 <strong>Replace Photo</strong></span>
             )}
             {dragDropHud.actionType === 'overlay' && (
-              <span>➕ <strong>Add as Overlay</strong> <span className={styles.hudKeyHint}>(Hold Alt to Replace)</span></span>
+              <span>Hold <strong>Alt</strong> to Replace</span>
             )}
             {dragDropHud.actionType === 'add' && (
-              <span>➕ Add Photo to Spread</span>
+              <span>➕ Add Photo</span>
             )}
           </div>
         )}
