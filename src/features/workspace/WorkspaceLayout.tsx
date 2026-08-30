@@ -1355,7 +1355,7 @@ export function WorkspaceLayout() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Default Gap</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '120px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
                       <NumberInput
                         value={currentProject.spacingValue}
                         onChange={(val) => {
@@ -1366,27 +1366,11 @@ export function WorkspaceLayout() {
                         min={0}
                         max={100}
                         step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : 0.5}
+                        precision={currentProject.spacingUnit === 'inch' || currentProject.spacingUnit === 'cm' ? 2 : 1}
                       />
-                      <select
-                        value={currentProject.spacingUnit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as Unit;
-                          updateProjectSpacing(currentProject.spacingValue, newUnit);
-                        }}
-                        style={{
-                          fontSize: '10px',
-                          backgroundColor: 'var(--color-bg-secondary)',
-                          color: 'var(--color-text-primary)',
-                          border: '1px solid var(--color-border)',
-                          borderRadius: 'var(--radius-sm)',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <option value="mm">mm</option>
-                        <option value="cm">cm</option>
-                        <option value="inch">in</option>
-                      </select>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '24px' }}>
+                        {currentProject.spacingUnit}
+                      </span>
                     </div>
                   </div>
 

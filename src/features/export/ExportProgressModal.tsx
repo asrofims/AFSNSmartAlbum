@@ -23,6 +23,58 @@ interface ExportProgressModalProps {
   onClose: () => void;
 }
 
+function AnimatedExportPhotoIcon() {
+  return (
+    <div className={styles.photoAnimationContainer}>
+      <svg width="68" height="68" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg" className={styles.photoSvg}>
+        <defs>
+          <linearGradient id="expPhotoGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8b5cf6" />
+            <stop offset="50%" stopColor="#ec4899" />
+            <stop offset="100%" stopColor="#f59e0b" />
+          </linearGradient>
+          <linearGradient id="expPhotoGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#06b6d4" />
+            <stop offset="50%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+          <linearGradient id="expSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fde047" />
+            <stop offset="100%" stopColor="#f97316" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer Aura Glow */}
+        <circle cx="34" cy="34" r="28" fill="url(#expPhotoGrad2)" opacity="0.18" className={styles.auraPulse} />
+
+        {/* Back Photo Card (Tilted left) */}
+        <g className={styles.backCard}>
+          <rect x="10" y="16" width="38" height="30" rx="4" fill="#1e293b" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+          <rect x="13" y="19" width="32" height="24" rx="2" fill="url(#expPhotoGrad1)" opacity="0.85" />
+        </g>
+
+        {/* Front Photo Card (Tilted right, vibrant scenery) */}
+        <g className={styles.frontCard}>
+          <rect x="18" y="22" width="40" height="32" rx="5" fill="#ffffff" stroke="rgba(255,255,255,0.9)" strokeWidth="1.5" />
+          {/* Photo Inner Screen */}
+          <rect x="21" y="25" width="34" height="26" rx="3" fill="url(#expPhotoGrad2)" />
+          {/* Sun */}
+          <circle cx="28" cy="31" r="3.5" fill="url(#expSunGrad)" />
+          {/* Landscape Mountains */}
+          <path d="M21 47 L30 38 L36 43 L45 33 L55 47 Z" fill="#0f172a" opacity="0.65" />
+          <path d="M28 47 L36 40 L43 45 L50 37 L55 44 L55 47 Z" fill="#1e1b4b" opacity="0.85" />
+        </g>
+
+        {/* Sparkles / Magic Stars */}
+        <g className={styles.sparkleGroup}>
+          <path d="M52 14 L53.5 18 L57.5 19.5 L53.5 21 L52 25 L50.5 21 L46.5 19.5 L50.5 18 Z" fill="#fbbf24" className={styles.sparkle1} />
+          <path d="M14 12 L15 15 L18 16 L15 17 L14 20 L13 17 L10 16 L13 15 Z" fill="#38bdf8" className={styles.sparkle2} />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgressModalProps) {
   const [progress, setProgress] = useState<ExportProgressPayload>({
     current: 0,
@@ -123,7 +175,7 @@ export function ExportProgressModal({ isOpen, outputDir, onClose }: ExportProgre
             <div className={styles.successIcon}>🎉</div>
           )
         ) : (
-          <div className={styles.iconWrapper}>⚙️</div>
+          <AnimatedExportPhotoIcon />
         )}
 
         <div className={styles.title}>

@@ -730,7 +730,7 @@ export function NewProjectDialog() {
                       label="Unit"
                       value={photoInsetUnit}
                       options={UNIT_OPTIONS}
-                      onChange={handleUnitChange}
+                      disabled
                     />
                   </div>
                 </div>
@@ -762,7 +762,7 @@ export function NewProjectDialog() {
                         label="Unit"
                         value={photoInsetUnit}
                         options={UNIT_OPTIONS}
-                        onChange={handleUnitChange}
+                        disabled
                       />
                     </div>
                   </div>
@@ -814,7 +814,7 @@ export function NewProjectDialog() {
                     label="Unit"
                     value={spacingUnit}
                     options={UNIT_OPTIONS}
-                    onChange={handleUnitChange}
+                    disabled
                   />
                 </div>
               </div>
