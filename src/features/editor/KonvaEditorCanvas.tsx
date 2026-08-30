@@ -573,6 +573,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
   const [isHoveredDropAlt, setIsHoveredDropAlt] = useState(false);
+  const justDroppedRef = useRef(false);
 
   // Window & Drag lifecycle safety guards to guarantee clean reset
   useEffect(() => {
@@ -975,6 +976,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     e.stopPropagation();
     setHoveredDropFrameId(null);
     setIsHoveredDropAlt(false);
+    justDroppedRef.current = true;
+    setTimeout(() => {
+      justDroppedRef.current = false;
+    }, 250);
 
     let photo: Photo | null = null;
     try {
@@ -1025,6 +1030,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
         if (targetFrame) {
           replacePhotoInFrame(activeSpread.id, targetFrame.id, photo);
+          clearSelection();
           return;
         }
       }
@@ -1681,6 +1687,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   isAltDrop={isHoveredDropAlt}
                   scaleFactor={scaleFactor}
                   onSelect={(e) => {
+                    if (justDroppedRef.current) return;
                     if (e) {
                       e.cancelBubble = true;
                       const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
