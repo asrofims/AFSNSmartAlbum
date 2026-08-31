@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
+use crate::asset_cache::cleanup_orphaned_photo_assets;
 use crate::db::{Database, PhotoFolderRow, PhotoRow};
 use crate::photo_engine::{process_photo, scan_directory, SUPPORTED_EXTENSIONS};
 
@@ -338,10 +339,13 @@ pub fn toggle_photo_favorite(
 
 #[tauri::command]
 pub fn remove_photo(
+    app: AppHandle,
     db: State<'_, Database>,
     photo_id: String,
 ) -> Result<(), String> {
-    db.delete_photo(&photo_id).map_err(|e| e.to_string())
+    db.delete_photo(&photo_id).map_err(|e| e.to_string())?;
+    cleanup_orphaned_photo_assets(&app, &db)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -467,10 +471,13 @@ pub async fn relink_folder(
 
 #[tauri::command]
 pub fn batch_delete_photos(
+    app: AppHandle,
     db: State<'_, Database>,
     photo_ids: Vec<String>,
 ) -> Result<(), String> {
-    db.batch_delete_photos(&photo_ids).map_err(|e| e.to_string())
+    db.batch_delete_photos(&photo_ids).map_err(|e| e.to_string())?;
+    cleanup_orphaned_photo_assets(&app, &db)?;
+    Ok(())
 }
 
 #[tauri::command]

@@ -861,6 +861,13 @@ impl Database {
         Ok(photos)
     }
 
+    pub fn get_photo_ids(&self) -> SqliteResult<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id FROM photos")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        rows.collect()
+    }
+
     pub fn get_photo(&self, photo_id: &str) -> SqliteResult<Option<PhotoRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -1906,6 +1913,7 @@ mod tests {
 
         let photos = db.get_photos_for_project("test-id-1").expect("Failed to get photos");
         assert_eq!(photos.len(), 2);
+        assert_eq!(db.get_photo_ids().expect("Failed to get photo IDs").len(), 2);
 
         db.update_photo_preview("photo-1", "C:\\cache\\preview1.jpg")
             .expect("Failed to update photo preview");

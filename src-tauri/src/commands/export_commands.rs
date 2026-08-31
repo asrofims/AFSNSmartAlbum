@@ -693,8 +693,13 @@ fn export_album_high_res_worker(
         };
         let pdf_dest = output_path.join(&pdf_filename);
 
-        assemble_pdf_from_jpegs(&temp_jpegs_for_pdf, &pdf_dest, options.dpi)
-            .map_err(|e| format!("Failed to assemble PDF: {}", e))?;
+        let pdf_result = assemble_pdf_from_jpegs(&temp_jpegs_for_pdf, &pdf_dest, options.dpi);
+        for (temp_jpeg, _, _) in &temp_jpegs_for_pdf {
+            if let Err(err) = fs::remove_file(temp_jpeg) {
+                log::warn!("Failed to remove temporary PDF JPEG {}: {}", temp_jpeg.display(), err);
+            }
+        }
+        pdf_result.map_err(|e| format!("Failed to assemble PDF: {}", e))?;
 
         output_files = vec![pdf_dest.to_string_lossy().to_string()];
     }

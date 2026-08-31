@@ -33,6 +33,7 @@
 - [x] Batch Action Bar (Batch Favorite, Copy, Move/Add to Folder, Batch Delete)
 - [x] Right-Click Context Menu for Photo Cards
 - [x] Missing Photo Detection & Automatic Relinking Wizard with spread-frame asset recovery
+- [x] Automatic Orphaned Thumbnail & Preview Cache Cleanup
 
 ## Phase 3 — Album Structure
 - [x] Spread Model (Left Page, Center Gutter/Crease, Spine Width, Right Page)
@@ -96,4 +97,3 @@
 - [x] Persistent Last Export Destination Directory
 - [x] 2-Way Upfront Pre-Flight Verification (Missing original photo check & Destination overwrite collision warning)
 - [x] Real-time Granular Progress Tracking Modal with Direct Destination Folder Launcher
-

@@ -1,3 +1,4 @@
+mod asset_cache;
 mod commands;
 mod db;
 mod photo_engine;
@@ -70,6 +71,18 @@ pub fn run() {
 
             let database = Database::init(db_path)
                 .expect("Failed to initialize database");
+
+            match asset_cache::cleanup_orphaned_photo_assets(&app.handle(), &database) {
+                Ok(report) if report.removed_files > 0 => {
+                    log::info!(
+                        "Removed {} orphaned photo cache file(s), reclaiming {} bytes",
+                        report.removed_files,
+                        report.reclaimed_bytes
+                    );
+                }
+                Ok(_) => {}
+                Err(err) => log::warn!("Photo cache cleanup skipped: {}", err),
+            }
 
             // Make database, launch state, import and export state available as managed state
             app.manage(database);

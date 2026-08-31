@@ -1,7 +1,8 @@
 use serde::Deserialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
+use crate::asset_cache::cleanup_orphaned_photo_assets;
 use crate::db::{AlbumPayload, Database, ProjectPackagePayload, ProjectRow};
 
 #[derive(Default)]
@@ -102,15 +103,19 @@ pub fn list_recent_projects(db: State<'_, Database>, limit: Option<i32>) -> Resu
 }
 
 #[tauri::command]
-pub fn delete_project(db: State<'_, Database>, id: String) -> Result<(), String> {
+pub fn delete_project(app: AppHandle, db: State<'_, Database>, id: String) -> Result<(), String> {
     log::info!("delete_project: {}", id);
-    db.delete_project(&id).map_err(|e| e.to_string())
+    db.delete_project(&id).map_err(|e| e.to_string())?;
+    cleanup_orphaned_photo_assets(&app, &db)?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn clear_recent_projects(db: State<'_, Database>) -> Result<(), String> {
+pub fn clear_recent_projects(app: AppHandle, db: State<'_, Database>) -> Result<(), String> {
     log::info!("clear_recent_projects");
-    db.clear_recent_projects().map_err(|e| e.to_string())
+    db.clear_recent_projects().map_err(|e| e.to_string())?;
+    cleanup_orphaned_photo_assets(&app, &db)?;
+    Ok(())
 }
 
 #[tauri::command]
