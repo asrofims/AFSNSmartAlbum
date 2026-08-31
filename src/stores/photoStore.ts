@@ -150,7 +150,21 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       set({ photos: photos || [], error: null });
       await get().loadFolders(projectId);
       await get().checkMissing(projectId);
-      await syncAlbumFramePhotoAssets(photos || []);
+      await syncAlbumFramePhotoAssets(get().photos);
+
+      // Existing projects receive previews in the background without delaying the initial photo library load.
+      void (async () => {
+        try {
+          const refreshedPhotos = await invoke<Photo[]>('generate_missing_previews', { projectId });
+          const isCurrentProject = get().photos.some((photo) => photo.projectId === projectId);
+          if (!isCurrentProject || !Array.isArray(refreshedPhotos)) return;
+
+          set({ photos: refreshedPhotos });
+          await syncAlbumFramePhotoAssets(refreshedPhotos);
+        } catch (err) {
+          console.warn('[AFSN] generate_missing_previews error:', err);
+        }
+      })();
     } catch (err) {
       console.warn('[AFSN] loadPhotos fallback or error:', err);
     }
@@ -325,16 +339,16 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   healThumbnail: async (photoId: string) => {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const newPath = await invoke<string>('regenerate_single_thumbnail', { photoId });
-      if (newPath) {
+      const regeneratedPhoto = await invoke<Photo>('regenerate_single_thumbnail', { photoId });
+      if (regeneratedPhoto?.thumbnailPath) {
         let nextPhotos: Photo[] = [];
         set((s) => ({
           photos: (nextPhotos = s.photos.map((p) =>
-            p.id === photoId ? { ...p, thumbnailPath: newPath, isMissing: false } : p
+            p.id === photoId ? regeneratedPhoto : p
           )),
         }));
         await syncAlbumFramePhotoAssets(nextPhotos);
-        return newPath;
+        return regeneratedPhoto.thumbnailPath;
       }
       return null;
     } catch (err) {

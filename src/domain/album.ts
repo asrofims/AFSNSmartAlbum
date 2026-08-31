@@ -54,7 +54,7 @@ export interface Album {
   totalPages: number;
 }
 
-export type PhotoAsset = Pick<Photo, 'id' | 'filePath' | 'fileName' | 'previewPath' | 'thumbnailPath' | 'width' | 'height'>;
+export type PhotoAsset = Pick<Photo, 'id' | 'filePath' | 'fileName' | 'previewPath' | 'thumbnailPath' | 'width' | 'height' | 'isMissing'>;
 
 function isDifferentFrameAsset(a: PhotoFrameElement, b: PhotoFrameElement): boolean {
   return (
@@ -72,7 +72,13 @@ export function mergeFramePhotoAsset(frame: PhotoFrameElement, photo?: PhotoAsse
   }
 
   const nextFilePath = photo.filePath || frame.filePath || '';
-  const nextPreviewPath = photo.previewPath || photo.thumbnailPath || photo.filePath || frame.previewPath || frame.thumbnailPath || frame.filePath || '';
+  const nextPreviewPath = photo.previewPath
+    || (!photo.isMissing ? photo.filePath : '')
+    || photo.thumbnailPath
+    || frame.thumbnailPath
+    || frame.previewPath
+    || frame.filePath
+    || '';
   const nextThumbnailPath = photo.thumbnailPath || frame.thumbnailPath || '';
   const nextPhotoAspect = photo.width > 0 && photo.height > 0
     ? Math.round((photo.width / photo.height) * 1000) / 1000

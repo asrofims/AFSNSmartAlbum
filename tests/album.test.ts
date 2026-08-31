@@ -164,20 +164,35 @@ const recoveredPhoto = {
   id: 'photo-relink-1',
   filePath: 'E:/recovered/session/photo-001.jpg',
   fileName: 'photo-001.jpg',
-  previewPath: null,
+  previewPath: 'C:/cache/recovered-photo-001-preview.jpg',
   thumbnailPath: 'C:/cache/recovered-photo-001.jpg',
   width: 6000,
   height: 4000,
+  isMissing: false,
 };
 const recoveredFrame = mergeFramePhotoAsset(staleFrame, recoveredPhoto);
 console.assert(recoveredFrame.filePath === recoveredPhoto.filePath, 'Recovered frame should use the relinked original path');
 console.assert(recoveredFrame.thumbnailPath === recoveredPhoto.thumbnailPath, 'Recovered frame should use the regenerated thumbnail');
-console.assert(recoveredFrame.previewPath === recoveredPhoto.thumbnailPath, 'Recovered frame should fall back to the healthy thumbnail when no preview exists');
+console.assert(recoveredFrame.previewPath === recoveredPhoto.previewPath, 'Recovered frame should use the generated canvas preview');
 console.assert(recoveredFrame.photoAspect === 1.5, 'Recovered frame should refresh its native photo aspect');
 console.assert(recoveredFrame.x === staleFrame.x && recoveredFrame.y === staleFrame.y, 'Recovery should preserve frame position');
 console.assert(recoveredFrame.width === staleFrame.width && recoveredFrame.height === staleFrame.height, 'Recovery should preserve frame size');
 console.assert(recoveredFrame.cropX === staleFrame.cropX && recoveredFrame.cropY === staleFrame.cropY && recoveredFrame.cropScale === staleFrame.cropScale, 'Recovery should preserve crop settings');
 console.assert(mergeFramePhotoAsset(staleFrame, { ...recoveredPhoto, id: 'other-photo' }) === staleFrame, 'Unrelated photos must not alter a frame');
+
+const recoveredWithoutPreview = mergeFramePhotoAsset(staleFrame, {
+  ...recoveredPhoto,
+  previewPath: null,
+});
+console.assert(recoveredWithoutPreview.previewPath === recoveredPhoto.filePath, 'Recovered frame should use the original only while a canvas preview is unavailable');
+
+const missingFrame = mergeFramePhotoAsset(staleFrame, {
+  ...recoveredPhoto,
+  filePath: staleFrame.filePath,
+  previewPath: null,
+  isMissing: true,
+});
+console.assert(missingFrame.previewPath === recoveredPhoto.thumbnailPath, 'Missing photos should still use a healthy thumbnail instead of the broken original path');
 
 const relinkAlbum = {
   ...recalculated,

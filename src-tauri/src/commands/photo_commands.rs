@@ -194,7 +194,7 @@ async fn import_paths_internal(
                             format: processed.format,
                             thumbnail_path: processed.thumbnail_path,
                             thumbnail_base64: None,
-                            preview_path: None,
+                            preview_path: processed.preview_path,
                             is_favorite: false,
                             used_count: 0,
                             is_missing: false,
@@ -206,6 +206,9 @@ async fn import_paths_internal(
                             let _ = db_thread.relink_photo(&photo_id, &row.file_path);
                             if let Some(tp) = &row.thumbnail_path {
                                 let _ = db_thread.update_photo_thumbnail(&photo_id, tp);
+                            }
+                            if let Some(pp) = &row.preview_path {
+                                let _ = db_thread.update_photo_preview(&photo_id, pp);
                             }
                         } else {
                             let _ = db_thread.add_photo(&row);
@@ -282,6 +285,49 @@ pub fn get_project_photos(
 }
 
 #[tauri::command]
+pub async fn generate_missing_previews(
+    app: AppHandle,
+    project_id: String,
+) -> Result<Vec<PhotoRow>, String> {
+    let db = app.state::<Database>();
+    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+    let photos_needing_preview: Vec<PhotoRow> = photos
+        .into_iter()
+        .filter(|photo| {
+            !photo.is_missing
+                && Path::new(&photo.file_path).exists()
+                && photo.preview_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true)
+        })
+        .collect();
+
+    if photos_needing_preview.is_empty() {
+        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
+    }
+
+    let cache_dir = get_cache_dir(&app);
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let db_thread = app_clone.state::<Database>();
+        // Backfill runs in the background but sequentially to keep peak memory bounded for old projects.
+        for photo in photos_needing_preview {
+            if let Ok(processed) = process_photo(Path::new(&photo.file_path), &cache_dir, &photo.id) {
+                if let Some(thumbnail_path) = processed.thumbnail_path {
+                    let _ = db_thread.update_photo_thumbnail(&photo.id, &thumbnail_path);
+                }
+                if let Some(preview_path) = processed.preview_path {
+                    let _ = db_thread.update_photo_preview(&photo.id, &preview_path);
+                }
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let db = app.state::<Database>();
+    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn toggle_photo_favorite(
     db: State<'_, Database>,
     photo_id: String,
@@ -318,7 +364,7 @@ pub fn check_missing_photos(
 pub async fn regenerate_single_thumbnail(
     app: AppHandle,
     photo_id: String,
-) -> Result<String, String> {
+) -> Result<PhotoRow, String> {
     let db = app.state::<Database>();
     let photo = db
         .get_photo(&photo_id)
@@ -335,19 +381,23 @@ pub async fn regenerate_single_thumbnail(
     let app_clone = app.clone();
     let photo_id_clone = photo_id.clone();
 
-    let new_thumb_path = tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
         let processed = process_photo(&file_path, &cache_dir, &photo_id_clone)?;
         let thumb_path = processed.thumbnail_path.ok_or_else(|| "Failed to generate thumbnail".to_string())?;
         
         let db_thread = app_clone.state::<Database>();
         let _ = db_thread.update_photo_thumbnail(&photo_id_clone, &thumb_path);
+        if let Some(preview_path) = processed.preview_path {
+            let _ = db_thread.update_photo_preview(&photo_id_clone, &preview_path);
+        }
         let _ = db_thread.update_photo_missing(&photo_id_clone, false);
-        Ok::<String, String>(thumb_path)
+        db_thread
+            .get_photo(&photo_id_clone)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Photo not found after regeneration: {}", photo_id_clone))
     })
     .await
-    .map_err(|e| e.to_string())??;
-
-    Ok(new_thumb_path)
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -396,6 +446,9 @@ pub async fn relink_folder(
                     if let Ok(processed) = process_photo(matching, &cache_dir, &photo.id) {
                         if let Some(tp) = processed.thumbnail_path {
                             let _ = db_thread.update_photo_thumbnail(&photo.id, &tp);
+                        }
+                        if let Some(pp) = processed.preview_path {
+                            let _ = db_thread.update_photo_preview(&photo.id, &pp);
                         }
                     }
                     log::info!("Relinked photo {} to {:?}", photo.file_name, new_path);

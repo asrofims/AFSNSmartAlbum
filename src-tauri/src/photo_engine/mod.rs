@@ -11,11 +11,13 @@ pub struct ProcessedPhoto {
     pub height: u32,
     pub format: String,
     pub thumbnail_path: Option<String>,
+    pub preview_path: Option<String>,
     #[allow(dead_code)]
     pub thumbnail_base64: Option<String>,
 }
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"];
+pub const PREVIEW_MAX_DIMENSION: u32 = 1200;
 
 pub fn is_supported_image(path: &Path) -> bool {
     path.extension()
@@ -94,12 +96,13 @@ fn try_extract_embedded_thumbnail(file_path: &Path, thumb_dest: &Path) -> Option
     None
 }
 
-/// Inspects image metadata and generates a thumbnail cache file.
+/// Inspects image metadata and generates disk-cached thumbnail and canvas preview files.
 /// Standard Industry Pipeline:
 /// 1. Instant header-only dimension check (no full pixel decode)
 /// 2. Embedded EXIF thumbnail extraction (instant 0.2ms from camera JPEG)
 /// 3. Fallback: Fast downsampled thumbnailing (240px)
-/// 4. Disk-cached JPEG only — ZERO base64 memory overhead in DB/IPC
+/// 4. Canvas preview generation (max 1200px)
+/// 5. Disk-cached JPEG only — ZERO base64 memory overhead in DB/IPC
 pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Result<ProcessedPhoto, String> {
     if !file_path.exists() {
         return Err(format!("File does not exist: {:?}", file_path));
@@ -134,6 +137,9 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
     let thumbs_dir = cache_dir.join("thumbnails");
     let _ = fs::create_dir_all(&thumbs_dir);
     let thumb_file_path = thumbs_dir.join(format!("{}.jpg", photo_id));
+    let previews_dir = cache_dir.join("previews");
+    let _ = fs::create_dir_all(&previews_dir);
+    let preview_file_path = previews_dir.join(format!("{}.jpg", photo_id));
 
     // 2. Try Embedded EXIF thumbnail extraction (0.2 millisecond - no decoding needed!)
     let mut thumb_created = false;
@@ -144,11 +150,12 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
     }
 
     // 3. Fallback: If no embedded thumbnail was present, generate fast downscaled thumbnail
+    let decoded_image = image::open(file_path).ok();
+
     if !thumb_created {
-        if let Ok(img) = image::open(file_path) {
+        if let Some(img) = decoded_image.as_ref() {
             let thumb = img.thumbnail(240, 240);
-            let _ = thumb.save_with_format(&thumb_file_path, ImageFormat::Jpeg);
-            thumb_created = true;
+            thumb_created = thumb.save_with_format(&thumb_file_path, ImageFormat::Jpeg).is_ok();
         }
     }
 
@@ -158,6 +165,14 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
         None
     };
 
+    let preview_path_str = decoded_image.as_ref().and_then(|img| {
+        let preview = img.thumbnail(PREVIEW_MAX_DIMENSION, PREVIEW_MAX_DIMENSION);
+        preview
+            .save_with_format(&preview_file_path, ImageFormat::Jpeg)
+            .ok()
+            .map(|_| preview_file_path.to_string_lossy().to_string())
+    });
+
     Ok(ProcessedPhoto {
         file_path: file_path.to_string_lossy().to_string(),
         file_name,
@@ -166,6 +181,7 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
         height,
         format: format_str,
         thumbnail_path: thumb_path_str,
+        preview_path: preview_path_str,
         thumbnail_base64: None,
     })
 }
@@ -182,7 +198,7 @@ mod tests {
         fs::create_dir_all(&temp_dir).unwrap();
 
         let sample_img_path = temp_dir.join("sample.png");
-        let mut img = RgbImage::new(400, 300);
+        let mut img = RgbImage::new(1600, 800);
         for pixel in img.pixels_mut() {
             *pixel = Rgb([200, 100, 50]);
         }
@@ -191,10 +207,13 @@ mod tests {
         assert!(is_supported_image(&sample_img_path));
 
         let processed = process_photo(&sample_img_path, &temp_dir, "test-p1").expect("Processing failed");
-        assert_eq!(processed.width, 400);
-        assert_eq!(processed.height, 300);
+        assert_eq!(processed.width, 1600);
+        assert_eq!(processed.height, 800);
         assert_eq!(processed.format, "png");
         assert!(processed.thumbnail_path.is_some());
+        let preview_path = processed.preview_path.expect("Canvas preview should be generated");
+        let preview_dimensions = image::image_dimensions(preview_path).expect("Preview should be readable");
+        assert_eq!(preview_dimensions, (1200, 600));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

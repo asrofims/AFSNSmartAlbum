@@ -24,7 +24,7 @@
 ## Phase 2 — Photo Library (Lightroom-Style Management)
 - [x] Native File & Directory Import via Tauri dialogs
 - [x] Drag & Drop Import from Windows Explorer
-- [x] Background Multi-threaded Thumbnail & Preview Generation
+- [x] Background Multi-threaded Thumbnail (240 px) & Canvas Preview (1200 px) Generation
 - [x] High-performance SQLite Metadata Indexing
 - [x] Used / Unused Photo Count Badges
 - [x] Favorite Star Toggle & Filter
@@ -96,5 +96,4 @@
 - [x] Persistent Last Export Destination Directory
 - [x] 2-Way Upfront Pre-Flight Verification (Missing original photo check & Destination overwrite collision warning)
 - [x] Real-time Granular Progress Tracking Modal with Direct Destination Folder Launcher
-
 

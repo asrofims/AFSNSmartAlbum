@@ -103,6 +103,7 @@ pub fn run() {
             commands::photo_commands::select_and_import_folder,
             commands::photo_commands::import_file_paths,
             commands::photo_commands::get_project_photos,
+            commands::photo_commands::generate_missing_previews,
             commands::photo_commands::toggle_photo_favorite,
             commands::photo_commands::remove_photo,
             commands::photo_commands::check_missing_photos,

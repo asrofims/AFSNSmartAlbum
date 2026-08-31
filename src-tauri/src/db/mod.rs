@@ -931,6 +931,15 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_photo_preview(&self, photo_id: &str, preview_path: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE photos SET preview_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![preview_path, photo_id],
+        )?;
+        Ok(())
+    }
+
     pub fn relink_photo(&self, photo_id: &str, new_path: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -1897,6 +1906,11 @@ mod tests {
 
         let photos = db.get_photos_for_project("test-id-1").expect("Failed to get photos");
         assert_eq!(photos.len(), 2);
+
+        db.update_photo_preview("photo-1", "C:\\cache\\preview1.jpg")
+            .expect("Failed to update photo preview");
+        let photo_with_preview = db.get_photo("photo-1").unwrap().unwrap();
+        assert_eq!(photo_with_preview.preview_path.as_deref(), Some("C:\\cache\\preview1.jpg"));
 
         // Test Batch Favorites
         db.batch_toggle_favorites(&["photo-1".to_string(), "photo-2".to_string()], true).expect("Failed batch fav");
