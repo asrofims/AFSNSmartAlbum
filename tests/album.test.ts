@@ -5,7 +5,10 @@ import {
   duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
+  mergeFramePhotoAsset,
+  syncAlbumPhotoAssets,
 } from '../src/domain/album';
+import type { PhotoFrameElement } from '../src/domain/editor';
 
 console.log('Testing Album Structure Domain...');
 
@@ -131,5 +134,59 @@ if (duplicateResult) {
   console.assert(dupSpread.elements[0].cropScale === 1.2, 'Duplicated frame should retain crop scale');
   console.assert(dupSpread.elements[0].borderColor === '#FF0000', 'Duplicated frame should retain border color');
 }
+
+// 8. Test recovered photos refresh stored frame assets without changing the layout or crop
+const staleFrame: PhotoFrameElement = {
+  id: 'frame-relink-1',
+  type: 'photo',
+  photoId: 'photo-relink-1',
+  filePath: 'D:/missing/session/photo-001.jpg',
+  previewPath: 'D:/missing/session/photo-001.jpg',
+  thumbnailPath: 'C:/cache/stale-photo-001.jpg',
+  fileName: 'photo-001.jpg',
+  x: 12,
+  y: 18,
+  width: 140,
+  height: 90,
+  rotation: 5,
+  zIndex: 2,
+  photoAspect: 1.5,
+  cropX: 0.18,
+  cropY: -0.12,
+  cropScale: 1.35,
+  cropRotation: 2,
+  borderEnabled: true,
+  borderWidth: 1.5,
+  borderColor: '#112233',
+  opacity: 0.8,
+};
+const recoveredPhoto = {
+  id: 'photo-relink-1',
+  filePath: 'E:/recovered/session/photo-001.jpg',
+  fileName: 'photo-001.jpg',
+  previewPath: null,
+  thumbnailPath: 'C:/cache/recovered-photo-001.jpg',
+  width: 6000,
+  height: 4000,
+};
+const recoveredFrame = mergeFramePhotoAsset(staleFrame, recoveredPhoto);
+console.assert(recoveredFrame.filePath === recoveredPhoto.filePath, 'Recovered frame should use the relinked original path');
+console.assert(recoveredFrame.thumbnailPath === recoveredPhoto.thumbnailPath, 'Recovered frame should use the regenerated thumbnail');
+console.assert(recoveredFrame.previewPath === recoveredPhoto.thumbnailPath, 'Recovered frame should fall back to the healthy thumbnail when no preview exists');
+console.assert(recoveredFrame.photoAspect === 1.5, 'Recovered frame should refresh its native photo aspect');
+console.assert(recoveredFrame.x === staleFrame.x && recoveredFrame.y === staleFrame.y, 'Recovery should preserve frame position');
+console.assert(recoveredFrame.width === staleFrame.width && recoveredFrame.height === staleFrame.height, 'Recovery should preserve frame size');
+console.assert(recoveredFrame.cropX === staleFrame.cropX && recoveredFrame.cropY === staleFrame.cropY && recoveredFrame.cropScale === staleFrame.cropScale, 'Recovery should preserve crop settings');
+console.assert(mergeFramePhotoAsset(staleFrame, { ...recoveredPhoto, id: 'other-photo' }) === staleFrame, 'Unrelated photos must not alter a frame');
+
+const relinkAlbum = {
+  ...recalculated,
+  coverSpread: { ...recalculated.coverSpread, elements: [staleFrame] },
+  spreads: recalculated.spreads.map((spread) => ({ ...spread, elements: [] })),
+};
+const syncedRelinkAlbum = syncAlbumPhotoAssets(relinkAlbum, [recoveredPhoto]);
+console.assert(syncedRelinkAlbum.changed, 'Album asset sync should report recovered frames as changed');
+console.assert(syncedRelinkAlbum.album.coverSpread.elements[0].filePath === recoveredPhoto.filePath, 'Album asset sync should update cover frames too');
+console.assert(syncedRelinkAlbum.album.coverSpread.elements[0].cropScale === staleFrame.cropScale, 'Album asset sync should retain cover frame crop');
 
 console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model & spread duplication)!');

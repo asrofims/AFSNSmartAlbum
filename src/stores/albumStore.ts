@@ -9,6 +9,7 @@ import {
   duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
   getAllAlbumSpreads,
+  syncAlbumPhotoAssets,
 } from '../domain/album';
 import {
   LayoutTemplate,
@@ -23,7 +24,8 @@ import {
 } from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
 import { useProjectStore } from './projectStore';
-import { PhotoFrameElement } from '../domain/editor';
+import type { PhotoFrameElement } from '../domain/editor';
+import type { Photo } from '../domain/photo';
 
 export interface AlbumState {
   currentAlbum: Album | null;
@@ -48,6 +50,7 @@ export interface AlbumState {
   loadAlbumFromDb: (projectId: string) => Promise<boolean>;
   saveAlbumToDb: () => Promise<boolean>;
   setSaveStatus: (status: 'saved' | 'saving' | 'unsaved') => void;
+  syncPhotoAssets: (photos: Photo[], options?: { persist?: boolean }) => Promise<boolean>;
   undo: () => void;
   redo: () => void;
   setActiveSpread: (spreadId: string) => void;
@@ -159,6 +162,25 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   toggleSpreadDrawer: () => set((s) => ({ isSpreadDrawerOpen: !s.isSpreadDrawerOpen })),
   setSaveStatus: (status) => set({ saveStatus: status }),
 
+  syncPhotoAssets: async (photos, options = {}) => {
+    const { currentAlbum, saveAlbumToDb } = get();
+    if (!currentAlbum || photos.length === 0) return false;
+
+    const { album: syncedAlbum, changed } = syncAlbumPhotoAssets(currentAlbum, photos);
+    if (!changed) return false;
+
+    set({
+      currentAlbum: syncedAlbum,
+      saveStatus: options.persist ? 'saving' : 'unsaved',
+    });
+
+    if (options.persist) {
+      return saveAlbumToDb();
+    }
+
+    return true;
+  },
+
   initializeAlbum: (project: Project) => {
     const album = createInitialAlbum(project);
     useHistoryStore.getState().clearHistory();
@@ -185,6 +207,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           saveStatus: 'saved',
           lastSavedAt: new Date().toLocaleTimeString(),
         });
+        try {
+          const { usePhotoStore } = await import('./photoStore');
+          await get().syncPhotoAssets(usePhotoStore.getState().photos, { persist: true });
+        } catch (err) {
+          console.warn('[AFSN] sync loaded album photo assets error:', err);
+        }
         return true;
       }
     } catch (err) {
@@ -206,6 +234,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
             saveStatus: 'saved',
             lastSavedAt: new Date().toLocaleTimeString(),
           });
+          try {
+            const { usePhotoStore } = await import('./photoStore');
+            await get().syncPhotoAssets(usePhotoStore.getState().photos, { persist: true });
+          } catch (err) {
+            console.warn('[AFSN] sync loaded album photo assets error:', err);
+          }
           // Resync to SQLite
           try {
             await invoke('save_album_structure', { album: parsed.album });

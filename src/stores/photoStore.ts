@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { Photo, PhotoFolder, ImportProgress, PhotoFilter, PhotoSortBy, getRangeSelection } from '../domain/photo';
 
+async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promise<void> {
+  if (!Array.isArray(photos) || photos.length === 0) return;
+
+  try {
+    const { useAlbumStore } = await import('./albumStore');
+    await useAlbumStore.getState().syncPhotoAssets(photos, { persist });
+  } catch (err) {
+    console.warn('[AFSN] sync album photo assets error:', err);
+  }
+}
+
 interface PhotoState {
   photos: Photo[];
   folders: PhotoFolder[];
@@ -139,6 +150,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       set({ photos: photos || [], error: null });
       await get().loadFolders(projectId);
       await get().checkMissing(projectId);
+      await syncAlbumFramePhotoAssets(photos || []);
     } catch (err) {
       console.warn('[AFSN] loadPhotos fallback or error:', err);
     }
@@ -152,6 +164,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('select_and_import_files', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
+        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
       await get().loadFolders(projectId);
     } catch (err) {
@@ -170,6 +183,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('select_and_import_folder', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
+        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
       await get().loadFolders(projectId);
     } catch (err) {
@@ -189,6 +203,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('import_file_paths', { projectId, paths, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
+        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
       await get().loadFolders(projectId);
     } catch (err) {
@@ -300,6 +315,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('check_missing_photos', { projectId });
       if (Array.isArray(updatedPhotos)) {
         set({ photos: updatedPhotos });
+        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
     } catch (err) {
       console.warn('[AFSN] check_missing_photos error:', err);
@@ -311,11 +327,13 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const { invoke } = await import('@tauri-apps/api/core');
       const newPath = await invoke<string>('regenerate_single_thumbnail', { photoId });
       if (newPath) {
+        let nextPhotos: Photo[] = [];
         set((s) => ({
-          photos: s.photos.map((p) =>
+          photos: (nextPhotos = s.photos.map((p) =>
             p.id === photoId ? { ...p, thumbnailPath: newPath, isMissing: false } : p
-          ),
+          )),
         }));
+        await syncAlbumFramePhotoAssets(nextPhotos);
         return newPath;
       }
       return null;
@@ -331,6 +349,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('relink_folder', { projectId });
       if (Array.isArray(updatedPhotos)) {
         set({ photos: updatedPhotos, isRelinkOpen: false });
+        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
     } catch (err) {
       console.error('[AFSN] relink_folder error:', err);

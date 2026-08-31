@@ -1,6 +1,7 @@
-import { Project } from './project';
-import { Unit } from './units';
-import { PhotoFrameElement } from './editor';
+import type { Project } from './project';
+import type { Unit } from './units';
+import type { PhotoFrameElement } from './editor';
+import type { Photo } from './photo';
 
 export type PageType = 'cover_front' | 'cover_back' | 'left' | 'right' | 'single';
 export type SpreadType = 'cover' | 'interior';
@@ -51,6 +52,77 @@ export interface Album {
   spreads: Spread[]; // Interior spreads (index 0 = Spread 1: Pages 2-3, etc.)
   totalSpreads: number;
   totalPages: number;
+}
+
+export type PhotoAsset = Pick<Photo, 'id' | 'filePath' | 'fileName' | 'previewPath' | 'thumbnailPath' | 'width' | 'height'>;
+
+function isDifferentFrameAsset(a: PhotoFrameElement, b: PhotoFrameElement): boolean {
+  return (
+    a.filePath !== b.filePath ||
+    a.fileName !== b.fileName ||
+    a.previewPath !== b.previewPath ||
+    a.thumbnailPath !== b.thumbnailPath ||
+    a.photoAspect !== b.photoAspect
+  );
+}
+
+export function mergeFramePhotoAsset(frame: PhotoFrameElement, photo?: PhotoAsset | null): PhotoFrameElement {
+  if (!frame.photoId || !photo || frame.photoId !== photo.id) {
+    return frame;
+  }
+
+  const nextFilePath = photo.filePath || frame.filePath || '';
+  const nextPreviewPath = photo.previewPath || photo.thumbnailPath || photo.filePath || frame.previewPath || frame.thumbnailPath || frame.filePath || '';
+  const nextThumbnailPath = photo.thumbnailPath || frame.thumbnailPath || '';
+  const nextPhotoAspect = photo.width > 0 && photo.height > 0
+    ? Math.round((photo.width / photo.height) * 1000) / 1000
+    : frame.photoAspect;
+
+  const nextFrame: PhotoFrameElement = {
+    ...frame,
+    filePath: nextFilePath,
+    fileName: photo.fileName || frame.fileName || '',
+    previewPath: nextPreviewPath,
+    thumbnailPath: nextThumbnailPath,
+    photoAspect: nextPhotoAspect,
+  };
+
+  return isDifferentFrameAsset(frame, nextFrame) ? nextFrame : frame;
+}
+
+export function syncAlbumPhotoAssets(
+  album: Album,
+  photos: PhotoAsset[]
+): { album: Album; changed: boolean } {
+  if (photos.length === 0) {
+    return { album, changed: false };
+  }
+
+  const photoById = new Map(photos.map((photo) => [photo.id, photo]));
+  let changed = false;
+
+  const syncElements = (elements: PhotoFrameElement[]): PhotoFrameElement[] =>
+    elements.map((element) => {
+      const nextElement = mergeFramePhotoAsset(element, element.photoId ? photoById.get(element.photoId) : null);
+      if (nextElement !== element) {
+        changed = true;
+      }
+      return nextElement;
+    });
+
+  const coverSpread = {
+    ...album.coverSpread,
+    elements: syncElements(album.coverSpread.elements || []),
+  };
+
+  const spreads = album.spreads.map((spread) => ({
+    ...spread,
+    elements: syncElements(spread.elements || []),
+  }));
+
+  return changed
+    ? { album: { ...album, coverSpread, spreads }, changed: true }
+    : { album, changed: false };
 }
 
 /**
@@ -324,4 +396,3 @@ export function duplicateAlbumSpread(
 export function getAllAlbumSpreads(album: Album): Spread[] {
   return album.spreads;
 }
-

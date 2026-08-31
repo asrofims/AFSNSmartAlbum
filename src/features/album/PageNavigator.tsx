@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
+import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { getAllAlbumSpreads, Spread } from '../../domain/album';
+import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import styles from './PageNavigator.module.css';
@@ -21,6 +22,9 @@ interface MiniSpreadPreviewProps {
 }
 
 function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
+  const photos = usePhotoStore((s) => s.photos);
+  const photoById = new Map(photos.map((photo) => [photo.id, photo]));
+
   const totalPhysicalW = (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || project.canvasWidth) + (spread.gutterWidth || 0);
   const totalPhysicalH = spread.leftPage?.height || project.canvasHeight || 200;
 
@@ -59,11 +63,14 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
 
       {/* Real-time Rendered Photo Elements */}
       {(spread.elements || []).map((el) => {
+        const hydratedElement = mergeFramePhotoAsset(el, el.photoId ? photoById.get(el.photoId) : null);
         const x = el.x * scaleX;
         const y = el.y * scaleY;
         const w = Math.max(3, el.width * scaleX);
         const h = Math.max(3, el.height * scaleY);
-        const imgSrc = el.photoId ? (el.thumbnailPath || el.previewPath || el.filePath) : null;
+        const imgSrc = hydratedElement.photoId
+          ? (hydratedElement.thumbnailPath || hydratedElement.previewPath || hydratedElement.filePath)
+          : null;
 
         return (
           <div

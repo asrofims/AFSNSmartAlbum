@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Circle, Group, Image as KonvaImage, Transformer, Text as KonvaText, Label, Tag } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -19,7 +19,7 @@ import {
   clamp,
   intersectRect,
 } from '../../domain/editor';
-import { getAllAlbumSpreads } from '../../domain/album';
+import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { convertUnit } from '../../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
@@ -78,7 +78,7 @@ function PhotoFrameNode({
       return;
     }
 
-    const imgPath = frame.previewPath || frame.filePath || frame.thumbnailPath;
+    const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
     if (!imgPath) {
       setImageObj(null);
       return;
@@ -563,6 +563,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     nudgeSelected,
     multiResizeGapMode,
   } = useEditorStore();
+  const photos = usePhotoStore((s) => s.photos);
+  const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -1659,13 +1661,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           {/* Layer 2: Interactive Photo Frames */}
           <Layer>
             {(activeSpread.elements || []).map((frame) => {
+              const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
               const isSelected = selectedFrameIds.includes(frame.id);
               const isCrop = editingCropFrameId === frame.id;
 
               return (
                 <PhotoFrameNode
                   key={frame.id}
-                  frame={frame}
+                  frame={hydratedFrame}
                   isSelected={isSelected}
                   isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
                   isCropMode={isCrop}
