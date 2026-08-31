@@ -337,17 +337,21 @@ export function calculateSnapping(
   if (config.snapToPageEdges) {
     vTargets.push(
       { pos: 0, label: 'Spread Left Edge', kind: 'edge' },
-      { pos: spineLeft, label: 'Left Page Inner Edge', kind: 'edge' },
-      { pos: spineRight, label: 'Right Page Inner Edge', kind: 'edge' },
+      ...(gutterWidth > 0
+        ? [
+            { pos: spineLeft, label: 'Left Page Inner Edge', kind: 'edge' as const },
+            { pos: spineRight, label: 'Right Page Inner Edge', kind: 'edge' as const },
+          ]
+        : []),
       { pos: spreadWidth, label: 'Spread Right Edge', kind: 'edge' }
     );
   }
 
   if (config.snapToPageCenters) {
     vTargets.push(
-      { pos: leftPageCenter, label: 'Page 1 Center (Left)', kind: 'center' },
-      { pos: spineCenter, label: 'Spread Center X (Spine)', kind: 'center' },
-      { pos: rightPageCenter, label: 'Page 2 Center (Right)', kind: 'center' }
+      { pos: leftPageCenter, label: 'Left Page Center', kind: 'center' },
+      { pos: spineCenter, label: 'Spread Center X', kind: 'center' },
+      { pos: rightPageCenter, label: 'Right Page Center', kind: 'center' }
     );
   }
 
@@ -371,7 +375,7 @@ export function calculateSnapping(
   }
 
   if (config.snapToPageCenters) {
-    hTargets.push({ pos: spreadHeight / 2, label: 'Spread Center Y (Middle)', kind: 'center' });
+    hTargets.push({ pos: spreadHeight / 2, label: 'Spread Center Y', kind: 'center' });
   }
 
   if (config.snapToMargins && safeArea > 0) {
@@ -910,11 +914,11 @@ export function calculateResizeSnapping(
   }
   verticalTargets.push(
     { pos: 0, label: 'Spread Left' },
-    { pos: singlePageWidth / 2, label: 'Page 1 Center (Left)' },
+    { pos: singlePageWidth / 2, label: 'Left Page Center' },
     { pos: spineLeft, label: 'Spine Left' },
-    { pos: spreadWidth / 2, label: 'Spread Center X (Spine)' },
+    { pos: spreadWidth / 2, label: 'Spread Center X' },
     { pos: spineRight, label: 'Spine Right' },
-    { pos: spineRight + singlePageWidth / 2, label: 'Page 2 Center (Right)' },
+    { pos: spineRight + singlePageWidth / 2, label: 'Right Page Center' },
     { pos: spreadWidth, label: 'Spread Right' }
   );
   for (const o of otherFrames) {
@@ -934,7 +938,7 @@ export function calculateResizeSnapping(
   }
   horizontalTargets.push(
     { pos: 0, label: 'Spread Top' },
-    { pos: spreadHeight / 2, label: 'Spread Center Y (Middle)' },
+    { pos: spreadHeight / 2, label: 'Spread Center Y' },
     { pos: spreadHeight, label: 'Spread Bottom' }
   );
   for (const o of otherFrames) {

@@ -51,14 +51,14 @@ console.assert(snapCenter.snappedX === 250, `Should snap center to 300 (x=250), 
 const draggedNearLeftCenter: RectBounds = { x: 99, y: 50, width: 100, height: 80 };
 const snapLeftCenter = calculateSnapping(draggedNearLeftCenter, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, 3.0);
 console.assert(snapLeftCenter.snappedX === 98.5, `Should snap center to 148.5 (x=98.5), got ${snapLeftCenter.snappedX}`);
-console.assert(snapLeftCenter.snapLines[0].label === 'Page 1 Center (Left)', `Snap line should be Page 1 Center (Left), got ${snapLeftCenter.snapLines[0].label}`);
+console.assert(snapLeftCenter.snapLines[0].label === 'Left Page Center', `Snap line should be Left Page Center, got ${snapLeftCenter.snapLines[0].label}`);
 console.assert(snapLeftCenter.snapLines[0].kind === 'center', `Snap line kind should be center, got ${snapLeftCenter.snapLines[0].kind}`);
 
 // Dragged near Right Page Center (Page 2 Center = 451.5mm, frame width = 100mm, x = 402mm -> centerX = 452mm)
 const draggedNearRightCenter: RectBounds = { x: 402, y: 50, width: 100, height: 80 };
 const snapRightCenter = calculateSnapping(draggedNearRightCenter, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, 3.0);
 console.assert(snapRightCenter.snappedX === 401.5, `Should snap center to 451.5 (x=401.5), got ${snapRightCenter.snappedX}`);
-console.assert(snapRightCenter.snapLines[0].label === 'Page 2 Center (Right)', `Snap line should be Page 2 Center (Right), got ${snapRightCenter.snapLines[0].label}`);
+console.assert(snapRightCenter.snapLines[0].label === 'Right Page Center', `Snap line should be Right Page Center, got ${snapRightCenter.snapLines[0].label}`);
 console.assert(snapRightCenter.snapLines[0].kind === 'center', `Snap line kind should be center, got ${snapRightCenter.snapLines[0].kind}`);
 
 // 2. Test Snapping to Other Neighboring Frames
@@ -151,20 +151,20 @@ const panoramicFrame: RectBounds = { x: 199, y: 124, width: 200, height: 150 };
 const snapSpreadCenter = calculateSnapping(panoramicFrame, 600, 400, 10, 0, [], 3.0, 'mm');
 console.assert(snapSpreadCenter.snappedX === 200, `Should snap panoramic frame to Spread Center X (x=200), got ${snapSpreadCenter.snappedX}`);
 console.assert(snapSpreadCenter.snappedY === 125, `Should snap panoramic frame to Spread Center Y (y=125), got ${snapSpreadCenter.snappedY}`);
-console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center X (Spine)'), 'Should produce Spread Center X (Spine) snap line');
-console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center Y (Middle)'), 'Should produce Spread Center Y (Middle) snap line');
+console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center X'), 'Should produce Spread Center X snap line');
+console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center Y'), 'Should produce Spread Center Y snap line');
 
 // Test Left Page (Page 1) Center Snap: frame w=100 -> center at x=150 -> x=100
 const leftPageFrame: RectBounds = { x: 99, y: 50, width: 100, height: 100 };
 const snapLeftPageCenter = calculateSnapping(leftPageFrame, 600, 400, 10, 0, [], 3.0, 'mm');
-console.assert(snapLeftPageCenter.snappedX === 100, `Should snap to Page 1 Center (x=100), got ${snapLeftPageCenter.snappedX}`);
-console.assert(snapLeftPageCenter.snapLines.some((l) => l.label === 'Page 1 Center (Left)'), 'Should produce Page 1 Center (Left) snap line');
+console.assert(snapLeftPageCenter.snappedX === 100, `Should snap to Left Page Center (x=100), got ${snapLeftPageCenter.snappedX}`);
+console.assert(snapLeftPageCenter.snapLines.some((l) => l.label === 'Left Page Center'), 'Should produce Left Page Center snap line');
 
 // Test Right Page (Page 2) Center Snap: frame w=100 -> center at x=450 -> x=400
 const rightPageFrame: RectBounds = { x: 399, y: 50, width: 100, height: 100 };
 const snapRightPageCenter = calculateSnapping(rightPageFrame, 600, 400, 10, 0, [], 3.0, 'mm');
-console.assert(snapRightPageCenter.snappedX === 400, `Should snap to Page 2 Center (x=400), got ${snapRightPageCenter.snappedX}`);
-console.assert(snapRightPageCenter.snapLines.some((l) => l.label === 'Page 2 Center (Right)'), 'Should produce Page 2 Center (Right) snap line');
+console.assert(snapRightPageCenter.snappedX === 400, `Should snap to Right Page Center (x=400), got ${snapRightPageCenter.snappedX}`);
+console.assert(snapRightPageCenter.snapLines.some((l) => l.label === 'Right Page Center'), 'Should produce Right Page Center snap line');
 
 // 6. Test Resize Snapping (Match Width of Neighbor Frame)
 // Frame A: width=120

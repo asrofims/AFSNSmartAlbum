@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { Stage, Layer, Rect, Line, Group, Image as KonvaImage, Transformer, Text as KonvaText, Label, Tag } from 'react-konva';
+import { Stage, Layer, Rect, Line, Circle, Group, Image as KonvaImage, Transformer, Text as KonvaText, Label, Tag } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
@@ -2106,8 +2106,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
               const isVert = line.type === 'vertical';
               const linePx = line.position * scaleFactor;
-              const badgeX = isVert ? linePx : screenSpreadW / 2;
-              const badgeY = isVert ? screenSpreadH / 2 : linePx;
+              // Stagger badges near the spread edges so center crosshair labels stay readable.
+              const badgeX = isVert ? linePx : Math.max(16, screenSpreadW * 0.12);
+              const badgeY = isVert ? Math.max(16, screenSpreadH * 0.12) : linePx;
 
               return (
                 <Group key={`snap-${idx}`} listening={false}>
@@ -2124,7 +2125,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   />
                   {line.label && (
                     <Group x={badgeX} y={badgeY}>
-                      <Label offsetX={isVert ? -8 : 36} offsetY={isVert ? 12 : -8}>
+                      <Label offsetX={isVert ? -8 : 0} offsetY={isVert ? 0 : -8}>
                         <Tag
                           fill={tagFill}
                           stroke={strokeColor}
@@ -2147,6 +2148,26 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 </Group>
               );
             })}
+
+            {/* Full spread center crosshair when both center axes are active. */}
+            {(() => {
+              const hasSpreadX = activeSnapLines.some((l) => l.type === 'vertical' && (l.label?.includes('Spread Center') || l.label?.includes('Center Spine')));
+              const hasSpreadY = activeSnapLines.some((l) => l.type === 'horizontal' && (l.label?.includes('Spread Center Y') || l.label?.includes('Vertical Center')));
+              if (hasSpreadX && hasSpreadY) {
+                return (
+                  <Group key="full-spread-center-indicator" x={screenSpreadW / 2} y={screenSpreadH / 2} listening={false}>
+                    <Circle radius={7} stroke="#ec4899" strokeWidth={2.5} fill="#831843" shadowColor="#ec4899" shadowBlur={10} />
+                    <Line points={[-12, 0, 12, 0]} stroke="#fce7f3" strokeWidth={1.5} />
+                    <Line points={[0, -12, 0, 12]} stroke="#fce7f3" strokeWidth={1.5} />
+                    <Label offsetX={70} offsetY={-18}>
+                      <Tag fill="#831843" stroke="#ec4899" strokeWidth={1.5} cornerRadius={4} shadowColor="rgba(0,0,0,0.7)" shadowBlur={8} />
+                      <KonvaText text="Spread Center" fill="#fce7f3" fontSize={10} fontStyle="bold" padding={5} />
+                    </Label>
+                  </Group>
+                );
+              }
+              return null;
+            })()}
 
             {/* Gap Guides & Equal Distance Indicators */}
             {activeGapGuides.map((gap, idx) => {
