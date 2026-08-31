@@ -1,6 +1,6 @@
 # 📸 AFSNSmartAlbum
 
-[![Release](https://img.shields.io/badge/Release-v1.0.10-blue.svg?style=flat-square)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.12-blue.svg?style=flat-square)](https://github.com/asrofims/AFSNSmartAlbum/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(64--bit)-0078D6.svg?style=flat-square&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131.svg?style=flat-square&logo=tauri)](https://tauri.app/)
 [![Rust](https://img.shields.io/badge/Rust-High%20Performance-DEA584.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)

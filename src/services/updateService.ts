@@ -40,7 +40,7 @@ const GITHUB_LATEST_RELEASE_URL = `https://api.github.com/repos/${GITHUB_REPO_OW
 const GITHUB_ALL_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases`;
 
 /**
- * Compare two semver strings (e.g. "v1.0.2-beta" vs "v1.0.1-beta")
+ * Compare two semver strings (e.g. "v2.0.0" vs "v1.9.0")
  * Returns:
  *   1 if v1 > v2 (v1 is newer)
  *   -1 if v1 < v2 (v2 is newer)
