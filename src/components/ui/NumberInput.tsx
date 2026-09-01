@@ -49,6 +49,12 @@ export function NumberInput({
     const raw = e.target.value;
     setLocalValue(raw);
 
+    // When user deletes everything (empty string), immediately treat as 0
+    if (raw.trim() === '') {
+      onChange(0);
+      return;
+    }
+
     // If valid number, notify parent immediately so live preview updates in real-time
     const parsed = parseFloat(raw);
     if (!isNaN(parsed) && isFinite(parsed)) {
@@ -60,10 +66,17 @@ export function NumberInput({
 
   const handleBlur = () => {
     isFocusedRef.current = false;
+    if (localValue.trim() === '') {
+      const formatted = formatNumber(0, precision);
+      setLocalValue(formatted);
+      onChange(0);
+      return;
+    }
+
     let numVal = parseFloat(localValue);
 
     if (isNaN(numVal)) {
-      numVal = min !== undefined ? min : value;
+      numVal = 0;
     }
 
     if (min !== undefined && numVal < min) numVal = min;
