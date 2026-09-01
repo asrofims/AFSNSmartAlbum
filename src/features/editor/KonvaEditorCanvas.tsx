@@ -56,7 +56,6 @@ function PhotoFrameNode({
   onFrameChange,
   onCropChange,
   onDoubleClick,
-  disableIndividualDrag,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
@@ -74,7 +73,6 @@ function PhotoFrameNode({
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
-  disableIndividualDrag?: boolean;
 }) {
   const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
   const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
@@ -211,7 +209,7 @@ function PhotoFrameNode({
       rotation={frame.rotation || 0}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
-      draggable={!isCropMode && !disableIndividualDrag}
+      draggable={!isCropMode}
       onMouseDown={(e) => {
         e.cancelBubble = true;
         // Ignore right-clicks & middle-clicks on mouse down
@@ -608,7 +606,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
-  const multiGroupRef = useRef<Konva.Group>(null);
+  const multiGroupRef = useRef<Konva.Rect>(null);
   const multiGroupRotationOverrideRef = useRef<number | null>(null);
   const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
   const activeTransformAnchorRef = useRef<string | null>(null);
@@ -816,9 +814,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         trRef.current.getLayer()?.batchDraw();
       }
     } else if (selectedFrameIds.length > 1) {
-      const groupNode = multiGroupRef.current || stageRef.current.findOne('#multi-selection-group');
-      if (groupNode) {
-        trRef.current.nodes([groupNode]);
+      const proxyNode = multiGroupRef.current || stageRef.current.findOne('#multi-selection-proxy');
+      if (proxyNode) {
+        trRef.current.nodes([proxyNode]);
         trRef.current.update();
         trRef.current.forceUpdate();
         trRef.current.getLayer()?.batchDraw();
@@ -1820,106 +1818,137 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
           {/* Layer 2: Interactive Photo Frames */}
           <Layer>
-            {selectedFrameIds.length > 1 && multiGroupInfo ? (
-              <>
-                {/* 1. Unselected Frames in World Space */}
-                {(activeSpread.elements || [])
-                  .filter((frame) => !selectedFrameIds.includes(frame.id))
-                  .map((frame) => {
-                    const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
-                    return (
-                      <PhotoFrameNode
-                        key={frame.id}
-                        frame={hydratedFrame}
-                        isSelected={false}
-                        isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
-                        isCropMode={false}
-                        isMultiSelectActive={true}
-                        isHoveredForDrop={hoveredDropFrameId === frame.id}
-                        isAltDrop={isHoveredDropAlt}
-                        scaleFactor={scaleFactor}
-                        onSelect={(e) => {
-                          if (justDroppedRef.current) return;
-                          if (e) {
-                            e.cancelBubble = true;
-                            const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
-                            selectFrame(frame.id, isMulti);
-                          } else {
-                            selectFrame(frame.id);
-                          }
-                        }}
-                        onDragMove={() => {}}
-                        onDragEnd={() => {}}
-                        onContextMenu={(e) => {
-                          openContextMenuAt(e.evt.clientX, e.evt.clientY);
-                        }}
-                        onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
-                        onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
-                        onDoubleClick={() => enterCropMode(frame.id)}
-                      />
-                    );
-                  })}
+            {(activeSpread.elements || []).map((frame) => {
+              const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
+              const isSelected = selectedFrameIds.includes(frame.id);
+              const isCrop = editingCropFrameId === frame.id;
 
-                {/* 2. Selected Frames wrapped in a Single Rotated Konva Group */}
-                <Group
-                  id="multi-selection-group"
-                  ref={multiGroupRef}
-                  x={multiGroupInfo.groupX * scaleFactor}
-                  y={multiGroupInfo.groupY * scaleFactor}
-                  width={multiGroupInfo.groupWidth * scaleFactor}
-                  height={multiGroupInfo.groupHeight * scaleFactor}
-                  rotation={multiGroupInfo.groupRotation}
-                  draggable
-                  onContextMenu={(e) => {
-                    e.evt.preventDefault();
-                    e.cancelBubble = true;
-                    openContextMenuAt(e.evt.clientX, e.evt.clientY);
+              return (
+                <PhotoFrameNode
+                  key={frame.id}
+                  frame={hydratedFrame}
+                  isSelected={isSelected}
+                  isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
+                  isCropMode={isCrop}
+                  isMultiSelectActive={isMultiSelected}
+                  isHoveredForDrop={hoveredDropFrameId === frame.id}
+                  isAltDrop={isHoveredDropAlt}
+                  scaleFactor={scaleFactor}
+                  onSelect={(e) => {
+                    if (justDroppedRef.current) return;
+                    if (e) {
+                      e.cancelBubble = true;
+                      const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                      selectFrame(frame.id, isMulti);
+                    } else {
+                      selectFrame(frame.id);
+                    }
                   }}
                   onDragStart={() => {
+                    const isThisSelected = selectedFrameIds.includes(frame.id);
+                    let currentGroupIds = isThisSelected ? [...selectedFrameIds] : [frame.id];
+                    if (!isThisSelected) {
+                      selectFrame(frame.id);
+                      currentGroupIds = [frame.id];
+                    }
+
                     const initialPositions = new Map<string, { x: number; y: number }>();
-                    selectedFrameIds.forEach((id) => {
+                    currentGroupIds.forEach((id) => {
                       const f = (activeSpread.elements || []).find((el) => el.id === id);
-                      if (f) initialPositions.set(id, { x: f.x, y: f.y });
+                      if (f) {
+                        initialPositions.set(id, { x: f.x, y: f.y });
+                      }
                     });
                     dragInitialPhysicalPositionsRef.current = initialPositions;
                   }}
                   onDragMove={(e) => {
-                    const groupNode = multiGroupRef.current;
-                    if (!groupNode) return;
+                    if (dragInitialPhysicalPositionsRef.current.size === 0) return;
+                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                    if (!draggedNode) return;
 
-                    const currentPhysX = groupNode.x() / scaleFactor;
-                    const currentPhysY = groupNode.y() / scaleFactor;
+                    let currentPhysX = draggedNode.x() / scaleFactor;
+                    let currentPhysY = draggedNode.y() / scaleFactor;
+                    let deltaPhysX = currentPhysX - frame.x;
+                    let deltaPhysY = currentPhysY - frame.y;
+
+                    if (e.evt?.shiftKey) {
+                      if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
+                        deltaPhysY = 0;
+                        currentPhysY = frame.y;
+                        draggedNode.y(frame.y * scaleFactor);
+                      } else {
+                        deltaPhysX = 0;
+                        currentPhysX = frame.x;
+                        draggedNode.x(frame.x * scaleFactor);
+                      }
+                    }
 
                     if (!snapEnabled || e.evt?.ctrlKey) {
                       clearSnapLines();
                     } else {
                       const otherRects = (activeSpread.elements || [])
-                        .filter((f) => !selectedFrameIds.includes(f.id))
+                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                         .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
+                      const thresholdUnits =
+                        typeof snappingConfig.threshold === 'number'
+                          ? snappingConfig.threshold
+                          : 0.1;
+
                       const snapRes = calculateSnapping(
-                        {
-                          x: currentPhysX,
-                          y: currentPhysY,
-                          width: multiGroupInfo.groupWidth,
-                          height: multiGroupInfo.groupHeight,
-                        },
+                        { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
                         totalSpreadPhysicalW,
                         totalSpreadPhysicalH,
                         activeSpread.safeArea,
                         gutterPhysicalW,
                         otherRects,
-                        snappingConfig,
+                        { ...snappingConfig, threshold: thresholdUnits },
                         unit
                       );
 
                       if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                         setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-                        groupNode.x(snapRes.snappedX * scaleFactor);
-                        groupNode.y(snapRes.snappedY * scaleFactor);
+                        const snappedPhysX = snapRes.snappedX;
+                        const snappedPhysY = snapRes.snappedY;
+                        deltaPhysX = snappedPhysX - frame.x;
+                        deltaPhysY = snappedPhysY - frame.y;
+                        draggedNode.x(snappedPhysX * scaleFactor);
+                        draggedNode.y(snappedPhysY * scaleFactor);
                       } else {
                         clearSnapLines();
                       }
+                    }
+
+                    const isAlt = Boolean(e.evt?.altKey);
+                    setIsHoveredDropAlt(isAlt);
+                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                      const draggedCenterPhysX = currentPhysX + frame.width / 2;
+                      const draggedCenterPhysY = currentPhysY + frame.height / 2;
+                      const hoverTarget = (activeSpread.elements || []).find((f) =>
+                        f.id !== frame.id &&
+                        draggedCenterPhysX >= f.x &&
+                        draggedCenterPhysX <= f.x + f.width &&
+                        draggedCenterPhysY >= f.y &&
+                        draggedCenterPhysY <= f.y + f.height
+                      );
+                      setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
+                    } else {
+                      setHoveredDropFrameId(null);
+                    }
+
+                    dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                      if (id !== frame.id) {
+                        const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                        if (node) {
+                          node.x((initPhys.x + deltaPhysX) * scaleFactor);
+                          node.y((initPhys.y + deltaPhysY) * scaleFactor);
+                        }
+                      }
+                    });
+
+                    if (multiGroupRef.current && multiGroupInfo) {
+                      multiGroupRef.current.x((multiGroupInfo.groupX + deltaPhysX) * scaleFactor);
+                      multiGroupRef.current.y((multiGroupInfo.groupY + deltaPhysY) * scaleFactor);
                     }
 
                     trRef.current?.update();
@@ -1927,354 +1956,150 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   }}
                   onDragEnd={(e) => {
                     clearSnapLines();
-                    const groupNode = multiGroupRef.current;
-                    if (!groupNode) return;
+                    setHoveredDropFrameId(null);
+                    setIsHoveredDropAlt(false);
+                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                    if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
+                      let finalCurrentPhysX = draggedNode.x() / scaleFactor;
+                      let finalCurrentPhysY = draggedNode.y() / scaleFactor;
 
-                    const finalPhysX = groupNode.x() / scaleFactor;
-                    const finalPhysY = groupNode.y() / scaleFactor;
-                    const deltaPhysX = finalPhysX - multiGroupInfo.groupX;
-                    const deltaPhysY = finalPhysY - multiGroupInfo.groupY;
-
-                    const isAltPressed = Boolean(e.evt?.altKey);
-                    if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
-                      groupNode.x(multiGroupInfo.groupX * scaleFactor);
-                      groupNode.y(multiGroupInfo.groupY * scaleFactor);
-
-                      const duplicates = selectedFrameIds.map((id) => {
-                        const f = (activeSpread.elements || []).find((el) => el.id === id);
-                        return {
-                          sourceId: id,
-                          x: Math.round(((f?.x || 0) + deltaPhysX) * 10) / 10,
-                          y: Math.round(((f?.y || 0) + deltaPhysY) * 10) / 10,
-                        };
-                      });
-
-                      duplicateFramesToPosition(activeSpread.id, duplicates);
-                      if (onToast) {
-                        onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
-                      }
-                    } else if (Math.abs(deltaPhysX) > 0.01 || Math.abs(deltaPhysY) > 0.01) {
-                      const updates = selectedFrameIds.map((id) => {
-                        const f = (activeSpread.elements || []).find((el) => el.id === id);
-                        return {
-                          id,
-                          geometry: {
-                            x: Math.round(((f?.x || 0) + deltaPhysX) * 10) / 10,
-                            y: Math.round(((f?.y || 0) + deltaPhysY) * 10) / 10,
-                          },
-                        };
-                      });
-                      batchUpdateFrames(activeSpread.id, updates);
-                    }
-                    dragInitialPhysicalPositionsRef.current.clear();
-                  }}
-                >
-                  {selectedFramesList.map((frame) => {
-                    const childLocal = multiGroupInfo.childLocalFrames.find((c) => c.id === frame.id);
-                    const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
-                    const localFrame = childLocal
-                      ? {
-                          ...hydratedFrame,
-                          x: childLocal.localX,
-                          y: childLocal.localY,
-                          rotation: childLocal.localRotation,
-                        }
-                      : hydratedFrame;
-
-                    return (
-                      <PhotoFrameNode
-                        key={frame.id}
-                        frame={localFrame}
-                        isSelected={true}
-                        isMuted={false}
-                        isCropMode={false}
-                        isMultiSelectActive={true}
-                        disableIndividualDrag={true}
-                        scaleFactor={scaleFactor}
-                        onSelect={(e) => {
-                          if (e) {
-                            e.cancelBubble = true;
-                            const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
-                            selectFrame(frame.id, isMulti);
-                          } else {
-                            selectFrame(frame.id);
-                          }
-                        }}
-                        onDragMove={() => {}}
-                        onDragEnd={() => {}}
-                        onFrameChange={(newAttrs) => updateFrameGeometry(activeSpread.id, frame.id, newAttrs)}
-                        onCropChange={(newAttrs) => updateCrop(activeSpread.id, frame.id, newAttrs)}
-                        onDoubleClick={() => {}}
-                      />
-                    );
-                  })}
-                </Group>
-              </>
-            ) : (
-              (activeSpread.elements || []).map((frame) => {
-                const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
-                const isSelected = selectedFrameIds.includes(frame.id);
-                const isCrop = editingCropFrameId === frame.id;
-
-                return (
-                  <PhotoFrameNode
-                    key={frame.id}
-                    frame={hydratedFrame}
-                    isSelected={isSelected}
-                    isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
-                    isCropMode={isCrop}
-                    isMultiSelectActive={isMultiSelected}
-                    isHoveredForDrop={hoveredDropFrameId === frame.id}
-                    isAltDrop={isHoveredDropAlt}
-                    scaleFactor={scaleFactor}
-                    onSelect={(e) => {
-                      if (justDroppedRef.current) return;
-                      if (e) {
-                        e.cancelBubble = true;
-                        const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
-                        selectFrame(frame.id, isMulti);
-                      } else {
-                        selectFrame(frame.id);
-                      }
-                    }}
-                    onDragStart={() => {
-                      const isThisSelected = selectedFrameIds.includes(frame.id);
-                      let currentGroupIds = isThisSelected ? [...selectedFrameIds] : [frame.id];
-                      if (!isThisSelected) {
-                        selectFrame(frame.id);
-                        currentGroupIds = [frame.id];
-                      }
-
-                      const initialPositions = new Map<string, { x: number; y: number }>();
-                      currentGroupIds.forEach((id) => {
-                        const f = (activeSpread.elements || []).find((el) => el.id === id);
-                        if (f) {
-                          initialPositions.set(id, { x: f.x, y: f.y });
-                        }
-                      });
-                      dragInitialPhysicalPositionsRef.current = initialPositions;
-                    }}
-                    onDragMove={(e) => {
-                      if (dragInitialPhysicalPositionsRef.current.size === 0) return;
-                      const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
-                      if (!draggedNode) return;
-
-                      let currentPhysX = draggedNode.x() / scaleFactor;
-                      let currentPhysY = draggedNode.y() / scaleFactor;
-                      let deltaPhysX = currentPhysX - frame.x;
-                      let deltaPhysY = currentPhysY - frame.y;
-
-                      if (e.evt?.shiftKey) {
-                        if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
-                          deltaPhysY = 0;
-                          currentPhysY = frame.y;
+                      const isShiftConstrained = Boolean(e.evt?.shiftKey);
+                      let isHorizontalConstraint = true;
+                      if (isShiftConstrained) {
+                        const rawDeltaX = finalCurrentPhysX - frame.x;
+                        const rawDeltaY = finalCurrentPhysY - frame.y;
+                        if (Math.abs(rawDeltaX) >= Math.abs(rawDeltaY)) {
+                          finalCurrentPhysY = frame.y;
                           draggedNode.y(frame.y * scaleFactor);
+                          isHorizontalConstraint = true;
                         } else {
-                          deltaPhysX = 0;
-                          currentPhysX = frame.x;
+                          finalCurrentPhysX = frame.x;
                           draggedNode.x(frame.x * scaleFactor);
+                          isHorizontalConstraint = false;
                         }
                       }
 
-                      if (!snapEnabled || e.evt?.ctrlKey) {
-                        clearSnapLines();
-                      } else {
-                        const otherRects = (activeSpread.elements || [])
-                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-
-                        const thresholdUnits =
-                          typeof snappingConfig.threshold === 'number'
-                            ? snappingConfig.threshold
-                            : 0.1;
-
-                        const snapRes = calculateSnapping(
-                          { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
-                          totalSpreadPhysicalW,
-                          totalSpreadPhysicalH,
-                          activeSpread.safeArea,
-                          gutterPhysicalW,
-                          otherRects,
-                          { ...snappingConfig, threshold: thresholdUnits },
-                          unit
-                        );
-
-                        if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
-                          setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-                          const snappedPhysX = snapRes.snappedX;
-                          const snappedPhysY = snapRes.snappedY;
-                          deltaPhysX = snappedPhysX - frame.x;
-                          deltaPhysY = snappedPhysY - frame.y;
-                          draggedNode.x(snappedPhysX * scaleFactor);
-                          draggedNode.y(snappedPhysY * scaleFactor);
-                        } else {
-                          clearSnapLines();
-                        }
-                      }
-
-                      const isAlt = Boolean(e.evt?.altKey);
-                      setIsHoveredDropAlt(isAlt);
-                      if (dragInitialPhysicalPositionsRef.current.size === 1) {
-                        const draggedCenterPhysX = currentPhysX + frame.width / 2;
-                        const draggedCenterPhysY = currentPhysY + frame.height / 2;
-                        const hoverTarget = (activeSpread.elements || []).find((f) =>
+                      const isAltPressed = Boolean(e.evt?.altKey);
+                      if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
+                        const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
+                        const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
+                        const dropTarget = (activeSpread.elements || []).find((f) =>
                           f.id !== frame.id &&
                           draggedCenterPhysX >= f.x &&
                           draggedCenterPhysX <= f.x + f.width &&
                           draggedCenterPhysY >= f.y &&
                           draggedCenterPhysY <= f.y + f.height
                         );
-                        setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
-                      } else {
-                        setHoveredDropFrameId(null);
+
+                        if (dropTarget) {
+                          draggedNode.x(frame.x * scaleFactor);
+                          draggedNode.y(frame.y * scaleFactor);
+                          swapFrames(activeSpread.id, frame.id, dropTarget.id);
+                          clearSelection();
+                          justDroppedRef.current = true;
+                          setTimeout(() => {
+                            justDroppedRef.current = false;
+                          }, 250);
+                          dragInitialPhysicalPositionsRef.current.clear();
+                          return;
+                        }
                       }
 
-                      dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
-                        if (id !== frame.id) {
-                          const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
-                          if (node) {
-                            node.x((initPhys.x + deltaPhysX) * scaleFactor);
-                            node.y((initPhys.y + deltaPhysY) * scaleFactor);
-                          }
-                        }
-                      });
+                      const otherRects = (activeSpread.elements || [])
+                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-                      trRef.current?.update();
-                      trRef.current?.getLayer()?.batchDraw();
-                    }}
-                    onDragEnd={(e) => {
-                      clearSnapLines();
-                      setHoveredDropFrameId(null);
-                      setIsHoveredDropAlt(false);
-                      const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
-                      if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
-                        let finalCurrentPhysX = draggedNode.x() / scaleFactor;
-                        let finalCurrentPhysY = draggedNode.y() / scaleFactor;
-
-                        const isShiftConstrained = Boolean(e.evt?.shiftKey);
-                        let isHorizontalConstraint = true;
-                        if (isShiftConstrained) {
-                          const rawDeltaX = finalCurrentPhysX - frame.x;
-                          const rawDeltaY = finalCurrentPhysY - frame.y;
-                          if (Math.abs(rawDeltaX) >= Math.abs(rawDeltaY)) {
-                            finalCurrentPhysY = frame.y;
-                            draggedNode.y(frame.y * scaleFactor);
-                            isHorizontalConstraint = true;
-                          } else {
-                            finalCurrentPhysX = frame.x;
-                            draggedNode.x(frame.x * scaleFactor);
-                            isHorizontalConstraint = false;
-                          }
-                        }
-
-                        const isAltPressed = Boolean(e.evt?.altKey);
-                        if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
-                          const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
-                          const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
-                          const dropTarget = (activeSpread.elements || []).find((f) =>
-                            f.id !== frame.id &&
-                            draggedCenterPhysX >= f.x &&
-                            draggedCenterPhysX <= f.x + f.width &&
-                            draggedCenterPhysY >= f.y &&
-                            draggedCenterPhysY <= f.y + f.height
+                      const snapRes = (!snapEnabled || e.evt?.ctrlKey)
+                        ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
+                        : calculateSnapping(
+                            { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
+                            totalSpreadPhysicalW,
+                            totalSpreadPhysicalH,
+                            activeSpread.safeArea,
+                            gutterPhysicalW,
+                            otherRects,
+                            snappingConfig,
+                            unit
                           );
 
-                          if (dropTarget) {
-                            draggedNode.x(frame.x * scaleFactor);
-                            draggedNode.y(frame.y * scaleFactor);
-                            swapFrames(activeSpread.id, frame.id, dropTarget.id);
-                            clearSelection();
-                            justDroppedRef.current = true;
-                            setTimeout(() => {
-                              justDroppedRef.current = false;
-                            }, 250);
-                            dragInitialPhysicalPositionsRef.current.clear();
-                            return;
-                          }
-                        }
+                      let deltaPhysX = snapRes.snappedX - frame.x;
+                      let deltaPhysY = snapRes.snappedY - frame.y;
 
-                        const otherRects = (activeSpread.elements || [])
-                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-
-                        const snapRes = (!snapEnabled || e.evt?.ctrlKey)
-                          ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
-                          : calculateSnapping(
-                              { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
-                              totalSpreadPhysicalW,
-                              totalSpreadPhysicalH,
-                              activeSpread.safeArea,
-                              gutterPhysicalW,
-                              otherRects,
-                              snappingConfig,
-                              unit
-                            );
-
-                        let deltaPhysX = snapRes.snappedX - frame.x;
-                        let deltaPhysY = snapRes.snappedY - frame.y;
-
-                        if (isShiftConstrained) {
-                          if (isHorizontalConstraint) {
-                            deltaPhysY = 0;
-                          } else {
-                            deltaPhysX = 0;
-                          }
-                        }
-
-                        if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
-                          if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
-                            dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
-                              const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
-                              if (node) {
-                                node.x(initPhys.x * scaleFactor);
-                                node.y(initPhys.y * scaleFactor);
-                              }
-                            });
-
-                            const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                              sourceId: id,
-                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                            }));
-
-                            duplicateFramesToPosition(activeSpread.id, duplicates);
-                            if (onToast) {
-                              onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
-                            }
-                          } else {
-                            const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                              id,
-                              geometry: {
-                                x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                                y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                              },
-                            }));
-
-                            batchUpdateFrames(activeSpread.id, updates);
-                          }
+                      if (isShiftConstrained) {
+                        if (isHorizontalConstraint) {
+                          deltaPhysY = 0;
+                        } else {
+                          deltaPhysX = 0;
                         }
                       }
-                      dragInitialPhysicalPositionsRef.current.clear();
-                    }}
-                    onContextMenu={(e) => {
-                      openContextMenuAt(e.evt.clientX, e.evt.clientY);
-                    }}
-                    onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
-                    onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
-                    onDoubleClick={() => enterCropMode(frame.id)}
-                  />
-                );
-              })
+
+                      if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
+                        if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                          dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                            const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                            if (node) {
+                              node.x(initPhys.x * scaleFactor);
+                              node.y(initPhys.y * scaleFactor);
+                            }
+                          });
+
+                          const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                            sourceId: id,
+                            x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                            y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                          }));
+
+                          duplicateFramesToPosition(activeSpread.id, duplicates);
+                          if (onToast) {
+                            onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
+                          }
+                        } else {
+                          const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                            id,
+                            geometry: {
+                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                            },
+                          }));
+
+                          batchUpdateFrames(activeSpread.id, updates);
+                        }
+                      }
+                    }
+                    dragInitialPhysicalPositionsRef.current.clear();
+                  }}
+                  onContextMenu={(e) => {
+                    openContextMenuAt(e.evt.clientX, e.evt.clientY);
+                  }}
+                  onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                  onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
+                  onDoubleClick={() => enterCropMode(frame.id)}
+                />
+              );
+            })}
+
+            {/* 2. Multi-Selection Proxy Rect for Rotated Transformer Envelope */}
+            {selectedFrameIds.length > 1 && multiGroupInfo && (
+              <Rect
+                id="multi-selection-proxy"
+                ref={multiGroupRef}
+                x={multiGroupInfo.groupX * scaleFactor}
+                y={multiGroupInfo.groupY * scaleFactor}
+                width={multiGroupInfo.groupWidth * scaleFactor}
+                height={multiGroupInfo.groupHeight * scaleFactor}
+                rotation={multiGroupInfo.groupRotation}
+                listening={false}
+              />
             )}
 
             {/* Dynamic Contextual Transformer */}
             <Transformer
-              ref={trRef}
-              visible={!editingCropFrameId}
-              rotateEnabled
-              keepRatio={true}
-              rotateAnchorOffset={20}
-              rotateAnchorCursor={'grab'}
+            ref={trRef}
+            visible={!editingCropFrameId}
+            rotateEnabled
+            keepRatio={true}
+            rotateAnchorOffset={20}
+            rotateAnchorCursor={'grab'}
               onContextMenu={(e) => {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
