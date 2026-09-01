@@ -56,6 +56,7 @@ function PhotoFrameNode({
   onFrameChange,
   onCropChange,
   onDoubleClick,
+  disableIndividualDrag,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
@@ -73,6 +74,7 @@ function PhotoFrameNode({
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
+  disableIndividualDrag?: boolean;
 }) {
   const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
   const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
@@ -209,7 +211,7 @@ function PhotoFrameNode({
       rotation={frame.rotation || 0}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
-      draggable={!isCropMode}
+      draggable={!isCropMode && !disableIndividualDrag}
       onMouseDown={(e) => {
         e.cancelBubble = true;
         // Ignore right-clicks & middle-clicks on mouse down
@@ -1987,6 +1989,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         isMuted={false}
                         isCropMode={false}
                         isMultiSelectActive={true}
+                        disableIndividualDrag={true}
                         scaleFactor={scaleFactor}
                         onSelect={(e) => {
                           if (e) {
