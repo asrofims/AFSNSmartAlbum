@@ -61,6 +61,10 @@ export interface EditorState {
   pasteFramesInPlace: (spreadId: string) => void;
   pasteFramesToAllSpreads: (options?: { includeCover?: boolean; replaceExisting?: boolean }) => { count: number; spreadsCount: number };
   duplicateSelectedFrames: (spreadId: string) => void;
+  duplicateFramesToPosition: (
+    spreadId: string,
+    duplicates: { sourceId: string; x: number; y: number }[]
+  ) => string[];
   replacePhotoInFrame: (spreadId: string, frameId: string, photo: Photo) => void;
   swapFrames: (spreadId: string, frameIdA: string, frameIdB: string) => void;
   bringToFront: (spreadId: string, frameId: string) => void;
@@ -590,6 +594,68 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   duplicateSelectedFrames: (spreadId) => {
     get().copySelectedFrames(spreadId);
     get().pasteFrames(spreadId);
+  },
+
+  duplicateFramesToPosition: (spreadId, duplicates) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || duplicates.length === 0) return [];
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!targetSpread) return [];
+
+    const existing = targetSpread.elements || [];
+    const newFrames: PhotoFrameElement[] = [];
+
+    duplicates.forEach((d, idx) => {
+      const source = existing.find((f) => f.id === d.sourceId);
+      if (source) {
+        newFrames.push({
+          ...source,
+          id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+          x: d.x,
+          y: d.y,
+          zIndex: existing.length + idx + 1,
+        });
+      }
+    });
+
+    if (newFrames.length === 0) return [];
+
+    if (isCover) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: [...existing, ...newFrames],
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId
+          ? { ...s, elements: [...existing, ...newFrames] }
+          : s
+      );
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: updatedSpreads,
+        },
+        saveStatus: 'unsaved',
+      });
+    }
+
+    const newIds = newFrames.map((f) => f.id);
+    set({ selectedFrameIds: newIds });
+    return newIds;
   },
 
   replacePhotoInFrame: (spreadId, frameId, photo) => {

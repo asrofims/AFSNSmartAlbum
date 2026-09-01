@@ -561,6 +561,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     pasteFramesInPlace,
     pasteFramesToAllSpreads,
     duplicateSelectedFrames,
+    duplicateFramesToPosition,
     replacePhotoInFrame,
     swapFrames,
     groupSelectedFrames,
@@ -1794,7 +1795,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
                     }
 
-                    if (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey) {
+                    if (!snapEnabled || e.evt?.ctrlKey) {
                       clearSnapLines();
                     } else {
                       const otherRects = (activeSpread.elements || [])
@@ -1917,7 +1918,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                         .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-                      const snapRes = (!snapEnabled || e.evt?.altKey || e.evt?.ctrlKey)
+                      const snapRes = (!snapEnabled || e.evt?.ctrlKey)
                         ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
                         : calculateSnapping(
                             { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
@@ -1942,15 +1943,40 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
 
                       if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
-                        const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                          id,
-                          geometry: {
+                        if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                          // Adobe-style Alt+Drag to Duplicate:
+                          // 1. Reset visual position of dragged Konva nodes back to their initial positions
+                          dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                            const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                            if (node) {
+                              node.x(initPhys.x * scaleFactor);
+                              node.y(initPhys.y * scaleFactor);
+                            }
+                          });
+
+                          // 2. Build duplicate frame specs
+                          const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                            sourceId: id,
                             x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
                             y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                          },
-                        }));
+                          }));
 
-                        batchUpdateFrames(activeSpread.id, updates);
+                          // 3. Create duplicated frames in store and auto-select them
+                          duplicateFramesToPosition(activeSpread.id, duplicates);
+                          if (onToast) {
+                            onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
+                          }
+                        } else {
+                          const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                            id,
+                            geometry: {
+                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                            },
+                          }));
+
+                          batchUpdateFrames(activeSpread.id, updates);
+                        }
                       }
                     }
                     dragInitialPhysicalPositionsRef.current.clear();

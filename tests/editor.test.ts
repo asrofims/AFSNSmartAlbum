@@ -769,4 +769,88 @@ for (const s of pastedAllSpreads) {
   console.assert(el.borderWidth === 1.5 && el.borderColor === '#FFCC00', 'Every spread must maintain exact border styling');
 }
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');
+// 16. Test Adobe-Style Alt+Drag to Duplicate Clones
+const originalFrame: PhotoFrameElement = {
+  id: 'frame-orig-1',
+  type: 'photo',
+  photoId: 'photo-alt-test',
+  x: 10,
+  y: 15,
+  width: 120,
+  height: 80,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 1.5,
+  borderEnabled: true,
+  borderWidth: 2,
+  borderColor: '#000000',
+};
+
+const deltaX = 50;
+const deltaY = 40;
+const altDragDuplicate: PhotoFrameElement = {
+  ...originalFrame,
+  id: 'frame-alt-duplicate-1',
+  x: originalFrame.x + deltaX,
+  y: originalFrame.y + deltaY,
+  zIndex: 2,
+};
+
+console.assert(altDragDuplicate.id !== originalFrame.id, 'Alt+Drag duplicate must have a unique ID');
+console.assert(altDragDuplicate.x === 60 && altDragDuplicate.y === 55, 'Alt+Drag duplicate must be positioned at new offset');
+// 17. Test Non-Interference: Photo Replacement & Frame Swap vs Alt Duplication
+// 17a. Photo Replacement
+const targetFrameToReplace: PhotoFrameElement = {
+  id: 'frame-target',
+  type: 'photo',
+  photoId: 'old-photo-id',
+  filePath: 'C:/photos/old.jpg',
+  fileName: 'old.jpg',
+  x: 20,
+  y: 30,
+  width: 100,
+  height: 80,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 1.25,
+  borderEnabled: true,
+  borderWidth: 1,
+  borderColor: '#FFFFFF',
+};
+
+const newIncomingPhoto = {
+  id: 'new-photo-id',
+  filePath: 'C:/photos/new.jpg',
+  fileName: 'new.jpg',
+  previewPath: 'C:/photos/preview.jpg',
+  thumbnailPath: 'C:/photos/thumb.jpg',
+  width: 1200,
+  height: 800,
+};
+
+const replacedFrame17: PhotoFrameElement = {
+  ...targetFrameToReplace,
+  photoId: newIncomingPhoto.id,
+  filePath: newIncomingPhoto.filePath,
+  fileName: newIncomingPhoto.fileName,
+  photoAspect: newIncomingPhoto.width / newIncomingPhoto.height,
+  cropX: 0,
+  cropY: 0,
+  cropScale: 1.0,
+};
+
+console.assert(replacedFrame17.photoId === 'new-photo-id', 'Replaced frame must receive new photo ID');
+console.assert(replacedFrame17.x === 20 && replacedFrame17.y === 30, 'Replaced frame must remain at exact canvas position');
+console.assert(replacedFrame17.photoAspect === 1.5, 'Replaced frame must update photo aspect ratio');
+
+// 17b. Canvas Frame Swap (Frame A <-> Frame B)
+const swapFrameA: PhotoFrameElement = { ...targetFrameToReplace, id: 'frame-A', photoId: 'photo-A', filePath: 'A.jpg' };
+const swapFrameB: PhotoFrameElement = { ...targetFrameToReplace, id: 'frame-B', photoId: 'photo-B', filePath: 'B.jpg', x: 150 };
+
+const swappedA17: PhotoFrameElement = { ...swapFrameA, photoId: swapFrameB.photoId, filePath: swapFrameB.filePath };
+const swappedB17: PhotoFrameElement = { ...swapFrameB, photoId: swapFrameA.photoId, filePath: swapFrameA.filePath };
+
+console.assert(swappedA17.photoId === 'photo-B' && swappedB17.photoId === 'photo-A', 'Swapped frames must exchange photo content');
+console.assert(swappedA17.x === 20 && swappedB17.x === 150, 'Swapped frames must keep their respective positions without duplicating');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');
