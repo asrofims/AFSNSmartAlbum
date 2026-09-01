@@ -232,9 +232,9 @@ export function PageNavigator() {
 
   return (
     <div className={styles.navigatorContainer}>
-      {/* Spread Thumbnail Drawer (Collapsible) */}
-      {isSpreadDrawerOpen && (
-        <div className={styles.drawer}>
+      {/* Spread Thumbnail Drawer (Collapsible with Hardware-Accelerated Smooth Slide) */}
+      <div className={`${styles.drawerWrapper} ${!isSpreadDrawerOpen ? styles.drawerWrapperCollapsed : ''}`}>
+        <div className={styles.drawerInner}>
           <div className={styles.drawerHeader}>
             <span className={styles.drawerTitle}>Album Spreads ({allSpreads.length})</span>
             <button
@@ -293,7 +293,7 @@ export function PageNavigator() {
                           moveSpread(spread.id, 'left');
                         }}
                         disabled={isFirst}
-                        title="Move spread left (earlier)"
+                        title={isFirst ? undefined : 'Move spread left (earlier)'}
                       >
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="15 18 9 12 15 6" />
@@ -307,7 +307,7 @@ export function PageNavigator() {
                           moveSpread(spread.id, 'right');
                         }}
                         disabled={isLast}
-                        title="Move spread right (later)"
+                        title={isLast ? undefined : 'Move spread right (later)'}
                       >
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="9 18 15 12 9 6" />
@@ -355,7 +355,7 @@ export function PageNavigator() {
             </button>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Bottom Main Navigation Bar */}
       <div className={styles.navigationBar}>

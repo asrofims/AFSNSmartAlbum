@@ -95,21 +95,39 @@
   font-size: 13px;
 }
 
-/* Spread Thumbnail Drawer */
-.drawer {
+/* Spread Thumbnail Drawer with Hardware-Accelerated Smooth Slide */
+.drawerWrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease, border-color 0.2s ease;
   background-color: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border);
-  padding: 12px 16px 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 155px;
-  animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 1;
+  overflow: hidden;
+  overflow-y: hidden;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+.drawerWrapperCollapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  border-bottom-color: transparent;
+  pointer-events: none;
+}
+
+.drawerInner {
+  min-height: 0;
+  overflow: hidden;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 10px 16px;
+  gap: 8px;
+  transform: translateY(0);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.drawerWrapperCollapsed .drawerInner {
+  transform: translateY(14px);
 }
 
 .drawerHeader {
@@ -146,11 +164,13 @@
   align-items: center;
   gap: var(--space-3);
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 8px 6px 10px 6px;
 }
 
 .drawerList::-webkit-scrollbar {
   height: 5px;
+  width: 0px;
 }
 
 .drawerList::-webkit-scrollbar-track {
@@ -177,7 +197,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.22s ease, opacity 0.18s ease;
   flex-shrink: 0;
   width: 146px;
   position: relative;
@@ -288,8 +308,10 @@
 }
 
 .reorderBtn:disabled {
-  opacity: 0.15;
-  cursor: not-allowed;
+  visibility: hidden;
+  pointer-events: none;
+  cursor: default;
+  opacity: 0;
 }
 
 .cardActionBtn {

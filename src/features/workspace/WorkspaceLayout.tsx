@@ -24,7 +24,6 @@ import { TemplatesPanel } from '../templates/TemplatesPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
-import appLogo from '../../assets/app-logo.png';
 import styles from './WorkspaceLayout.module.css';
 
 export function WorkspaceLayout() {
@@ -318,17 +317,8 @@ export function WorkspaceLayout() {
     <div className={styles.workspace}>
       {/* Top Main Toolbar */}
       <header className={styles.toolbar} data-tauri-drag-region>
-        {/* Left Section: Brand & File Actions */}
+        {/* Left Section: File Actions & Menus */}
         <div className={styles.toolbarSection}>
-          <div className={styles.brand}>
-            <span className={styles.brandIcon}>
-              <img src={appLogo} alt="AFSN" style={{ width: 18, height: 18, objectFit: 'contain' }} />
-            </span>
-            <span>AFSNSmartAlbum</span>
-          </div>
-
-          <div className={styles.toolbarSeparator} />
-
           {/* Professional File Menu Dropdown */}
           <div className={styles.menuContainer} ref={fileMenuRef}>
             <Button
