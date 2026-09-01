@@ -11,7 +11,7 @@ import {
   calculateSnapping,
   calculateResizeSnapping,
   calculateImageOffset,
-  calculateMultiFrameResize,
+  calculateRotatedMultiFrameResize,
   computeMultiFrameGroupInfo,
   unprojectGroupChildToWorld,
   FrameBounds,
@@ -604,7 +604,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     setSnapLines,
     clearSnapLines,
     nudgeSelected,
-    multiResizeGapMode,
   } = useEditorStore();
   const photos = usePhotoStore((s) => s.photos);
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
@@ -2213,34 +2212,19 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   } else {
                     const sx = Math.abs(proxyNode.scaleX());
                     const sy = Math.abs(proxyNode.scaleY());
-                    const newW = multiGroupInfo.groupWidth * sx;
-                    const newH = multiGroupInfo.groupHeight * sy;
                     const newX = proxyNode.x() / scaleFactor;
                     const newY = proxyNode.y() / scaleFactor;
-
-                    const newGroupBounds: RectBounds = {
-                      x: newX,
-                      y: newY,
-                      width: newW,
-                      height: newH,
-                    };
-
-                    const initialGroupBounds: RectBounds = {
-                      x: multiGroupInfo.groupX,
-                      y: multiGroupInfo.groupY,
-                      width: multiGroupInfo.groupWidth,
-                      height: multiGroupInfo.groupHeight,
-                    };
 
                     const initialFrames = multiTransformInitialStateRef.current?.frames ||
                       (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
 
-                    const updates = calculateMultiFrameResize(
+                    const updates = calculateRotatedMultiFrameResize(
+                      multiGroupInfo,
                       initialFrames,
-                      initialGroupBounds,
-                      newGroupBounds,
-                      activeAnchor || undefined,
-                      multiResizeGapMode
+                      newX,
+                      newY,
+                      sx,
+                      sy
                     );
 
                     updates.forEach((u) => {
@@ -2249,6 +2233,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       if (node && initialFrame && initialFrame.width > 0 && initialFrame.height > 0) {
                         node.x((u.geometry.x ?? initialFrame.x) * scaleFactor);
                         node.y((u.geometry.y ?? initialFrame.y) * scaleFactor);
+                        node.rotation(u.geometry.rotation ?? initialFrame.rotation ?? 0);
                         const targetW = u.geometry.width ?? initialFrame.width;
                         const targetH = u.geometry.height ?? initialFrame.height;
                         node.scaleX(targetW / initialFrame.width);
@@ -2353,38 +2338,24 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     } else {
                       const sx = Math.abs(proxyNode.scaleX());
                       const sy = Math.abs(proxyNode.scaleY());
-                      const newW = multiGroupInfo.groupWidth * sx;
-                      const newH = multiGroupInfo.groupHeight * sy;
                       const newX = proxyNode.x() / scaleFactor;
                       const newY = proxyNode.y() / scaleFactor;
 
                       proxyNode.scaleX(1);
                       proxyNode.scaleY(1);
 
-                      const newGroupBounds: RectBounds = {
-                        x: newX,
-                        y: newY,
-                        width: newW,
-                        height: newH,
-                      };
-
-                      const initialGroupBounds: RectBounds = {
-                        x: multiGroupInfo.groupX,
-                        y: multiGroupInfo.groupY,
-                        width: multiGroupInfo.groupWidth,
-                        height: multiGroupInfo.groupHeight,
-                      };
-
                       const initialFrames = multiTransformInitialStateRef.current?.frames ||
                         (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
 
-                      const updates = calculateMultiFrameResize(
+                      const updates = calculateRotatedMultiFrameResize(
+                        multiGroupInfo,
                         initialFrames,
-                        initialGroupBounds,
-                        newGroupBounds,
-                        activeAnchor || undefined,
-                        multiResizeGapMode
+                        newX,
+                        newY,
+                        sx,
+                        sy
                       );
+
                       if (updates.length > 0) {
                         batchUpdateFrames(activeSpread.id, updates);
                       }

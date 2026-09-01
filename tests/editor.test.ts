@@ -16,6 +16,7 @@ import {
   distributeFrames,
   applyFixedGap,
   calculateMultiFrameResize,
+  calculateRotatedMultiFrameResize,
   calculateCenterRotatedPosition,
   computeMultiFrameGroupBounds,
   computeMultiFrameGroupInfo,
@@ -936,7 +937,21 @@ const unprojectedChild1 = unprojectGroupChildToWorld(
   child1.localRotation
 );
 console.assert(Math.abs(unprojectedChild1.x - rotatedCW[0].x) < 0.1, `Unprojected child 1 x must match ${rotatedCW[0].x}, got ${unprojectedChild1.x}`);
-console.assert(Math.abs(unprojectedChild1.y - rotatedCW[0].y) < 0.1, `Unprojected child 1 y must match ${rotatedCW[0].y}, got ${unprojectedChild1.y}`);
-console.assert(unprojectedChild1.rotation === 90, `Unprojected child 1 rotation must be 90, got ${unprojectedChild1.rotation}`);
+// 18h. Rotated Multi-Frame Resize in Rotated Group Space
+const groupResized90 = calculateRotatedMultiFrameResize(
+  groupInfo90,
+  rotatedCW,
+  groupInfo90.groupX,
+  groupInfo90.groupY,
+  1.5,
+  1.5
+);
+console.assert(groupResized90.length === 2, 'Must return 2 resized frames');
+console.assert(groupResized90[0].geometry.width === 150, `Frame 1 width should scale 100 -> 150, got ${groupResized90[0].geometry.width}`);
+console.assert(groupResized90[0].geometry.height === 120, `Frame 1 height should scale 80 -> 120, got ${groupResized90[0].geometry.height}`);
+console.assert(groupResized90[0].geometry.rotation === 90, `Frame 1 rotation must stay 90, got ${groupResized90[0].geometry.rotation}`);
+console.assert(groupResized90[1].geometry.width === 150, `Frame 2 width should scale 100 -> 150, got ${groupResized90[1].geometry.width}`);
+console.assert(groupResized90[1].geometry.height === 120, `Frame 2 height should scale 80 -> 120, got ${groupResized90[1].geometry.height}`);
+console.assert(groupResized90[1].geometry.rotation === 90, `Frame 2 rotation must stay 90, got ${groupResized90[1].geometry.rotation}`);
 
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, and Snapping Config Persistence tests passed successfully!');

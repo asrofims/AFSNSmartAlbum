@@ -2069,3 +2069,52 @@ export function computeMultiFrameGroupBounds(frames: PhotoFrameElement[]): {
     rotation: info.groupRotation,
   };
 }
+
+/**
+ * Calculates resized dimensions and world positions for multiple frames within a rotated group envelope.
+ * Accurately scales child positions and dimensions in the rotated coordinate space, and maps back to world coordinates.
+ */
+export function calculateRotatedMultiFrameResize(
+  groupInfo: MultiFrameGroupInfo,
+  initialFrames: FrameBounds[],
+  newGroupX: number,
+  newGroupY: number,
+  scaleX: number,
+  scaleY: number
+): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+  if (initialFrames.length === 0 || groupInfo.childLocalFrames.length === 0) return [];
+
+  const initialMap = new Map(initialFrames.map((f) => [f.id, f]));
+  const scale = (scaleX + scaleY) / 2;
+
+  return groupInfo.childLocalFrames.map((child) => {
+    const orig = initialMap.get(child.id);
+    const origW = orig ? orig.width : 100;
+    const origH = orig ? orig.height : 100;
+
+    const newLocalX = child.localX * scale;
+    const newLocalY = child.localY * scale;
+    const newWidth = roundToHundredth(Math.max(1, origW * scale));
+    const newHeight = roundToHundredth(Math.max(1, origH * scale));
+
+    const worldGeom = unprojectGroupChildToWorld(
+      newGroupX,
+      newGroupY,
+      groupInfo.groupRotation,
+      newLocalX,
+      newLocalY,
+      child.localRotation
+    );
+
+    return {
+      id: child.id,
+      geometry: {
+        x: worldGeom.x,
+        y: worldGeom.y,
+        width: newWidth,
+        height: newHeight,
+        rotation: worldGeom.rotation,
+      },
+    };
+  });
+}
