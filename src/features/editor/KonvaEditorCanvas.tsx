@@ -612,7 +612,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const multiGroupRef = useRef<Konva.Rect>(null);
-  const multiGroupRotationOverrideRef = useRef<number | null>(null);
   const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
   const activeTransformAnchorRef = useRef<string | null>(null);
 
@@ -769,34 +768,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     return (activeSpread?.elements || []).filter((el) => selectedFrameIds.includes(el.id));
   }, [activeSpread?.elements, selectedFrameIds]);
 
-  // Persist multi-group rotation angle across drag and resize operations.
-  // Group rotation is only re-initialized when the set of selected frames changes.
-  const selectionIdSignature = useMemo(() => {
-    return [...selectedFrameIds].sort().join(',');
-  }, [selectedFrameIds]);
-
-  const prevSelectionIdSignatureRef = useRef(selectionIdSignature);
-  useEffect(() => {
-    if (prevSelectionIdSignatureRef.current !== selectionIdSignature) {
-      if (selectedFrameIds.length > 1) {
-        const selected = (activeSpread?.elements || []).filter((el) => selectedFrameIds.includes(el.id));
-        if (selected.length > 0) {
-          const firstRot = (((selected[0]?.rotation || 0) % 360) + 360) % 360;
-          const allSame = selected.every((f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1);
-          multiGroupRotationOverrideRef.current = allSame ? firstRot : 0;
-        } else {
-          multiGroupRotationOverrideRef.current = null;
-        }
-      } else {
-        multiGroupRotationOverrideRef.current = null;
-      }
-      prevSelectionIdSignatureRef.current = selectionIdSignature;
-    }
-  }, [selectionIdSignature, selectedFrameIds, activeSpread?.elements]);
-
   const multiGroupInfo = useMemo(() => {
     if (selectedFramesList.length <= 1) return null;
-    return computeMultiFrameGroupInfo(selectedFramesList, multiGroupRotationOverrideRef.current ?? undefined);
+    return computeMultiFrameGroupInfo(selectedFramesList);
   }, [selectedFramesList]);
 
   // Sync Konva Transformer to selected node(s)
@@ -920,10 +894,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (selectedFrameIds.length > 0 && !editingCropFrameId) {
           e.preventDefault();
-          if (selectedFrameIds.length > 1) {
-            const delta = e.shiftKey ? -90 : 90;
-            multiGroupRotationOverrideRef.current = (((multiGroupRotationOverrideRef.current ?? (multiGroupInfo?.groupRotation || 0)) + delta) % 360 + 360) % 360;
-          }
           rotateSelectedFrames(activeSpread.id, e.shiftKey ? 'ccw' : 'cw');
         }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -1546,9 +1516,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             icon: '↻',
             shortcut: 'R',
             onClick: () => {
-              if (selectedFrameIds.length > 1) {
-                multiGroupRotationOverrideRef.current = (((multiGroupRotationOverrideRef.current ?? (multiGroupInfo?.groupRotation || 0)) + 90) % 360 + 360) % 360;
-              }
               rotateSelectedFrames(activeSpread.id, 'cw');
             },
           },
@@ -1558,9 +1525,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             icon: '↺',
             shortcut: 'Shift+R',
             onClick: () => {
-              if (selectedFrameIds.length > 1) {
-                multiGroupRotationOverrideRef.current = (((multiGroupRotationOverrideRef.current ?? (multiGroupInfo?.groupRotation || 0)) - 90) % 360 + 360) % 360;
-              }
               rotateSelectedFrames(activeSpread.id, 'ccw');
             },
           },
@@ -2327,8 +2291,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                       proxyNode.scaleX(1);
                       proxyNode.scaleY(1);
-
-                      multiGroupRotationOverrideRef.current = newGroupRot;
 
                       const updates = multiGroupInfo.childLocalFrames.map((child) => {
                         const worldGeom = unprojectGroupChildToWorld(

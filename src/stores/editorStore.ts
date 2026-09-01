@@ -14,6 +14,8 @@ import {
   SafeMarginBounds,
   SnapLine,
   SnappingConfig,
+  computeMultiFrameGroupInfo,
+  unprojectGroupChildToWorld,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { getAllAlbumSpreads } from '../domain/album';
@@ -965,26 +967,77 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const delta =
       deltaOrAngle === 'cw' ? 90 : deltaOrAngle === 'ccw' ? -90 : deltaOrAngle;
 
-    const updateElements = (elements: PhotoFrameElement[]) =>
-      elements.map((f) => {
-        if (!selectedFrameIds.includes(f.id)) return f;
+    const updateElements = (elements: PhotoFrameElement[]) => {
+      const selectedFrames = elements.filter((f) => selectedFrameIds.includes(f.id));
+      if (selectedFrames.length === 0) return elements;
 
+      if (selectedFrames.length === 1) {
+        const f = selectedFrames[0];
+        if (!f) return elements;
         let targetRotation: number;
         if (isAbsolute && typeof deltaOrAngle === 'number') {
           targetRotation = ((deltaOrAngle % 360) + 360) % 360;
         } else {
           targetRotation = (((f.rotation || 0) + delta) % 360 + 360) % 360;
         }
-
         const rotatedGeo = calculateCenterRotatedPosition(f, targetRotation);
 
+        return elements.map((el) => {
+          if (el.id !== f.id) return el;
+          return {
+            ...el,
+            x: rotatedGeo.x,
+            y: rotatedGeo.y,
+            rotation: rotatedGeo.rotation,
+          };
+        });
+      }
+
+      // Multi-Frame Group Rotation around Group Center
+      const groupInfo = computeMultiFrameGroupInfo(selectedFrames);
+      const currentGroupRot = groupInfo.groupRotation;
+      let targetGroupRot: number;
+      if (isAbsolute && typeof deltaOrAngle === 'number') {
+        targetGroupRot = ((deltaOrAngle % 360) + 360) % 360;
+      } else {
+        targetGroupRot = (((currentGroupRot + delta) % 360) + 360) % 360;
+      }
+
+      // Group center is invariant
+      const rad = (currentGroupRot * Math.PI) / 180;
+      const halfW = groupInfo.groupWidth / 2;
+      const halfH = groupInfo.groupHeight / 2;
+      const centerX = groupInfo.groupX + halfW * Math.cos(rad) - halfH * Math.sin(rad);
+      const centerY = groupInfo.groupY + halfW * Math.sin(rad) + halfH * Math.cos(rad);
+
+      const newRad = (targetGroupRot * Math.PI) / 180;
+      const newGroupX = centerX - (halfW * Math.cos(newRad) - halfH * Math.sin(newRad));
+      const newGroupY = centerY - (halfW * Math.sin(newRad) + halfH * Math.cos(newRad));
+
+      const updatedMap = new Map<string, { x: number; y: number; rotation: number }>();
+      groupInfo.childLocalFrames.forEach((child) => {
+        const worldGeom = unprojectGroupChildToWorld(
+          newGroupX,
+          newGroupY,
+          targetGroupRot,
+          child.localX,
+          child.localY,
+          child.localRotation
+        );
+        updatedMap.set(child.id, worldGeom);
+      });
+
+      return elements.map((el) => {
+        const geom = updatedMap.get(el.id);
+        if (!geom) return el;
         return {
-          ...f,
-          x: rotatedGeo.x,
-          y: rotatedGeo.y,
-          rotation: rotatedGeo.rotation,
+          ...el,
+          x: geom.x,
+          y: geom.y,
+          rotation: geom.rotation,
         };
       });
+    };
 
     if (currentAlbum.coverSpread.id === spreadId) {
       useAlbumStore.setState({

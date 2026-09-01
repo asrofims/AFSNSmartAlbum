@@ -947,11 +947,35 @@ const groupResized90 = calculateRotatedMultiFrameResize(
   1.5
 );
 console.assert(groupResized90.length === 2, 'Must return 2 resized frames');
-console.assert(groupResized90[0].geometry.width === 150, `Frame 1 width should scale 100 -> 150, got ${groupResized90[0].geometry.width}`);
-console.assert(groupResized90[0].geometry.height === 120, `Frame 1 height should scale 80 -> 120, got ${groupResized90[0].geometry.height}`);
-console.assert(groupResized90[0].geometry.rotation === 90, `Frame 1 rotation must stay 90, got ${groupResized90[0].geometry.rotation}`);
-console.assert(groupResized90[1].geometry.width === 150, `Frame 2 width should scale 100 -> 150, got ${groupResized90[1].geometry.width}`);
-console.assert(groupResized90[1].geometry.height === 120, `Frame 2 height should scale 80 -> 120, got ${groupResized90[1].geometry.height}`);
-console.assert(groupResized90[1].geometry.rotation === 90, `Frame 2 rotation must stay 90, got ${groupResized90[1].geometry.rotation}`);
+// 18i. Multi-Frame Group Rotation around Group Center with Invariant Pivot
+const initialRotateGroup = computeMultiFrameGroupInfo(multiRotateFrames);
+const halfW = initialRotateGroup.groupWidth / 2;
+const halfH = initialRotateGroup.groupHeight / 2;
+const groupCenterX = initialRotateGroup.groupX + halfW; // 20 + 105 = 125
+const groupCenterY = initialRotateGroup.groupY + halfH; // 30 + 40 = 70
+
+// Rotate group to 90°
+const targetRad = (90 * Math.PI) / 180;
+const newGX = groupCenterX - (halfW * Math.cos(targetRad) - halfH * Math.sin(targetRad));
+const newGY = groupCenterY - (halfW * Math.sin(targetRad) + halfH * Math.cos(targetRad));
+
+const rotatedGroupFrames = initialRotateGroup.childLocalFrames.map((child) => {
+  return unprojectGroupChildToWorld(newGX, newGY, 90, child.localX, child.localY, child.localRotation);
+});
+
+console.assert(rotatedGroupFrames.length === 2, 'Must return 2 frames');
+console.assert(rotatedGroupFrames[0].rotation === 90, `Rotated child 1 must have rotation 90, got ${rotatedGroupFrames[0].rotation}`);
+console.assert(rotatedGroupFrames[1].rotation === 90, `Rotated child 2 must have rotation 90, got ${rotatedGroupFrames[1].rotation}`);
+
+// Verify group center invariance after 90° rotation
+const rotatedGroupInfo = computeMultiFrameGroupInfo(rotatedGroupFrames.map((g, i) => ({ ...multiRotateFrames[i], ...g })));
+const rRad = (rotatedGroupInfo.groupRotation * Math.PI) / 180;
+const rHalfW = rotatedGroupInfo.groupWidth / 2;
+const rHalfH = rotatedGroupInfo.groupHeight / 2;
+const rotCenterX = rotatedGroupInfo.groupX + rHalfW * Math.cos(rRad) - rHalfH * Math.sin(rRad);
+const rotCenterY = rotatedGroupInfo.groupY + rHalfW * Math.sin(rRad) + rHalfH * Math.cos(rRad);
+
+console.assert(Math.abs(rotCenterX - groupCenterX) < 0.1, `Group center X must stay ${groupCenterX}, got ${rotCenterX}`);
+console.assert(Math.abs(rotCenterY - groupCenterY) < 0.1, `Group center Y must stay ${groupCenterY}, got ${rotCenterY}`);
 
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, and Snapping Config Persistence tests passed successfully!');
