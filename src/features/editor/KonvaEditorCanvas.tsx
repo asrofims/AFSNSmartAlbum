@@ -70,6 +70,8 @@ function PhotoFrameNode({
 }) {
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
   const shapeRef = useRef<Konva.Group>(null);
+  const ghostImgRef = useRef<Konva.Image>(null);
+  const ghostRectRef = useRef<Konva.Rect>(null);
 
   // Load preview or thumbnail image
   useEffect(() => {
@@ -313,6 +315,7 @@ function PhotoFrameNode({
       {isCropMode && imageObj && (
         <Group listening={false}>
           <KonvaImage
+            ref={ghostImgRef}
             image={imageObj}
             x={offsetX}
             y={offsetY}
@@ -321,6 +324,7 @@ function PhotoFrameNode({
             opacity={0.25}
           />
           <Rect
+            ref={ghostRectRef}
             x={offsetX}
             y={offsetY}
             width={renderImgW}
@@ -382,6 +386,18 @@ function PhotoFrameNode({
                 }
                 e.target.x(targetX);
                 e.target.y(targetY);
+
+                // Synchronize ghost reveal uncropped image & dashed border in real-time
+                if (ghostImgRef.current) {
+                  ghostImgRef.current.x(targetX);
+                  ghostImgRef.current.y(targetY);
+                }
+                if (ghostRectRef.current) {
+                  ghostRectRef.current.x(targetX);
+                  ghostRectRef.current.y(targetY);
+                }
+
+                e.target.getLayer()?.batchDraw();
               }
             }}
             onDragEnd={(e) => {
