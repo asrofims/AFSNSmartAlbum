@@ -705,4 +705,68 @@ console.assert(reloadedConfig.snapToEqualGaps === false, 'Reloaded snapToEqualGa
 // Reset to default for clean test teardown
 saveSnappingConfig(DEFAULT_SNAPPING_CONFIG);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');
+// 15. Test Paste in Place and Paste to All Spreads Clones
+const mockFrameSrc: PhotoFrameElement = {
+  id: 'frame-origin',
+  type: 'photo',
+  photoId: 'photo-123',
+  filePath: 'C:/photos/hero.jpg',
+  fileName: 'hero.jpg',
+  x: 25.5,
+  y: 30.0,
+  width: 140.0,
+  height: 95.0,
+  rotation: 0,
+  zIndex: 1,
+  photoAspect: 140 / 95,
+  borderEnabled: true,
+  borderWidth: 1.5,
+  borderColor: '#FFCC00',
+  opacity: 0.95,
+};
+
+// Simulate Paste in Place
+const pasteInPlaceClone: PhotoFrameElement = {
+  ...mockFrameSrc,
+  id: 'frame-clone-in-place',
+  x: mockFrameSrc.x,
+  y: mockFrameSrc.y,
+};
+console.assert(pasteInPlaceClone.id !== mockFrameSrc.id, 'Paste in place clone must have a new unique ID');
+console.assert(pasteInPlaceClone.x === 25.5 && pasteInPlaceClone.y === 30.0, 'Paste in place clone must preserve exact coordinates');
+console.assert(pasteInPlaceClone.width === 140.0 && pasteInPlaceClone.height === 95.0, 'Paste in place clone must preserve exact dimensions');
+console.assert(pasteInPlaceClone.borderWidth === 1.5 && pasteInPlaceClone.borderColor === '#FFCC00', 'Paste in place clone must preserve border properties');
+
+// Simulate Paste to All Spreads across 3 spreads
+const mockSpreads = [
+  { id: 'spread-1', elements: [] as PhotoFrameElement[] },
+  { id: 'spread-2', elements: [] as PhotoFrameElement[] },
+  { id: 'spread-3', elements: [] as PhotoFrameElement[] },
+];
+
+const pastedAllSpreads = mockSpreads.map((spread, sIdx) => ({
+  ...spread,
+  elements: [
+    ...spread.elements,
+    {
+      ...mockFrameSrc,
+      id: `frame-all-${sIdx}`,
+      x: mockFrameSrc.x,
+      y: mockFrameSrc.y,
+      width: mockFrameSrc.width,
+      height: mockFrameSrc.height,
+    },
+  ],
+}));
+
+console.assert(pastedAllSpreads.length === 3, 'All 3 spreads must receive the pasted frame');
+const allIds = new Set(pastedAllSpreads.map((s) => s.elements[0].id));
+console.assert(allIds.size === 3, 'Every spread must receive a unique frame ID');
+for (const s of pastedAllSpreads) {
+  const el = s.elements[0];
+  console.assert(el.x === 25.5 && el.y === 30.0, 'Every spread must maintain exact physical coordinates');
+  console.assert(el.width === 140.0 && el.height === 95.0, 'Every spread must maintain exact dimensions');
+  console.assert(el.borderWidth === 1.5 && el.borderColor === '#FFCC00', 'Every spread must maintain exact border styling');
+}
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');

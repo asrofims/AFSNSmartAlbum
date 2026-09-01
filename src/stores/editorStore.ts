@@ -58,6 +58,8 @@ export interface EditorState {
   deleteSelectedFrames: (spreadId: string) => void;
   copySelectedFrames: (spreadId: string) => void;
   pasteFrames: (spreadId: string, targetPos?: { x: number; y: number }) => void;
+  pasteFramesInPlace: (spreadId: string) => void;
+  pasteFramesToAllSpreads: (options?: { includeCover?: boolean; replaceExisting?: boolean }) => { count: number; spreadsCount: number };
   duplicateSelectedFrames: (spreadId: string) => void;
   replacePhotoInFrame: (spreadId: string, frameId: string, photo: Photo) => void;
   swapFrames: (spreadId: string, frameIdA: string, frameIdB: string) => void;
@@ -463,6 +465,126 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         get().addPhotoToSpread(spreadId, p, targetPos);
       }
     }
+  },
+
+  pasteFramesInPlace: (spreadId) => {
+    const { clipboardFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || clipboardFrames.length === 0) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const pasted: PhotoFrameElement[] = clipboardFrames.map((f, idx) => ({
+      ...f,
+      id: `frame-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      x: f.x,
+      y: f.y,
+    }));
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      const existing = currentAlbum.coverSpread.elements || [];
+      const updatedCover = {
+        ...currentAlbum.coverSpread,
+        elements: [
+          ...existing,
+          ...pasted.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+        ],
+      };
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, coverSpread: updatedCover },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((spread) => {
+        if (spread.id === spreadId) {
+          const existing = spread.elements || [];
+          return {
+            ...spread,
+            elements: [
+              ...existing,
+              ...pasted.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+            ],
+          };
+        }
+        return spread;
+      });
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
+
+    set({ selectedFrameIds: pasted.map((p) => p.id) });
+  },
+
+  pasteFramesToAllSpreads: (options) => {
+    const { clipboardFrames } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || clipboardFrames.length === 0) {
+      return { count: 0, spreadsCount: 0 };
+    }
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const includeCover = options?.includeCover ?? false;
+    let spreadsModified = 0;
+
+    const updatedSpreads = currentAlbum.spreads.map((spread, sIdx) => {
+      const newFrames: PhotoFrameElement[] = clipboardFrames.map((f, idx) => ({
+        ...f,
+        id: `frame-${Date.now()}-${sIdx}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+      }));
+
+      const existing = options?.replaceExisting ? [] : (spread.elements || []);
+      spreadsModified++;
+
+      return {
+        ...spread,
+        elements: [
+          ...existing,
+          ...newFrames.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+        ],
+      };
+    });
+
+    let updatedCover = currentAlbum.coverSpread;
+    if (includeCover) {
+      const coverFrames: PhotoFrameElement[] = clipboardFrames.map((f, idx) => ({
+        ...f,
+        id: `frame-${Date.now()}-c-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+      }));
+      const existing = options?.replaceExisting ? [] : (currentAlbum.coverSpread.elements || []);
+      spreadsModified++;
+      updatedCover = {
+        ...currentAlbum.coverSpread,
+        elements: [
+          ...existing,
+          ...coverFrames.map((p, i) => ({ ...p, zIndex: existing.length + i + 1 })),
+        ],
+      };
+    }
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+        coverSpread: updatedCover,
+      },
+      saveStatus: 'unsaved',
+    });
+
+    return {
+      count: clipboardFrames.length,
+      spreadsCount: spreadsModified,
+    };
   },
 
   duplicateSelectedFrames: (spreadId) => {

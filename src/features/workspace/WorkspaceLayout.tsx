@@ -678,6 +678,7 @@ export function WorkspaceLayout() {
               <KonvaEditorCanvas
                 zoomLevel={zoomLevel}
                 onZoomChange={setZoomLevel}
+                onToast={showToast}
               />
               <FrameToolbar />
             </>

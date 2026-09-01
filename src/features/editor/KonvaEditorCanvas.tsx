@@ -20,7 +20,6 @@ import {
   intersectRect,
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
-import { convertUnit } from '../../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
@@ -30,6 +29,7 @@ interface KonvaEditorCanvasProps {
   zoomLevel: number;
   activeTool?: 'select' | 'pan';
   onZoomChange?: (updater: (prev: number) => number) => void;
+  onToast?: (msg: string) => void;
 }
 
 // Single Photo Frame Component rendered with Konva
@@ -528,7 +528,7 @@ function PhotoFrameNode({
   );
 }
 
-export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoomChange }: KonvaEditorCanvasProps) {
+export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoomChange, onToast }: KonvaEditorCanvasProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     currentAlbum,
@@ -558,6 +558,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
+    pasteFramesInPlace,
+    pasteFramesToAllSpreads,
     duplicateSelectedFrames,
     replacePhotoInFrame,
     swapFrames,
@@ -806,7 +808,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
-        pasteFrames(activeSpread.id);
+        if (e.altKey) {
+          const res = pasteFramesToAllSpreads();
+          if (res.spreadsCount > 0 && onToast) {
+            onToast(`✓ Pasted ${res.count} element(s) to all ${res.spreadsCount} spreads`);
+          }
+        } else if (e.shiftKey) {
+          pasteFramesInPlace(activeSpread.id);
+          if (onToast) onToast('✓ Pasted in place');
+        } else {
+          pasteFrames(activeSpread.id);
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
@@ -829,43 +841,32 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
           if (cropFrame) {
             e.preventDefault();
-            const step = e.shiftKey ? 0.05 : e.altKey || e.ctrlKey ? 0.002 : 0.01;
-            let dx = 0;
-            let dy = 0;
-            if (e.key === 'ArrowLeft') dx = -step;
-            if (e.key === 'ArrowRight') dx = step;
-            if (e.key === 'ArrowUp') dy = -step;
-            if (e.key === 'ArrowDown') dy = step;
-            updateCrop(activeSpread.id, cropFrame.id, {
-              cropX: clamp((cropFrame.cropX || 0) + dx, -1, 1),
-              cropY: clamp((cropFrame.cropY || 0) + dy, -1, 1),
-              cropScale: cropFrame.cropScale || 1.0,
+            const step = e.shiftKey ? 0.05 : 0.01;
+            const currentX = cropFrame.cropX ?? 0;
+            const currentY = cropFrame.cropY ?? 0;
+            let newX = currentX;
+            let newY = currentY;
+            if (e.key === 'ArrowLeft') newX = clamp(currentX - step, -1, 1);
+            if (e.key === 'ArrowRight') newX = clamp(currentX + step, -1, 1);
+            if (e.key === 'ArrowUp') newY = clamp(currentY - step, -1, 1);
+            if (e.key === 'ArrowDown') newY = clamp(currentY + step, -1, 1);
+            updateCrop(activeSpread.id, editingCropFrameId, {
+              cropX: Math.round(newX * 1000) / 1000,
+              cropY: Math.round(newY * 1000) / 1000,
             });
           }
-          return;
-        }
-        if (selectedFrameIds.length > 0) {
+        } else if (selectedFrameIds.length > 0) {
           e.preventDefault();
-          const canvasUnit = currentProject?.canvasUnit || 'mm';
-          // Fine-grained physical increments:
-          // - Default arrow: 0.5 mm (detailed & precise spacing)
-          // - Alt / Ctrl + arrow: 0.1 mm (ultra-fine micro-precision)
-          // - Shift + arrow: 2.0 mm (fast movement)
-          let stepInMm = 0.5;
-          if (e.shiftKey) {
-            stepInMm = 2.0;
-          } else if (e.altKey || e.ctrlKey) {
-            stepInMm = 0.1;
-          }
-          const step = convertUnit(stepInMm, 'mm', canvasUnit);
-
-          let dx = 0;
-          let dy = 0;
-          if (e.key === 'ArrowLeft') dx = -step;
-          if (e.key === 'ArrowRight') dx = step;
-          if (e.key === 'ArrowUp') dy = -step;
-          if (e.key === 'ArrowDown') dy = step;
-          nudgeSelected(activeSpread.id, dx, dy);
+          const unit = currentProject?.canvasUnit || 'mm';
+          const defaultStep = unit === 'inch' ? 0.05 : unit === 'cm' ? 0.1 : 1;
+          const step = e.shiftKey ? defaultStep * 5 : defaultStep;
+          let deltaX = 0;
+          let deltaY = 0;
+          if (e.key === 'ArrowLeft') deltaX = -step;
+          if (e.key === 'ArrowRight') deltaX = step;
+          if (e.key === 'ArrowUp') deltaY = -step;
+          if (e.key === 'ArrowDown') deltaY = step;
+          nudgeSelected(activeSpread.id, deltaX, deltaY);
         }
       }
     };
@@ -880,11 +881,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     deleteSelectedFrames,
     copySelectedFrames,
     pasteFrames,
+    pasteFramesInPlace,
+    pasteFramesToAllSpreads,
     clearSelection,
     exitCropMode,
     updateFrameGeometry,
     updateCrop,
     nudgeSelected,
+    onToast,
   ]);
 
   if (!currentProject || !currentAlbum || !activeSpread) {
@@ -1162,6 +1166,30 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           disabled: !hasClipboard,
           onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
         },
+        {
+          id: 'paste-in-place',
+          label: 'Paste in Place',
+          icon: '📍',
+          shortcut: 'Ctrl+Shift+V',
+          disabled: !hasClipboard,
+          onClick: () => {
+            pasteFramesInPlace(activeSpread.id);
+            if (onToast) onToast('✓ Pasted in place');
+          },
+        },
+        {
+          id: 'paste-to-all-spreads',
+          label: `Paste to All Spreads (${currentAlbum?.spreads.length || 0})`,
+          icon: '📑',
+          shortcut: 'Ctrl+Alt+V',
+          disabled: !hasClipboard,
+          onClick: () => {
+            const res = pasteFramesToAllSpreads();
+            if (res.spreadsCount > 0 && onToast) {
+              onToast(`✓ Pasted ${res.count} element(s) to all ${res.spreadsCount} spreads`);
+            }
+          },
+        },
         { divider: true, id: 'div-spread', label: '' },
         {
           id: 'duplicate-spread',
@@ -1209,6 +1237,30 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         shortcut: 'Ctrl+V',
         disabled: !hasClipboard,
         onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
+      },
+      {
+        id: 'paste-in-place',
+        label: 'Paste in Place',
+        icon: '📍',
+        shortcut: 'Ctrl+Shift+V',
+        disabled: !hasClipboard,
+        onClick: () => {
+          pasteFramesInPlace(activeSpread.id);
+          if (onToast) onToast('✓ Pasted in place');
+        },
+      },
+      {
+        id: 'paste-to-all-spreads',
+        label: `Paste to All Spreads (${currentAlbum?.spreads.length || 0})`,
+        icon: '📑',
+        shortcut: 'Ctrl+Alt+V',
+        disabled: !hasClipboard,
+        onClick: () => {
+          const res = pasteFramesToAllSpreads();
+          if (res.spreadsCount > 0 && onToast) {
+            onToast(`✓ Pasted ${res.count} element(s) to all ${res.spreadsCount} spreads`);
+          }
+        },
       },
       {
         id: 'duplicate',
