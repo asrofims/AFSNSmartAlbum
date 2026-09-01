@@ -1120,14 +1120,14 @@ export function WorkspaceLayout() {
                           <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Border Width</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
                             <NumberInput
-                              value={selectedFrame.borderWidth || 1}
+                              value={selectedFrame.borderWidth || (currentProject.canvasUnit === 'inch' ? 0.04 : currentProject.canvasUnit === 'cm' ? 0.1 : 1)}
                               onChange={(val) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderWidth: val })}
-                              min={0.1}
-                              max={50}
-                              step={0.5}
-                              precision={1}
+                              min={currentProject.canvasUnit === 'inch' ? 0.01 : currentProject.canvasUnit === 'cm' ? 0.01 : 0.1}
+                              max={currentProject.canvasUnit === 'inch' ? 2 : currentProject.canvasUnit === 'cm' ? 5 : 50}
+                              step={currentProject.canvasUnit === 'inch' ? 0.01 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
+                              precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                             />
-                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>mm</span>
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                           </div>
                         </div>
 

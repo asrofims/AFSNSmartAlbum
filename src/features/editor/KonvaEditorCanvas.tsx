@@ -436,7 +436,7 @@ function PhotoFrameNode({
 
       {/* Frame Border (Inside Stroke to maintain exact outer bounds for snapping) */}
       {frame.borderEnabled && (() => {
-        const strokePx = Math.max(1, (frame.borderWidth || 1) * (scaleFactor / 10));
+        const strokePx = Math.max(1, Math.round((frame.borderWidth || 0) * scaleFactor));
         return (
           <Rect
             x={strokePx / 2}
