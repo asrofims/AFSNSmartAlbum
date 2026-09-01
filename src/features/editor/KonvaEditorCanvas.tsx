@@ -2154,6 +2154,101 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 if (anchor === 'rotater' && stageRef.current) {
                   stageRef.current.container().style.cursor = 'grabbing';
                 }
+
+                if (selectedFrameIds.length > 1 && activeSpread && multiGroupInfo) {
+                  const selectedFrames = (activeSpread.elements || [])
+                    .filter((f) => selectedFrameIds.includes(f.id))
+                    .map((f) => ({ ...f }));
+                  multiTransformInitialStateRef.current = {
+                    frames: selectedFrames,
+                    bounds: {
+                      x: multiGroupInfo.groupX,
+                      y: multiGroupInfo.groupY,
+                      width: multiGroupInfo.groupWidth,
+                      height: multiGroupInfo.groupHeight,
+                    },
+                  };
+                } else {
+                  multiTransformInitialStateRef.current = null;
+                }
+              }}
+              onTransform={() => {
+                // Live Real-Time WYSIWYG 60 FPS Multi-Frame Transform during mouse dragging
+                if (selectedFrameIds.length > 1 && multiGroupInfo && activeSpread) {
+                  const activeAnchor = activeTransformAnchorRef.current || trRef.current?.getActiveAnchor();
+                  const proxyNode = multiGroupRef.current;
+                  if (!proxyNode) return;
+
+                  if (activeAnchor === 'rotater') {
+                    const currentGroupRot = proxyNode.rotation();
+                    const currentGroupX = proxyNode.x() / scaleFactor;
+                    const currentGroupY = proxyNode.y() / scaleFactor;
+
+                    multiGroupInfo.childLocalFrames.forEach((child) => {
+                      const worldGeom = unprojectGroupChildToWorld(
+                        currentGroupX,
+                        currentGroupY,
+                        currentGroupRot,
+                        child.localX,
+                        child.localY,
+                        child.localRotation
+                      );
+                      const node = stageRef.current?.findOne(`#${child.id}`) as Konva.Node | undefined;
+                      if (node) {
+                        node.x(worldGeom.x * scaleFactor);
+                        node.y(worldGeom.y * scaleFactor);
+                        node.rotation(worldGeom.rotation);
+                      }
+                    });
+                    proxyNode.getLayer()?.batchDraw();
+                  } else {
+                    const sx = Math.abs(proxyNode.scaleX());
+                    const sy = Math.abs(proxyNode.scaleY());
+                    const newW = multiGroupInfo.groupWidth * sx;
+                    const newH = multiGroupInfo.groupHeight * sy;
+                    const newX = proxyNode.x() / scaleFactor;
+                    const newY = proxyNode.y() / scaleFactor;
+
+                    const newGroupBounds: RectBounds = {
+                      x: newX,
+                      y: newY,
+                      width: newW,
+                      height: newH,
+                    };
+
+                    const initialGroupBounds: RectBounds = {
+                      x: multiGroupInfo.groupX,
+                      y: multiGroupInfo.groupY,
+                      width: multiGroupInfo.groupWidth,
+                      height: multiGroupInfo.groupHeight,
+                    };
+
+                    const initialFrames = multiTransformInitialStateRef.current?.frames ||
+                      (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+
+                    const updates = calculateMultiFrameResize(
+                      initialFrames,
+                      initialGroupBounds,
+                      newGroupBounds,
+                      activeAnchor || undefined,
+                      multiResizeGapMode
+                    );
+
+                    updates.forEach((u) => {
+                      const node = stageRef.current?.findOne(`#${u.id}`) as Konva.Group | undefined;
+                      const initialFrame = initialFrames.find((f) => f.id === u.id);
+                      if (node && initialFrame && initialFrame.width > 0 && initialFrame.height > 0) {
+                        node.x((u.geometry.x ?? initialFrame.x) * scaleFactor);
+                        node.y((u.geometry.y ?? initialFrame.y) * scaleFactor);
+                        const targetW = u.geometry.width ?? initialFrame.width;
+                        const targetH = u.geometry.height ?? initialFrame.height;
+                        node.scaleX(targetW / initialFrame.width);
+                        node.scaleY(targetH / initialFrame.height);
+                      }
+                    });
+                    proxyNode.getLayer()?.batchDraw();
+                  }
+                }
               }}
               boundBoxFunc={(oldBox, newBox) => {
                 if (newBox.width < 4 || newBox.height < 4) {
@@ -2208,16 +2303,25 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                 if (selectedFrameIds.length > 1 && multiGroupInfo && activeSpread) {
                   const activeAnchor = activeTransformAnchorRef.current || tr.getActiveAnchor();
-                  const groupNode = multiGroupRef.current;
+                  const proxyNode = multiGroupRef.current;
 
-                  if (groupNode) {
+                  // Reset temporary transform scales on individual Konva frame groups
+                  selectedFrameIds.forEach((id) => {
+                    const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                    if (node) {
+                      node.scaleX(1);
+                      node.scaleY(1);
+                    }
+                  });
+
+                  if (proxyNode) {
                     if (activeAnchor === 'rotater') {
-                      const newGroupRot = Math.round(groupNode.rotation() * 10) / 10;
-                      const newGroupX = groupNode.x() / scaleFactor;
-                      const newGroupY = groupNode.y() / scaleFactor;
+                      const newGroupRot = Math.round(proxyNode.rotation() * 10) / 10;
+                      const newGroupX = proxyNode.x() / scaleFactor;
+                      const newGroupY = proxyNode.y() / scaleFactor;
 
-                      groupNode.scaleX(1);
-                      groupNode.scaleY(1);
+                      proxyNode.scaleX(1);
+                      proxyNode.scaleY(1);
 
                       multiGroupRotationOverrideRef.current = newGroupRot;
 
@@ -2238,15 +2342,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                       batchUpdateFrames(activeSpread.id, updates);
                     } else {
-                      const sx = Math.abs(groupNode.scaleX());
-                      const sy = Math.abs(groupNode.scaleY());
+                      const sx = Math.abs(proxyNode.scaleX());
+                      const sy = Math.abs(proxyNode.scaleY());
                       const newW = multiGroupInfo.groupWidth * sx;
                       const newH = multiGroupInfo.groupHeight * sy;
-                      const newX = groupNode.x() / scaleFactor;
-                      const newY = groupNode.y() / scaleFactor;
+                      const newX = proxyNode.x() / scaleFactor;
+                      const newY = proxyNode.y() / scaleFactor;
 
-                      groupNode.scaleX(1);
-                      groupNode.scaleY(1);
+                      proxyNode.scaleX(1);
+                      proxyNode.scaleY(1);
 
                       const newGroupBounds: RectBounds = {
                         x: newX,
@@ -2262,9 +2366,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         height: multiGroupInfo.groupHeight,
                       };
 
-                      const selectedFrames = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+                      const initialFrames = multiTransformInitialStateRef.current?.frames ||
+                        (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+
                       const updates = calculateMultiFrameResize(
-                        selectedFrames,
+                        initialFrames,
                         initialGroupBounds,
                         newGroupBounds,
                         activeAnchor || undefined,
