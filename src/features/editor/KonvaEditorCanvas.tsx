@@ -12,6 +12,8 @@ import {
   calculateResizeSnapping,
   calculateImageOffset,
   calculateMultiFrameResize,
+  computeMultiFrameGroupInfo,
+  unprojectGroupChildToWorld,
   FrameBounds,
   RectBounds,
   roundToHundredth,
@@ -31,6 +33,10 @@ interface KonvaEditorCanvasProps {
   onZoomChange?: (updater: (prev: number) => number) => void;
   onToast?: (msg: string) => void;
 }
+
+// Module-level image cache to prevent solid-color flash when PhotoFrameNode remounts
+// during multi-selection mode switches (normal → group rendering and vice versa).
+const photoImageCache = new Map<string, HTMLImageElement>();
 
 // Single Photo Frame Component rendered with Konva
 function PhotoFrameNode({
@@ -68,21 +74,32 @@ function PhotoFrameNode({
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
 }) {
-  const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
+  const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
+  const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
+  const cachedImg = cacheKey ? photoImageCache.get(cacheKey) ?? null : null;
+  const [imageObj, setImageObj] = useState<HTMLImageElement | null>(cachedImg);
   const shapeRef = useRef<Konva.Group>(null);
   const ghostImgRef = useRef<Konva.Image>(null);
   const ghostRectRef = useRef<Konva.Rect>(null);
 
-  // Load preview or thumbnail image
+  // Load preview or thumbnail image (uses cache to avoid flash on remount)
   useEffect(() => {
     if (!frame.photoId) {
       setImageObj(null);
       return;
     }
 
-    const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
     if (!imgPath) {
       setImageObj(null);
+      return;
+    }
+
+    const currentCacheKey = `${frame.photoId}::${imgPath}`;
+
+    // Check cache first – if already loaded, use immediately
+    const cached = photoImageCache.get(currentCacheKey);
+    if (cached && cached.complete && cached.naturalWidth > 0) {
+      setImageObj(cached);
       return;
     }
 
@@ -92,6 +109,7 @@ function PhotoFrameNode({
     img.src = convertFileSrc(imgPath);
     img.onload = () => {
       if (!isMounted) return;
+      photoImageCache.set(currentCacheKey, img);
       setImageObj(img);
       if (img.naturalWidth > 0 && img.naturalHeight > 0) {
         const aspect = Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000;
@@ -566,17 +584,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     swapFrames,
     groupSelectedFrames,
     ungroupSelectedFrames,
-    bringToFront,
-    sendToBack,
-    rotateFrame90,
-    resetToOriginalRatio,
+    bringSelectedToFront,
+    sendSelectedToBack,
+    rotateSelectedFrames,
+    resetSelectedRatio,
     alignSelectedFrames,
     distributeSelectedFrames,
     applyFixedGapToSelected,
     matchSelectedDimensions,
     enterCropMode,
     exitCropMode,
-    resetCrop,
+    resetSelectedCrop,
     setSnapLines,
     clearSnapLines,
     nudgeSelected,
@@ -588,6 +606,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const multiGroupRef = useRef<Konva.Group>(null);
+  const multiGroupRotationOverrideRef = useRef<number | null>(null);
   const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
   const activeTransformAnchorRef = useRef<string | null>(null);
 
@@ -740,6 +760,39 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
+  const selectedFramesList = useMemo(() => {
+    return (activeSpread?.elements || []).filter((el) => selectedFrameIds.includes(el.id));
+  }, [activeSpread?.elements, selectedFrameIds]);
+
+  // Detect external (store-based) rotation changes and reset stale canvas rotation override.
+  // When the user rotates via keyboard/button/panel, the store updates frame rotations which
+  // changes selectedFramesList. If multiGroupRotationOverrideRef still holds a canvas rotation
+  // value, it would cause computeMultiFrameGroupInfo to use a stale preferredRotation.
+  const selectedFramesRotationSignature = useMemo(() => {
+    return selectedFramesList.map((f) => `${f.id}:${f.rotation || 0}`).join(',');
+  }, [selectedFramesList]);
+
+  const prevRotationSignatureRef = useRef(selectedFramesRotationSignature);
+  useEffect(() => {
+    if (prevRotationSignatureRef.current !== selectedFramesRotationSignature) {
+      // Rotations changed externally (not from canvas Transformer) — reset override
+      if (multiGroupRotationOverrideRef.current !== null) {
+        multiGroupRotationOverrideRef.current = null;
+      }
+      prevRotationSignatureRef.current = selectedFramesRotationSignature;
+    }
+  }, [selectedFramesRotationSignature]);
+
+  const multiGroupInfo = useMemo(() => {
+    if (selectedFramesList.length <= 1) return null;
+    return computeMultiFrameGroupInfo(selectedFramesList, multiGroupRotationOverrideRef.current ?? undefined);
+  }, [selectedFramesList]);
+
+  // Reset multiGroupRotationOverrideRef on selection change
+  useEffect(() => {
+    multiGroupRotationOverrideRef.current = null;
+  }, [selectedFrameIds]);
+
   // Sync Konva Transformer to selected node(s)
   useEffect(() => {
     if (!trRef.current || !stageRef.current) return;
@@ -748,21 +801,42 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       trRef.current.nodes([]);
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
-    } else if (selectedFrameIds.length > 0) {
-      const selectedNodes = selectedFrameIds
-        .map((id) => stageRef.current?.findOne(`#${id}`))
-        .filter(Boolean) as Konva.Node[];
-
-      trRef.current.nodes(selectedNodes);
-      trRef.current.update();
-      trRef.current.forceUpdate();
-      trRef.current.getLayer()?.batchDraw();
+    } else if (selectedFrameIds.length === 1) {
+      const singleNode = stageRef.current.findOne(`#${selectedFrameIds[0]}`);
+      if (singleNode) {
+        trRef.current.nodes([singleNode]);
+        trRef.current.update();
+        trRef.current.forceUpdate();
+        trRef.current.getLayer()?.batchDraw();
+      } else {
+        trRef.current.nodes([]);
+        trRef.current.forceUpdate();
+        trRef.current.getLayer()?.batchDraw();
+      }
+    } else if (selectedFrameIds.length > 1) {
+      const groupNode = multiGroupRef.current || stageRef.current.findOne('#multi-selection-group');
+      if (groupNode) {
+        trRef.current.nodes([groupNode]);
+        trRef.current.update();
+        trRef.current.forceUpdate();
+        trRef.current.getLayer()?.batchDraw();
+      } else {
+        const selectedNodes = selectedFrameIds
+          .map((id) => stageRef.current?.findOne(`#${id}`))
+          .filter(Boolean) as Konva.Node[];
+        if (selectedNodes.length > 0) {
+          trRef.current.nodes(selectedNodes);
+          trRef.current.update();
+          trRef.current.forceUpdate();
+          trRef.current.getLayer()?.batchDraw();
+        }
+      }
     } else {
       trRef.current.nodes([]);
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize]);
+  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize, multiGroupInfo]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
@@ -836,6 +910,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         if (selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1]) {
           e.preventDefault();
           swapFrames(activeSpread.id, selectedFrameIds[0], selectedFrameIds[1]);
+        }
+      } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (selectedFrameIds.length > 0 && !editingCropFrameId) {
+          e.preventDefault();
+          rotateSelectedFrames(activeSpread.id, e.shiftKey ? 'ccw' : 'cw');
         }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (editingCropFrameId) {
@@ -1439,7 +1518,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             label: 'Bring to Front',
             icon: '🔼',
             onClick: () => {
-              selectedFrameIds.forEach((id) => bringToFront(activeSpread.id, id));
+              bringSelectedToFront(activeSpread.id);
             },
           },
           {
@@ -1447,16 +1526,26 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             label: 'Send to Back',
             icon: '🔽',
             onClick: () => {
-              selectedFrameIds.forEach((id) => sendToBack(activeSpread.id, id));
+              sendSelectedToBack(activeSpread.id);
             },
           },
           { divider: true, id: 'div-subrot', label: '' },
           {
             id: 'rotate-cw',
             label: 'Rotate 90° Clockwise',
-            icon: '🔄',
+            icon: '↻',
+            shortcut: 'R',
             onClick: () => {
-              selectedFrameIds.forEach((id) => rotateFrame90(activeSpread.id, id, 'cw'));
+              rotateSelectedFrames(activeSpread.id, 'cw');
+            },
+          },
+          {
+            id: 'rotate-ccw',
+            label: 'Rotate 90° Counter-Clockwise',
+            icon: '↺',
+            shortcut: 'Shift+R',
+            onClick: () => {
+              rotateSelectedFrames(activeSpread.id, 'ccw');
             },
           },
           {
@@ -1464,7 +1553,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             label: '↺ Reset Aspect Ratio',
             icon: '⇱',
             onClick: () => {
-              selectedFrameIds.forEach((id) => resetToOriginalRatio(activeSpread.id, id));
+              resetSelectedRatio(activeSpread.id);
             },
           },
           {
@@ -1472,7 +1561,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             label: '↺ Reset Crop & Center',
             icon: '🎯',
             onClick: () => {
-              selectedFrameIds.forEach((id) => resetCrop(activeSpread.id, id));
+              resetSelectedCrop(activeSpread.id);
             },
           },
         ],
@@ -1729,267 +1818,451 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
           {/* Layer 2: Interactive Photo Frames */}
           <Layer>
-            {(activeSpread.elements || []).map((frame) => {
-              const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
-              const isSelected = selectedFrameIds.includes(frame.id);
-              const isCrop = editingCropFrameId === frame.id;
+            {selectedFrameIds.length > 1 && multiGroupInfo ? (
+              <>
+                {/* 1. Unselected Frames in World Space */}
+                {(activeSpread.elements || [])
+                  .filter((frame) => !selectedFrameIds.includes(frame.id))
+                  .map((frame) => {
+                    const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
+                    return (
+                      <PhotoFrameNode
+                        key={frame.id}
+                        frame={hydratedFrame}
+                        isSelected={false}
+                        isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
+                        isCropMode={false}
+                        isMultiSelectActive={true}
+                        isHoveredForDrop={hoveredDropFrameId === frame.id}
+                        isAltDrop={isHoveredDropAlt}
+                        scaleFactor={scaleFactor}
+                        onSelect={(e) => {
+                          if (justDroppedRef.current) return;
+                          if (e) {
+                            e.cancelBubble = true;
+                            const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                            selectFrame(frame.id, isMulti);
+                          } else {
+                            selectFrame(frame.id);
+                          }
+                        }}
+                        onDragMove={() => {}}
+                        onDragEnd={() => {}}
+                        onContextMenu={(e) => {
+                          openContextMenuAt(e.evt.clientX, e.evt.clientY);
+                        }}
+                        onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                        onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
+                        onDoubleClick={() => enterCropMode(frame.id)}
+                      />
+                    );
+                  })}
 
-              return (
-                <PhotoFrameNode
-                  key={frame.id}
-                  frame={hydratedFrame}
-                  isSelected={isSelected}
-                  isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
-                  isCropMode={isCrop}
-                  isMultiSelectActive={isMultiSelected}
-                  isHoveredForDrop={hoveredDropFrameId === frame.id}
-                  isAltDrop={isHoveredDropAlt}
-                  scaleFactor={scaleFactor}
-                  onSelect={(e) => {
-                    if (justDroppedRef.current) return;
-                    if (e) {
-                      e.cancelBubble = true;
-                      const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
-                      selectFrame(frame.id, isMulti);
-                    } else {
-                      selectFrame(frame.id);
-                    }
+                {/* 2. Selected Frames wrapped in a Single Rotated Konva Group */}
+                <Group
+                  id="multi-selection-group"
+                  ref={multiGroupRef}
+                  x={multiGroupInfo.groupX * scaleFactor}
+                  y={multiGroupInfo.groupY * scaleFactor}
+                  width={multiGroupInfo.groupWidth * scaleFactor}
+                  height={multiGroupInfo.groupHeight * scaleFactor}
+                  rotation={multiGroupInfo.groupRotation}
+                  draggable
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    e.cancelBubble = true;
+                    openContextMenuAt(e.evt.clientX, e.evt.clientY);
                   }}
                   onDragStart={() => {
-                    const isThisSelected = selectedFrameIds.includes(frame.id);
-                    let currentGroupIds = isThisSelected ? [...selectedFrameIds] : [frame.id];
-                    if (!isThisSelected) {
-                      selectFrame(frame.id);
-                      currentGroupIds = [frame.id];
-                    }
-
                     const initialPositions = new Map<string, { x: number; y: number }>();
-                    currentGroupIds.forEach((id) => {
+                    selectedFrameIds.forEach((id) => {
                       const f = (activeSpread.elements || []).find((el) => el.id === id);
-                      if (f) {
-                        initialPositions.set(id, { x: f.x, y: f.y });
-                      }
+                      if (f) initialPositions.set(id, { x: f.x, y: f.y });
                     });
                     dragInitialPhysicalPositionsRef.current = initialPositions;
                   }}
                   onDragMove={(e) => {
-                    if (dragInitialPhysicalPositionsRef.current.size === 0) return;
-                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
-                    if (!draggedNode) return;
+                    const groupNode = multiGroupRef.current;
+                    if (!groupNode) return;
 
-                    let currentPhysX = draggedNode.x() / scaleFactor;
-                    let currentPhysY = draggedNode.y() / scaleFactor;
-                    let deltaPhysX = currentPhysX - frame.x;
-                    let deltaPhysY = currentPhysY - frame.y;
-
-                    // Axis-Constrained Dragging with SHIFT Key (Straight horizontal or vertical constraint)
-                    if (e.evt?.shiftKey) {
-                      if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
-                        deltaPhysY = 0;
-                        currentPhysY = frame.y;
-                        draggedNode.y(frame.y * scaleFactor);
-                      } else {
-                        deltaPhysX = 0;
-                        currentPhysX = frame.x;
-                        draggedNode.x(frame.x * scaleFactor);
-                      }
-                    }
+                    const currentPhysX = groupNode.x() / scaleFactor;
+                    const currentPhysY = groupNode.y() / scaleFactor;
 
                     if (!snapEnabled || e.evt?.ctrlKey) {
                       clearSnapLines();
                     } else {
                       const otherRects = (activeSpread.elements || [])
-                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                        .filter((f) => !selectedFrameIds.includes(f.id))
                         .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-                      const thresholdUnits =
-                        typeof snappingConfig.threshold === 'number'
-                          ? snappingConfig.threshold
-                          : 0.1;
-
                       const snapRes = calculateSnapping(
-                        { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
+                        {
+                          x: currentPhysX,
+                          y: currentPhysY,
+                          width: multiGroupInfo.groupWidth,
+                          height: multiGroupInfo.groupHeight,
+                        },
                         totalSpreadPhysicalW,
                         totalSpreadPhysicalH,
                         activeSpread.safeArea,
                         gutterPhysicalW,
                         otherRects,
-                        { ...snappingConfig, threshold: thresholdUnits },
+                        snappingConfig,
                         unit
                       );
 
                       if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
                         setSnapLines(snapRes.snapLines, snapRes.gapGuides);
-                        // Live magnetic snapping: lock frame position directly to the guideline
-                        const snappedPhysX = snapRes.snappedX;
-                        const snappedPhysY = snapRes.snappedY;
-                        deltaPhysX = snappedPhysX - frame.x;
-                        deltaPhysY = snappedPhysY - frame.y;
-                        draggedNode.x(snappedPhysX * scaleFactor);
-                        draggedNode.y(snappedPhysY * scaleFactor);
+                        groupNode.x(snapRes.snappedX * scaleFactor);
+                        groupNode.y(snapRes.snappedY * scaleFactor);
                       } else {
                         clearSnapLines();
                       }
                     }
 
-                    // Check if hovering over another frame for canvas swap
-                    const isAlt = Boolean(e.evt?.altKey);
-                    setIsHoveredDropAlt(isAlt);
-                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
-                      const draggedCenterPhysX = currentPhysX + frame.width / 2;
-                      const draggedCenterPhysY = currentPhysY + frame.height / 2;
-                      const hoverTarget = (activeSpread.elements || []).find((f) =>
-                        f.id !== frame.id &&
-                        draggedCenterPhysX >= f.x &&
-                        draggedCenterPhysX <= f.x + f.width &&
-                        draggedCenterPhysY >= f.y &&
-                        draggedCenterPhysY <= f.y + f.height
-                      );
-                      setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
-                    } else {
-                      setHoveredDropFrameId(null);
-                    }
-
-                    // Move all companion selected photo nodes synchronously in screen pixels
-                    dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
-                      if (id !== frame.id) {
-                        const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
-                        if (node) {
-                          node.x((initPhys.x + deltaPhysX) * scaleFactor);
-                          node.y((initPhys.y + deltaPhysY) * scaleFactor);
-                        }
-                      }
-                    });
+                    trRef.current?.update();
+                    trRef.current?.getLayer()?.batchDraw();
                   }}
                   onDragEnd={(e) => {
                     clearSnapLines();
-                    setHoveredDropFrameId(null);
-                    setIsHoveredDropAlt(false);
-                    const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
-                    if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
-                      let finalCurrentPhysX = draggedNode.x() / scaleFactor;
-                      let finalCurrentPhysY = draggedNode.y() / scaleFactor;
+                    const groupNode = multiGroupRef.current;
+                    if (!groupNode) return;
 
-                      // Axis-Constrained Dragging with SHIFT Key on Drag End
-                      const isShiftConstrained = Boolean(e.evt?.shiftKey);
-                      let isHorizontalConstraint = true;
-                      if (isShiftConstrained) {
-                        const rawDeltaX = finalCurrentPhysX - frame.x;
-                        const rawDeltaY = finalCurrentPhysY - frame.y;
-                        if (Math.abs(rawDeltaX) >= Math.abs(rawDeltaY)) {
-                          finalCurrentPhysY = frame.y;
+                    const finalPhysX = groupNode.x() / scaleFactor;
+                    const finalPhysY = groupNode.y() / scaleFactor;
+                    const deltaPhysX = finalPhysX - multiGroupInfo.groupX;
+                    const deltaPhysY = finalPhysY - multiGroupInfo.groupY;
+
+                    const isAltPressed = Boolean(e.evt?.altKey);
+                    if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                      groupNode.x(multiGroupInfo.groupX * scaleFactor);
+                      groupNode.y(multiGroupInfo.groupY * scaleFactor);
+
+                      const duplicates = selectedFrameIds.map((id) => {
+                        const f = (activeSpread.elements || []).find((el) => el.id === id);
+                        return {
+                          sourceId: id,
+                          x: Math.round(((f?.x || 0) + deltaPhysX) * 10) / 10,
+                          y: Math.round(((f?.y || 0) + deltaPhysY) * 10) / 10,
+                        };
+                      });
+
+                      duplicateFramesToPosition(activeSpread.id, duplicates);
+                      if (onToast) {
+                        onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
+                      }
+                    } else if (Math.abs(deltaPhysX) > 0.01 || Math.abs(deltaPhysY) > 0.01) {
+                      const updates = selectedFrameIds.map((id) => {
+                        const f = (activeSpread.elements || []).find((el) => el.id === id);
+                        return {
+                          id,
+                          geometry: {
+                            x: Math.round(((f?.x || 0) + deltaPhysX) * 10) / 10,
+                            y: Math.round(((f?.y || 0) + deltaPhysY) * 10) / 10,
+                          },
+                        };
+                      });
+                      batchUpdateFrames(activeSpread.id, updates);
+                    }
+                    dragInitialPhysicalPositionsRef.current.clear();
+                  }}
+                >
+                  {selectedFramesList.map((frame) => {
+                    const childLocal = multiGroupInfo.childLocalFrames.find((c) => c.id === frame.id);
+                    const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
+                    const localFrame = childLocal
+                      ? {
+                          ...hydratedFrame,
+                          x: childLocal.localX,
+                          y: childLocal.localY,
+                          rotation: childLocal.localRotation,
+                        }
+                      : hydratedFrame;
+
+                    return (
+                      <PhotoFrameNode
+                        key={frame.id}
+                        frame={localFrame}
+                        isSelected={true}
+                        isMuted={false}
+                        isCropMode={false}
+                        isMultiSelectActive={true}
+                        scaleFactor={scaleFactor}
+                        onSelect={(e) => {
+                          if (e) {
+                            e.cancelBubble = true;
+                            const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                            selectFrame(frame.id, isMulti);
+                          } else {
+                            selectFrame(frame.id);
+                          }
+                        }}
+                        onDragMove={() => {}}
+                        onDragEnd={() => {}}
+                        onFrameChange={(newAttrs) => updateFrameGeometry(activeSpread.id, frame.id, newAttrs)}
+                        onCropChange={(newAttrs) => updateCrop(activeSpread.id, frame.id, newAttrs)}
+                        onDoubleClick={() => {}}
+                      />
+                    );
+                  })}
+                </Group>
+              </>
+            ) : (
+              (activeSpread.elements || []).map((frame) => {
+                const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
+                const isSelected = selectedFrameIds.includes(frame.id);
+                const isCrop = editingCropFrameId === frame.id;
+
+                return (
+                  <PhotoFrameNode
+                    key={frame.id}
+                    frame={hydratedFrame}
+                    isSelected={isSelected}
+                    isMuted={Boolean(editingCropFrameId && editingCropFrameId !== frame.id)}
+                    isCropMode={isCrop}
+                    isMultiSelectActive={isMultiSelected}
+                    isHoveredForDrop={hoveredDropFrameId === frame.id}
+                    isAltDrop={isHoveredDropAlt}
+                    scaleFactor={scaleFactor}
+                    onSelect={(e) => {
+                      if (justDroppedRef.current) return;
+                      if (e) {
+                        e.cancelBubble = true;
+                        const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                        selectFrame(frame.id, isMulti);
+                      } else {
+                        selectFrame(frame.id);
+                      }
+                    }}
+                    onDragStart={() => {
+                      const isThisSelected = selectedFrameIds.includes(frame.id);
+                      let currentGroupIds = isThisSelected ? [...selectedFrameIds] : [frame.id];
+                      if (!isThisSelected) {
+                        selectFrame(frame.id);
+                        currentGroupIds = [frame.id];
+                      }
+
+                      const initialPositions = new Map<string, { x: number; y: number }>();
+                      currentGroupIds.forEach((id) => {
+                        const f = (activeSpread.elements || []).find((el) => el.id === id);
+                        if (f) {
+                          initialPositions.set(id, { x: f.x, y: f.y });
+                        }
+                      });
+                      dragInitialPhysicalPositionsRef.current = initialPositions;
+                    }}
+                    onDragMove={(e) => {
+                      if (dragInitialPhysicalPositionsRef.current.size === 0) return;
+                      const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                      if (!draggedNode) return;
+
+                      let currentPhysX = draggedNode.x() / scaleFactor;
+                      let currentPhysY = draggedNode.y() / scaleFactor;
+                      let deltaPhysX = currentPhysX - frame.x;
+                      let deltaPhysY = currentPhysY - frame.y;
+
+                      if (e.evt?.shiftKey) {
+                        if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
+                          deltaPhysY = 0;
+                          currentPhysY = frame.y;
                           draggedNode.y(frame.y * scaleFactor);
-                          isHorizontalConstraint = true;
                         } else {
-                          finalCurrentPhysX = frame.x;
+                          deltaPhysX = 0;
+                          currentPhysX = frame.x;
                           draggedNode.x(frame.x * scaleFactor);
-                          isHorizontalConstraint = false;
                         }
                       }
 
-                      // Check if dropped directly onto another frame on the canvas to SWAP (Requires ALT key)
-                      const isAltPressed = Boolean(e.evt?.altKey);
-                      if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
-                        const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
-                        const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
-                        const dropTarget = (activeSpread.elements || []).find((f) =>
+                      if (!snapEnabled || e.evt?.ctrlKey) {
+                        clearSnapLines();
+                      } else {
+                        const otherRects = (activeSpread.elements || [])
+                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                        const thresholdUnits =
+                          typeof snappingConfig.threshold === 'number'
+                            ? snappingConfig.threshold
+                            : 0.1;
+
+                        const snapRes = calculateSnapping(
+                          { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
+                          totalSpreadPhysicalW,
+                          totalSpreadPhysicalH,
+                          activeSpread.safeArea,
+                          gutterPhysicalW,
+                          otherRects,
+                          { ...snappingConfig, threshold: thresholdUnits },
+                          unit
+                        );
+
+                        if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                          setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                          const snappedPhysX = snapRes.snappedX;
+                          const snappedPhysY = snapRes.snappedY;
+                          deltaPhysX = snappedPhysX - frame.x;
+                          deltaPhysY = snappedPhysY - frame.y;
+                          draggedNode.x(snappedPhysX * scaleFactor);
+                          draggedNode.y(snappedPhysY * scaleFactor);
+                        } else {
+                          clearSnapLines();
+                        }
+                      }
+
+                      const isAlt = Boolean(e.evt?.altKey);
+                      setIsHoveredDropAlt(isAlt);
+                      if (dragInitialPhysicalPositionsRef.current.size === 1) {
+                        const draggedCenterPhysX = currentPhysX + frame.width / 2;
+                        const draggedCenterPhysY = currentPhysY + frame.height / 2;
+                        const hoverTarget = (activeSpread.elements || []).find((f) =>
                           f.id !== frame.id &&
                           draggedCenterPhysX >= f.x &&
                           draggedCenterPhysX <= f.x + f.width &&
                           draggedCenterPhysY >= f.y &&
                           draggedCenterPhysY <= f.y + f.height
                         );
-
-                        if (dropTarget) {
-                          draggedNode.x(frame.x * scaleFactor);
-                          draggedNode.y(frame.y * scaleFactor);
-                          swapFrames(activeSpread.id, frame.id, dropTarget.id);
-                          clearSelection();
-                          justDroppedRef.current = true;
-                          setTimeout(() => {
-                            justDroppedRef.current = false;
-                          }, 250);
-                          dragInitialPhysicalPositionsRef.current.clear();
-                          return;
-                        }
+                        setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
+                      } else {
+                        setHoveredDropFrameId(null);
                       }
 
-                      const otherRects = (activeSpread.elements || [])
-                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                      dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                        if (id !== frame.id) {
+                          const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                          if (node) {
+                            node.x((initPhys.x + deltaPhysX) * scaleFactor);
+                            node.y((initPhys.y + deltaPhysY) * scaleFactor);
+                          }
+                        }
+                      });
 
-                      const snapRes = (!snapEnabled || e.evt?.ctrlKey)
-                        ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
-                        : calculateSnapping(
-                            { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
-                            totalSpreadPhysicalW,
-                            totalSpreadPhysicalH,
-                            activeSpread.safeArea,
-                            gutterPhysicalW,
-                            otherRects,
-                            snappingConfig,
-                            unit
+                      trRef.current?.update();
+                      trRef.current?.getLayer()?.batchDraw();
+                    }}
+                    onDragEnd={(e) => {
+                      clearSnapLines();
+                      setHoveredDropFrameId(null);
+                      setIsHoveredDropAlt(false);
+                      const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
+                      if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
+                        let finalCurrentPhysX = draggedNode.x() / scaleFactor;
+                        let finalCurrentPhysY = draggedNode.y() / scaleFactor;
+
+                        const isShiftConstrained = Boolean(e.evt?.shiftKey);
+                        let isHorizontalConstraint = true;
+                        if (isShiftConstrained) {
+                          const rawDeltaX = finalCurrentPhysX - frame.x;
+                          const rawDeltaY = finalCurrentPhysY - frame.y;
+                          if (Math.abs(rawDeltaX) >= Math.abs(rawDeltaY)) {
+                            finalCurrentPhysY = frame.y;
+                            draggedNode.y(frame.y * scaleFactor);
+                            isHorizontalConstraint = true;
+                          } else {
+                            finalCurrentPhysX = frame.x;
+                            draggedNode.x(frame.x * scaleFactor);
+                            isHorizontalConstraint = false;
+                          }
+                        }
+
+                        const isAltPressed = Boolean(e.evt?.altKey);
+                        if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
+                          const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
+                          const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
+                          const dropTarget = (activeSpread.elements || []).find((f) =>
+                            f.id !== frame.id &&
+                            draggedCenterPhysX >= f.x &&
+                            draggedCenterPhysX <= f.x + f.width &&
+                            draggedCenterPhysY >= f.y &&
+                            draggedCenterPhysY <= f.y + f.height
                           );
 
-                      let deltaPhysX = snapRes.snappedX - frame.x;
-                      let deltaPhysY = snapRes.snappedY - frame.y;
-
-                      if (isShiftConstrained) {
-                        if (isHorizontalConstraint) {
-                          deltaPhysY = 0;
-                        } else {
-                          deltaPhysX = 0;
-                        }
-                      }
-
-                      if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
-                        if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
-                          // Adobe-style Alt+Drag to Duplicate:
-                          // 1. Reset visual position of dragged Konva nodes back to their initial positions
-                          dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
-                            const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
-                            if (node) {
-                              node.x(initPhys.x * scaleFactor);
-                              node.y(initPhys.y * scaleFactor);
-                            }
-                          });
-
-                          // 2. Build duplicate frame specs
-                          const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                            sourceId: id,
-                            x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                            y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                          }));
-
-                          // 3. Create duplicated frames in store and auto-select them
-                          duplicateFramesToPosition(activeSpread.id, duplicates);
-                          if (onToast) {
-                            onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
+                          if (dropTarget) {
+                            draggedNode.x(frame.x * scaleFactor);
+                            draggedNode.y(frame.y * scaleFactor);
+                            swapFrames(activeSpread.id, frame.id, dropTarget.id);
+                            clearSelection();
+                            justDroppedRef.current = true;
+                            setTimeout(() => {
+                              justDroppedRef.current = false;
+                            }, 250);
+                            dragInitialPhysicalPositionsRef.current.clear();
+                            return;
                           }
-                        } else {
-                          const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                            id,
-                            geometry: {
+                        }
+
+                        const otherRects = (activeSpread.elements || [])
+                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                        const snapRes = (!snapEnabled || e.evt?.ctrlKey)
+                          ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
+                          : calculateSnapping(
+                              { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
+                              totalSpreadPhysicalW,
+                              totalSpreadPhysicalH,
+                              activeSpread.safeArea,
+                              gutterPhysicalW,
+                              otherRects,
+                              snappingConfig,
+                              unit
+                            );
+
+                        let deltaPhysX = snapRes.snappedX - frame.x;
+                        let deltaPhysY = snapRes.snappedY - frame.y;
+
+                        if (isShiftConstrained) {
+                          if (isHorizontalConstraint) {
+                            deltaPhysY = 0;
+                          } else {
+                            deltaPhysX = 0;
+                          }
+                        }
+
+                        if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
+                          if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                            dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                              const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                              if (node) {
+                                node.x(initPhys.x * scaleFactor);
+                                node.y(initPhys.y * scaleFactor);
+                              }
+                            });
+
+                            const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                              sourceId: id,
                               x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
                               y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                            },
-                          }));
+                            }));
 
-                          batchUpdateFrames(activeSpread.id, updates);
+                            duplicateFramesToPosition(activeSpread.id, duplicates);
+                            if (onToast) {
+                              onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
+                            }
+                          } else {
+                            const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                              id,
+                              geometry: {
+                                x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                                y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                              },
+                            }));
+
+                            batchUpdateFrames(activeSpread.id, updates);
+                          }
                         }
                       }
-                    }
-                    dragInitialPhysicalPositionsRef.current.clear();
-                  }}
-                  onContextMenu={(e) => {
-                    openContextMenuAt(e.evt.clientX, e.evt.clientY);
-                  }}
-                  onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
-                  onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
-                  onDoubleClick={() => enterCropMode(frame.id)}
-                />
-              );
-            })}
+                      dragInitialPhysicalPositionsRef.current.clear();
+                    }}
+                    onContextMenu={(e) => {
+                      openContextMenuAt(e.evt.clientX, e.evt.clientY);
+                    }}
+                    onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                    onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
+                    onDoubleClick={() => enterCropMode(frame.id)}
+                  />
+                );
+              })
+            )}
 
             {/* Dynamic Contextual Transformer */}
             <Transformer
@@ -1997,6 +2270,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               visible={!editingCropFrameId}
               rotateEnabled
               keepRatio={true}
+              rotateAnchorOffset={20}
+              rotateAnchorCursor={'grab'}
               onContextMenu={(e) => {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
@@ -2047,27 +2322,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   anchor === 'bottom-right';
                 tr.keepRatio(isCorner || selectedFrameIds.length > 1);
 
-                if (selectedFrameIds.length > 1 && activeSpread) {
-                  const selectedFrames = (activeSpread.elements || [])
-                    .filter((f) => selectedFrameIds.includes(f.id))
-                    .map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height }));
-
-                  if (selectedFrames.length > 0) {
-                    const minX = Math.min(...selectedFrames.map((f) => f.x));
-                    const minY = Math.min(...selectedFrames.map((f) => f.y));
-                    const maxX = Math.max(...selectedFrames.map((f) => f.x + f.width));
-                    const maxY = Math.max(...selectedFrames.map((f) => f.y + f.height));
-                    multiTransformInitialStateRef.current = {
-                      frames: selectedFrames,
-                      bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
-                    };
-                  }
-                } else {
-                  multiTransformInitialStateRef.current = null;
+                // Switch to grabbing cursor during active rotation
+                if (anchor === 'rotater' && stageRef.current) {
+                  stageRef.current.container().style.cursor = 'grabbing';
                 }
               }}
               boundBoxFunc={(oldBox, newBox) => {
-                // Minimum size limits (allow tiny micro sizes down to 4px)
                 if (newBox.width < 4 || newBox.height < 4) {
                   return oldBox;
                 }
@@ -2118,51 +2378,73 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 const tr = trRef.current;
                 if (!tr) return;
 
-                if (selectedFrameIds.length > 1 && multiTransformInitialStateRef.current && activeSpread) {
-                  const { frames: initialFrames, bounds: initialBounds } = multiTransformInitialStateRef.current;
+                if (selectedFrameIds.length > 1 && multiGroupInfo && activeSpread) {
                   const activeAnchor = activeTransformAnchorRef.current || tr.getActiveAnchor();
-                  const selectedNodes = selectedFrameIds
-                    .map((id) => stageRef.current?.findOne(`#${id}`))
-                    .filter(Boolean) as Konva.Node[];
+                  const groupNode = multiGroupRef.current;
 
-                  if (selectedNodes.length > 0) {
-                    const pixelBoxes = selectedNodes.map((n) => {
-                      const sx = Math.abs(n.scaleX());
-                      const sy = Math.abs(n.scaleY());
-                      return {
-                        x: n.x(),
-                        y: n.y(),
-                        width: n.width() * sx,
-                        height: n.height() * sy,
-                      };
-                    });
+                  if (groupNode) {
+                    if (activeAnchor === 'rotater') {
+                      const newGroupRot = Math.round(groupNode.rotation() * 10) / 10;
+                      const newGroupX = groupNode.x() / scaleFactor;
+                      const newGroupY = groupNode.y() / scaleFactor;
 
-                    const minPxX = Math.min(...pixelBoxes.map((b) => b.x));
-                    const minPxY = Math.min(...pixelBoxes.map((b) => b.y));
-                    const maxPxX = Math.max(...pixelBoxes.map((b) => b.x + b.width));
-                    const maxPxY = Math.max(...pixelBoxes.map((b) => b.y + b.height));
+                      groupNode.scaleX(1);
+                      groupNode.scaleY(1);
 
-                    const newGroupBounds: RectBounds = {
-                      x: minPxX / scaleFactor,
-                      y: minPxY / scaleFactor,
-                      width: (maxPxX - minPxX) / scaleFactor,
-                      height: (maxPxY - minPxY) / scaleFactor,
-                    };
+                      multiGroupRotationOverrideRef.current = newGroupRot;
 
-                    selectedNodes.forEach((n) => {
-                      n.scaleX(1);
-                      n.scaleY(1);
-                    });
+                      const updates = multiGroupInfo.childLocalFrames.map((child) => {
+                        const worldGeom = unprojectGroupChildToWorld(
+                          newGroupX,
+                          newGroupY,
+                          newGroupRot,
+                          child.localX,
+                          child.localY,
+                          child.localRotation
+                        );
+                        return {
+                          id: child.id,
+                          geometry: worldGeom,
+                        };
+                      });
 
-                    const updates = calculateMultiFrameResize(
-                      initialFrames,
-                      initialBounds,
-                      newGroupBounds,
-                      activeAnchor || undefined,
-                      multiResizeGapMode
-                    );
-                    if (updates.length > 0) {
                       batchUpdateFrames(activeSpread.id, updates);
+                    } else {
+                      const sx = Math.abs(groupNode.scaleX());
+                      const sy = Math.abs(groupNode.scaleY());
+                      const newW = multiGroupInfo.groupWidth * sx;
+                      const newH = multiGroupInfo.groupHeight * sy;
+                      const newX = groupNode.x() / scaleFactor;
+                      const newY = groupNode.y() / scaleFactor;
+
+                      groupNode.scaleX(1);
+                      groupNode.scaleY(1);
+
+                      const newGroupBounds: RectBounds = {
+                        x: newX,
+                        y: newY,
+                        width: newW,
+                        height: newH,
+                      };
+
+                      const initialGroupBounds: RectBounds = {
+                        x: multiGroupInfo.groupX,
+                        y: multiGroupInfo.groupY,
+                        width: multiGroupInfo.groupWidth,
+                        height: multiGroupInfo.groupHeight,
+                      };
+
+                      const selectedFrames = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+                      const updates = calculateMultiFrameResize(
+                        selectedFrames,
+                        initialGroupBounds,
+                        newGroupBounds,
+                        activeAnchor || undefined,
+                        multiResizeGapMode
+                      );
+                      if (updates.length > 0) {
+                        batchUpdateFrames(activeSpread.id, updates);
+                      }
                     }
                   }
                   multiTransformInitialStateRef.current = null;
@@ -2172,6 +2454,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 tr.keepRatio(true);
                 tr.update();
                 tr.getLayer()?.batchDraw();
+
+                // Restore cursor after transform (especially after rotation)
+                if (stageRef.current) {
+                  stageRef.current.container().style.cursor = 'default';
+                }
               }}
             />
 

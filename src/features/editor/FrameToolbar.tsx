@@ -10,10 +10,11 @@ export function FrameToolbar() {
     selectedFrameIds,
     editingCropFrameId,
     deleteSelectedFrames,
-    rotateFrame90,
+    rotateSelectedFrames,
     enterCropMode,
     exitCropMode,
     resetToOriginalRatio,
+    resetSelectedRatio,
     resetCrop,
     swapFrames,
     groupSelectedFrames,
@@ -140,8 +141,12 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => resetToOriginalRatio(activeSpread.id, frame.id)}
-            title="Reset to Original Aspect Ratio (3:2 / 4:3)"
+            onClick={() =>
+              selectedFrameIds.length > 1
+                ? resetSelectedRatio(activeSpread.id)
+                : resetToOriginalRatio(activeSpread.id, frame.id)
+            }
+            title={selectedFrameIds.length > 1 ? `Reset ${selectedFrameIds.length} Frames to Original Aspect Ratio` : 'Reset to Original Aspect Ratio (3:2 / 4:3)'}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="18" height="14" rx="2" strokeDasharray="3 2" />
@@ -154,8 +159,8 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => rotateFrame90(activeSpread.id, frame.id, 'cw')}
-            title="Rotate 90° (R)"
+            onClick={() => rotateSelectedFrames(activeSpread.id, 'cw')}
+            title={selectedFrameIds.length > 1 ? `Rotate ${selectedFrameIds.length} Frames 90° (R)` : 'Rotate 90° (R)'}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.6L21 8" />

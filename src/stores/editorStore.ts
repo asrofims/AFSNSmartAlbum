@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   alignFrames,
   applyFixedGap,
+  calculateCenterRotatedPosition,
   clampCropTransform,
   loadSavedSnappingConfig,
   saveSnappingConfig,
@@ -69,7 +70,14 @@ export interface EditorState {
   swapFrames: (spreadId: string, frameIdA: string, frameIdB: string) => void;
   bringToFront: (spreadId: string, frameId: string) => void;
   sendToBack: (spreadId: string, frameId: string) => void;
+  bringSelectedToFront: (spreadId: string) => void;
+  sendSelectedToBack: (spreadId: string) => void;
   rotateFrame90: (spreadId: string, frameId: string, direction?: 'cw' | 'ccw') => void;
+  rotateSelectedFrames: (
+    spreadId: string,
+    deltaOrAngle: number | 'cw' | 'ccw',
+    isAbsolute?: boolean
+  ) => void;
   groupSelectedFrames: (spreadId: string) => void;
   ungroupSelectedFrames: (spreadId: string) => void;
 
@@ -96,7 +104,9 @@ export interface EditorState {
   enterCropMode: (frameId: string) => void;
   exitCropMode: () => void;
   resetToOriginalRatio: (spreadId: string, frameId: string) => void;
+  resetSelectedRatio: (spreadId: string) => void;
   resetCrop: (spreadId: string, frameId: string) => void;
+  resetSelectedCrop: (spreadId: string) => void;
   updateCrop: (
     spreadId: string,
     frameId: string,
@@ -860,23 +870,142 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  rotateFrame90: (spreadId, frameId, direction = 'cw') => {
+  bringSelectedToFront: (spreadId) => {
+    const { selectedFrameIds } = get();
+    if (selectedFrameIds.length === 0) return;
+
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
-    const delta = direction === 'cw' ? 90 : -90;
-    const { updateFrameGeometry } = get();
+    useHistoryStore.getState().pushState(currentAlbum);
 
-    const activeSpread =
-      currentAlbum.coverSpread.id === spreadId
-        ? currentAlbum.coverSpread
-        : currentAlbum.spreads.find((s) => s.id === spreadId);
+    const updateElements = (elements: PhotoFrameElement[]) => {
+      const selected = elements.filter((f) => selectedFrameIds.includes(f.id));
+      const unselected = elements.filter((f) => !selectedFrameIds.includes(f.id));
+      return [...unselected, ...selected].map((f, idx) => ({ ...f, zIndex: idx + 1 }));
+    };
 
-    const frame = (activeSpread?.elements || []).find((f) => f.id === frameId);
-    if (!frame) return;
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: updateElements(currentAlbum.coverSpread.elements || []),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+      );
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
+  },
 
-    const newRotation = (frame.rotation + delta + 360) % 360;
-    updateFrameGeometry(spreadId, frameId, { rotation: newRotation });
+  sendSelectedToBack: (spreadId) => {
+    const { selectedFrameIds } = get();
+    if (selectedFrameIds.length === 0) return;
+
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updateElements = (elements: PhotoFrameElement[]) => {
+      const selected = elements.filter((f) => selectedFrameIds.includes(f.id));
+      const unselected = elements.filter((f) => !selectedFrameIds.includes(f.id));
+      return [...selected, ...unselected].map((f, idx) => ({ ...f, zIndex: idx + 1 }));
+    };
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: updateElements(currentAlbum.coverSpread.elements || []),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+      );
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
+  },
+
+  rotateFrame90: (spreadId, frameId, direction = 'cw') => {
+    const { selectedFrameIds, rotateSelectedFrames } = get();
+    if (!selectedFrameIds.includes(frameId)) {
+      set({ selectedFrameIds: [frameId] });
+    }
+    rotateSelectedFrames(spreadId, direction);
+  },
+
+  rotateSelectedFrames: (spreadId, deltaOrAngle, isAbsolute = false) => {
+    const { selectedFrameIds } = get();
+    if (selectedFrameIds.length === 0) return;
+
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    // Push history once for the entire batch operation
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const delta =
+      deltaOrAngle === 'cw' ? 90 : deltaOrAngle === 'ccw' ? -90 : deltaOrAngle;
+
+    const updateElements = (elements: PhotoFrameElement[]) =>
+      elements.map((f) => {
+        if (!selectedFrameIds.includes(f.id)) return f;
+
+        let targetRotation: number;
+        if (isAbsolute && typeof deltaOrAngle === 'number') {
+          targetRotation = ((deltaOrAngle % 360) + 360) % 360;
+        } else {
+          targetRotation = (((f.rotation || 0) + delta) % 360 + 360) % 360;
+        }
+
+        const rotatedGeo = calculateCenterRotatedPosition(f, targetRotation);
+
+        return {
+          ...f,
+          x: rotatedGeo.x,
+          y: rotatedGeo.y,
+          rotation: rotatedGeo.rotation,
+        };
+      });
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: updateElements(currentAlbum.coverSpread.elements || []),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+    } else {
+      const updatedSpreads = currentAlbum.spreads.map((s) =>
+        s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+      );
+      useAlbumStore.setState({
+        currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+        saveStatus: 'unsaved',
+      });
+    }
   },
 
   groupSelectedFrames: (spreadId: string) => {
@@ -1118,6 +1247,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  resetSelectedRatio: (spreadId) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    if (selectedFrameIds.length === 0) return;
+
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    const activeSpread =
+      currentAlbum.coverSpread.id === spreadId
+        ? currentAlbum.coverSpread
+        : currentAlbum.spreads.find((s) => s.id === spreadId);
+
+    if (!activeSpread) return;
+
+    const updates = (activeSpread.elements || [])
+      .filter((f) => selectedFrameIds.includes(f.id))
+      .map((frame) => {
+        const aspect = getPhotoAspect(frame);
+        const newHeight = Math.round((frame.width / aspect) * 10) / 10;
+        return {
+          id: frame.id,
+          geometry: {
+            height: newHeight,
+            cropX: 0,
+            cropY: 0,
+            cropScale: 1.0,
+          },
+        };
+      });
+
+    if (updates.length > 0) {
+      batchUpdateFrames(spreadId, updates);
+    }
+  },
+
   resetCrop: (spreadId, frameId) => {
     const { updateFrameGeometry } = get();
     updateFrameGeometry(spreadId, frameId, {
@@ -1125,6 +1289,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       cropY: 0,
       cropScale: 1.0,
     });
+  },
+
+  resetSelectedCrop: (spreadId) => {
+    const { selectedFrameIds, batchUpdateFrames } = get();
+    if (selectedFrameIds.length === 0) return;
+
+    const updates = selectedFrameIds.map((id) => ({
+      id,
+      geometry: {
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+      },
+    }));
+
+    batchUpdateFrames(spreadId, updates);
   },
 
   updateCrop: (spreadId, frameId, crop) => {

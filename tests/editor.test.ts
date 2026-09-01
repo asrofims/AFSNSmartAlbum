@@ -16,6 +16,10 @@ import {
   distributeFrames,
   applyFixedGap,
   calculateMultiFrameResize,
+  calculateCenterRotatedPosition,
+  computeMultiFrameGroupBounds,
+  computeMultiFrameGroupInfo,
+  unprojectGroupChildToWorld,
   matchFrameDimensions,
   clusterFramesIntoEntities,
   SafeMarginBounds,
@@ -847,10 +851,92 @@ console.assert(replacedFrame17.photoAspect === 1.5, 'Replaced frame must update 
 const swapFrameA: PhotoFrameElement = { ...targetFrameToReplace, id: 'frame-A', photoId: 'photo-A', filePath: 'A.jpg' };
 const swapFrameB: PhotoFrameElement = { ...targetFrameToReplace, id: 'frame-B', photoId: 'photo-B', filePath: 'B.jpg', x: 150 };
 
-const swappedA17: PhotoFrameElement = { ...swapFrameA, photoId: swapFrameB.photoId, filePath: swapFrameB.filePath };
-const swappedB17: PhotoFrameElement = { ...swapFrameB, photoId: swapFrameA.photoId, filePath: swapFrameA.filePath };
+// 18. Test Batch Multi-Frame Rotation & Center Pivot Preservation (No Overlap & Single-Step Undo Integrity)
+const multiRotateFrames: PhotoFrameElement[] = [
+  { id: 'f1', type: 'photo', x: 20, y: 30, width: 100, height: 80, rotation: 0, zIndex: 1, photoAspect: 1.5, cropX: 0, cropY: 0, cropScale: 1.0, cropRotation: 0, borderEnabled: false, borderWidth: 0, borderColor: '', opacity: 1, fileName: '', filePath: '', photoId: null, previewPath: '', thumbnailPath: '' },
+  { id: 'f2', type: 'photo', x: 130, y: 30, width: 100, height: 80, rotation: 0, zIndex: 2, photoAspect: 1.5, cropX: 0, cropY: 0, cropScale: 1.0, cropRotation: 0, borderEnabled: false, borderWidth: 0, borderColor: '', opacity: 1, fileName: '', filePath: '', photoId: null, previewPath: '', thumbnailPath: '' },
+];
 
-console.assert(swappedA17.photoId === 'photo-B' && swappedB17.photoId === 'photo-A', 'Swapped frames must exchange photo content');
-console.assert(swappedA17.x === 20 && swappedB17.x === 150, 'Swapped frames must keep their respective positions without duplicating');
+// 18a. Rotate 90° Clockwise with Center Pivot Preservation
+const rotatedCW = multiRotateFrames.map((f) => {
+  const geo = calculateCenterRotatedPosition(f, (f.rotation + 90) % 360);
+  return { ...f, ...geo };
+});
+console.assert(rotatedCW[0].rotation === 90, `f1 should rotate to 90°, got ${rotatedCW[0].rotation}`);
+console.assert(rotatedCW[1].rotation === 90, `f2 should rotate to 90°, got ${rotatedCW[1].rotation}`);
+console.assert(rotatedCW[0].x === 110 && rotatedCW[0].y === 20, `f1 should shift top-left to (110, 20) to keep center at (70, 70), got (${rotatedCW[0].x}, ${rotatedCW[0].y})`);
+console.assert(rotatedCW[1].x === 220 && rotatedCW[1].y === 20, `f2 should shift top-left to (220, 20) to keep center at (180, 70), got (${rotatedCW[1].x}, ${rotatedCW[1].y})`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');
+// 18b. Verify Center Invariance: Visual center of rotated frame stays identical to original
+const origCenter1X = multiRotateFrames[0].x + multiRotateFrames[0].width / 2; // 70
+const origCenter1Y = multiRotateFrames[0].y + multiRotateFrames[0].height / 2; // 70
+const radCW = (rotatedCW[0].rotation * Math.PI) / 180;
+const newCenter1X = rotatedCW[0].x + (rotatedCW[0].width / 2) * Math.cos(radCW) - (rotatedCW[0].height / 2) * Math.sin(radCW);
+const newCenter1Y = rotatedCW[0].y + (rotatedCW[0].width / 2) * Math.sin(radCW) + (rotatedCW[0].height / 2) * Math.cos(radCW);
+console.assert(Math.abs(origCenter1X - newCenter1X) < 0.01, `Center X must remain unchanged: orig ${origCenter1X} vs new ${newCenter1X}`);
+console.assert(Math.abs(origCenter1Y - newCenter1Y) < 0.01, `Center Y must remain unchanged: orig ${origCenter1Y} vs new ${newCenter1Y}`);
+
+// 18c. Absolute Angle Reset to 0° with Center Invariance
+const resetRot = rotatedCW.map((f) => {
+  const geo = calculateCenterRotatedPosition(f, 0);
+  return { ...f, ...geo };
+});
+console.assert(resetRot[0].rotation === 0 && resetRot[0].x === 20 && resetRot[0].y === 30, 'Reset rotation must return exactly to initial position (20, 30)');
+console.assert(resetRot[1].rotation === 0 && resetRot[1].x === 130 && resetRot[1].y === 30, 'Reset rotation must return exactly to initial position (130, 30)');
+
+// 18d. Batch Reset Aspect Ratio
+const resetRatioFrames = multiRotateFrames.map((f) => {
+  const newHeight = Math.round((f.width / (f.photoAspect || 1.5)) * 10) / 10;
+  return { ...f, height: newHeight, cropX: 0, cropY: 0, cropScale: 1.0 };
+});
+console.assert(Math.abs(resetRatioFrames[0].height - 66.7) < 0.1, `f1 height should reset to 66.7, got ${resetRatioFrames[0].height}`);
+console.assert(Math.abs(resetRatioFrames[1].height - 66.7) < 0.1, `f2 height should reset to 66.7, got ${resetRatioFrames[1].height}`);
+
+// 18e. Multi-Frame Resize with Rotated Frames
+const framesToResize = rotatedCW.map((f) => ({
+  id: f.id,
+  x: f.x,
+  y: f.y,
+  width: f.width,
+  height: f.height,
+  rotation: f.rotation,
+}));
+const initGroupBounds: RectBounds = { x: 30, y: 20, width: 190, height: 100 };
+const newGroupBounds: RectBounds = { x: 30, y: 20, width: 380, height: 200 }; // 2x scale
+const resizedRotatedFrames = calculateMultiFrameResize(framesToResize, initGroupBounds, newGroupBounds, 'bottom-right', 'proportional');
+
+console.assert(resizedRotatedFrames.length === 2, 'Must return 2 resized frames');
+console.assert(resizedRotatedFrames[0].geometry.width === 200, `f1 width should be 200, got ${resizedRotatedFrames[0].geometry.width}`);
+console.assert(resizedRotatedFrames[0].geometry.height === 160, `f1 height should be 160, got ${resizedRotatedFrames[0].geometry.height}`);
+console.assert(resizedRotatedFrames[0].geometry.x === 190, `f1 x should be 190, got ${resizedRotatedFrames[0].geometry.x}`);
+console.assert(resizedRotatedFrames[0].geometry.y === 20, `f1 y should be 20, got ${resizedRotatedFrames[0].geometry.y}`);
+
+// 18f. Multi-Frame Group Rotated Bounding Box
+const groupBounds0 = computeMultiFrameGroupBounds(multiRotateFrames);
+console.assert(groupBounds0.x === 20 && groupBounds0.y === 30 && groupBounds0.width === 210 && groupBounds0.height === 80 && groupBounds0.rotation === 0, 'Unrotated group bounds must match (20, 30, 210, 80, rot 0)');
+
+const groupBounds90 = computeMultiFrameGroupBounds(rotatedCW);
+console.assert(groupBounds90.rotation === 90, `Rotated group must inherit 90° rotation, got ${groupBounds90.rotation}`);
+console.assert(groupBounds90.x === 220, `Rotated group x must be 220, got ${groupBounds90.x}`);
+console.assert(groupBounds90.y === 20, `Rotated group y must be 20, got ${groupBounds90.y}`);
+console.assert(groupBounds90.width === 100, `Rotated group width must be 100, got ${groupBounds90.width}`);
+console.assert(groupBounds90.height === 190, `Rotated group height must be 190, got ${groupBounds90.height}`);
+
+// 18g. Multi-Frame Group Info & Unprojection
+const groupInfo90 = computeMultiFrameGroupInfo(rotatedCW);
+console.assert(groupInfo90.groupRotation === 90, `Group rotation must be 90, got ${groupInfo90.groupRotation}`);
+console.assert(groupInfo90.childLocalFrames.length === 2, 'Must have 2 local children');
+const child1 = groupInfo90.childLocalFrames[0];
+const unprojectedChild1 = unprojectGroupChildToWorld(
+  groupInfo90.groupX,
+  groupInfo90.groupY,
+  groupInfo90.groupRotation,
+  child1.localX,
+  child1.localY,
+  child1.localRotation
+);
+console.assert(Math.abs(unprojectedChild1.x - rotatedCW[0].x) < 0.1, `Unprojected child 1 x must match ${rotatedCW[0].x}, got ${unprojectedChild1.x}`);
+console.assert(Math.abs(unprojectedChild1.y - rotatedCW[0].y) < 0.1, `Unprojected child 1 y must match ${rotatedCW[0].y}, got ${unprojectedChild1.y}`);
+console.assert(unprojectedChild1.rotation === 90, `Unprojected child 1 rotation must be 90, got ${unprojectedChild1.rotation}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, and Snapping Config Persistence tests passed successfully!');

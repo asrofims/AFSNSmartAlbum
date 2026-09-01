@@ -1491,15 +1491,63 @@ export interface FrameBounds {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
+}
+
+/**
+ * Computes the axis-aligned visual bounding box of a photo frame in spread coordinates,
+ * taking its rotation angle into account.
+ */
+export function getFrameVisualBounds(frame: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+}): RectBounds {
+  const rot = frame.rotation || 0;
+  if (Math.abs(rot % 360) < 0.001) {
+    return {
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+    };
+  }
+
+  const rad = (rot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  const w = frame.width;
+  const h = frame.height;
+
+  const x0 = 0;
+  const y0 = 0;
+  const x1 = w * cos;
+  const y1 = w * sin;
+  const x2 = w * cos - h * sin;
+  const y2 = w * sin + h * cos;
+  const x3 = -h * sin;
+  const y3 = h * cos;
+
+  const minRelX = Math.min(x0, x1, x2, x3);
+  const maxRelX = Math.max(x0, x1, x2, x3);
+  const minRelY = Math.min(y0, y1, y2, y3);
+  const maxRelY = Math.max(y0, y1, y2, y3);
+
+  return {
+    x: roundToHundredth(frame.x + minRelX),
+    y: roundToHundredth(frame.y + minRelY),
+    width: roundToHundredth(maxRelX - minRelX),
+    height: roundToHundredth(maxRelY - minRelY),
+  };
 }
 
 /**
  * Calculates resized dimensions and positions for multiple frames while strictly preserving
- * the exact inter-frame gap spacing (both horizontally and vertically).
- */
-/**
- * Calculates resized dimensions and positions for multiple frames while strictly preserving
- * the exact inter-frame gap spacing (both horizontally and vertically) across any layout topology.
+ * the exact inter-frame gap spacing (both horizontally and vertically) across any layout topology,
+ * fully supporting rotated frames with center pivot invariance.
  */
 export function calculateMultiFrameResize(
   initialFrames: FrameBounds[],
@@ -1509,25 +1557,41 @@ export function calculateMultiFrameResize(
   mode: 'proportional' | 'fixed_gap' = 'proportional'
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
   if (initialFrames.length === 0) return [];
+
+  // Compute visual bounds for all initial frames
+  const visualMap = new Map<string, RectBounds>();
+  for (const f of initialFrames) {
+    visualMap.set(f.id, getFrameVisualBounds(f));
+  }
+
   if (initialFrames.length === 1) {
     const f = initialFrames[0];
     if (!f) return [];
     const uniformScale = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
+    const newWidth = roundToHundredth(Math.max(1, f.width * uniformScale));
+    const newHeight = roundToHundredth(Math.max(1, f.height * uniformScale));
+    const newCenterX = newGroupBounds.x + newGroupBounds.width / 2;
+    const newCenterY = newGroupBounds.y + newGroupBounds.height / 2;
+    const rad = ((f.rotation || 0) * Math.PI) / 180;
+    const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
+    const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
+
     return [{
       id: f.id,
       geometry: {
-        x: roundToHundredth(newGroupBounds.x),
-        y: roundToHundredth(newGroupBounds.y),
-        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
-        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
+        x: roundToHundredth(finalX),
+        y: roundToHundredth(finalY),
+        width: newWidth,
+        height: newHeight,
       },
     }];
   }
 
-  const minGroupX = Math.min(...initialFrames.map((f) => f.x));
-  const minGroupY = Math.min(...initialFrames.map((f) => f.y));
-  const maxGroupX = Math.max(...initialFrames.map((f) => f.x + f.width));
-  const maxGroupY = Math.max(...initialFrames.map((f) => f.y + f.height));
+  const visualBoxes = initialFrames.map((f) => visualMap.get(f.id)!);
+  const minGroupX = Math.min(...visualBoxes.map((b) => b.x));
+  const minGroupY = Math.min(...visualBoxes.map((b) => b.y));
+  const maxGroupX = Math.max(...visualBoxes.map((b) => b.x + b.width));
+  const maxGroupY = Math.max(...visualBoxes.map((b) => b.y + b.height));
   const initW = maxGroupX - minGroupX;
   const initH = maxGroupY - minGroupY;
 
@@ -1561,30 +1625,47 @@ export function calculateMultiFrameResize(
       finalOriginY = isTopDragged ? minGroupY + initH - newTotalH : newGroupBounds.y;
     }
 
-    return initialFrames.map((f) => ({
-      id: f.id,
-      geometry: {
-        x: roundToHundredth(finalOriginX + (f.x - minGroupX) * scale),
-        y: roundToHundredth(finalOriginY + (f.y - minGroupY) * scale),
-        width: roundToHundredth(Math.max(1, f.width * scale)),
-        height: roundToHundredth(Math.max(1, f.height * scale)),
-      },
-    }));
+    return initialFrames.map((f) => {
+      const vb = visualMap.get(f.id)!;
+      const newVbX = finalOriginX + (vb.x - minGroupX) * scale;
+      const newVbY = finalOriginY + (vb.y - minGroupY) * scale;
+      const newVbW = vb.width * scale;
+      const newVbH = vb.height * scale;
+      const newCenterX = newVbX + newVbW / 2;
+      const newCenterY = newVbY + newVbH / 2;
+      const newWidth = roundToHundredth(Math.max(1, f.width * scale));
+      const newHeight = roundToHundredth(Math.max(1, f.height * scale));
+
+      const rad = ((f.rotation || 0) * Math.PI) / 180;
+      const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
+      const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
+
+      return {
+        id: f.id,
+        geometry: {
+          x: roundToHundredth(finalX),
+          y: roundToHundredth(finalY),
+          width: newWidth,
+          height: newHeight,
+        },
+      };
+    });
   }
 
-  // --- 1. Build 2D Spatial Neighbor Relations & Extract Invariant Gaps ---
-  // Horizontal neighbor: A is immediate left neighbor of B if A is to the left of B and their Y spans overlap
+  // --- FIXED GAP MODE ---
+  // 1. Build 2D Spatial Neighbor Relations from Visual Bounds
   const leftNeighbors = new Map<string, { neighborId: string; gap: number }>();
   for (const b of initialFrames) {
+    const vb = visualMap.get(b.id)!;
     let closestA: FrameBounds | null = null;
     let closestDist = -Infinity;
 
     for (const a of initialFrames) {
       if (a.id === b.id) continue;
-      const rightEdgeA = a.x + a.width;
-      if (rightEdgeA <= b.x + 0.1) {
-        // Check if vertical spans overlap
-        const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      const va = visualMap.get(a.id)!;
+      const rightEdgeA = va.x + va.width;
+      if (rightEdgeA <= vb.x + 0.1) {
+        const overlapY = Math.min(va.y + va.height, vb.y + vb.height) - Math.max(va.y, vb.y);
         if (overlapY > 0.5) {
           if (rightEdgeA > closestDist) {
             closestDist = rightEdgeA;
@@ -1595,23 +1676,24 @@ export function calculateMultiFrameResize(
     }
 
     if (closestA) {
-      const gap = Math.max(0, b.x - (closestA.x + closestA.width));
+      const va = visualMap.get(closestA.id)!;
+      const gap = Math.max(0, vb.x - (va.x + va.width));
       leftNeighbors.set(b.id, { neighborId: closestA.id, gap });
     }
   }
 
-  // Vertical neighbor: C is immediate top neighbor of B if C is above B and their X spans overlap
   const topNeighbors = new Map<string, { neighborId: string; gap: number }>();
   for (const b of initialFrames) {
+    const vb = visualMap.get(b.id)!;
     let closestC: FrameBounds | null = null;
     let closestDist = -Infinity;
 
     for (const c of initialFrames) {
       if (c.id === b.id) continue;
-      const bottomEdgeC = c.y + c.height;
-      if (bottomEdgeC <= b.y + 0.1) {
-        // Check if horizontal spans overlap
-        const overlapX = Math.min(c.x + c.width, b.x + b.width) - Math.max(c.x, b.x);
+      const vc = visualMap.get(c.id)!;
+      const bottomEdgeC = vc.y + vc.height;
+      if (bottomEdgeC <= vb.y + 0.1) {
+        const overlapX = Math.min(vc.x + vc.width, vb.x + vb.width) - Math.max(vc.x, vb.x);
         if (overlapX > 0.5) {
           if (bottomEdgeC > closestDist) {
             closestDist = bottomEdgeC;
@@ -1622,13 +1704,13 @@ export function calculateMultiFrameResize(
     }
 
     if (closestC) {
-      const gap = Math.max(0, b.y - (closestC.y + closestC.height));
+      const vc = visualMap.get(closestC.id)!;
+      const gap = Math.max(0, vb.y - (vc.y + vc.height));
       topNeighbors.set(b.id, { neighborId: closestC.id, gap });
     }
   }
 
-  // --- 2. Calculate Longest Path Gaps to Determine Available Frame Scaling ---
-  // Compute max accumulated horizontal gap along any path
+  // 2. Longest Path Gaps
   let maxPathGapX = 0;
   for (const frame of initialFrames) {
     let curGap = 0;
@@ -1641,7 +1723,6 @@ export function calculateMultiFrameResize(
     maxPathGapX = Math.max(maxPathGapX, curGap);
   }
 
-  // Compute max accumulated vertical gap along any path
   let maxPathGapY = 0;
   for (const frame of initialFrames) {
     let curGap = 0;
@@ -1666,87 +1747,91 @@ export function calculateMultiFrameResize(
     ? scaleXFromGroup
     : scaleYFromGroup;
 
-  // --- 3. Compute Topologically Sorted Positions with 100% Invariant Gaps ---
+  // 3. Topologically Sorted Positions
   const newPositionsX = new Map<string, number>();
-  const sortedByX = [...initialFrames].sort((a, b) => a.x - b.x);
+  const sortedByX = [...initialFrames].sort((a, b) => visualMap.get(a.id)!.x - visualMap.get(b.id)!.x);
   for (const f of sortedByX) {
+    const vf = visualMap.get(f.id)!;
     const leftEdge = leftNeighbors.get(f.id);
     if (leftEdge && newPositionsX.has(leftEdge.neighborId)) {
       const leftNeighbor = initialFrames.find((item) => item.id === leftEdge.neighborId)!;
       const leftNeighborNewX = newPositionsX.get(leftEdge.neighborId)!;
-      const leftNeighborNewW = leftNeighbor.width * uniformScale;
+      const leftNeighborNewW = visualMap.get(leftNeighbor.id)!.width * uniformScale;
       newPositionsX.set(f.id, leftNeighborNewX + leftNeighborNewW + leftEdge.gap);
     } else {
-      // Root frame along X axis
-      newPositionsX.set(f.id, (f.x - minGroupX) * uniformScale);
+      newPositionsX.set(f.id, (vf.x - minGroupX) * uniformScale);
     }
   }
 
   const newPositionsY = new Map<string, number>();
-  const sortedByY = [...initialFrames].sort((a, b) => a.y - b.y);
+  const sortedByY = [...initialFrames].sort((a, b) => visualMap.get(a.id)!.y - visualMap.get(b.id)!.y);
   for (const f of sortedByY) {
+    const vf = visualMap.get(f.id)!;
     const topEdge = topNeighbors.get(f.id);
     if (topEdge && newPositionsY.has(topEdge.neighborId)) {
       const topNeighbor = initialFrames.find((item) => item.id === topEdge.neighborId)!;
       const topNeighborNewY = newPositionsY.get(topEdge.neighborId)!;
-      const topNeighborNewH = topNeighbor.height * uniformScale;
+      const topNeighborNewH = visualMap.get(topNeighbor.id)!.height * uniformScale;
       newPositionsY.set(f.id, topNeighborNewY + topNeighborNewH + topEdge.gap);
     } else {
-      // Root frame along Y axis
-      newPositionsY.set(f.id, (f.y - minGroupY) * uniformScale);
+      newPositionsY.set(f.id, (vf.y - minGroupY) * uniformScale);
     }
   }
 
-  // --- 4. Anchor-Directional Origin Alignment ---
+  // 4. Anchor-Directional Origin Alignment
   const minComputedX = Math.min(...Array.from(newPositionsX.values()));
-  const maxComputedX = Math.max(...sortedByX.map((f) => (newPositionsX.get(f.id) ?? 0) + f.width * uniformScale));
+  const maxComputedX = Math.max(...sortedByX.map((f) => (newPositionsX.get(f.id) ?? 0) + visualMap.get(f.id)!.width * uniformScale));
   const newTotalW = maxComputedX - minComputedX;
 
   const minComputedY = Math.min(...Array.from(newPositionsY.values()));
-  const maxComputedY = Math.max(...sortedByY.map((f) => (newPositionsY.get(f.id) ?? 0) + f.height * uniformScale));
+  const maxComputedY = Math.max(...sortedByY.map((f) => (newPositionsY.get(f.id) ?? 0) + visualMap.get(f.id)!.height * uniformScale));
   const newTotalH = maxComputedY - minComputedY;
 
   let finalOriginX: number;
   let finalOriginY: number;
 
   if (anchor) {
-    // If left handle was pulled, right edge was fixed at minGroupX + initW
     if (anchor.includes('left')) {
       finalOriginX = (minGroupX + initW) - newTotalW;
     } else {
       finalOriginX = minGroupX;
     }
-
-    // If top handle was pulled, bottom edge was fixed at minGroupY + initH
     if (anchor.includes('top')) {
       finalOriginY = (minGroupY + initH) - newTotalH;
     } else {
       finalOriginY = minGroupY;
     }
   } else {
-    // Fallback heuristic: check if group origin moved significantly (> 0.5mm)
     const isLeftDragged = newGroupBounds.x < minGroupX - 0.5 || newGroupBounds.x > minGroupX + 0.5;
     const isTopDragged = newGroupBounds.y < minGroupY - 0.5 || newGroupBounds.y > minGroupY + 0.5;
-
-    finalOriginX = isLeftDragged
-      ? minGroupX + initW - newTotalW
-      : newGroupBounds.x;
-    finalOriginY = isTopDragged
-      ? minGroupY + initH - newTotalH
-      : newGroupBounds.y;
+    finalOriginX = isLeftDragged ? minGroupX + initW - newTotalW : newGroupBounds.x;
+    finalOriginY = isTopDragged ? minGroupY + initH - newTotalH : newGroupBounds.y;
   }
 
   return initialFrames.map((f) => {
-    const rawX = newPositionsX.get(f.id) ?? (f.x - minGroupX) * uniformScale;
-    const rawY = newPositionsY.get(f.id) ?? (f.y - minGroupY) * uniformScale;
+    const vf = visualMap.get(f.id)!;
+    const rawX = newPositionsX.get(f.id) ?? (vf.x - minGroupX) * uniformScale;
+    const rawY = newPositionsY.get(f.id) ?? (vf.y - minGroupY) * uniformScale;
+    const newVbX = finalOriginX + rawX - minComputedX;
+    const newVbY = finalOriginY + rawY - minComputedY;
+    const newVbW = vf.width * uniformScale;
+    const newVbH = vf.height * uniformScale;
+    const newCenterX = newVbX + newVbW / 2;
+    const newCenterY = newVbY + newVbH / 2;
+    const newWidth = roundToHundredth(Math.max(1, f.width * uniformScale));
+    const newHeight = roundToHundredth(Math.max(1, f.height * uniformScale));
+
+    const rad = ((f.rotation || 0) * Math.PI) / 180;
+    const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
+    const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
     return {
       id: f.id,
       geometry: {
-        x: roundToHundredth(finalOriginX + rawX - minComputedX),
-        y: roundToHundredth(finalOriginY + rawY - minComputedY),
-        width: roundToHundredth(Math.max(1, f.width * uniformScale)),
-        height: roundToHundredth(Math.max(1, f.height * uniformScale)),
+        x: roundToHundredth(finalX),
+        y: roundToHundredth(finalY),
+        width: newWidth,
+        height: newHeight,
       },
     };
   });
@@ -1780,4 +1865,207 @@ export function matchFrameDimensions(
     }
     return { id: f.id, geometry };
   });
+}
+
+/**
+ * Calculates new top-left (x, y) coordinates for a photo frame when rotating to targetRotation,
+ * guaranteeing that the visual center of the frame remains exact and unchanged.
+ * Prevents adjacent objects from swinging wildly and overlapping each other.
+ */
+export function calculateCenterRotatedPosition(
+  frame: { x: number; y: number; width: number; height: number; rotation?: number },
+  targetRotation: number
+): { x: number; y: number; rotation: number } {
+  const currentRot = frame.rotation || 0;
+  const targetRot = ((targetRotation % 360) + 360) % 360;
+
+  if (Math.abs(currentRot - targetRot) < 0.001) {
+    return { x: roundToHundredth(frame.x), y: roundToHundredth(frame.y), rotation: Math.round(targetRot * 10) / 10 };
+  }
+
+  const rad1 = (currentRot * Math.PI) / 180;
+  const halfW = frame.width / 2;
+  const halfH = frame.height / 2;
+
+  // 1. Calculate the current visual center point (cx, cy)
+  const cx = frame.x + halfW * Math.cos(rad1) - halfH * Math.sin(rad1);
+  const cy = frame.y + halfW * Math.sin(rad1) + halfH * Math.cos(rad1);
+
+  // 2. Calculate the new top-left (x', y') with targetRot such that center stays at (cx, cy)
+  const rad2 = (targetRot * Math.PI) / 180;
+  const newX = cx - (halfW * Math.cos(rad2) - halfH * Math.sin(rad2));
+  const newY = cy - (halfW * Math.sin(rad2) + halfH * Math.cos(rad2));
+
+  return {
+    x: roundToHundredth(newX),
+    y: roundToHundredth(newY),
+    rotation: Math.round(targetRot * 10) / 10,
+  };
+}
+
+/**
+ * Computes the tight rotated bounding box for a group of frames.
+ * If all frames share the same rotation angle, the returned group box inherits
+ * that rotation angle, keeping the Transformer bounding box and its rotation handle
+ * aligned with the rotation of the selected objects.
+ */
+export interface MultiFrameGroupInfo {
+  groupX: number;
+  groupY: number;
+  groupWidth: number;
+  groupHeight: number;
+  groupRotation: number;
+  childLocalFrames: Array<{
+    id: string;
+    localX: number;
+    localY: number;
+    localRotation: number;
+  }>;
+}
+
+export function computeMultiFrameGroupInfo(
+  frames: PhotoFrameElement[],
+  preferredRotation?: number
+): MultiFrameGroupInfo {
+  if (frames.length === 0) {
+    return {
+      groupX: 0,
+      groupY: 0,
+      groupWidth: 0,
+      groupHeight: 0,
+      groupRotation: 0,
+      childLocalFrames: [],
+    };
+  }
+
+  const firstFrame = frames[0];
+  if (frames.length === 1 && firstFrame) {
+    return {
+      groupX: firstFrame.x,
+      groupY: firstFrame.y,
+      groupWidth: firstFrame.width,
+      groupHeight: firstFrame.height,
+      groupRotation: firstFrame.rotation || 0,
+      childLocalFrames: [
+        {
+          id: firstFrame.id,
+          localX: 0,
+          localY: 0,
+          localRotation: 0,
+        },
+      ],
+    };
+  }
+
+  let groupRot = 0;
+  if (typeof preferredRotation === 'number') {
+    groupRot = ((preferredRotation % 360) + 360) % 360;
+  } else {
+    const firstRot = (((firstFrame?.rotation || 0) % 360) + 360) % 360;
+    const allSameRot = frames.every(
+      (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
+    );
+    groupRot = allSameRot ? firstRot : 0;
+  }
+
+  const rad = (groupRot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  let minU = Infinity;
+  let minV = Infinity;
+  let maxU = -Infinity;
+  let maxV = -Infinity;
+
+  for (const f of frames) {
+    const fRot = ((f.rotation || 0) * Math.PI) / 180;
+    const fCos = Math.cos(fRot);
+    const fSin = Math.sin(fRot);
+
+    const corners = [
+      { x: f.x, y: f.y },
+      { x: f.x + f.width * fCos, y: f.y + f.width * fSin },
+      { x: f.x + f.width * fCos - f.height * fSin, y: f.y + f.width * fSin + f.height * fCos },
+      { x: f.x - f.height * fSin, y: f.y + f.height * fCos },
+    ];
+
+    for (const pt of corners) {
+      const u = pt.x * cos + pt.y * sin;
+      const v = -pt.x * sin + pt.y * cos;
+      minU = Math.min(minU, u);
+      minV = Math.min(minV, v);
+      maxU = Math.max(maxU, u);
+      maxV = Math.max(maxV, v);
+    }
+  }
+
+  const groupW = maxU - minU;
+  const groupH = maxV - minV;
+
+  const groupX = minU * cos - minV * sin;
+  const groupY = minU * sin + minV * cos;
+
+  const childLocalFrames = frames.map((f) => {
+    const dx = f.x - groupX;
+    const dy = f.y - groupY;
+    const lx = dx * cos + dy * sin;
+    const ly = -dx * sin + dy * cos;
+    const localRot = (((f.rotation || 0) - groupRot) % 360 + 360) % 360;
+
+    return {
+      id: f.id,
+      localX: roundToHundredth(lx),
+      localY: roundToHundredth(ly),
+      localRotation: Math.round(localRot * 10) / 10,
+    };
+  });
+
+  return {
+    groupX: roundToHundredth(groupX),
+    groupY: roundToHundredth(groupY),
+    groupWidth: roundToHundredth(groupW),
+    groupHeight: roundToHundredth(groupH),
+    groupRotation: Math.round(groupRot * 10) / 10,
+    childLocalFrames,
+  };
+}
+
+export function unprojectGroupChildToWorld(
+  groupX: number,
+  groupY: number,
+  groupRotation: number,
+  localX: number,
+  localY: number,
+  localRotation: number
+): { x: number; y: number; rotation: number } {
+  const rad = (groupRotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  const worldX = groupX + localX * cos - localY * sin;
+  const worldY = groupY + localX * sin + localY * cos;
+  const worldRot = ((groupRotation + localRotation) % 360 + 360) % 360;
+
+  return {
+    x: roundToHundredth(worldX),
+    y: roundToHundredth(worldY),
+    rotation: Math.round(worldRot * 10) / 10,
+  };
+}
+
+export function computeMultiFrameGroupBounds(frames: PhotoFrameElement[]): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+} {
+  const info = computeMultiFrameGroupInfo(frames);
+  return {
+    x: info.groupX,
+    y: info.groupY,
+    width: info.groupWidth,
+    height: info.groupHeight,
+    rotation: info.groupRotation,
+  };
 }

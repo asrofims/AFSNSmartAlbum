@@ -66,7 +66,10 @@ export function WorkspaceLayout() {
   const updateFrameGeometry = useEditorStore((s) => s.updateFrameGeometry);
   const updateCrop = useEditorStore((s) => s.updateCrop);
   const resetToOriginalRatio = useEditorStore((s) => s.resetToOriginalRatio);
+  const resetSelectedRatio = useEditorStore((s) => s.resetSelectedRatio);
   const resetCrop = useEditorStore((s) => s.resetCrop);
+  const resetSelectedCrop = useEditorStore((s) => s.resetSelectedCrop);
+  const rotateSelectedFrames = useEditorStore((s) => s.rotateSelectedFrames);
   const editingCropFrameId = useEditorStore((s) => s.editingCropFrameId);
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
   const exitCropMode = useEditorStore((s) => s.exitCropMode);
@@ -877,6 +880,79 @@ export function WorkspaceLayout() {
                           <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both">⬚ Both</button>
                         </div>
                       </div>
+
+                      {/* Multi-Frame Rotation & Transform */}
+                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                          Rotation & Transform
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => rotateSelectedFrames(activeSpread.id, 'ccw')}
+                            title="Rotate all selected frames 90° Counter-Clockwise (Shift+R)"
+                          >
+                            ↺ 90° CCW
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => rotateSelectedFrames(activeSpread.id, 'cw')}
+                            title="Rotate all selected frames 90° Clockwise (R)"
+                          >
+                            ↻ 90° CW
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <NumberInput
+                              value={
+                                selectedFrameIds.length > 0
+                                  ? ((activeSpread.elements || []).find((f) => f.id === selectedFrameIds[0])?.rotation || 0)
+                                  : 0
+                              }
+                              onChange={(newRot) =>
+                                rotateSelectedFrames(activeSpread.id, newRot, true)
+                              }
+                              min={-360}
+                              max={360}
+                              step={1}
+                              precision={0}
+                            />
+                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
+                          </div>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => rotateSelectedFrames(activeSpread.id, 0, true)}
+                            title="Reset rotation of all selected frames to 0°"
+                            style={{ padding: '4px 10px' }}
+                          >
+                            ↺ 0°
+                          </button>
+                        </div>
+
+                        {/* Multi-Selection Dual Entity Reset */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => resetSelectedRatio(activeSpread.id)}
+                            title="Restore original photo aspect ratios (3:2 / 4:3) for all selected frames"
+                          >
+                            ↺ Reset Ratio
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => resetSelectedCrop(activeSpread.id)}
+                            title="Reset pan/zoom crop to 1.0x centered for all selected frames"
+                          >
+                            ↺ Reset Crop
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 }
@@ -1287,7 +1363,7 @@ export function WorkspaceLayout() {
                           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={selectedFrame.rotation || 0}
-                              onChange={(newRot) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: ((newRot % 360) + 360) % 360 })}
+                              onChange={(newRot) => rotateSelectedFrames(activeSpread.id, newRot, true)}
                               min={-360}
                               max={360}
                               step={1}
@@ -1297,7 +1373,7 @@ export function WorkspaceLayout() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => updateFrameGeometry(activeSpread.id, selectedFrame.id, { rotation: 0 })}
+                            onClick={() => rotateSelectedFrames(activeSpread.id, 0, true)}
                             style={{
                               padding: '4px 8px',
                               borderRadius: 'var(--radius-sm)',

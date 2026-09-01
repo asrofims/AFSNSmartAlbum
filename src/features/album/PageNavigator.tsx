@@ -4,6 +4,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
+import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import styles from './PageNavigator.module.css';
@@ -25,16 +26,18 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
   const photos = usePhotoStore((s) => s.photos);
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
 
-  const totalPhysicalW = (spread.leftPage?.width || project.canvasWidth) + (spread.rightPage?.width || project.canvasWidth) + (spread.gutterWidth || 0);
-  const totalPhysicalH = spread.leftPage?.height || project.canvasHeight || 200;
+  const dims = getProjectDimensionsInCanvasUnit(project);
+  const totalPhysicalW = (spread.leftPage?.width || dims.pageWidth) + (spread.rightPage?.width || dims.pageWidth) + (spread.gutterWidth ?? dims.gutterWidth ?? 0);
+  const totalPhysicalH = spread.leftPage?.height || dims.pageHeight || 200;
 
   // Mini thumbnail box dimensions
-  const previewWidth = 124;
-  const previewHeight = 56;
-  const scaleX = previewWidth / (totalPhysicalW || 400);
-  const scaleY = previewHeight / (totalPhysicalH || 200);
+  const previewBoxW = 124;
+  const previewBoxH = 56;
+  const scale = Math.min(previewBoxW / (totalPhysicalW || 400), previewBoxH / (totalPhysicalH || 200));
 
-  const spineX = spread.leftPage ? spread.leftPage.width * scaleX : previewWidth / 2;
+  const actualSpreadW = Math.round(totalPhysicalW * scale);
+  const actualSpreadH = Math.round(totalPhysicalH * scale);
+  const spineX = (spread.leftPage ? spread.leftPage.width : totalPhysicalW / 2) * scale;
   const bgStyle = project.backgroundType === 'color' ? project.backgroundColor || '#ffffff' : '#ffffff';
 
   return (
@@ -42,8 +45,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       className={styles.miniSpread}
       style={{
         position: 'relative',
-        width: `${previewWidth}px`,
-        height: `${previewHeight}px`,
+        width: `${actualSpreadW}px`,
+        height: `${actualSpreadH}px`,
         backgroundColor: bgStyle,
         overflow: 'hidden',
       }}
@@ -64,10 +67,11 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       {/* Real-time Rendered Photo Elements */}
       {(spread.elements || []).map((el) => {
         const hydratedElement = mergeFramePhotoAsset(el, el.photoId ? photoById.get(el.photoId) : null);
-        const x = el.x * scaleX;
-        const y = el.y * scaleY;
-        const w = Math.max(3, el.width * scaleX);
-        const h = Math.max(3, el.height * scaleY);
+        const x = el.x * scale;
+        const y = el.y * scale;
+        const w = el.width * scale;
+        const h = el.height * scale;
+        const rot = el.rotation || 0;
         const imgSrc = hydratedElement.photoId
           ? (hydratedElement.thumbnailPath || hydratedElement.previewPath || hydratedElement.filePath)
           : null;
@@ -81,8 +85,11 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               top: `${y}px`,
               width: `${w}px`,
               height: `${h}px`,
+              transform: rot ? `rotate(${rot}deg)` : undefined,
+              transformOrigin: '0 0',
               overflow: 'hidden',
               backgroundColor: '#1e293b',
+              opacity: el.opacity ?? 1,
               border: el.borderEnabled && el.borderWidth ? `1px solid ${el.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
               borderRadius: '1px',
               zIndex: 2,
