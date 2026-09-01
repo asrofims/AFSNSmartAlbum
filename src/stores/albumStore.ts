@@ -611,7 +611,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     if (!targetSpread || targetSpread.elements.length === 0) return;
 
-    const currentPhotos: AdaptivePhoto[] = targetSpread.elements.map((el) => ({
+    const lockedElements = targetSpread.elements.filter((el) => el.locked);
+    const unlockedElements = targetSpread.elements.filter((el) => !el.locked);
+
+    // If all elements are locked, do not cycle/modify layout
+    if (unlockedElements.length === 0) return;
+
+    const currentPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
       id: el.id,
       photoId: el.photoId,
       filePath: el.filePath,
@@ -655,7 +661,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const newElements = buildSpreadElementsFromVariation(
+    const newUnlockedElements = buildSpreadElementsFromVariation(
       chosenVariation,
       currentPhotos,
       project.borderEnabled,
@@ -663,18 +669,20 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       project.borderColor
     );
 
+    const finalElements = [...lockedElements, ...newUnlockedElements];
+
     if (isCover) {
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, elements: newElements },
+          coverSpread: { ...currentAlbum.coverSpread, elements: finalElements },
         },
         spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: nextIndex },
         saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((s) =>
-        s.id === spreadId ? { ...s, elements: newElements } : s
+        s.id === spreadId ? { ...s, elements: finalElements } : s
       );
       set({
         currentAlbum: {
@@ -735,7 +743,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     if (!targetSpread || targetSpread.elements.length === 0) return;
 
-    const currentPhotos: AdaptivePhoto[] = targetSpread.elements.map((el) => ({
+    const lockedElements = targetSpread.elements.filter((el) => el.locked);
+    const unlockedElements = targetSpread.elements.filter((el) => !el.locked);
+
+    // If all elements are locked, do not apply/modify layout
+    if (unlockedElements.length === 0) return;
+
+    const currentPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
       id: el.id,
       photoId: el.photoId,
       filePath: el.filePath,
@@ -773,7 +787,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const newElements = buildSpreadElementsFromVariation(
+    const newUnlockedElements = buildSpreadElementsFromVariation(
       chosenVariation,
       currentPhotos,
       project.borderEnabled,
@@ -781,18 +795,20 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       project.borderColor
     );
 
+    const finalElements = [...lockedElements, ...newUnlockedElements];
+
     if (isCover) {
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, elements: newElements },
+          coverSpread: { ...currentAlbum.coverSpread, elements: finalElements },
         },
         spreadLayoutIndices: { ...spreadLayoutIndices, [spreadId]: index },
         saveStatus: 'unsaved',
       });
     } else {
       const updatedSpreads = currentAlbum.spreads.map((s) =>
-        s.id === spreadId ? { ...s, elements: newElements } : s
+        s.id === spreadId ? { ...s, elements: finalElements } : s
       );
       set({
         currentAlbum: {

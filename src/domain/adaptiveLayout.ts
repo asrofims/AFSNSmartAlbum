@@ -897,17 +897,28 @@ export function buildSpreadElementsFromVariation(
 export function shuffleElementsPhotos(elements: PhotoFrameElement[]): PhotoFrameElement[] {
   if (elements.length <= 1) return elements;
 
-  const photoPayloads = elements.map((el) => ({
-    photoId: el.photoId,
-    filePath: el.filePath,
-    fileName: el.fileName,
-    previewPath: el.previewPath,
-    thumbnailPath: el.thumbnailPath,
-    photoAspect: el.photoAspect,
-  }));
+  // Separate locked elements from unlocked elements
+  const unlockedIndices: number[] = [];
+  elements.forEach((el, idx) => {
+    if (!el.locked) unlockedIndices.push(idx);
+  });
 
-  // Fisher-Yates shuffle
-  const shuffled = [...photoPayloads];
+  if (unlockedIndices.length <= 1) return elements;
+
+  const unlockedPayloads = unlockedIndices.map((idx) => {
+    const el = elements[idx]!;
+    return {
+      photoId: el.photoId,
+      filePath: el.filePath,
+      fileName: el.fileName,
+      previewPath: el.previewPath,
+      thumbnailPath: el.thumbnailPath,
+      photoAspect: el.photoAspect,
+    };
+  });
+
+  // Fisher-Yates shuffle of unlocked payloads only
+  const shuffled = [...unlockedPayloads];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     const a = shuffled[i];
@@ -919,14 +930,23 @@ export function shuffleElementsPhotos(elements: PhotoFrameElement[]): PhotoFrame
   }
 
   // If shuffle resulted in identical order, force a shift
-  const isIdentical = shuffled.every((s, idx) => s && photoPayloads[idx] && s.filePath === photoPayloads[idx]?.filePath);
+  const isIdentical = shuffled.every(
+    (s, idx) => s && unlockedPayloads[idx] && s.filePath === unlockedPayloads[idx]?.filePath
+  );
   if (isIdentical && shuffled.length > 1) {
     const first = shuffled.shift();
     if (first !== undefined) shuffled.push(first);
   }
 
+  // Create a result map
+  const resultMap = new Map<number, (typeof unlockedPayloads)[0]>();
+  unlockedIndices.forEach((elemIdx, i) => {
+    resultMap.set(elemIdx, shuffled[i]!);
+  });
+
   return elements.map((el, idx) => {
-    const newP = shuffled[idx];
+    if (el.locked || !resultMap.has(idx)) return el;
+    const newP = resultMap.get(idx);
     if (!newP) return el;
     return {
       ...el,
@@ -935,7 +955,7 @@ export function shuffleElementsPhotos(elements: PhotoFrameElement[]): PhotoFrame
       fileName: newP.fileName,
       previewPath: newP.previewPath,
       thumbnailPath: newP.thumbnailPath,
-      photoAspect: newP.photoAspect || (el.width / el.height),
+      photoAspect: newP.photoAspect || el.width / el.height,
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,

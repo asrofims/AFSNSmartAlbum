@@ -31,11 +31,12 @@ export interface PhotoFrameElement {
   cropScale: number; // zoom inside frame, default 1.0 (>= 1.0)
   cropRotation: number;
 
-  // Styling
+  // Styling & State
   borderEnabled: boolean;
   borderWidth: number;
   borderColor: string;
   opacity: number;
+  locked?: boolean;
 }
 
 export interface SnapLine {

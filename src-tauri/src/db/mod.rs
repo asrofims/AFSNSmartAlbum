@@ -121,6 +121,8 @@ pub struct ElementPayload {
     pub border_color: String,
     #[serde(default = "default_opacity")]
     pub opacity: f64,
+    #[serde(default)]
+    pub locked: Option<bool>,
 }
 
 /// Represents a single page in a spread.
@@ -285,6 +287,10 @@ impl Database {
 
         if current_version < 7 {
             Self::migrate_v7(conn)?;
+        }
+
+        if current_version < 8 {
+            Self::migrate_v8(conn)?;
         }
 
         Ok(())
@@ -529,6 +535,29 @@ impl Database {
         }
 
         log::info!("Applied database migration v7");
+        Ok(())
+    }
+
+    /// Schema version 8: Add locked to spread_elements table.
+    fn migrate_v8(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"locked".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE spread_elements ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+                INSERT INTO schema_version (version) VALUES (8);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (8)", [])?;
+        }
+
+        log::info!("Applied database migration v8");
         Ok(())
     }
 
@@ -1231,14 +1260,14 @@ impl Database {
                         preview_path, thumbnail_path, x, y, width, height,
                         rotation, z_index, photo_aspect, original_width, original_height,
                         crop_x, crop_y, crop_scale, crop_rotation,
-                        border_enabled, border_width, border_color, opacity,
+                        border_enabled, border_width, border_color, opacity, locked,
                         created_at, updated_at
                     ) VALUES (
                         ?1, ?2, ?3, ?4, ?5, ?6, ?7,
                         ?8, ?9, ?10, ?11, ?12, ?13,
                         ?14, ?15, ?16, ?17, ?18,
                         ?19, ?20, ?21, ?22,
-                        ?23, ?24, ?25, ?26,
+                        ?23, ?24, ?25, ?26, ?27,
                         datetime('now'), datetime('now')
                     )",
                     rusqlite::params![
@@ -1268,6 +1297,7 @@ impl Database {
                         elem.border_width,
                         elem.border_color,
                         elem.opacity,
+                        elem.locked.unwrap_or(false) as i32,
                     ],
                 )?;
             }
@@ -1349,7 +1379,7 @@ impl Database {
                     rotation, z_index, photo_aspect, original_width, original_height,
                     crop_x, crop_y, crop_scale, crop_rotation,
                     border_enabled, border_width, border_color, opacity,
-                    group_id, created_at, updated_at
+                    group_id, locked, created_at, updated_at
              FROM spread_elements
              WHERE spread_id = ?1
              ORDER BY z_index ASC",
@@ -1383,6 +1413,7 @@ impl Database {
             // Load elements for this spread
             let elem_rows = elem_stmt.query_map([&id], |er| {
                 let border_int: i32 = er.get(21)?;
+                let locked_int: i32 = er.get(26).unwrap_or(0);
                 Ok(ElementPayload {
                     id: er.get(0)?,
                     r#type: er.get(2)?,
@@ -1409,6 +1440,7 @@ impl Database {
                     border_color: er.get(23)?,
                     opacity: er.get(24)?,
                     group_id: er.get(25).ok(),
+                    locked: Some(locked_int != 0),
                 })
             })?;
 
@@ -1836,7 +1868,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 7);
+        assert_eq!(db.get_schema_version().unwrap(), 8);
 
         db.create_project(
             "test-id-1",
@@ -2055,6 +2087,7 @@ mod tests {
                     border_width: 1.0,
                     border_color: "#FFFFFF".to_string(),
                     opacity: 1.0,
+                    locked: Some(false),
                 }
             ],
         };
@@ -2077,6 +2110,7 @@ mod tests {
         assert_eq!(loaded_album.spreads[0].elements[0].id, "frame-1");
         assert_eq!(loaded_album.spreads[0].elements[0].width, 50.0);
         assert_eq!(loaded_album.spreads[0].elements[0].border_enabled, true);
+        assert_eq!(loaded_album.spreads[0].elements[0].locked, Some(false));
 
         // Test Export & Import .afsn Package
         let afsn_path = temp_dir.join("test_package.afsn");

@@ -79,6 +79,7 @@ export function WorkspaceLayout() {
   const distributeSelectedFrames = useEditorStore((s) => s.distributeSelectedFrames);
   const applyFixedGapToSelected = useEditorStore((s) => s.applyFixedGapToSelected);
   const matchSelectedDimensions = useEditorStore((s) => s.matchSelectedDimensions);
+  const toggleLockSelectedFrames = useEditorStore((s) => s.toggleLockSelectedFrames);
 
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
@@ -775,6 +776,9 @@ export function WorkspaceLayout() {
 
                 // MULTI-SELECTION MODE (>= 2 frames selected)
                 if (selectedFrameIds.length >= 2) {
+                  const selectedFrames = (activeSpread?.elements || []).filter((f) =>
+                    selectedFrameIds.includes(f.id)
+                  );
                   return (
                     <div
                       className={styles.propSection}
@@ -952,6 +956,33 @@ export function WorkspaceLayout() {
                             ↺ Reset Crop
                           </button>
                         </div>
+
+                        {/* Multi-Selection Lock / Unlock Button */}
+                        <div style={{ marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            className={styles.multiActionBtn}
+                            onClick={() => toggleLockSelectedFrames(activeSpread.id)}
+                            title="Toggle Lock for all selected photos (Ctrl+L / Ctrl+Shift+L)"
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              backgroundColor: selectedFrames.every((f) => f.locked)
+                                ? 'rgba(245, 158, 11, 0.18)'
+                                : 'rgba(255, 255, 255, 0.05)',
+                              borderColor: selectedFrames.every((f) => f.locked)
+                                ? '#f59e0b'
+                                : 'var(--color-border)',
+                              color: selectedFrames.every((f) => f.locked)
+                                ? '#fbbf24'
+                                : 'var(--color-text-secondary)',
+                            }}
+                          >
+                            {selectedFrames.every((f) => f.locked)
+                              ? `🔓 Unlock All ${selectedFrames.length} Photos (Ctrl+Shift+L)`
+                              : `🔒 Lock All ${selectedFrames.length} Photos (Ctrl+L)`}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -975,7 +1006,47 @@ export function WorkspaceLayout() {
                   >
                     <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span>Selected Photo Frame</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleLockSelectedFrames(activeSpread.id)}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: selectedFrame.locked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                          border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
+                          color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                        title={selectedFrame.locked ? 'Click to Unlock Photo (Ctrl+Shift+L)' : 'Click to Lock Photo (Ctrl+L)'}
+                      >
+                        {selectedFrame.locked ? '🔒 Locked' : '🔓 Lock'}
+                      </button>
                     </div>
+
+                    {selectedFrame.locked && (
+                      <div
+                        style={{
+                          marginBottom: '8px',
+                          padding: '6px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          color: '#fbbf24',
+                          fontSize: '11px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>🔒</span>
+                        <span>This photo is locked. Unlock to drag, resize, or crop.</span>
+                      </div>
+                    )}
 
                     {/* Photo Crop Section */}
                     <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>

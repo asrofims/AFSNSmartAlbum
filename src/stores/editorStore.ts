@@ -82,6 +82,8 @@ export interface EditorState {
   ) => void;
   groupSelectedFrames: (spreadId: string) => void;
   ungroupSelectedFrames: (spreadId: string) => void;
+  toggleLockSelectedFrames: (spreadId?: string, forceState?: boolean) => void;
+  unlockAllFramesOnSpread: (spreadId: string) => void;
 
   // Batch Alignment & Distribution
   alignSelectedFrames: (
@@ -354,9 +356,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length === 0) return;
 
-    useHistoryStore.getState().pushState(currentAlbum);
+    const allElements = [
+      ...(currentAlbum.coverSpread.elements || []),
+      ...currentAlbum.spreads.flatMap((s) => s.elements || []),
+    ];
 
-    const idsToDelete = new Set(selectedFrameIds);
+    const lockedSelectedIds = new Set(
+      allElements.filter((f) => selectedFrameIds.includes(f.id) && f.locked).map((f) => f.id)
+    );
+
+    const idsToDelete = new Set(selectedFrameIds.filter((id) => !lockedSelectedIds.has(id)));
+    if (idsToDelete.size === 0) return; // All selected frames are locked, prevent deletion
+
+    useHistoryStore.getState().pushState(currentAlbum);
 
     const updatedCover = {
       ...currentAlbum.coverSpread,
@@ -381,7 +393,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       saveStatus: 'unsaved',
     });
 
-    set({ selectedFrameIds: [], editingCropFrameId: null });
+    set({ selectedFrameIds: Array.from(lockedSelectedIds), editingCropFrameId: null });
   },
 
   copySelectedFrames: (spreadId) => {
@@ -1170,6 +1182,86 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  toggleLockSelectedFrames: (_spreadId, forceState) => {
+    const { selectedFrameIds } = get();
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum || selectedFrameIds.length === 0) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const idsSet = new Set(selectedFrameIds);
+
+    let targetLocked = forceState;
+    if (targetLocked === undefined) {
+      const allElements = [
+        ...(currentAlbum.coverSpread.elements || []),
+        ...currentAlbum.spreads.flatMap((s) => s.elements || []),
+      ];
+      const selectedElems = allElements.filter((f) => idsSet.has(f.id));
+      const hasUnlocked = selectedElems.some((f) => !f.locked);
+      targetLocked = hasUnlocked;
+    }
+
+    const updateElements = (elements: PhotoFrameElement[]) => {
+      return (elements || []).map((f) => {
+        if (!idsSet.has(f.id)) return f;
+        return {
+          ...f,
+          locked: targetLocked,
+        };
+      });
+    };
+
+    const updatedCover = {
+      ...currentAlbum.coverSpread,
+      elements: updateElements(currentAlbum.coverSpread.elements || []),
+    };
+
+    const updatedSpreads = currentAlbum.spreads.map((spread) => ({
+      ...spread,
+      elements: updateElements(spread.elements || []),
+    }));
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  unlockAllFramesOnSpread: (spreadId) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const unlockList = (elements: PhotoFrameElement[]) =>
+      (elements || []).map((f) => (f.locked ? { ...f, locked: false } : f));
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const updatedCover = isCover
+      ? { ...currentAlbum.coverSpread, elements: unlockList(currentAlbum.coverSpread.elements || []) }
+      : currentAlbum.coverSpread;
+
+    const updatedSpreads = currentAlbum.spreads.map((spread) =>
+      spread.id === spreadId
+        ? { ...spread, elements: unlockList(spread.elements || []) }
+        : spread
+    );
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
   alignSelectedFrames: (spreadId, alignment) => {
     const { selectedFrameIds, batchUpdateFrames } = get();
     const { currentAlbum } = useAlbumStore.getState();
@@ -1183,7 +1275,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
-      selectedFrameIds.includes(f.id)
+      selectedFrameIds.includes(f.id) && !f.locked
     );
     if (selectedFrames.length === 0) return;
 
@@ -1216,8 +1308,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
-      selectedFrameIds.includes(f.id)
+      selectedFrameIds.includes(f.id) && !f.locked
     );
+    if (selectedFrames.length < 3) return;
+
     const updates = distributeFrames(selectedFrames, direction);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);
@@ -1236,8 +1330,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
-      selectedFrameIds.includes(f.id)
+      selectedFrameIds.includes(f.id) && !f.locked
     );
+    if (selectedFrames.length < 2) return;
+
     const updates = applyFixedGap(selectedFrames, direction, gap);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);

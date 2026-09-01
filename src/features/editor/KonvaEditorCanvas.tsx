@@ -215,7 +215,7 @@ function PhotoFrameNode({
       rotation={frame.rotation || 0}
       opacity={isMuted ? 0.38 : 1}
       listening={!isMuted}
-      draggable={!isCropMode}
+      draggable={!frame.locked && !isCropMode}
       onMouseDown={(e) => {
         e.cancelBubble = true;
         // Ignore right-clicks & middle-clicks on mouse down
@@ -256,14 +256,14 @@ function PhotoFrameNode({
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
-        // Double-click to crop MUST ONLY trigger on primary left button and NEVER during multi-select
+        // Double-click to crop MUST ONLY trigger on primary left button and NEVER during multi-select or locked
         if ('button' in e.evt && e.evt.button !== 0) {
           return;
         }
         if ('which' in e.evt && e.evt.which !== 1) {
           return;
         }
-        if (isMultiSelectActive) {
+        if (isMultiSelectActive || frame.locked) {
           return;
         }
         onDoubleClick();
@@ -545,6 +545,40 @@ function PhotoFrameNode({
           <Line points={[(pixelW * 2) / 3, 0, (pixelW * 2) / 3, pixelH]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
           <Line points={[0, pixelH / 3, pixelW, pixelH / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
           <Line points={[0, (pixelH * 2) / 3, pixelW, (pixelH * 2) / 3]} stroke="rgba(255,255,255,0.7)" strokeWidth={1} strokeScaleEnabled={false} />
+        </Group>
+      )}
+
+      {/* Locked Badge Indicator (top-right corner) */}
+      {frame.locked && (
+        <Group
+          x={Math.max(14, pixelW - 16)}
+          y={16}
+          listening={true}
+          onClick={(e) => {
+            e.cancelBubble = true;
+            useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true;
+            useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
+          }}
+        >
+          <Circle
+            radius={11}
+            fill="rgba(15, 23, 42, 0.88)"
+            stroke="#f59e0b"
+            strokeWidth={1.5}
+            shadowColor="rgba(0, 0, 0, 0.6)"
+            shadowBlur={4}
+            shadowOffset={{ x: 0, y: 1 }}
+          />
+          <KonvaText
+            text="🔒"
+            fontSize={11}
+            x={-5.5}
+            y={-6.5}
+            listening={false}
+          />
         </Group>
       )}
 
@@ -886,6 +920,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         } else {
           groupSelectedFrames(activeSpread.id);
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        if (e.altKey && activeSpread) {
+          useEditorStore.getState().unlockAllFramesOnSpread(activeSpread.id);
+          if (onToast) onToast('🔓 Unlocked all photos on spread');
+        } else if (e.shiftKey && activeSpread) {
+          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
+          if (onToast) onToast('🔓 Unlocked selected photo(s)');
+        } else if (activeSpread) {
+          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
+          if (onToast) onToast('🔒 Locked selected photo(s)');
+        }
       } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1]) {
           e.preventDefault();
@@ -1007,6 +1053,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     selectedFrameIds.includes(f.id)
   );
   const isMultiSelected = selectedElements.length > 1;
+  const isSelectionFullyLocked = useMemo(() => {
+    if (!activeSpread || selectedFrameIds.length === 0) return false;
+    const selected = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+    return selected.length > 0 && selected.every((f) => f.locked);
+  }, [activeSpread, selectedFrameIds]);
 
   // Handle Drag & Drop photo from filmstrip tray onto canvas
   const handleDragOver = (e: React.DragEvent) => {
@@ -1021,6 +1072,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const physicalY = dropY / scaleFactor;
 
       const targetFrame = [...activeSpread.elements].reverse().find((f) =>
+        !f.locked &&
         physicalX >= f.x &&
         physicalX <= f.x + f.width &&
         physicalY >= f.y &&
@@ -1091,6 +1143,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       // Replace photo only if ALT key was held during drop
       if (isAlt) {
         const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
+          !f.locked &&
           physicalX >= f.x &&
           physicalX <= f.x + f.width &&
           physicalY >= f.y &&
@@ -1349,6 +1402,35 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         icon: '🔓',
         shortcut: 'Ctrl+Shift+G',
         onClick: () => ungroupSelectedFrames(activeSpread.id),
+      });
+    }
+
+    const hasLocked = selectedElements.some((f) => f.locked);
+    const hasUnlocked = selectedElements.some((f) => !f.locked);
+
+    if (hasUnlocked) {
+      items.push({
+        id: 'lock-photos',
+        label: count > 1 ? `Lock ${count} Photos` : 'Lock Photo',
+        icon: '🔒',
+        shortcut: 'Ctrl+L',
+        onClick: () => {
+          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
+          if (onToast) onToast(`🔒 Locked ${count} photo(s)`);
+        },
+      });
+    }
+
+    if (hasLocked) {
+      items.push({
+        id: 'unlock-photos',
+        label: count > 1 ? `Unlock ${count} Photos` : 'Unlock Photo',
+        icon: '🔓',
+        shortcut: 'Ctrl+Shift+L',
+        onClick: () => {
+          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
+          if (onToast) onToast(`🔓 Unlocked ${count} photo(s)`);
+        },
       });
     }
 
@@ -2069,7 +2151,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             <Transformer
             ref={trRef}
             visible={!editingCropFrameId}
-            rotateEnabled
+            rotateEnabled={!isSelectionFullyLocked && !editingCropFrameId}
             keepRatio={true}
             rotateAnchorOffset={20}
             rotateAnchorCursor={ROTATE_CURSOR}
@@ -2089,7 +2171,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 }
               }}
               enabledAnchors={
-                selectedFrameIds.length > 1
+                isSelectionFullyLocked
+                  ? []
+                  : selectedFrameIds.length > 1
                   ? ['top-left', 'top-right', 'bottom-right', 'bottom-left']
                   : [
                       'top-left',
@@ -2102,14 +2186,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       'middle-left',
                     ]
               }
-              anchorSize={8}
+              anchorSize={isSelectionFullyLocked ? 0 : 8}
               anchorCornerRadius={2}
               anchorFill="#ffffff"
-              anchorStroke={editingCropFrameId ? '#f59e0b' : '#3b82f6'}
+              anchorStroke={isSelectionFullyLocked ? '#f59e0b' : editingCropFrameId ? '#f59e0b' : '#3b82f6'}
               anchorStrokeWidth={1.5}
-              borderStroke={editingCropFrameId ? '#f59e0b' : '#3b82f6'}
+              borderStroke={isSelectionFullyLocked ? '#f59e0b' : editingCropFrameId ? '#f59e0b' : '#3b82f6'}
               borderStrokeWidth={1.5}
-              borderDash={editingCropFrameId ? [5, 3] : [4, 3]}
+              borderDash={isSelectionFullyLocked ? [4, 4] : editingCropFrameId ? [5, 3] : [4, 3]}
               onTransformStart={() => {
                 const tr = trRef.current;
                 if (!tr) return;

@@ -155,7 +155,18 @@ function runTests() {
   console.assert(scoredVariations[0].score !== undefined, 'Top variation must have score');
   console.assert(scoredVariations[0].score! >= scoredVariations[scoredVariations.length - 1].score!, 'Top variation score must be >= bottom variation score');
   console.assert(scoredVariations[0].fingerprint === '1L+2P', 'Top variation must record fingerprint 1L+2P');
-  console.log('✓ Layout variations sorted and ranked by aspect-ratio match score.');
+  // Test 10: Shuffle Photos with Locked Frames
+  const shuffleTestFrames: PhotoFrameElement[] = [
+    { id: 'sf-1', type: 'photo', photoId: 'photo-1', filePath: '/p1.jpg', previewPath: '/p1.jpg', thumbnailPath: '/p1.jpg', fileName: 'p1.jpg', x: 0, y: 0, width: 100, height: 100, rotation: 0, zIndex: 1, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
+    { id: 'sf-2', type: 'photo', photoId: 'photo-2-LOCKED', filePath: '/locked.jpg', previewPath: '/locked.jpg', thumbnailPath: '/locked.jpg', fileName: 'locked.jpg', x: 100, y: 0, width: 100, height: 100, rotation: 0, zIndex: 2, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: true },
+    { id: 'sf-3', type: 'photo', photoId: 'photo-3', filePath: '/p3.jpg', previewPath: '/p3.jpg', thumbnailPath: '/p3.jpg', fileName: 'p3.jpg', x: 200, y: 0, width: 100, height: 100, rotation: 0, zIndex: 3, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
+  ];
+
+  const shuffledResult = shuffleElementsPhotos(shuffleTestFrames);
+  console.assert(shuffledResult[1].photoId === 'photo-2-LOCKED', 'Locked frame sf-2 must retain its photo');
+  console.assert(shuffledResult[1].filePath === '/locked.jpg', 'Locked frame sf-2 must retain its filePath');
+  console.assert(shuffledResult[0].photoId === 'photo-3' && shuffledResult[2].photoId === 'photo-1', 'Unlocked frames sf-1 and sf-3 must be swapped');
+  console.log('✓ Photo shuffle with locked frame immunity passed.');
 
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
 }
