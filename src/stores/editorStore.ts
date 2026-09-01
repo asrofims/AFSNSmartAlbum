@@ -356,17 +356,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || selectedFrameIds.length === 0) return;
 
+    // Separate locked and unlocked frames
     const allElements = [
       ...(currentAlbum.coverSpread.elements || []),
       ...currentAlbum.spreads.flatMap((s) => s.elements || []),
     ];
+    const lockedIds = new Set(allElements.filter((f) => f.locked).map((f) => f.id));
+    const idsToDelete = new Set(selectedFrameIds.filter((id) => !lockedIds.has(id)));
 
-    const lockedSelectedIds = new Set(
-      allElements.filter((f) => selectedFrameIds.includes(f.id) && f.locked).map((f) => f.id)
-    );
-
-    const idsToDelete = new Set(selectedFrameIds.filter((id) => !lockedSelectedIds.has(id)));
-    if (idsToDelete.size === 0) return; // All selected frames are locked, prevent deletion
+    if (idsToDelete.size === 0) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
@@ -393,7 +391,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       saveStatus: 'unsaved',
     });
 
-    set({ selectedFrameIds: Array.from(lockedSelectedIds), editingCropFrameId: null });
+    set({
+      selectedFrameIds: selectedFrameIds.filter((id) => lockedIds.has(id)),
+      editingCropFrameId: null,
+    });
   },
 
   copySelectedFrames: (spreadId) => {
@@ -743,7 +744,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const swapInElements = (elements: PhotoFrameElement[]): PhotoFrameElement[] => {
       const elA = elements.find((f) => f.id === frameIdA);
       const elB = elements.find((f) => f.id === frameIdB);
-      if (!elA || !elB) return elements;
+      if (!elA || !elB || elA.locked || elB.locked) return elements;
 
       return elements.map((f) => {
         if (f.id === frameIdA) {
@@ -1197,29 +1198,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...(currentAlbum.coverSpread.elements || []),
         ...currentAlbum.spreads.flatMap((s) => s.elements || []),
       ];
-      const selectedElems = allElements.filter((f) => idsSet.has(f.id));
-      const hasUnlocked = selectedElems.some((f) => !f.locked);
+      const selected = allElements.filter((f) => idsSet.has(f.id));
+      const hasUnlocked = selected.some((f) => !f.locked);
       targetLocked = hasUnlocked;
     }
 
-    const updateElements = (elements: PhotoFrameElement[]) => {
-      return (elements || []).map((f) => {
-        if (!idsSet.has(f.id)) return f;
-        return {
-          ...f,
-          locked: targetLocked,
-        };
-      });
+    const updateElem = (f: PhotoFrameElement): PhotoFrameElement => {
+      if (idsSet.has(f.id)) {
+        return { ...f, locked: targetLocked };
+      }
+      return f;
     };
 
     const updatedCover = {
       ...currentAlbum.coverSpread,
-      elements: updateElements(currentAlbum.coverSpread.elements || []),
+      elements: (currentAlbum.coverSpread.elements || []).map(updateElem),
     };
 
     const updatedSpreads = currentAlbum.spreads.map((spread) => ({
       ...spread,
-      elements: updateElements(spread.elements || []),
+      elements: (spread.elements || []).map(updateElem),
     }));
 
     useAlbumStore.setState({
@@ -1238,24 +1236,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const unlockList = (elements: PhotoFrameElement[]) =>
-      (elements || []).map((f) => (f.locked ? { ...f, locked: false } : f));
+    const updateElem = (f: PhotoFrameElement): PhotoFrameElement => {
+      if (f.locked) {
+        return { ...f, locked: false };
+      }
+      return f;
+    };
 
-    const isCover = currentAlbum.coverSpread.id === spreadId;
-    const updatedCover = isCover
-      ? { ...currentAlbum.coverSpread, elements: unlockList(currentAlbum.coverSpread.elements || []) }
-      : currentAlbum.coverSpread;
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: (currentAlbum.coverSpread.elements || []).map(updateElem),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
 
-    const updatedSpreads = currentAlbum.spreads.map((spread) =>
-      spread.id === spreadId
-        ? { ...spread, elements: unlockList(spread.elements || []) }
-        : spread
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === spreadId
+        ? { ...s, elements: (s.elements || []).map(updateElem) }
+        : s
     );
 
     useAlbumStore.setState({
       currentAlbum: {
         ...currentAlbum,
-        coverSpread: updatedCover,
         spreads: updatedSpreads,
       },
       saveStatus: 'unsaved',
@@ -1310,8 +1320,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selectedFrames = (spread.elements || []).filter((f) =>
       selectedFrameIds.includes(f.id) && !f.locked
     );
-    if (selectedFrames.length < 3) return;
-
     const updates = distributeFrames(selectedFrames, direction);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);
@@ -1332,8 +1340,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selectedFrames = (spread.elements || []).filter((f) =>
       selectedFrameIds.includes(f.id) && !f.locked
     );
-    if (selectedFrames.length < 2) return;
-
     const updates = applyFixedGap(selectedFrames, direction, gap);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);
@@ -1352,7 +1358,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!spread) return;
 
     const selectedFrames = (spread.elements || []).filter((f) =>
-      selectedFrameIds.includes(f.id)
+      selectedFrameIds.includes(f.id) && !f.locked
     );
     const updates = matchFrameDimensions(selectedFrames, dimension);
     if (updates.length > 0) {
@@ -1524,7 +1530,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!activeSpread) return;
 
     const updates = (activeSpread.elements || [])
-      .filter((f) => selectedFrameIds.includes(f.id))
+      .filter((f) => selectedFrameIds.includes(f.id) && !f.locked)
       .map((f) => ({
         id: f.id,
         geometry: { x: f.x + dx, y: f.y + dy },

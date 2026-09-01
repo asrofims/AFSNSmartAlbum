@@ -538,7 +538,7 @@ impl Database {
         Ok(())
     }
 
-    /// Schema version 8: Add locked to spread_elements table.
+    /// Schema version 8: Photo frame element lock status.
     fn migrate_v8(conn: &Connection) -> SqliteResult<()> {
         let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
         let col_names: Vec<String> = cols
@@ -549,7 +549,7 @@ impl Database {
         if !col_names.contains(&"locked".to_string()) {
             conn.execute_batch(
                 "BEGIN;
-                ALTER TABLE spread_elements ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE spread_elements ADD COLUMN locked INTEGER DEFAULT 0;
                 INSERT INTO schema_version (version) VALUES (8);
                 COMMIT;",
             )?;
@@ -1386,20 +1386,20 @@ impl Database {
         )?;
 
         let spread_rows = spread_stmt.query_map([project_id], |row| {
-            let is_cover_int: i32 = row.get(12)?;
+            let is_cover_int: i32 = row.get(12).unwrap_or(0);
             Ok((
                 row.get::<_, String>(0)?, // id
-                row.get::<_, String>(1)?, // project_id
-                row.get::<_, i32>(2)?,    // spread_index
-                row.get::<_, String>(3)?, // spread_type
-                row.get::<_, String>(4)?, // name
-                row.get::<_, Option<String>>(5)?, // left_page_id
-                row.get::<_, Option<String>>(6)?, // right_page_id
-                row.get::<_, f64>(7)?,    // gutter_width
-                row.get::<_, String>(8)?, // gutter_unit
-                row.get::<_, f64>(9)?,    // bleed
-                row.get::<_, f64>(10)?,   // safe_area
-                row.get::<_, String>(11)?, // background_color
+                row.get::<_, String>(1).unwrap_or_default(), // project_id
+                row.get::<_, i32>(2).unwrap_or(0),    // spread_index
+                row.get::<_, String>(3).unwrap_or_else(|_| "interior".to_string()), // spread_type
+                row.get::<_, String>(4).unwrap_or_else(|_| "Spread".to_string()), // name
+                row.get::<_, Option<String>>(5).ok().flatten(), // left_page_id
+                row.get::<_, Option<String>>(6).ok().flatten(), // right_page_id
+                row.get::<_, f64>(7).unwrap_or(0.0),    // gutter_width
+                row.get::<_, String>(8).unwrap_or_else(|_| "mm".to_string()), // gutter_unit
+                row.get::<_, f64>(9).unwrap_or(3.0),    // bleed
+                row.get::<_, f64>(10).unwrap_or(10.0),   // safe_area
+                row.get::<_, String>(11).unwrap_or_else(|_| "#FFFFFF".to_string()), // background_color
                 is_cover_int != 0,        // is_cover
             ))
         })?;
@@ -1412,33 +1412,35 @@ impl Database {
 
             // Load elements for this spread
             let elem_rows = elem_stmt.query_map([&id], |er| {
-                let border_int: i32 = er.get(21)?;
+                let border_int: i32 = er.get(21).unwrap_or(0);
                 let locked_int: i32 = er.get(26).unwrap_or(0);
+                let w: f64 = er.get(10).unwrap_or(100.0);
+                let h: f64 = er.get(11).unwrap_or(80.0);
                 Ok(ElementPayload {
                     id: er.get(0)?,
-                    r#type: er.get(2)?,
-                    photo_id: er.get(3)?,
-                    file_path: er.get(4)?,
-                    file_name: er.get(5)?,
-                    preview_path: er.get(6)?,
-                    thumbnail_path: er.get(7)?,
-                    x: er.get(8)?,
-                    y: er.get(9)?,
-                    width: er.get(10)?,
-                    height: er.get(11)?,
-                    rotation: er.get(12)?,
-                    z_index: er.get(13)?,
-                    photo_aspect: er.get(14)?,
-                    original_width: Some(er.get(15)?),
-                    original_height: Some(er.get(16)?),
-                    crop_x: er.get(17)?,
-                    crop_y: er.get(18)?,
-                    crop_scale: er.get(19)?,
-                    crop_rotation: Some(er.get(20)?),
+                    r#type: er.get(2).unwrap_or_else(|_| "photo".to_string()),
+                    photo_id: er.get(3).ok(),
+                    file_path: er.get(4).unwrap_or_default(),
+                    file_name: er.get(5).unwrap_or_default(),
+                    preview_path: er.get(6).ok(),
+                    thumbnail_path: er.get(7).ok(),
+                    x: er.get(8).unwrap_or(0.0),
+                    y: er.get(9).unwrap_or(0.0),
+                    width: w,
+                    height: h,
+                    rotation: er.get(12).unwrap_or(0.0),
+                    z_index: er.get(13).unwrap_or(1),
+                    photo_aspect: er.get(14).unwrap_or(1.0),
+                    original_width: er.get(15).ok().or(Some(w)),
+                    original_height: er.get(16).ok().or(Some(h)),
+                    crop_x: er.get(17).unwrap_or(0.0),
+                    crop_y: er.get(18).unwrap_or(0.0),
+                    crop_scale: er.get(19).unwrap_or(1.0),
+                    crop_rotation: er.get(20).ok(),
                     border_enabled: border_int != 0,
-                    border_width: er.get(22)?,
-                    border_color: er.get(23)?,
-                    opacity: er.get(24)?,
+                    border_width: er.get(22).unwrap_or(0.0),
+                    border_color: er.get(23).unwrap_or_else(|_| "#FFFFFF".to_string()),
+                    opacity: er.get(24).unwrap_or(1.0),
                     group_id: er.get(25).ok(),
                     locked: Some(locked_int != 0),
                 })

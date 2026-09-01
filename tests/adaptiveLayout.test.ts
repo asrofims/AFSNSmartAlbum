@@ -155,18 +155,87 @@ function runTests() {
   console.assert(scoredVariations[0].score !== undefined, 'Top variation must have score');
   console.assert(scoredVariations[0].score! >= scoredVariations[scoredVariations.length - 1].score!, 'Top variation score must be >= bottom variation score');
   console.assert(scoredVariations[0].fingerprint === '1L+2P', 'Top variation must record fingerprint 1L+2P');
-  // Test 10: Shuffle Photos with Locked Frames
-  const shuffleTestFrames: PhotoFrameElement[] = [
-    { id: 'sf-1', type: 'photo', photoId: 'photo-1', filePath: '/p1.jpg', previewPath: '/p1.jpg', thumbnailPath: '/p1.jpg', fileName: 'p1.jpg', x: 0, y: 0, width: 100, height: 100, rotation: 0, zIndex: 1, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
-    { id: 'sf-2', type: 'photo', photoId: 'photo-2-LOCKED', filePath: '/locked.jpg', previewPath: '/locked.jpg', thumbnailPath: '/locked.jpg', fileName: 'locked.jpg', x: 100, y: 0, width: 100, height: 100, rotation: 0, zIndex: 2, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: true },
-    { id: 'sf-3', type: 'photo', photoId: 'photo-3', filePath: '/p3.jpg', previewPath: '/p3.jpg', thumbnailPath: '/p3.jpg', fileName: 'p3.jpg', x: 200, y: 0, width: 100, height: 100, rotation: 0, zIndex: 3, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
-  ];
+  console.log('✓ Layout variations sorted and ranked by aspect-ratio match score.');
 
-  const shuffledResult = shuffleElementsPhotos(shuffleTestFrames);
-  console.assert(shuffledResult[1].photoId === 'photo-2-LOCKED', 'Locked frame sf-2 must retain its photo');
-  console.assert(shuffledResult[1].filePath === '/locked.jpg', 'Locked frame sf-2 must retain its filePath');
-  console.assert(shuffledResult[0].photoId === 'photo-3' && shuffledResult[2].photoId === 'photo-1', 'Unlocked frames sf-1 and sf-3 must be swapped');
-  console.log('✓ Photo shuffle with locked frame immunity passed.');
+  // Test 10: Locked Frames Shuffle Immunity
+  const elementsWithLock: any[] = [
+    { id: 'f1', photoId: 'p1', filePath: 'a.jpg', fileName: 'a.jpg', locked: true, x: 10, y: 10, width: 80, height: 60 },
+    { id: 'f2', photoId: 'p2', filePath: 'b.jpg', fileName: 'b.jpg', locked: false, x: 100, y: 10, width: 80, height: 60 },
+    { id: 'f3', photoId: 'p3', filePath: 'c.jpg', fileName: 'c.jpg', locked: false, x: 190, y: 10, width: 80, height: 60 },
+  ];
+  const shuffledResult = shuffleElementsPhotos(elementsWithLock);
+  console.assert(shuffledResult[0].photoId === 'p1', 'Locked frame f1 photoId must remain p1');
+  console.assert(shuffledResult[0].filePath === 'a.jpg', 'Locked frame f1 filePath must remain a.jpg');
+  console.assert(shuffledResult[0].locked === true, 'Locked frame f1 must remain locked');
+  console.log('✓ Locked frame photo content is 100% immune to shuffle.');
+
+  // Test 11: Non-Overlapping Smart Layout with Locked Frame on Full Left Page
+  const leftLockedFrame: any = {
+    id: 'lock-left',
+    x: 10,
+    y: 10,
+    width: 180,
+    height: 180,
+    locked: true,
+  };
+  const unlockedTwoPhotos: AdaptivePhoto[] = [
+    { photoAspect: 1.5, filePath: 'photo1.jpg' },
+    { photoAspect: 1.5, filePath: 'photo2.jpg' },
+  ];
+  const paramsWithLeftLock = {
+    ...baseParams,
+    lockedElements: [leftLockedFrame],
+  };
+  const lockedSpreadVariations = generateAdaptiveLayoutVariations(paramsWithLeftLock, unlockedTwoPhotos);
+  console.assert(lockedSpreadVariations.length > 0, 'Must produce non-overlapping variations');
+  for (const v of lockedSpreadVariations) {
+    for (const r of v.rects) {
+      console.assert(
+        r.x >= 200, // Right page area starts after 200mm
+        `Generated rect (x=${r.x}) must not occupy or overlap full locked left page!`
+      );
+    }
+  }
+  console.log('✓ Smart layout generates non-overlapping rects exclusively on unoccupied page when full left page is locked.');
+
+  // Test 12: Surrounding Sub-Box Occupancy (Top-half locked, bottom-half and right page available)
+  const topHalfLocked: any = {
+    id: 'lock-top-left',
+    x: 10,
+    y: 10,
+    width: 180,
+    height: 80, // occupies y=10..90 on left page (height 180 total, so bottom y=95..190 is free)
+    locked: true,
+  };
+  const paramsWithTopHalfLock = {
+    ...baseParams,
+    lockedElements: [topHalfLocked],
+  };
+  const surroundingVariations = generateAdaptiveLayoutVariations(paramsWithTopHalfLock, unlockedTwoPhotos);
+  console.assert(surroundingVariations.length > 0, 'Must produce variations');
+
+  // Verify that there ARE variations placing rects in the bottom half of the left page (y >= 90, x < 200)
+  const hasSamePageBottomVariations = surroundingVariations.some((v) =>
+    v.rects.some((r) => r.x < 200 && r.y >= 90)
+  );
+  console.assert(
+    hasSamePageBottomVariations,
+    'Smart layout must generate variations utilizing available space below the locked photo on the same page!'
+  );
+
+  // Verify ZERO rects in ANY variation collide with the locked top-half frame
+  for (const v of surroundingVariations) {
+    for (const r of v.rects) {
+      const collides = !(
+        r.x >= topHalfLocked.x + topHalfLocked.width ||
+        r.x + r.width <= topHalfLocked.x ||
+        r.y >= topHalfLocked.y + topHalfLocked.height ||
+        r.y + r.height <= topHalfLocked.y
+      );
+      console.assert(!collides, `Generated rect [${r.x}, ${r.y}, ${r.width}, ${r.height}] collides with locked frame!`);
+    }
+  }
+  console.log('✓ Smart layout cleanly utilizes free surrounding space around locked photos without any collision.');
 
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
 }

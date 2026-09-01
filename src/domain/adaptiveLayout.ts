@@ -692,6 +692,89 @@ function recursiveBspPartition(
  * Generates rich, dynamic, multi-photo adaptive layout variations for ANY photo count N,
  * automatically scoring and sorting them by visual aspect-ratio harmony and minimal crop penalty.
  */
+function rectsIntersect(
+  r1: { x: number; y: number; width: number; height: number },
+  r2: { x: number; y: number; width: number; height: number }
+): boolean {
+  return !(
+    r2.x >= r1.x + r1.width - 0.01 ||
+    r2.x + r2.width <= r1.x + 0.01 ||
+    r2.y >= r1.y + r1.height - 0.01 ||
+    r2.y + r2.height <= r1.y + 0.01
+  );
+}
+
+/**
+ * Computes all maximal unoccupied rectangular sub-boxes inside a page container
+ * that do not intersect any locked frame (with proper spacing padding).
+ */
+function computeFreePageSubBoxes(
+  pageArea: RectBounds,
+  lockedFrames: PhotoFrameElement[],
+  spacing: number
+): RectBounds[] {
+  const intersectingLocked = lockedFrames.filter((f) => rectsIntersect(f, pageArea));
+  if (intersectingLocked.length === 0) {
+    return [{ ...pageArea }];
+  }
+
+  const minDimension = 15; // Minimum 15mm width/height to be a usable photo frame slot
+  const freeBoxes: RectBounds[] = [];
+
+  const minX = Math.min(...intersectingLocked.map((f) => f.x));
+  const minY = Math.min(...intersectingLocked.map((f) => f.y));
+  const maxX = Math.max(...intersectingLocked.map((f) => f.x + f.width));
+  const maxY = Math.max(...intersectingLocked.map((f) => f.y + f.height));
+
+  // 1. Bottom Sub-box (Below locked frames on the same page)
+  const bottomY = round4(maxY + spacing);
+  const bottomH = round4(pageArea.y + pageArea.height - bottomY);
+  if (bottomH >= minDimension) {
+    freeBoxes.push({
+      x: pageArea.x,
+      y: bottomY,
+      width: pageArea.width,
+      height: bottomH,
+    });
+  }
+
+  // 2. Top Sub-box (Above locked frames on the same page)
+  const topH = round4(minY - spacing - pageArea.y);
+  if (topH >= minDimension) {
+    freeBoxes.push({
+      x: pageArea.x,
+      y: pageArea.y,
+      width: pageArea.width,
+      height: topH,
+    });
+  }
+
+  // 3. Right Sub-box (To the right of locked frames on the same page)
+  const rightX = round4(maxX + spacing);
+  const rightW = round4(pageArea.x + pageArea.width - rightX);
+  if (rightW >= minDimension) {
+    freeBoxes.push({
+      x: rightX,
+      y: pageArea.y,
+      width: rightW,
+      height: pageArea.height,
+    });
+  }
+
+  // 4. Left Sub-box (To the left of locked frames on the same page)
+  const leftW = round4(minX - spacing - pageArea.x);
+  if (leftW >= minDimension) {
+    freeBoxes.push({
+      x: pageArea.x,
+      y: pageArea.y,
+      width: leftW,
+      height: pageArea.height,
+    });
+  }
+
+  return freeBoxes;
+}
+
 export function generateAdaptiveLayoutVariations(
   params: TemplateParams,
   photos: AdaptivePhoto[] = []
@@ -703,10 +786,20 @@ export function generateAdaptiveLayoutVariations(
   const spacing = params.spacing;
   const isCover = !params.isSpread;
   const fingerprint = getPhotosFingerprint(photos);
+  const locked = params.lockedElements || [];
 
-  // Helper to score and enrich raw variations
+  // Helper to score, filter collisions, and enrich raw variations
   const scoreAndSortVariations = (rawVariations: AdaptiveLayoutVariation[]): AdaptiveLayoutVariation[] => {
-    const enriched = rawVariations.map((v) => {
+    // Mathematical guarantee: Exclude any variation where any rect intersects or covers a locked frame
+    const nonColliding = locked.length > 0
+      ? rawVariations.filter((v) =>
+          v.rects.every((r) => locked.every((l) => !rectsIntersect(r, l)))
+        )
+      : rawVariations;
+
+    const sourceVariations = nonColliding.length > 0 ? nonColliding : rawVariations;
+
+    const enriched = sourceVariations.map((v) => {
       const matchRes = findOptimalPhotoSlotMapping(photos, v.rects);
       return {
         ...v,
@@ -720,6 +813,87 @@ export function generateAdaptiveLayoutVariations(
     // Sort descending by match score
     return enriched.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   };
+
+  // If there are locked frames, we place unlocked photos in all valid unoccupied surrounding zones
+  if (locked.length > 0) {
+    const variations: AdaptiveLayoutVariation[] = [];
+
+    if (isCover) {
+      const freeCoverBoxes = computeFreePageSubBoxes(spreadArea, locked, spacing);
+      for (const [bIdx, box] of freeCoverBoxes.entries()) {
+        const maxVariants = count === 1 ? 3 : count === 2 ? 6 : count === 3 ? 8 : 6;
+        for (let v = 0; v < maxVariants; v++) {
+          const rects = partitionPageBoxIntoKRects(box, count, spacing, v);
+          variations.push({
+            id: `cover_zone_${bIdx + 1}_var${v + 1}`,
+            name: `Cover Unlocked Zone ${bIdx + 1} (${count} Photo${count > 1 ? 's' : ''})`,
+            description: `Arranged cleanly around locked cover elements.`,
+            rects,
+            tags: ['cover', 'unlocked', `${count}p`],
+          });
+        }
+      }
+      return scoreAndSortVariations(variations);
+    }
+
+    // 2-Page Spread with locked elements:
+    const freeLeftBoxes = computeFreePageSubBoxes(leftPageArea, locked, spacing);
+    const freeRightBoxes = computeFreePageSubBoxes(rightPageArea, locked, spacing);
+    const allFreeBoxes = [...freeLeftBoxes, ...freeRightBoxes];
+
+    // 1. Single Box placement: Place ALL count photos inside any single valid free box
+    // (e.g. all in bottom zone below locked photo, or all on right page)
+    allFreeBoxes.forEach((box, bIdx) => {
+      const isLeft = box.x < leftPageArea.x + leftPageArea.width;
+      const zoneName = isLeft ? 'Left Page Available Space' : 'Right Page Available Space';
+      const maxVariants = count === 1 ? 4 : count === 2 ? 6 : count === 3 ? 8 : count === 4 ? 8 : 6;
+      for (let v = 0; v < maxVariants; v++) {
+        const rects = partitionPageBoxIntoKRects(box, count, spacing, v);
+        variations.push({
+          id: `single_zone_${bIdx + 1}_var${v + 1}`,
+          name: `${zoneName} (${count} Photo${count > 1 ? 's' : ''} - Var ${v + 1})`,
+          description: `Arranged cleanly inside available space (${zoneName}) without overlapping locked photos.`,
+          rects,
+          tags: ['unlocked-zone', `${count}p`],
+        });
+      }
+    });
+
+    // 2. Multi-Zone split placement (if count >= 2 and we have available free space on BOTH sides)
+    if (count >= 2 && freeLeftBoxes.length > 0 && freeRightBoxes.length > 0) {
+      for (const leftBox of freeLeftBoxes) {
+        for (const rightBox of freeRightBoxes) {
+          for (let nLeft = 1; nLeft < count; nLeft++) {
+            const nRight = count - nLeft;
+            const leftVariants = nLeft === 1 ? 2 : nLeft === 2 ? 4 : 4;
+            const rightVariants = nRight === 1 ? 2 : nRight === 2 ? 4 : 4;
+            const maxCombos = Math.min(6, leftVariants * rightVariants);
+
+            for (let c = 0; c < maxCombos; c++) {
+              const vLeft = c % leftVariants;
+              const vRight = Math.floor(c / leftVariants) % rightVariants;
+
+              const rectsLeft = partitionPageBoxIntoKRects(leftBox, nLeft, spacing, vLeft);
+              const rectsRight = partitionPageBoxIntoKRects(rightBox, nRight, spacing, vRight);
+
+              const allRects = [...rectsLeft, ...rectsRight];
+              if (allRects.length === count) {
+                variations.push({
+                  id: `split_free_${nLeft}L_${nRight}R_c${c + 1}`,
+                  name: `${nLeft} Photo${nLeft > 1 ? 's' : ''} Left + ${nRight} Right Spread (${count} Photos)`,
+                  description: `Arranged into available spaces across both pages around locked photos.`,
+                  rects: allRects,
+                  tags: ['split-free', `${count}p`],
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return scoreAndSortVariations(variations);
+  }
 
   // Single page / Cover mode
   if (isCover) {
@@ -897,27 +1071,35 @@ export function buildSpreadElementsFromVariation(
 export function shuffleElementsPhotos(elements: PhotoFrameElement[]): PhotoFrameElement[] {
   if (elements.length <= 1) return elements;
 
-  // Separate locked elements from unlocked elements
   const unlockedIndices: number[] = [];
+  const unlockedPayloads: Array<{
+    photoId: string | null;
+    filePath: string;
+    fileName: string;
+    previewPath?: string;
+    thumbnailPath?: string;
+    photoAspect?: number;
+  }> = [];
+
   elements.forEach((el, idx) => {
-    if (!el.locked) unlockedIndices.push(idx);
+    if (!el.locked) {
+      unlockedIndices.push(idx);
+      unlockedPayloads.push({
+        photoId: el.photoId ?? null,
+        filePath: el.filePath,
+        fileName: el.fileName,
+        previewPath: el.previewPath,
+        thumbnailPath: el.thumbnailPath,
+        photoAspect: el.photoAspect,
+      });
+    }
   });
 
-  if (unlockedIndices.length <= 1) return elements;
+  if (unlockedPayloads.length <= 1) {
+    return elements;
+  }
 
-  const unlockedPayloads = unlockedIndices.map((idx) => {
-    const el = elements[idx]!;
-    return {
-      photoId: el.photoId,
-      filePath: el.filePath,
-      fileName: el.fileName,
-      previewPath: el.previewPath,
-      thumbnailPath: el.thumbnailPath,
-      photoAspect: el.photoAspect,
-    };
-  });
-
-  // Fisher-Yates shuffle of unlocked payloads only
+  // Fisher-Yates shuffle on unlocked payloads only
   const shuffled = [...unlockedPayloads];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -930,35 +1112,31 @@ export function shuffleElementsPhotos(elements: PhotoFrameElement[]): PhotoFrame
   }
 
   // If shuffle resulted in identical order, force a shift
-  const isIdentical = shuffled.every(
-    (s, idx) => s && unlockedPayloads[idx] && s.filePath === unlockedPayloads[idx]?.filePath
-  );
+  const isIdentical = shuffled.every((s, idx) => s && unlockedPayloads[idx] && s.filePath === unlockedPayloads[idx]?.filePath);
   if (isIdentical && shuffled.length > 1) {
     const first = shuffled.shift();
     if (first !== undefined) shuffled.push(first);
   }
 
-  // Create a result map
-  const resultMap = new Map<number, (typeof unlockedPayloads)[0]>();
-  unlockedIndices.forEach((elemIdx, i) => {
-    resultMap.set(elemIdx, shuffled[i]!);
+  const result = [...elements];
+  unlockedIndices.forEach((origIdx, sIdx) => {
+    const newP = shuffled[sIdx];
+    const el = elements[origIdx];
+    if (newP && el) {
+      result[origIdx] = {
+        ...el,
+        photoId: newP.photoId,
+        filePath: newP.filePath,
+        fileName: newP.fileName,
+        previewPath: newP.previewPath,
+        thumbnailPath: newP.thumbnailPath,
+        photoAspect: newP.photoAspect || (el.width / el.height),
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+      };
+    }
   });
 
-  return elements.map((el, idx) => {
-    if (el.locked || !resultMap.has(idx)) return el;
-    const newP = resultMap.get(idx);
-    if (!newP) return el;
-    return {
-      ...el,
-      photoId: newP.photoId,
-      filePath: newP.filePath,
-      fileName: newP.fileName,
-      previewPath: newP.previewPath,
-      thumbnailPath: newP.thumbnailPath,
-      photoAspect: newP.photoAspect || el.width / el.height,
-      cropX: 0,
-      cropY: 0,
-      cropScale: 1.0,
-    };
-  });
+  return result;
 }

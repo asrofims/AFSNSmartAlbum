@@ -776,9 +776,6 @@ export function WorkspaceLayout() {
 
                 // MULTI-SELECTION MODE (>= 2 frames selected)
                 if (selectedFrameIds.length >= 2) {
-                  const selectedFrames = (activeSpread?.elements || []).filter((f) =>
-                    selectedFrameIds.includes(f.id)
-                  );
                   return (
                     <div
                       className={styles.propSection}
@@ -789,9 +786,40 @@ export function WorkspaceLayout() {
                         backgroundColor: 'rgba(59, 130, 246, 0.04)',
                       }}
                     >
-                      <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Multi-Selection ({selectedFrameIds.length} Frames)</span>
-                      </div>
+                      {(() => {
+                        const selectedElements = (activeSpread?.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+                        const hasUnlocked = selectedElements.some((f) => !f.locked);
+                        const isAllLocked = selectedElements.length > 0 && selectedElements.every((f) => f.locked);
+
+                        return (
+                          <div className={styles.propTitle} style={{ color: isAllLocked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span>Multi-Selection ({selectedFrameIds.length} Frames)</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleLockSelectedFrames(activeSpread.id);
+                                showToast(hasUnlocked ? `🔒 Locked ${selectedFrameIds.length} frames` : `🔓 Unlocked ${selectedFrameIds.length} frames`);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                borderRadius: '999px',
+                                background: isAllLocked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                                border: isAllLocked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
+                                color: isAllLocked ? '#f59e0b' : 'var(--color-text-secondary)',
+                                cursor: 'pointer',
+                              }}
+                              title={hasUnlocked ? 'Lock all selected frames (Ctrl+L)' : 'Unlock all selected frames (Ctrl+Shift+L)'}
+                            >
+                              {isAllLocked ? '🔒 Locked' : hasUnlocked ? '🔓 Lock All' : '🔒 Unlock All'}
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* GAP Spacing Control */}
                       <div style={{ marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)' }}>
@@ -956,33 +984,6 @@ export function WorkspaceLayout() {
                             ↺ Reset Crop
                           </button>
                         </div>
-
-                        {/* Multi-Selection Lock / Unlock Button */}
-                        <div style={{ marginTop: '8px' }}>
-                          <button
-                            type="button"
-                            className={styles.multiActionBtn}
-                            onClick={() => toggleLockSelectedFrames(activeSpread.id)}
-                            title="Toggle Lock for all selected photos (Ctrl+L / Ctrl+Shift+L)"
-                            style={{
-                              width: '100%',
-                              padding: '6px 10px',
-                              backgroundColor: selectedFrames.every((f) => f.locked)
-                                ? 'rgba(245, 158, 11, 0.18)'
-                                : 'rgba(255, 255, 255, 0.05)',
-                              borderColor: selectedFrames.every((f) => f.locked)
-                                ? '#f59e0b'
-                                : 'var(--color-border)',
-                              color: selectedFrames.every((f) => f.locked)
-                                ? '#fbbf24'
-                                : 'var(--color-text-secondary)',
-                            }}
-                          >
-                            {selectedFrames.every((f) => f.locked)
-                              ? `🔓 Unlock All ${selectedFrames.length} Photos (Ctrl+Shift+L)`
-                              : `🔒 Lock All ${selectedFrames.length} Photos (Ctrl+L)`}
-                          </button>
-                        </div>
                       </div>
                     </div>
                   );
@@ -1004,47 +1005,51 @@ export function WorkspaceLayout() {
                       backgroundColor: 'rgba(59, 130, 246, 0.04)',
                     }}
                   >
-                    <div className={styles.propTitle} style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span>Selected Photo Frame</span>
                       <button
                         type="button"
-                        onClick={() => toggleLockSelectedFrames(activeSpread.id)}
+                        onClick={() => {
+                          toggleLockSelectedFrames(activeSpread.id);
+                          showToast(selectedFrame.locked ? '🔓 Photo unlocked' : '🔒 Photo locked');
+                        }}
                         style={{
-                          padding: '3px 8px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: selectedFrame.locked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                          border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                          color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
+                          padding: '3px 8px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          borderRadius: '999px',
+                          background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                          border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
+                          color: selectedFrame.locked ? '#f59e0b' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
                         }}
-                        title={selectedFrame.locked ? 'Click to Unlock Photo (Ctrl+Shift+L)' : 'Click to Lock Photo (Ctrl+L)'}
+                        title={selectedFrame.locked ? 'Unlock Photo (Ctrl+Shift+L)' : 'Lock Photo (Ctrl+L)'}
                       >
                         {selectedFrame.locked ? '🔒 Locked' : '🔓 Lock'}
                       </button>
                     </div>
 
+                    {/* Locked Notice Banner */}
                     {selectedFrame.locked && (
                       <div
                         style={{
-                          marginBottom: '8px',
-                          padding: '6px 8px',
-                          borderRadius: 'var(--radius-sm)',
+                          marginBottom: '10px',
+                          padding: '8px 10px',
+                          borderRadius: 'var(--radius-md)',
                           backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                          border: '1px solid rgba(245, 158, 11, 0.3)',
-                          color: '#fbbf24',
-                          fontSize: '11px',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '8px',
+                          fontSize: '11px',
+                          color: '#fbbf24',
                         }}
                       >
-                        <span>🔒</span>
-                        <span>This photo is locked. Unlock to drag, resize, or crop.</span>
+                        <span style={{ fontSize: '13px' }}>🔒</span>
+                        <span>This photo frame is locked against movements, smart layouts, shuffling, and deletion.</span>
                       </div>
                     )}
 

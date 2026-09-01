@@ -29,9 +29,18 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
-  const photos: AdaptivePhoto[] = useMemo(() => {
+  const unlockedElements = useMemo(() => {
     if (!activeSpread) return [];
-    return activeSpread.elements.map((el) => ({
+    return activeSpread.elements.filter((el) => !el.locked);
+  }, [activeSpread]);
+
+  const lockedElements = useMemo(() => {
+    if (!activeSpread) return [];
+    return activeSpread.elements.filter((el) => el.locked);
+  }, [activeSpread]);
+
+  const photos: AdaptivePhoto[] = useMemo(() => {
+    return unlockedElements.map((el) => ({
       id: el.id,
       photoId: el.photoId,
       filePath: el.filePath,
@@ -40,7 +49,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
       thumbnailPath: el.thumbnailPath,
       photoAspect: el.photoAspect,
     }));
-  }, [activeSpread]);
+  }, [unlockedElements]);
 
   const currentPhotoCount = photos.length;
 
@@ -59,10 +68,11 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
         safeMargin: dims.safeMargin,
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
+        lockedElements,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos]);
+  }, [currentProject, activeSpread, photos, lockedElements]);
 
   const currentActiveIndex =
     activeSpread && spreadLayoutIndices[activeSpread.id] !== undefined

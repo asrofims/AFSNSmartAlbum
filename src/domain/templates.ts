@@ -1,6 +1,7 @@
 import { Unit, convertUnit } from './units';
 import { Project } from './project';
 import { Spread } from './album';
+import type { PhotoFrameElement } from './editor';
 
 export interface RectBounds {
   x: number;
@@ -30,6 +31,7 @@ export interface TemplateParams {
     thumbnailPath?: string;
     photoAspect?: number;
   }>;
+  lockedElements?: PhotoFrameElement[];
 }
 
 export function round4(n: number): number {

@@ -26,9 +26,18 @@ export function LayoutCycleHUD() {
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
-  const photos: AdaptivePhoto[] = useMemo(() => {
+  const unlockedElements = useMemo(() => {
     if (!activeSpread) return [];
-    return activeSpread.elements.map((el) => ({
+    return activeSpread.elements.filter((el) => !el.locked);
+  }, [activeSpread]);
+
+  const lockedElements = useMemo(() => {
+    if (!activeSpread) return [];
+    return activeSpread.elements.filter((el) => el.locked);
+  }, [activeSpread]);
+
+  const photos: AdaptivePhoto[] = useMemo(() => {
+    return unlockedElements.map((el) => ({
       id: el.id,
       photoId: el.photoId,
       filePath: el.filePath,
@@ -37,7 +46,7 @@ export function LayoutCycleHUD() {
       thumbnailPath: el.thumbnailPath,
       photoAspect: el.photoAspect,
     }));
-  }, [activeSpread]);
+  }, [unlockedElements]);
 
   const variations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
@@ -53,10 +62,11 @@ export function LayoutCycleHUD() {
         safeMargin: dims.safeMargin,
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
+        lockedElements,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos]);
+  }, [currentProject, activeSpread, photos, lockedElements]);
 
   const currentIndex = (activeSpread && spreadLayoutIndices[activeSpread.id]) ?? 0;
   const safeIndex = variations.length > 0 ? currentIndex % variations.length : 0;

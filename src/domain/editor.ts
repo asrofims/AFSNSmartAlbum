@@ -31,7 +31,7 @@ export interface PhotoFrameElement {
   cropScale: number; // zoom inside frame, default 1.0 (>= 1.0)
   cropRotation: number;
 
-  // Styling & State
+  // Styling
   borderEnabled: boolean;
   borderWidth: number;
   borderColor: string;

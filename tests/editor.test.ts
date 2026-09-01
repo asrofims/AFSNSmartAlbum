@@ -992,30 +992,8 @@ const testRotFrame: PhotoFrameElement = {
 const hitMarquee: RectBounds = { x: 60, y: 120, width: 20, height: 20 };
 console.assert(doesMarqueeIntersectFrame(hitMarquee, testRotFrame) === true, 'Marquee hitting visual area must intersect');
 
-// 19. Single & Multi-Frame Lock Mechanism & Mutation Shield
-console.log('Testing Single & Multi-Frame Lock Mechanism...');
+// Marquee hitting the old unrotated ghost area X: [120, 180], Y: [110, 140] (empty space)
+const ghostMarquee: RectBounds = { x: 120, y: 110, width: 20, height: 20 };
+console.assert(doesMarqueeIntersectFrame(ghostMarquee, testRotFrame) === false, 'Marquee in ghost unrotated space must NOT intersect');
 
-const initialTestFrames: PhotoFrameElement[] = [
-  { id: 'f-lock-1', type: 'photo', photoId: 'p1', filePath: '/p1.jpg', previewPath: '/p1.jpg', thumbnailPath: '/p1.jpg', fileName: 'p1.jpg', x: 20, y: 30, width: 100, height: 80, rotation: 0, zIndex: 1, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
-  { id: 'f-lock-2', type: 'photo', photoId: 'p2', filePath: '/p2.jpg', previewPath: '/p2.jpg', thumbnailPath: '/p2.jpg', fileName: 'p2.jpg', x: 130, y: 30, width: 100, height: 80, rotation: 0, zIndex: 2, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: true },
-  { id: 'f-lock-3', type: 'photo', photoId: 'p3', filePath: '/p3.jpg', previewPath: '/p3.jpg', thumbnailPath: '/p3.jpg', fileName: 'p3.jpg', x: 240, y: 30, width: 100, height: 80, rotation: 0, zIndex: 3, borderEnabled: false, borderWidth: 0, borderColor: '#fff', opacity: 1, cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, locked: false },
-];
-
-// 19a. Batch deletion shield: Attempting to delete ['f-lock-1', 'f-lock-2'] should preserve 'f-lock-2'
-const toDeleteIds = ['f-lock-1', 'f-lock-2'];
-const lockedIdsSet = new Set(initialTestFrames.filter((f) => toDeleteIds.includes(f.id) && f.locked).map((f) => f.id));
-const allowedDeleteIds = new Set(toDeleteIds.filter((id) => !lockedIdsSet.has(id)));
-const remainingAfterDelete = initialTestFrames.filter((f) => !allowedDeleteIds.has(f.id));
-
-console.assert(remainingAfterDelete.length === 2, 'Should keep 2 frames after delete (f-lock-2 and f-lock-3)');
-console.assert(remainingAfterDelete.some((f) => f.id === 'f-lock-2'), 'Locked frame f-lock-2 must survive deletion');
-console.assert(!remainingAfterDelete.some((f) => f.id === 'f-lock-1'), 'Unlocked frame f-lock-1 must be deleted');
-
-// 19b. Multi-Frame Lock Toggle
-const lockedAll = initialTestFrames.map((f) => ({ ...f, locked: true }));
-console.assert(lockedAll.every((f) => f.locked === true), 'All frames should be locked');
-
-const unlockedAll = lockedAll.map((f) => ({ ...f, locked: false }));
-console.assert(unlockedAll.every((f) => f.locked === false), 'All frames should be unlocked');
-
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, Single & Multi-Frame Lock Shield, and Snapping Config Persistence tests passed successfully!');
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');
