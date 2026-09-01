@@ -177,7 +177,15 @@ export function PageNavigator() {
 
   const handleDeleteRequest = (e: React.MouseEvent, spread: Spread) => {
     e.stopPropagation();
-    setSpreadToDelete(spread);
+    const photoCount = (spread.elements || []).filter((el) => Boolean(el.photoId || el.filePath)).length;
+
+    if (photoCount === 0) {
+      // Empty spread without photos -> delete immediately without confirmation modal
+      deleteSpread(spread.id);
+    } else {
+      // Spread has placed photos -> prompt confirmation dialog to protect user content
+      setSpreadToDelete(spread);
+    }
   };
 
   const handleConfirmDelete = () => {
@@ -414,12 +422,16 @@ export function PageNavigator() {
         </button>
       </div>
 
-      {/* Confirm Delete Spread Dialog */}
+      {/* Confirm Delete Spread Dialog (only shown when spread has photos) */}
       <ConfirmDialog
         isOpen={spreadToDelete !== null}
         title="Delete Album Spread?"
         message={`Are you sure you want to delete "${spreadToDelete?.name}"?`}
-        detail="The two facing pages and any layout elements on this spread will be removed from your album."
+        detail={
+          spreadToDelete
+            ? `This spread contains ${(spreadToDelete.elements || []).filter((el) => Boolean(el.photoId || el.filePath)).length} photo(s). Deleting it will remove this spread from your album.`
+            : 'The two facing pages and any layout elements on this spread will be removed from your album.'
+        }
         confirmText="Delete Spread"
         cancelText="Cancel"
         variant="danger"

@@ -19,6 +19,9 @@ import {
   matchFrameDimensions,
   clusterFramesIntoEntities,
   SafeMarginBounds,
+  loadSavedSnappingConfig,
+  saveSnappingConfig,
+  DEFAULT_SNAPPING_CONFIG,
 } from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
@@ -679,4 +682,27 @@ const resizeBottomRes = calculateResizeSnapping(
 console.assert(resizeBottomRes.snappedBounds.height === 240, `Resized frame height should snap to 240 (bottom edge at 290), got ${resizeBottomRes.snappedBounds.height}`);
 console.assert(resizeBottomRes.snapLines.some((l) => l.label === 'Safe Margin Bottom'), 'Should generate Safe Margin Bottom snap line');
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Replacement, and Photo Swap tests passed successfully!');
+// 14. Test Snapping Configuration Persistence (localStorage)
+const initialConfig = loadSavedSnappingConfig();
+console.assert(typeof initialConfig.threshold === 'number', 'Initial threshold should be a number');
+console.assert(initialConfig.snapToPageEdges === true, 'Default snapToPageEdges should be true');
+
+saveSnappingConfig({
+  enabled: true,
+  threshold: 1.5,
+  snapToPageEdges: false,
+  snapToPageCenters: true,
+  snapToMargins: true,
+  snapToFrames: true,
+  snapToEqualGaps: false,
+});
+
+const reloadedConfig = loadSavedSnappingConfig();
+console.assert(reloadedConfig.threshold === 1.5, `Reloaded threshold should be 1.5, got ${reloadedConfig.threshold}`);
+console.assert(reloadedConfig.snapToPageEdges === false, 'Reloaded snapToPageEdges should be false');
+console.assert(reloadedConfig.snapToEqualGaps === false, 'Reloaded snapToEqualGaps should be false');
+
+// Reset to default for clean test teardown
+saveSnappingConfig(DEFAULT_SNAPPING_CONFIG);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Replacement, Photo Swap, and Snapping Config Persistence tests passed successfully!');

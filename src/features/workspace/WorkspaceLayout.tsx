@@ -1685,33 +1685,49 @@ export function WorkspaceLayout() {
                   </div>
                 </div>
 
-                {/* Smart Snapping Switch & Granular Config Link */}
-                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                {/* Smart Snapping Card & Granular Config Button */}
+                <div className={styles.snappingCard}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Smart Magnetic Snapping</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={snapEnabled ? 'var(--color-accent)' : 'var(--color-text-muted)'}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ transition: 'stroke 0.2s ease' }}
+                      >
+                        <path d="m6 15-3-3 6.36-6.36a3 3 0 0 1 4.24 0l1.41 1.41a3 3 0 0 1 0 4.24L8.65 17.65a3 3 0 0 1-4.24 0l-1.41-1.41" />
+                        <path d="m15 6 3 3" />
+                        <path d="m9 12 3 3" />
+                      </svg>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        Smart Snapping
+                      </span>
+                    </div>
                     <Switch checked={snapEnabled} onChange={toggleSnap} size="sm" />
                   </div>
-                  <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={() => openSettings('snapping')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-accent)',
-                        fontSize: '10px',
-                        cursor: 'pointer',
-                        padding: '2px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        textDecoration: 'none',
-                      }}
-                      title="Configure Granular Snapping Targets in Settings"
-                    >
-                      <span>⚙ Configure Snapping Targets...</span>
-                    </button>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openSettings('snapping')}
+                    className={styles.snappingConfigBtn}
+                    title="Configure Granular Snapping Targets & Tolerance in Settings"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <span>Configure Snapping...</span>
+                    </div>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 

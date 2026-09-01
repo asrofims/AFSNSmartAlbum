@@ -290,6 +290,44 @@ export const DEFAULT_SNAPPING_CONFIG: SnappingConfig = {
   snapToEqualGaps: true,
 };
 
+export const SNAPPING_CONFIG_STORAGE_KEY = 'afsn_snapping_config';
+
+let memorySnappingConfig: SnappingConfig = { ...DEFAULT_SNAPPING_CONFIG };
+
+export function loadSavedSnappingConfig(): SnappingConfig {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(SNAPPING_CONFIG_STORAGE_KEY);
+      if (!raw) return memorySnappingConfig;
+      const parsed = JSON.parse(raw);
+      return {
+        enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_SNAPPING_CONFIG.enabled,
+        threshold: typeof parsed.threshold === 'number' && parsed.threshold > 0 ? parsed.threshold : DEFAULT_SNAPPING_CONFIG.threshold,
+        snapToPageEdges: typeof parsed.snapToPageEdges === 'boolean' ? parsed.snapToPageEdges : DEFAULT_SNAPPING_CONFIG.snapToPageEdges,
+        snapToPageCenters: typeof parsed.snapToPageCenters === 'boolean' ? parsed.snapToPageCenters : DEFAULT_SNAPPING_CONFIG.snapToPageCenters,
+        snapToMargins: typeof parsed.snapToMargins === 'boolean' ? parsed.snapToMargins : DEFAULT_SNAPPING_CONFIG.snapToMargins,
+        snapToFrames: typeof parsed.snapToFrames === 'boolean' ? parsed.snapToFrames : DEFAULT_SNAPPING_CONFIG.snapToFrames,
+        snapToEqualGaps: typeof parsed.snapToEqualGaps === 'boolean' ? parsed.snapToEqualGaps : DEFAULT_SNAPPING_CONFIG.snapToEqualGaps,
+      };
+    }
+    return memorySnappingConfig;
+  } catch (err) {
+    console.warn('[AFSN] Failed to load snapping config:', err);
+    return memorySnappingConfig;
+  }
+}
+
+export function saveSnappingConfig(config: SnappingConfig): void {
+  try {
+    memorySnappingConfig = { ...config };
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SNAPPING_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    }
+  } catch (err) {
+    console.warn('[AFSN] Failed to save snapping config to localStorage:', err);
+  }
+}
+
 export interface ResizeSnapResult {
   snappedBounds: RectBounds;
   snapLines: SnapLine[];

@@ -3,7 +3,8 @@ import {
   alignFrames,
   applyFixedGap,
   clampCropTransform,
-  DEFAULT_SNAPPING_CONFIG,
+  loadSavedSnappingConfig,
+  saveSnappingConfig,
   distributeFrames,
   GapGuide,
   getPhotoAspect,
@@ -113,8 +114,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeSnapLines: [],
   activeGapGuides: [],
   clipboardFrames: [],
-  snapEnabled: true,
-  snappingConfig: { ...DEFAULT_SNAPPING_CONFIG },
+  snapEnabled: loadSavedSnappingConfig().enabled,
+  snappingConfig: loadSavedSnappingConfig(),
   multiResizeGapMode: 'proportional',
   isDragging: false,
   isResizing: false,
@@ -965,9 +966,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleSnap: () => {
     set((s) => {
       const next = !s.snapEnabled;
+      const nextConfig = { ...s.snappingConfig, enabled: next };
+      saveSnappingConfig(nextConfig);
       return {
         snapEnabled: next,
-        snappingConfig: { ...s.snappingConfig, enabled: next },
+        snappingConfig: nextConfig,
       };
     });
   },
@@ -975,6 +978,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateSnappingConfig: (updates) => {
     set((s) => {
       const nextConfig = { ...s.snappingConfig, ...updates };
+      saveSnappingConfig(nextConfig);
       return {
         snappingConfig: nextConfig,
         snapEnabled: nextConfig.enabled,
