@@ -19,7 +19,7 @@ import {
   roundToHundredth,
   getPhotoAspect,
   clamp,
-  intersectRect,
+  doesMarqueeIntersectFrame,
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -1185,14 +1185,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       };
 
       const matchedIds = (activeSpread.elements || [])
-        .filter((f) =>
-          intersectRect(marqueePhysical, {
-            x: f.x,
-            y: f.y,
-            width: f.width,
-            height: f.height,
-          })
-        )
+        .filter((f) => doesMarqueeIntersectFrame(marqueePhysical, f))
         .map((f) => f.id);
 
       const combined = Array.from(new Set([...marqueeInitialSelectedIdsRef.current, ...matchedIds]));

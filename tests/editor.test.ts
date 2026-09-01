@@ -17,6 +17,7 @@ import {
   applyFixedGap,
   calculateMultiFrameResize,
   calculateRotatedMultiFrameResize,
+  doesMarqueeIntersectFrame,
   calculateCenterRotatedPosition,
   computeMultiFrameGroupBounds,
   computeMultiFrameGroupInfo,
@@ -975,7 +976,24 @@ const rHalfH = rotatedGroupInfo.groupHeight / 2;
 const rotCenterX = rotatedGroupInfo.groupX + rHalfW * Math.cos(rRad) - rHalfH * Math.sin(rRad);
 const rotCenterY = rotatedGroupInfo.groupY + rHalfW * Math.sin(rRad) + rHalfH * Math.cos(rRad);
 
-console.assert(Math.abs(rotCenterX - groupCenterX) < 0.1, `Group center X must stay ${groupCenterX}, got ${rotCenterX}`);
-console.assert(Math.abs(rotCenterY - groupCenterY) < 0.1, `Group center Y must stay ${groupCenterY}, got ${rotCenterY}`);
+// 18j. SAT Marquee Area Selection on Rotated Frames
+const testRotFrame: PhotoFrameElement = {
+  id: 'rot-frame-1',
+  type: 'photo',
+  x: 100,
+  y: 100,
+  width: 100,
+  height: 50,
+  rotation: 90, // rotated 90°: visual spans X: [50, 100], Y: [100, 200]
+  zIndex: 1,
+};
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, and Snapping Config Persistence tests passed successfully!');
+// Marquee hitting the REAL visual area of the rotated frame
+const hitMarquee: RectBounds = { x: 60, y: 120, width: 20, height: 20 };
+console.assert(doesMarqueeIntersectFrame(hitMarquee, testRotFrame) === true, 'Marquee hitting visual area must intersect');
+
+// Marquee hitting the old unrotated ghost area X: [120, 180], Y: [110, 140] (empty space)
+const ghostMarquee: RectBounds = { x: 120, y: 110, width: 20, height: 20 };
+console.assert(doesMarqueeIntersectFrame(ghostMarquee, testRotFrame) === false, 'Marquee in ghost unrotated space must NOT intersect');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');

@@ -1545,6 +1545,91 @@ export function getFrameVisualBounds(frame: {
 }
 
 /**
+ * Accurately checks if a rectangular marquee intersects a potentially rotated photo frame,
+ * using the Separating Axis Theorem (SAT) for exact oriented polygon collision detection.
+ */
+export function doesMarqueeIntersectFrame(
+  marquee: RectBounds,
+  frame: { x: number; y: number; width: number; height: number; rotation?: number }
+): boolean {
+  const rot = frame.rotation || 0;
+  // If not rotated, standard fast AABB check
+  if (Math.abs(rot % 360) < 0.001) {
+    return intersectRect(marquee, {
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+    });
+  }
+
+  // Broad phase: Visual AABB check
+  const visualBounds = getFrameVisualBounds(frame);
+  if (!intersectRect(marquee, visualBounds)) {
+    return false;
+  }
+
+  // Narrow phase: Separating Axis Theorem (SAT) for 2D OBB vs AABB
+  const rad = (rot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  const w = frame.width;
+  const h = frame.height;
+
+  // 4 corners of the rotated frame
+  const frameCorners = [
+    { x: frame.x, y: frame.y },
+    { x: frame.x + w * cos, y: frame.y + w * sin },
+    { x: frame.x + w * cos - h * sin, y: frame.y + w * sin + h * cos },
+    { x: frame.x - h * sin, y: frame.y + h * cos },
+  ];
+
+  // 4 corners of the marquee
+  const marqueeCorners = [
+    { x: marquee.x, y: marquee.y },
+    { x: marquee.x + marquee.width, y: marquee.y },
+    { x: marquee.x + marquee.width, y: marquee.y + marquee.height },
+    { x: marquee.x, y: marquee.y + marquee.height },
+  ];
+
+  // Test axes: 2 from marquee (X: (1, 0), Y: (0, 1)) + 2 from rotated frame ((cos, sin), (-sin, cos))
+  const axes = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: cos, y: sin },
+    { x: -sin, y: cos },
+  ];
+
+  for (const axis of axes) {
+    // Project frame corners onto axis
+    let minA = Infinity;
+    let maxA = -Infinity;
+    for (const pt of frameCorners) {
+      const dot = pt.x * axis.x + pt.y * axis.y;
+      if (dot < minA) minA = dot;
+      if (dot > maxA) maxA = dot;
+    }
+
+    // Project marquee corners onto axis
+    let minB = Infinity;
+    let maxB = -Infinity;
+    for (const pt of marqueeCorners) {
+      const dot = pt.x * axis.x + pt.y * axis.y;
+      if (dot < minB) minB = dot;
+      if (dot > maxB) maxB = dot;
+    }
+
+    // If there is a separating axis with no overlap, they do not intersect
+    if (maxA < minB || maxB < minA) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Calculates resized dimensions and positions for multiple frames while strictly preserving
  * the exact inter-frame gap spacing (both horizontally and vertically) across any layout topology,
  * fully supporting rotated frames with center pivot invariance.
