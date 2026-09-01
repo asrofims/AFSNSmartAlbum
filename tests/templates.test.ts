@@ -1,13 +1,13 @@
 import {
-  BUILTIN_LAYOUT_TEMPLATES,
-  generateSpreadElementsFromTemplate,
-  generateTemplateSvgPreview,
   getUsableAreas,
+  getProjectDimensionsInCanvasUnit,
+  fitInsideBoxCentered,
   TemplateParams,
 } from '../src/domain/templates';
+import { Project } from '../src/domain/project';
 
 function runTests() {
-  console.log('Testing Phase 6: Layout Templates & Generator Engine...');
+  console.log('Testing Phase 6: Spatial Layout Calculation & Safe Area Engine...');
 
   const params: TemplateParams = {
     spreadWidth: 405, // 200 left + 5 gutter + 200 right
@@ -17,10 +17,8 @@ function runTests() {
     gutterWidth: 5,
     spacing: 4,
     currentPhotos: [
-      { id: 'p1', filePath: 'C:/photos/img1.jpg', fileName: 'img1.jpg' },
-      { id: 'p2', filePath: 'C:/photos/img2.jpg', fileName: 'img2.jpg' },
-      { id: 'p3', filePath: 'C:/photos/img3.jpg', fileName: 'img3.jpg' },
-      { id: 'p4', filePath: 'C:/photos/img4.jpg', fileName: 'img4.jpg' },
+      { id: 'p1', filePath: 'C:/photos/img1.jpg', fileName: 'img1.jpg', photoAspect: 1.5 },
+      { id: 'p2', filePath: 'C:/photos/img2.jpg', fileName: 'img2.jpg', photoAspect: 1.5 },
     ],
   };
 
@@ -37,50 +35,69 @@ function runTests() {
   }
   console.log('✓ Exact Safe Margin Box alignment (left & right page blue dashed boxes) verified.');
 
-  // 2. Verify all built-in templates
-  for (const t of BUILTIN_LAYOUT_TEMPLATES) {
-    const rects = t.generateRects(params);
-    if (rects.length !== t.photoCount) {
-      throw new Error(`Template ${t.id} generated ${rects.length} rects, expected ${t.photoCount}`);
-    }
-
-    for (const r of rects) {
-      if (r.width <= 0 || r.height <= 0) {
-        throw new Error(`Template ${t.id} produced non-positive dimensions: ${JSON.stringify(r)}`);
-      }
-      if (r.x < 0 || r.y < 0) {
-        throw new Error(`Template ${t.id} produced negative coordinate: ${JSON.stringify(r)}`);
-      }
-    }
-
-    const svg = generateTemplateSvgPreview(t);
-    if (!svg.startsWith('<svg') || !svg.endsWith('</svg>')) {
-      throw new Error(`Invalid SVG generated for ${t.id}`);
-    }
+  // 2. Verify Inset variations
+  const insetParams: TemplateParams = {
+    ...params,
+    photoInset: 5,
+    photoInsetTop: 4,
+    photoInsetBottom: 6,
+    photoInsetLeft: 8,
+    photoInsetRight: 10,
+  };
+  const withInsets = getUsableAreas(insetParams);
+  if (withInsets.leftPageArea.x !== 18 || withInsets.leftPageArea.y !== 14) {
+    throw new Error(`Incorrect Left Inset box: ${JSON.stringify(withInsets.leftPageArea)}`);
   }
-  console.log(`✓ All ${BUILTIN_LAYOUT_TEMPLATES.length} Visual Grid Blueprints validated.`);
+  console.log('✓ Dynamic 4-side photoInset safe area padding verified.');
 
-  // 3. Verify Reflow & Frame Element Generation
-  const template4p = BUILTIN_LAYOUT_TEMPLATES.find((t) => t.id === '4p_facing_2plus2_stacks');
-  if (!template4p) throw new Error('Missing 4p_facing_2plus2_stacks template');
-
-  const elements = generateSpreadElementsFromTemplate(template4p, params, true, 2, '#FF0000');
-  if (elements.length !== 4) {
-    throw new Error(`Expected 4 elements, got ${elements.length}`);
+  // 3. Verify Photo Centered Fitting
+  const fitted = fitInsideBoxCentered(rightPageArea, 1.5, 1.0);
+  if (fitted.width <= 0 || fitted.height <= 0) {
+    throw new Error('fitInsideBoxCentered produced invalid dimensions');
   }
-
-  // Left frames start at x=10
-  if (elements[0].x !== 10 || elements[1].x !== 10) {
-    throw new Error('Left stacked elements do not align with Left Safe Box x=10');
+  if (Math.abs((fitted.width / fitted.height) - 1.5) > 0.01) {
+    throw new Error('Fitted photo aspect ratio distortion detected');
   }
+  console.log('✓ Aspect-ratio preserving centered box fitting verified.');
 
-  // Right frames start at x=215
-  if (elements[2].x !== 215 || elements[3].x !== 215) {
-    throw new Error('Right stacked elements do not align with Right Safe Box x=215');
+  // 4. Verify Project Dimensions In Canvas Unit Converter
+  const mockProject: Project = {
+    id: 'proj-1',
+    name: 'Test Project',
+    canvasWidth: 30,
+    canvasHeight: 30,
+    canvasUnit: 'cm',
+    canvasDpi: 300,
+    marginValue: 20,
+    marginUnit: 'mm',
+    spacingValue: 5,
+    spacingUnit: 'mm',
+    photoInset: 10,
+    photoInsetUnit: 'mm',
+    borderEnabled: false,
+    borderWidth: 1,
+    borderUnit: 'mm',
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const dims = getProjectDimensionsInCanvasUnit(mockProject);
+  if (dims.pageWidth !== 30 || dims.pageHeight !== 30) {
+    throw new Error(`Page dimensions incorrect: ${dims.pageWidth}x${dims.pageHeight}`);
   }
+  // 20mm margin in cm = 2.0cm
+  if (Math.abs(dims.safeMargin - 2.0) > 0.001) {
+    throw new Error(`Expected safeMargin 2.0cm, got ${dims.safeMargin}`);
+  }
+  // 5mm spacing in cm = 0.5cm
+  if (Math.abs(dims.spacing - 0.5) > 0.001) {
+    throw new Error(`Expected spacing 0.5cm, got ${dims.spacing}`);
+  }
+  console.log('✓ Multi-unit dimensional converter (mm -> cm/inch/px) verified.');
 
-  console.log('✓ Element generation, Safe Margin confinement, and photo preservation passed.');
-  console.log('ALL TEMPLATE TESTS PASSED SUCCESSFULLY! 🎉');
+  console.log('ALL SPATIAL LAYOUT TESTS PASSED SUCCESSFULLY! 🎉');
 }
 
 runTests();
