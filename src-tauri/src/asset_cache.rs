@@ -46,7 +46,7 @@ pub fn cleanup_asset_directories(
         for entry in entries {
             let entry = entry.map_err(|err| format!("Failed to inspect cache entry: {}", err))?;
             let path = entry.path();
-            if !is_generated_jpeg(&path) || cache_file_is_referenced(&path, live_photo_ids) {
+            if !is_generated_cache_asset(&path) || cache_file_is_referenced(&path, live_photo_ids) {
                 continue;
             }
 
@@ -61,12 +61,12 @@ pub fn cleanup_asset_directories(
     Ok(report)
 }
 
-fn is_generated_jpeg(path: &Path) -> bool {
+fn is_generated_cache_asset(path: &Path) -> bool {
     path.is_file()
         && path
             .extension()
             .and_then(|extension| extension.to_str())
-            .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg"))
+            .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "webp"))
             .unwrap_or(false)
 }
 

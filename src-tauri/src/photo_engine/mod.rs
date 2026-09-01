@@ -133,17 +133,28 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
         }
     };
 
+    let is_transparent_format = matches!(
+        format_str.as_str(),
+        "png" | "webp" | "gif" | "svg" | "ico"
+    );
+
+    let (thumb_ext, preview_ext, target_format) = if is_transparent_format {
+        ("png", "png", ImageFormat::Png)
+    } else {
+        ("jpg", "jpg", ImageFormat::Jpeg)
+    };
+
     // Prepare thumbnail directory in disk cache
     let thumbs_dir = cache_dir.join("thumbnails");
     let _ = fs::create_dir_all(&thumbs_dir);
-    let thumb_file_path = thumbs_dir.join(format!("{}.jpg", photo_id));
+    let thumb_file_path = thumbs_dir.join(format!("{}.{}", photo_id, thumb_ext));
     let previews_dir = cache_dir.join("previews");
     let _ = fs::create_dir_all(&previews_dir);
-    let preview_file_path = previews_dir.join(format!("{}.jpg", photo_id));
+    let preview_file_path = previews_dir.join(format!("{}.{}", photo_id, preview_ext));
 
     // 2. Try Embedded EXIF thumbnail extraction (0.2 millisecond - no decoding needed!)
     let mut thumb_created = false;
-    if format_str == "jpg" || format_str == "jpeg" || format_str == "tiff" || format_str == "tif" {
+    if !is_transparent_format && (format_str == "jpg" || format_str == "jpeg" || format_str == "tiff" || format_str == "tif") {
         if try_extract_embedded_thumbnail(file_path, &thumb_file_path).is_some() {
             thumb_created = true;
         }
@@ -155,7 +166,7 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
     if !thumb_created {
         if let Some(img) = decoded_image.as_ref() {
             let thumb = img.thumbnail(240, 240);
-            thumb_created = thumb.save_with_format(&thumb_file_path, ImageFormat::Jpeg).is_ok();
+            thumb_created = thumb.save_with_format(&thumb_file_path, target_format).is_ok();
         }
     }
 
@@ -168,7 +179,7 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
     let preview_path_str = decoded_image.as_ref().and_then(|img| {
         let preview = img.thumbnail(PREVIEW_MAX_DIMENSION, PREVIEW_MAX_DIMENSION);
         preview
-            .save_with_format(&preview_file_path, ImageFormat::Jpeg)
+            .save_with_format(&preview_file_path, target_format)
             .ok()
             .map(|_| preview_file_path.to_string_lossy().to_string())
     });
@@ -214,6 +225,38 @@ mod tests {
         let preview_path = processed.preview_path.expect("Canvas preview should be generated");
         let preview_dimensions = image::image_dimensions(preview_path).expect("Preview should be readable");
         assert_eq!(preview_dimensions, (1200, 600));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_png_transparency_preservation() {
+        use image::{Rgba, RgbaImage};
+
+        let temp_dir = std::env::temp_dir().join("afsn_test_png_transparency");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let sample_png_path = temp_dir.join("transparent_logo.png");
+        let mut img = RgbaImage::new(400, 400);
+        // Half opaque, half fully transparent
+        for (x, _y, pixel) in img.enumerate_pixels_mut() {
+            if x < 200 {
+                *pixel = Rgba([255, 0, 0, 255]); // Red opaque
+            } else {
+                *pixel = Rgba([0, 0, 0, 0]); // Fully transparent
+            }
+        }
+        img.save(&sample_png_path).unwrap();
+
+        let processed = process_photo(&sample_png_path, &temp_dir, "test-trans-1").expect("Processing failed");
+        let preview_path = processed.preview_path.expect("Preview should exist");
+        assert!(preview_path.ends_with(".png"), "Preview for transparent PNG must be .png");
+
+        let loaded_preview = image::open(&preview_path).expect("Must open preview").to_rgba8();
+        // Check transparent half
+        let transparent_pixel = loaded_preview.get_pixel(loaded_preview.width() - 10, loaded_preview.height() / 2);
+        assert_eq!(transparent_pixel[3], 0, "Alpha must be 0 for transparent region in preview");
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

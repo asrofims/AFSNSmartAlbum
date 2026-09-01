@@ -334,16 +334,20 @@ fn render_photo_element(
             }
 
             let p = resized_rgba.get_pixel(fx, fy);
-            if elem.opacity < 0.999 {
-                let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
-                let alpha = (p[3] as f64 / 255.0 * elem.opacity).clamp(0.0, 1.0);
-                let inv_alpha = 1.0 - alpha;
-                existing[0] = ((p[0] as f64 * alpha) + (existing[0] as f64 * inv_alpha)) as u8;
-                existing[1] = ((p[1] as f64 * alpha) + (existing[1] as f64 * inv_alpha)) as u8;
-                existing[2] = ((p[2] as f64 * alpha) + (existing[2] as f64 * inv_alpha)) as u8;
-                existing[3] = 255;
-            } else {
+            let effective_alpha = (p[3] as f64 / 255.0 * elem.opacity).clamp(0.0, 1.0);
+            if effective_alpha < 0.001 {
+                // Completely transparent pixel, leave canvas background intact
+                continue;
+            }
+            if effective_alpha > 0.999 {
                 canvas.put_pixel(dest_x as u32, dest_y as u32, *p);
+            } else {
+                let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
+                let inv_alpha = 1.0 - effective_alpha;
+                existing[0] = ((p[0] as f64 * effective_alpha) + (existing[0] as f64 * inv_alpha)).round() as u8;
+                existing[1] = ((p[1] as f64 * effective_alpha) + (existing[1] as f64 * inv_alpha)).round() as u8;
+                existing[2] = ((p[2] as f64 * effective_alpha) + (existing[2] as f64 * inv_alpha)).round() as u8;
+                existing[3] = 255;
             }
         }
     }
