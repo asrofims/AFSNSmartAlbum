@@ -8,6 +8,8 @@ import {
   createInteriorSpread,
   duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
+  reorderAlbumSpreads,
+  moveAlbumSpread,
   getAllAlbumSpreads,
   syncAlbumPhotoAssets,
 } from '../domain/album';
@@ -60,6 +62,8 @@ export interface AlbumState {
   addSpread: (project: Project, afterIndex?: number) => void;
   deleteSpread: (spreadId: string) => void;
   duplicateSpread: (spreadId: string, project: Project) => void;
+  moveSpread: (spreadId: string, direction: 'left' | 'right') => void;
+  reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
   updatePhotoInset: (photoInset: number, side?: 'all' | 'top' | 'bottom' | 'left' | 'right') => void;
@@ -155,7 +159,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   showGutterGuide: true,
   showBleedGuide: true,
   showSafeAreaGuide: true,
-  isSpreadDrawerOpen: true,
+  isSpreadDrawerOpen: false,
   spreadLayoutIndices: {},
 
   setSpreadDrawerOpen: (isOpen: boolean) => set({ isSpreadDrawerOpen: isOpen }),
@@ -509,6 +513,42 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       activeSpreadId: result.newSpreadId,
       activeSpreadIndex: result.newSpreadIndex,
       selectedPageId: null,
+      saveStatus: 'unsaved',
+    });
+  },
+
+  moveSpread: (spreadId: string, direction: 'left' | 'right') => {
+    const { currentAlbum, activeSpreadId } = get();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const result = moveAlbumSpread(currentAlbum, spreadId, direction);
+    if (!result) return;
+
+    const nextActiveId = activeSpreadId === spreadId ? spreadId : (result.updatedAlbum.spreads[result.newActiveIndex]?.id || activeSpreadId);
+    const nextActiveIndex = result.updatedAlbum.spreads.findIndex((s) => s.id === nextActiveId);
+
+    set({
+      currentAlbum: result.updatedAlbum,
+      activeSpreadId: nextActiveId,
+      activeSpreadIndex: Math.max(0, nextActiveIndex),
+      saveStatus: 'unsaved',
+    });
+  },
+
+  reorderSpread: (fromIndex: number, toIndex: number) => {
+    const { currentAlbum, activeSpreadId } = get();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updatedAlbum = reorderAlbumSpreads(currentAlbum, fromIndex, toIndex);
+    const nextActiveIndex = updatedAlbum.spreads.findIndex((s) => s.id === activeSpreadId);
+
+    set({
+      currentAlbum: updatedAlbum,
+      activeSpreadIndex: Math.max(0, nextActiveIndex),
       saveStatus: 'unsaved',
     });
   },

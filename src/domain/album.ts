@@ -397,6 +397,57 @@ export function duplicateAlbumSpread(
 }
 
 /**
+ * Reorders interior spreads by moving a spread from fromIndex to toIndex.
+ * Automatically recalculates sequential spread numbers and left/right page numbers.
+ */
+export function reorderAlbumSpreads(
+  album: Album,
+  fromIndex: number,
+  toIndex: number
+): Album {
+  if (
+    fromIndex < 0 ||
+    fromIndex >= album.spreads.length ||
+    toIndex < 0 ||
+    toIndex >= album.spreads.length ||
+    fromIndex === toIndex
+  ) {
+    return album;
+  }
+
+  const updatedSpreads = [...album.spreads];
+  const [movedSpread] = updatedSpreads.splice(fromIndex, 1);
+  if (!movedSpread) return album;
+  updatedSpreads.splice(toIndex, 0, movedSpread);
+
+  return recalculateAlbumPageNumbers({
+    ...album,
+    spreads: updatedSpreads,
+  });
+}
+
+/**
+ * Moves a spread left (earlier) or right (later) by 1 position.
+ */
+export function moveAlbumSpread(
+  album: Album,
+  spreadId: string,
+  direction: 'left' | 'right'
+): { updatedAlbum: Album; newActiveIndex: number } | null {
+  const currentIndex = album.spreads.findIndex((s) => s.id === spreadId);
+  if (currentIndex === -1) return null;
+
+  const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+  if (targetIndex < 0 || targetIndex >= album.spreads.length) return null;
+
+  const updatedAlbum = reorderAlbumSpreads(album, currentIndex, targetIndex);
+  return {
+    updatedAlbum,
+    newActiveIndex: targetIndex,
+  };
+}
+
+/**
  * Returns all album spreads in sequential order.
  */
 export function getAllAlbumSpreads(album: Album): Spread[] {

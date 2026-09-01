@@ -130,11 +130,15 @@ export function PageNavigator() {
     addSpread,
     deleteSpread,
     duplicateSpread,
+    moveSpread,
+    reorderSpread,
     setSpreadDrawerOpen,
     toggleSpreadDrawer,
   } = useAlbumStore();
 
   const [spreadToDelete, setSpreadToDelete] = useState<Spread | null>(null);
+  const [draggedSpreadIndex, setDraggedSpreadIndex] = useState<number | null>(null);
+  const [dragOverSpreadIndex, setDragOverSpreadIndex] = useState<number | null>(null);
 
   // Keyboard navigation shortcuts
   useEffect(() => {
@@ -183,6 +187,41 @@ export function PageNavigator() {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedSpreadIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSpreadIndex !== index) {
+      setDragOverSpreadIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverSpreadIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndexStr = e.dataTransfer.getData('text/plain');
+    const sourceIndex = sourceIndexStr ? parseInt(sourceIndexStr, 10) : draggedSpreadIndex;
+    setDraggedSpreadIndex(null);
+    setDragOverSpreadIndex(null);
+
+    if (sourceIndex !== null && !isNaN(sourceIndex) && sourceIndex !== targetIndex) {
+      reorderSpread(sourceIndex, targetIndex);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedSpreadIndex(null);
+    setDragOverSpreadIndex(null);
+  };
+
   return (
     <div className={styles.navigatorContainer}>
       {/* Spread Thumbnail Drawer (Collapsible) */}
@@ -201,17 +240,32 @@ export function PageNavigator() {
           </div>
 
           <div className={styles.drawerList}>
-            {allSpreads.map((spread) => {
+            {allSpreads.map((spread, index) => {
               const isActive = activeSpreadId === spread.id;
+              const isDragging = draggedSpreadIndex === index;
+              const isDragOver = dragOverSpreadIndex === index;
+              const isFirst = index === 0;
+              const isLast = index === allSpreads.length - 1;
+
+              let dragOverClass = '';
+              if (isDragOver && draggedSpreadIndex !== null && draggedSpreadIndex !== index) {
+                dragOverClass = (draggedSpreadIndex < index ? styles.dragOverRight : styles.dragOverLeft) || '';
+              }
 
               return (
                 <div
                   key={spread.id}
-                  className={`${styles.thumbnailCard} ${isActive ? styles.cardActive : ''}`}
+                  draggable={true}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={`${styles.thumbnailCard} ${isActive ? styles.cardActive : ''} ${isDragging ? styles.draggingCard : ''} ${dragOverClass}`}
                   onClick={() => {
                     setActiveSpread(spread.id);
                   }}
-                  title={spread.name}
+                  title={`${spread.name} (Drag or use ◀ ▶ to reorder)`}
                 >
                   {/* Real-time Miniature Spread Preview */}
                   <MiniSpreadPreview spread={spread} project={currentProject} />
@@ -221,15 +275,46 @@ export function PageNavigator() {
                     <span className={styles.cardIndexText}>{spread.spreadIndex}</span>
                     <span className={styles.cardNameText}>{spread.name}</span>
 
-                    {/* Quick Actions (Duplicate / Delete) */}
+                    {/* Quick Actions (Reorder ◀ ▶ / Duplicate / Delete) */}
                     <div className={styles.cardActions}>
                       <button
                         type="button"
-                        className={styles.cardActionBtn}
+                        className={styles.reorderBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveSpread(spread.id, 'left');
+                        }}
+                        disabled={isFirst}
+                        title="Move spread left (earlier)"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.reorderBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveSpread(spread.id, 'right');
+                        }}
+                        disabled={isLast}
+                        title="Move spread right (later)"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.cardActionBtn} ${styles.cardActionBtnDuplicate}`}
                         onClick={(e) => handleDuplicateSpread(e, spread)}
                         title="Duplicate this spread"
                       >
-                        📋
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
                       </button>
                       {allSpreads.length > 1 && (
                         <button
@@ -238,7 +323,10 @@ export function PageNavigator() {
                           onClick={(e) => handleDeleteRequest(e, spread)}
                           title="Delete this spread"
                         >
-                          🗑
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
                         </button>
                       )}
                     </div>

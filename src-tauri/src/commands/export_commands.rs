@@ -6,8 +6,8 @@ use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
 use crate::db::{AlbumPayload, Database, ProjectRow, SpreadPayload};
 use crate::export_engine::{
-    apply_print_sharpening, assemble_pdf_from_jpegs, render_spread_to_image_with_progress,
-    split_spread_into_pages, ExportOptions, ExportProgressEvent,
+    apply_print_sharpening, assemble_pdf_from_jpegs, encode_jpeg_with_dpi, encode_png_with_dpi,
+    render_spread_to_image_with_progress, split_spread_into_pages, ExportOptions, ExportProgressEvent,
 };
 
 #[derive(Default)]
@@ -523,27 +523,29 @@ fn export_album_high_res_worker(
 
                     if options.format == "png" {
                         safe_write_image(&left_path, |tmp| {
-                            left_page.save_with_format(tmp, image::ImageFormat::Png)
+                            let png_bytes = encode_png_with_dpi(&left_page, options.dpi)?;
+                            fs::write(tmp, &png_bytes)
                                 .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
                         })?;
                         safe_write_image(&right_path, |tmp| {
-                            right_page.save_with_format(tmp, image::ImageFormat::Png)
+                            let png_bytes = encode_png_with_dpi(&right_page, options.dpi)?;
+                            fs::write(tmp, &png_bytes)
                                 .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
                         })?;
                     } else {
-                        // JPEG with atomic safe write
+                        // JPEG with atomic safe write and explicit JFIF DPI metadata
                         let left_rgb = image::DynamicImage::ImageRgba8(left_page).to_rgb8();
                         safe_write_image(&left_path, |tmp| {
-                            let mut left_f = fs::File::create(tmp).map_err(|e| e.to_string())?;
-                            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut left_f, options.jpeg_quality);
-                            encoder.encode_image(&left_rgb).map_err(|e| e.to_string())
+                            let jpg_bytes = encode_jpeg_with_dpi(&left_rgb, options.jpeg_quality, options.dpi)?;
+                            fs::write(tmp, &jpg_bytes)
+                                .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
                         })?;
 
                         let right_rgb = image::DynamicImage::ImageRgba8(right_page).to_rgb8();
                         safe_write_image(&right_path, |tmp| {
-                            let mut right_f = fs::File::create(tmp).map_err(|e| e.to_string())?;
-                            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut right_f, options.jpeg_quality);
-                            encoder.encode_image(&right_rgb).map_err(|e| e.to_string())
+                            let jpg_bytes = encode_jpeg_with_dpi(&right_rgb, options.jpeg_quality, options.dpi)?;
+                            fs::write(tmp, &jpg_bytes)
+                                .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
                         })?;
 
                         if options.format == "pdf" {
@@ -563,15 +565,16 @@ fn export_album_high_res_worker(
 
                     if options.format == "png" {
                         safe_write_image(&file_dest, |tmp| {
-                            spread_img.save_with_format(tmp, image::ImageFormat::Png)
+                            let png_bytes = encode_png_with_dpi(&spread_img, options.dpi)?;
+                            fs::write(tmp, &png_bytes)
                                 .map_err(|e| format!("Failed to save {}: {}", file_dest.display(), e))
                         })?;
                     } else {
                         let spread_rgb = image::DynamicImage::ImageRgba8(spread_img).to_rgb8();
                         safe_write_image(&file_dest, |tmp| {
-                            let mut f = fs::File::create(tmp).map_err(|e| e.to_string())?;
-                            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut f, options.jpeg_quality);
-                            encoder.encode_image(&spread_rgb).map_err(|e| e.to_string())
+                            let jpg_bytes = encode_jpeg_with_dpi(&spread_rgb, options.jpeg_quality, options.dpi)?;
+                            fs::write(tmp, &jpg_bytes)
+                                .map_err(|e| format!("Failed to save {}: {}", file_dest.display(), e))
                         })?;
 
                         if options.format == "pdf" {

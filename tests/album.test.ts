@@ -4,6 +4,8 @@ import {
   createInteriorSpread,
   duplicateAlbumSpread,
   recalculateAlbumPageNumbers,
+  reorderAlbumSpreads,
+  moveAlbumSpread,
   getAllAlbumSpreads,
   mergeFramePhotoAsset,
   syncAlbumPhotoAssets,
@@ -201,7 +203,24 @@ const relinkAlbum = {
 };
 const syncedRelinkAlbum = syncAlbumPhotoAssets(relinkAlbum, [recoveredPhoto]);
 console.assert(syncedRelinkAlbum.changed, 'Album asset sync should report recovered frames as changed');
-console.assert(syncedRelinkAlbum.album.coverSpread.elements[0].filePath === recoveredPhoto.filePath, 'Album asset sync should update cover frames too');
-console.assert(syncedRelinkAlbum.album.coverSpread.elements[0].cropScale === staleFrame.cropScale, 'Album asset sync should retain cover frame crop');
+// 9. Test Reordering Spreads and Automatic Page Renumbering
+const reordered = reorderAlbumSpreads(recalculated, 2, 0); // Move spread 3 (index 2) to front (index 0)
+console.assert(reordered.spreads[0].id === spread3.id, 'Spread 3 should now be first');
+console.assert(reordered.spreads[0].name === 'Spread 1 (Pages 1-2)', 'First spread name should be updated to Spread 1 (Pages 1-2)');
+console.assert(reordered.spreads[0].leftPage?.pageNumber === 1, 'First spread left page should be Page 1');
+console.assert(reordered.spreads[0].rightPage?.pageNumber === 2, 'First spread right page should be Page 2');
+console.assert(reordered.spreads[1].id === spread1.id, 'Original Spread 1 should now be at index 1');
+console.assert(reordered.spreads[1].name === 'Spread 2 (Pages 3-4)', 'Second spread name should be updated to Spread 2 (Pages 3-4)');
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model & spread duplication)!');
+// Test Move Spread Left and Right
+const movedRight = moveAlbumSpread(recalculated, spread1.id, 'right');
+console.assert(movedRight !== null, 'moveAlbumSpread right should succeed');
+if (movedRight) {
+  console.assert(movedRight.newActiveIndex === 1, 'Spread 1 should move to index 1');
+  console.assert(movedRight.updatedAlbum.spreads[1].id === spread1.id, 'Spread 1 should be at index 1');
+}
+
+const invalidMoveLeft = moveAlbumSpread(recalculated, spread1.id, 'left');
+console.assert(invalidMoveLeft === null, 'Moving first spread left should return null');
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering)!');

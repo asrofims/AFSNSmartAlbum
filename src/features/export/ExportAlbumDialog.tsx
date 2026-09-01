@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { getAllAlbumSpreads, Spread } from '../../domain/album';
-import { toPixels } from '../../domain/units';
+import { calculateExportPixels } from '../../domain/units';
 import styles from './ExportAlbumDialog.module.css';
 
 export interface ExportOptions {
@@ -84,6 +84,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
 
   const [format, setFormat] = useState<'jpeg' | 'png' | 'pdf'>('jpeg');
   const [dpi, setDpi] = useState<number>(currentProject?.canvasDpi || 300);
+  const [isCustomDpi, setIsCustomDpi] = useState<boolean>(false);
   const [jpegQuality, setJpegQuality] = useState<number>(95);
   const [includeBleed, setIncludeBleed] = useState<boolean>(true);
   const [splitPages, setSplitPages] = useState<boolean>(false);
@@ -156,8 +157,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const spreadWWithBleed = includeBleed ? totalSpreadW + bleed * 2 : totalSpreadW;
   const spreadHWithBleed = includeBleed ? totalSpreadH + bleed * 2 : totalSpreadH;
 
-  const pixelW = Math.round(toPixels(spreadWWithBleed, currentProject.canvasUnit, dpi));
-  const pixelH = Math.round(toPixels(spreadHWithBleed, currentProject.canvasUnit, dpi));
+  const pixelW = calculateExportPixels(spreadWWithBleed, currentProject.canvasUnit, dpi, currentProject.canvasDpi);
+  const pixelH = calculateExportPixels(spreadHWithBleed, currentProject.canvasUnit, dpi, currentProject.canvasDpi);
 
   const targetSpreadCount = targetSpreads.length;
   const targetPageCount = splitPages ? targetSpreadCount * 2 : targetSpreadCount;
@@ -382,18 +383,45 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
         <div className={styles.optionsGrid}>
           <div className={styles.optionField}>
             <label className={styles.label}>Print Resolution</label>
-            <select
-              className={styles.select}
-              value={dpi}
-              onChange={(e) => setDpi(Number(e.target.value))}
-            >
-              <option value={300}>300 DPI (Production Print)</option>
-              <option value={240}>240 DPI (Standard Print)</option>
-              <option value={600}>600 DPI (Ultra Fine Print)</option>
-              {currentProject.canvasDpi !== 300 && currentProject.canvasDpi !== 240 && currentProject.canvasDpi !== 600 && (
-                <option value={currentProject.canvasDpi}>Project DPI ({currentProject.canvasDpi} DPI)</option>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select
+                className={styles.select}
+                value={isCustomDpi ? 'custom' : dpi}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'custom') {
+                    setIsCustomDpi(true);
+                  } else {
+                    setIsCustomDpi(false);
+                    setDpi(Number(val));
+                  }
+                }}
+                style={{ flex: isCustomDpi ? '0 0 140px' : '1' }}
+              >
+                <option value={300}>300 DPI (Production Print)</option>
+                <option value={240}>240 DPI (Standard Print)</option>
+                <option value={600}>600 DPI (Ultra Fine Print)</option>
+                {currentProject.canvasDpi !== 300 && currentProject.canvasDpi !== 240 && currentProject.canvasDpi !== 600 && (
+                  <option value={currentProject.canvasDpi}>Project DPI ({currentProject.canvasDpi} DPI)</option>
+                )}
+                <option value="custom">Custom DPI...</option>
+              </select>
+              {isCustomDpi && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                  <input
+                    type="number"
+                    className={styles.select}
+                    style={{ flex: 1, padding: '0 8px' }}
+                    min={72}
+                    max={1200}
+                    step={10}
+                    value={dpi}
+                    onChange={(e) => setDpi(Math.max(72, Math.min(1200, Number(e.target.value) || 300)))}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>DPI</span>
+                </div>
               )}
-            </select>
+            </div>
           </div>
 
           {format !== 'png' ? (

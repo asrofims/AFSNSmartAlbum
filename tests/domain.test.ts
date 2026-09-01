@@ -3,6 +3,7 @@ import {
   convertUnit,
   toPixels,
   fromPixels,
+  calculateExportPixels,
   formatDimensions,
 } from '../src/domain/units';
 import {
@@ -28,6 +29,14 @@ assert.strictEqual(convertUnit(10, 'cm', 'mm'), 100);
 assert.strictEqual(toPixels(1, 'inch', 300), 300);
 assert.strictEqual(fromPixels(300, 'inch', 300), 1);
 assert.strictEqual(formatDimensions(210, 297, 'mm'), '210 × 297 mm');
+
+// Test calculateExportPixels: physical units vs pixel units with custom DPI
+assert.strictEqual(calculateExportPixels(1, 'inch', 300, 300), 300);
+assert.strictEqual(calculateExportPixels(1, 'inch', 600, 300), 600);
+assert.strictEqual(calculateExportPixels(20, 'cm', 300, 300), 2362);
+assert.strictEqual(calculateExportPixels(1920, 'px', 300, 300), 1920);
+assert.strictEqual(calculateExportPixels(1920, 'px', 600, 300), 3840);
+assert.strictEqual(calculateExportPixels(1000, 'px', 300, 72), 4167);
 console.log('✓ Unit conversions passed.');
 
 // Test 2: Presets & Custom Presets Lifecycle

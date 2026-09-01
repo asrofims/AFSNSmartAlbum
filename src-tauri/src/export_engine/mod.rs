@@ -51,15 +51,142 @@ pub struct ExportProgressEvent {
     pub output_files: Vec<String>,
 }
 
-/// Convert physical dimension (in mm, cm, inch, or px) to pixels at given DPI
-pub fn unit_to_pixels(val: f64, unit: &str, dpi: u32) -> f64 {
-    let dpi_f = dpi as f64;
+/// Calculate the scale factor to convert project units to export pixels.
+/// - If project unit is 'px', scales by (export_dpi / project_base_dpi).
+/// - If project unit is physical ('mm', 'cm', 'inch'), converts physical unit to pixels at export_dpi.
+pub fn calculate_export_scale(unit: &str, project_base_dpi: i32, export_dpi: u32) -> f64 {
+    let export_dpi_f = export_dpi as f64;
     match unit.to_lowercase().as_str() {
-        "mm" => val * (dpi_f / 25.4),
-        "cm" => val * (dpi_f / 2.54),
-        "inch" | "in" => val * dpi_f,
-        "px" => val,
-        _ => val * (dpi_f / 25.4), // default mm
+        "mm" => export_dpi_f / 25.4,
+        "cm" => export_dpi_f / 2.54,
+        "inch" | "in" => export_dpi_f,
+        "px" => {
+            let base = if project_base_dpi > 0 { project_base_dpi as f64 } else { 300.0 };
+            export_dpi_f / base
+        }
+        _ => export_dpi_f / 25.4, // default mm
+    }
+}
+
+/// Convert physical dimension (in mm, cm, inch, or px) to pixels at given DPI (assumes 300 base DPI for px)
+#[allow(dead_code)]
+pub fn unit_to_pixels(val: f64, unit: &str, dpi: u32) -> f64 {
+    let scale = calculate_export_scale(unit, 300, dpi);
+    val * scale
+}
+
+/// Convert dimension value to pixels using explicit project base DPI and export DPI
+#[allow(dead_code)]
+pub fn unit_to_pixels_with_base_dpi(val: f64, unit: &str, project_base_dpi: i32, export_dpi: u32) -> f64 {
+    let scale = calculate_export_scale(unit, project_base_dpi, export_dpi);
+    val * scale
+}
+
+/// Standard IEEE 802.3 CRC32 calculation for PNG chunks
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &byte in data {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            if (crc & 1) != 0 {
+                crc = (crc >> 1) ^ 0xEDB8_8320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    !crc
+}
+
+/// Creates a standard JFIF APP0 header segment with the specified DPI
+pub fn create_jfif_app0_header(dpi: u16) -> [u8; 18] {
+    let dpi_bytes = dpi.to_be_bytes();
+    [
+        0xFF, 0xE0, // APP0 marker
+        0x00, 0x10, // Length of segment (16 bytes)
+        0x4A, 0x46, 0x49, 0x46, 0x00, // "JFIF\0"
+        0x01, 0x02, // Version 1.02
+        0x01,       // Units: 1 = dots per inch (DPI)
+        dpi_bytes[0], dpi_bytes[1], // Xdensity
+        dpi_bytes[0], dpi_bytes[1], // Ydensity
+        0x00,       // Xthumbnail (0)
+        0x00,       // Ythumbnail (0)
+    ]
+}
+
+/// Encodes an RGB image into JPEG bytes with embedded JFIF DPI density metadata
+pub fn encode_jpeg_with_dpi(rgb_img: &image::RgbImage, quality: u8, dpi: u32) -> Result<Vec<u8>, String> {
+    let mut raw_bytes = Vec::new();
+    {
+        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut raw_bytes, quality);
+        encoder.encode_image(rgb_img).map_err(|e| e.to_string())?;
+    }
+
+    let jfif_header = create_jfif_app0_header(dpi.clamp(1, 65535) as u16);
+
+    if raw_bytes.len() >= 4 && raw_bytes[0] == 0xFF && raw_bytes[1] == 0xD8 {
+        if raw_bytes[2] == 0xFF && raw_bytes[3] == 0xE0 && raw_bytes.len() >= 20 {
+            // Replace existing APP0 with our explicit JFIF DPI header
+            let mut final_bytes = Vec::with_capacity(raw_bytes.len() + 18);
+            final_bytes.extend_from_slice(&raw_bytes[0..2]); // SOI
+            final_bytes.extend_from_slice(&jfif_header);     // APP0 JFIF
+            let original_app0_len = ((raw_bytes[4] as usize) << 8) | (raw_bytes[5] as usize);
+            let skip_offset = 4 + original_app0_len;
+            if skip_offset <= raw_bytes.len() {
+                final_bytes.extend_from_slice(&raw_bytes[skip_offset..]);
+            } else {
+                final_bytes.extend_from_slice(&raw_bytes[20..]);
+            }
+            Ok(final_bytes)
+        } else {
+            // Insert APP0 JFIF right after SOI
+            let mut final_bytes = Vec::with_capacity(raw_bytes.len() + 18);
+            final_bytes.extend_from_slice(&raw_bytes[0..2]); // SOI
+            final_bytes.extend_from_slice(&jfif_header);     // APP0 JFIF
+            final_bytes.extend_from_slice(&raw_bytes[2..]);  // Rest of JPEG stream
+            Ok(final_bytes)
+        }
+    } else {
+        Ok(raw_bytes)
+    }
+}
+
+/// Creates a standard PNG pHYs (physical pixel dimensions) chunk with the specified DPI
+pub fn create_png_phys_chunk(dpi: u32) -> Vec<u8> {
+    // 1 meter = 39.37007874 inches
+    let ppm = (dpi as f64 * 39.37007874).round() as u32;
+    let mut chunk_data = Vec::with_capacity(13);
+    chunk_data.extend_from_slice(b"pHYs");
+    chunk_data.extend_from_slice(&ppm.to_be_bytes()); // X pixels per meter
+    chunk_data.extend_from_slice(&ppm.to_be_bytes()); // Y pixels per meter
+    chunk_data.push(1); // 1 = meter
+
+    let crc = crc32(&chunk_data);
+
+    let mut result = Vec::with_capacity(21);
+    result.extend_from_slice(&9u32.to_be_bytes()); // Length of chunk data (9 bytes)
+    result.extend_from_slice(&chunk_data);         // Type + Data (13 bytes)
+    result.extend_from_slice(&crc.to_be_bytes());  // CRC (4 bytes)
+    result
+}
+
+/// Encodes an RGBA image into PNG bytes with embedded pHYs DPI density metadata
+pub fn encode_png_with_dpi(rgba_img: &RgbaImage, dpi: u32) -> Result<Vec<u8>, String> {
+    let mut raw_bytes = Vec::new();
+    rgba_img.write_to(&mut std::io::Cursor::new(&mut raw_bytes), image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+
+    let phys_chunk = create_png_phys_chunk(dpi);
+
+    // PNG signature (8 bytes) + IHDR (25 bytes) = 33 bytes
+    if raw_bytes.len() >= 33 && &raw_bytes[0..8] == b"\x89PNG\r\n\x1a\n" {
+        let mut final_bytes = Vec::with_capacity(raw_bytes.len() + phys_chunk.len());
+        final_bytes.extend_from_slice(&raw_bytes[0..33]);
+        final_bytes.extend_from_slice(&phys_chunk);
+        final_bytes.extend_from_slice(&raw_bytes[33..]);
+        Ok(final_bytes)
+    } else {
+        Ok(raw_bytes)
     }
 }
 
@@ -268,7 +395,7 @@ pub fn render_spread_to_image_with_progress<F>(
 where
     F: FnMut(usize, usize) -> bool,
 {
-    let scale = unit_to_pixels(1.0, &project.canvas_unit, dpi);
+    let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
     let single_page_w = project.canvas_width;
     let single_page_h = project.canvas_height;
     let gutter_w = spread.gutter_width;
@@ -327,7 +454,7 @@ pub fn split_spread_into_pages(
     dpi: u32,
     include_bleed: bool,
 ) -> (RgbaImage, RgbaImage) {
-    let scale = unit_to_pixels(1.0, &project.canvas_unit, dpi);
+    let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
     let single_page_w = project.canvas_width;
     let gutter_w = spread.gutter_width;
     let bleed = spread.bleed;
@@ -539,6 +666,63 @@ mod tests {
         // 2.54 cm at 300 DPI = 300 px
         let px_cm = unit_to_pixels(2.54, "cm", 300);
         assert!((px_cm - 300.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_calculate_export_scale_physical_and_pixels() {
+        // Physical units scale directly with export DPI
+        let scale_mm_300 = calculate_export_scale("mm", 300, 300);
+        assert!((scale_mm_300 - (300.0 / 25.4)).abs() < 0.001);
+
+        let scale_cm_600 = calculate_export_scale("cm", 300, 600);
+        assert!((scale_cm_600 - (600.0 / 2.54)).abs() < 0.001);
+
+        let scale_in_300 = calculate_export_scale("inch", 300, 300);
+        assert_eq!(scale_in_300, 300.0);
+
+        // Pixel units scale dynamically by (export_dpi / base_dpi)
+        let scale_px_72_to_300 = calculate_export_scale("px", 72, 300);
+        assert!((scale_px_72_to_300 - (300.0 / 72.0)).abs() < 0.001);
+
+        let scale_px_300_to_600 = calculate_export_scale("px", 300, 600);
+        assert_eq!(scale_px_300_to_600, 2.0);
+
+        let scale_px_same = calculate_export_scale("px", 300, 300);
+        assert_eq!(scale_px_same, 1.0);
+    }
+
+    #[test]
+    fn test_encode_with_dpi_metadata() {
+        // Test JPEG DPI Header injection
+        let rgb_img = image::RgbImage::new(10, 10);
+        let jpg_300 = encode_jpeg_with_dpi(&rgb_img, 95, 300).unwrap();
+        assert!(jpg_300.len() > 20);
+        assert_eq!(&jpg_300[0..2], &[0xFF, 0xD8]); // SOI
+        assert_eq!(&jpg_300[2..4], &[0xFF, 0xE0]); // APP0
+        assert_eq!(&jpg_300[6..11], b"JFIF\0");
+        assert_eq!(jpg_300[13], 1); // Units = DPI
+        let x_density = u16::from_be_bytes([jpg_300[14], jpg_300[15]]);
+        let y_density = u16::from_be_bytes([jpg_300[16], jpg_300[17]]);
+        assert_eq!(x_density, 300);
+        assert_eq!(y_density, 300);
+
+        // Test PNG pHYs chunk injection
+        let rgba_img = RgbaImage::new(10, 10);
+        let png_600 = encode_png_with_dpi(&rgba_img, 600).unwrap();
+        assert!(png_600.len() > 33);
+        assert_eq!(&png_600[0..8], b"\x89PNG\r\n\x1a\n");
+        // Verify pHYs chunk appears in PNG stream
+        let ppm_expected = (600.0f64 * 39.37007874f64).round() as u32;
+        let mut found_phys = false;
+        for i in 0..(png_600.len() - 12) {
+            if &png_600[i..i + 4] == b"pHYs" {
+                found_phys = true;
+                let ppm_x = u32::from_be_bytes([png_600[i + 4], png_600[i + 5], png_600[i + 6], png_600[i + 7]]);
+                assert_eq!(ppm_x, ppm_expected);
+                break;
+            }
+        }
+        assert!(found_phys, "PNG output must contain pHYs DPI chunk");
     }
 
     #[test]

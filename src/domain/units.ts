@@ -86,9 +86,29 @@ export function fromPixels(px: number, unit: Unit, dpi: number = 300, decimals: 
 }
 
 /**
+ * Calculate target export pixel dimension from a dimension value, project unit, target export DPI,
+ * and base project DPI.
+ * If unit is 'px', scales by (exportDpi / baseDpi).
+ * If unit is physical ('mm', 'cm', 'inch'), converts physical unit to pixels at exportDpi.
+ */
+export function calculateExportPixels(
+  value: number,
+  unit: Unit,
+  exportDpi: number,
+  projectBaseDpi: number = 300
+): number {
+  if (unit === 'px') {
+    const base = projectBaseDpi > 0 ? projectBaseDpi : 300;
+    return Math.round(value * (exportDpi / base));
+  }
+  return Math.round(toPixels(value, unit, exportDpi));
+}
+
+/**
  * Format dimensions as a clean display string (e.g., "210 × 297 mm" or "8 × 8 in").
  */
 export function formatDimensions(width: number, height: number, unit: Unit): string {
   const label = UNIT_LABELS[unit] ?? unit;
   return `${width} × ${height} ${label}`;
 }
+

@@ -894,10 +894,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const totalSpreadPhysicalH = singlePageH;
 
   // Dynamic responsive canvas scaling (Fills workspace comfortably with breathing margin)
-  const marginH = 80; // 32px padding + 8px breathing margin on each side
-  const marginV = 80;
-  const maxAvailableW = Math.max(200, containerSize.width - marginH);
-  const maxAvailableH = Math.max(150, containerSize.height - marginV);
+  const marginH = 110;
+  const marginV = 100;
+  const maxAvailableW = Math.max(200, (containerSize.width - marginH) * 0.92);
+  const maxAvailableH = Math.max(150, (containerSize.height - marginV) * 0.92);
   const aspect = totalSpreadPhysicalW / Math.max(0.001, totalSpreadPhysicalH);
 
   let baseW = maxAvailableW;
