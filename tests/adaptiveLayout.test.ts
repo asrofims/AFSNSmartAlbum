@@ -3,6 +3,10 @@ import {
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
   partitionPageBoxIntoKRects,
+  getPhotoOrientation,
+  getPhotosFingerprint,
+  calculateCropPenalty,
+  findOptimalPhotoSlotMapping,
   AdaptivePhoto,
 } from '../src/domain/adaptiveLayout';
 import { TemplateParams, getUsableAreas } from '../src/domain/templates';
@@ -105,6 +109,53 @@ function runTests() {
     throw new Error('Shuffle changed elements count');
   }
   console.log('✓ Shuffle photo randomized rotation passed.');
+
+  // Test 6: Orientation & Aspect-Ratio Fingerprinting
+  console.assert(getPhotoOrientation(1.5) === 'landscape', '1.5 should be landscape');
+  console.assert(getPhotoOrientation(0.67) === 'portrait', '0.67 should be portrait');
+  console.assert(getPhotoOrientation(1.0) === 'square', '1.0 should be square');
+
+  const mixedPhotos: AdaptivePhoto[] = [
+    { photoAspect: 1.5 }, // L
+    { photoAspect: 0.67 }, // P
+    { photoAspect: 0.67 }, // P
+  ];
+  const fp = getPhotosFingerprint(mixedPhotos);
+  console.assert(fp === '1L+2P', `Fingerprint should be 1L+2P, got ${fp}`);
+  console.log('✓ Photo orientation classification & fingerprinting passed.');
+
+  // Test 7: Crop Loss Penalty Metric
+  const zeroPenalty = calculateCropPenalty(1.5, 1.5);
+  console.assert(Math.abs(zeroPenalty) < 0.001, `Exact aspect match must have 0 crop penalty, got ${zeroPenalty}`);
+
+  const mismatchPenalty = calculateCropPenalty(1.5, 0.67);
+  console.assert(mismatchPenalty > 0.5, `Mismatch penalty must be > 0.5, got ${mismatchPenalty}`);
+  console.log('✓ Crop loss penalty calculation passed.');
+
+  // Test 8: Optimal Photo-to-Slot Bipartite Assignment
+  const testSlots = [
+    { x: 0, y: 0, width: 80, height: 120 }, // slot 0: Portrait (0.67)
+    { x: 90, y: 0, width: 180, height: 120 }, // slot 1: Landscape (1.5)
+  ];
+  const testTwoPhotos: AdaptivePhoto[] = [
+    { photoAspect: 1.5 }, // photo 0: Landscape
+    { photoAspect: 0.67 }, // photo 1: Portrait
+  ];
+  const mappingRes = findOptimalPhotoSlotMapping(testTwoPhotos, testSlots);
+  // Photo 0 (Landscape) should be assigned to Slot 1 (Landscape)
+  // Photo 1 (Portrait) should be assigned to Slot 0 (Portrait)
+  console.assert(mappingRes.mapping[0] === 1, `Photo 0 (Landscape) must map to Slot 1, got ${mappingRes.mapping[0]}`);
+  console.assert(mappingRes.mapping[1] === 0, `Photo 1 (Portrait) must map to Slot 0, got ${mappingRes.mapping[1]}`);
+  console.assert(mappingRes.score === 100, `Perfect fit score must be 100%, got ${mappingRes.score}`);
+  console.log('✓ Optimal photo-to-slot bipartite matching passed.');
+
+  // Test 9: Layout Variations Ranked by Score (Top variation has highest score)
+  const scoredVariations = generateAdaptiveLayoutVariations(baseParams, mixedPhotos);
+  console.assert(scoredVariations.length > 0, 'Must produce variations');
+  console.assert(scoredVariations[0].score !== undefined, 'Top variation must have score');
+  console.assert(scoredVariations[0].score! >= scoredVariations[scoredVariations.length - 1].score!, 'Top variation score must be >= bottom variation score');
+  console.assert(scoredVariations[0].fingerprint === '1L+2P', 'Top variation must record fingerprint 1L+2P');
+  console.log('✓ Layout variations sorted and ranked by aspect-ratio match score.');
 
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
 }

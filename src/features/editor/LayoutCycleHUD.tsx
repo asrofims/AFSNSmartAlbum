@@ -139,9 +139,29 @@ export function LayoutCycleHUD() {
       <div className={styles.separator} />
 
       {currentVariation && (
-        <span className={styles.layoutName} title={currentVariation.description}>
-          {currentVariation.name}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {currentVariation.score !== undefined && (
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: currentVariation.score >= 85 ? '#34d399' : currentVariation.score >= 70 ? '#fbbf24' : '#94a3b8',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+              title={`Layout Aspect-Ratio Match: ${currentVariation.score}%\nEstimated Crop Penalty: ${Math.round((currentVariation.cropPenalty || 0) * 100)}%\nFingerprint: ${currentVariation.fingerprint || 'Auto'}`}
+            >
+              ⭐ {currentVariation.score}%
+            </span>
+          )}
+          <span className={styles.layoutName} title={currentVariation.description}>
+            {currentVariation.name}
+          </span>
+        </div>
       )}
 
       <div className={styles.separator} />

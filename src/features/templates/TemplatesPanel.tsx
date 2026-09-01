@@ -163,6 +163,18 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
                 <span className={styles.templateDesc}>{variation.description}</span>
                 <div className={styles.tagRow}>
                   <span className={styles.tagPill}>{index + 1} of {adaptiveVariations.length}</span>
+                  {variation.score !== undefined && (
+                    <span
+                      className={styles.tagPill}
+                      style={{
+                        background: variation.score >= 85 ? 'rgba(52,211,153,0.2)' : variation.score >= 70 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)',
+                        color: variation.score >= 85 ? '#34d399' : variation.score >= 70 ? '#fbbf24' : '#94a3b8',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⭐ {variation.score}%
+                    </span>
+                  )}
                   {isCurrent && (
                     <span
                       className={styles.tagPill}

@@ -1,6 +1,8 @@
 import { RectBounds, TemplateParams, getUsableAreas, fitInsideBoxCentered, round4 } from './templates';
 import { PhotoFrameElement } from './editor';
 
+export type PhotoOrientation = 'landscape' | 'portrait' | 'square';
+
 export interface AdaptivePhoto {
   id?: string;
   photoId?: string | null;
@@ -9,6 +11,8 @@ export interface AdaptivePhoto {
   previewPath?: string;
   thumbnailPath?: string;
   photoAspect?: number;
+  rating?: number; // 0 to 5 stars for hero scoring
+  isFavorite?: boolean;
 }
 
 export interface AdaptiveLayoutVariation {
@@ -17,6 +21,178 @@ export interface AdaptiveLayoutVariation {
   description: string;
   rects: RectBounds[];
   tags: string[];
+  score?: number; // 0 - 100% composite visual match score
+  cropPenalty?: number; // 0.0 (no crop) to 1.0 (heavy crop)
+  fingerprint?: string; // e.g. "1L+2P"
+  photoAssignments?: number[]; // Mapping of photo[i] -> rect[j]
+}
+
+/**
+ * Classifies a photo aspect ratio into landscape, portrait, or square.
+ */
+export function getPhotoOrientation(aspect: number): PhotoOrientation {
+  if (aspect > 1.15) return 'landscape';
+  if (aspect < 0.85) return 'portrait';
+  return 'square';
+}
+
+/**
+ * Computes an orientation signature fingerprint for an array of photos (e.g. "1L+2P", "2L", "3P").
+ */
+export function getPhotosFingerprint(photos: AdaptivePhoto[]): string {
+  let l = 0;
+  let p = 0;
+  let s = 0;
+  for (const ph of photos) {
+    const ori = getPhotoOrientation(ph.photoAspect || 1.5);
+    if (ori === 'landscape') l++;
+    else if (ori === 'portrait') p++;
+    else s++;
+  }
+  const parts: string[] = [];
+  if (l > 0) parts.push(`${l}L`);
+  if (p > 0) parts.push(`${p}P`);
+  if (s > 0) parts.push(`${s}S`);
+  return parts.length > 0 ? parts.join('+') : '0P';
+}
+
+/**
+ * Calculates crop loss penalty between a photo aspect ratio and a slot aspect ratio.
+ * Returns a value between 0.0 (exact aspect match, zero crop) and 1.0 (severe crop).
+ */
+export function calculateCropPenalty(photoAspect: number, slotAspect: number): number {
+  if (!photoAspect || !slotAspect || photoAspect <= 0 || slotAspect <= 0) return 0.5;
+  const ratio = Math.min(photoAspect / slotAspect, slotAspect / photoAspect);
+  return Math.max(0, Math.min(1, 1 - ratio));
+}
+
+/**
+ * Finds the optimal bipartite 1-to-1 assignment of photos to frame slots that minimizes
+ * total crop penalty across all photos, prioritizing hero photos for the largest slots.
+ */
+export function findOptimalPhotoSlotMapping(
+  photos: AdaptivePhoto[],
+  slots: RectBounds[]
+): { mapping: number[]; score: number; avgCropPenalty: number } {
+  const n = Math.min(photos.length, slots.length);
+  if (n === 0) return { mapping: [], score: 100, avgCropPenalty: 0 };
+  if (n === 1) {
+    const firstPhoto = photos[0];
+    const firstSlot = slots[0];
+    const pAspect = firstPhoto?.photoAspect || 1.5;
+    const sAspect = firstSlot ? firstSlot.width / firstSlot.height : 1.5;
+    const penalty = calculateCropPenalty(pAspect, sAspect);
+    const score = Math.round((1 - penalty) * 100);
+    return { mapping: [0], score, avgCropPenalty: penalty };
+  }
+
+  // Cost matrix: cost[p][s] = crop penalty + hero weighting
+  // Find slot areas to identify the hero (largest) slot
+  const slotAreas = slots.map((s) => s.width * s.height);
+  const maxSlotArea = slotAreas.length > 0 ? Math.max(...slotAreas) : 0;
+
+  const costMatrix: number[][] = [];
+  for (let p = 0; p < n; p++) {
+    const row: number[] = [];
+    const photo = photos[p];
+    const pAspect = photo?.photoAspect || 1.5;
+    const isHeroPhoto = Boolean(
+      (photo?.rating && photo.rating >= 4) ||
+      photo?.isFavorite ||
+      p === 0
+    );
+
+    for (let s = 0; s < n; s++) {
+      const slot = slots[s];
+      const sAspect = slot ? slot.width / slot.height : 1.5;
+      let penalty = calculateCropPenalty(pAspect, sAspect);
+
+      // If photo is a preferred hero and slot is the largest slot, award a bonus (lower cost)
+      const slotArea = slotAreas[s] ?? 0;
+      if (isHeroPhoto && maxSlotArea > 0 && slotArea >= maxSlotArea * 0.9) {
+        penalty = Math.max(0, penalty * 0.7);
+      }
+      row.push(penalty);
+    }
+    costMatrix.push(row);
+  }
+
+  if (n <= 7) {
+    // Permutation search with branch-and-bound pruning for optimal assignment
+    let bestCost = Infinity;
+    let bestMapping: number[] = Array.from({ length: n }, (_, i) => i);
+
+    const used = new Array<boolean>(n).fill(false);
+    const currentMapping: number[] = new Array<number>(n);
+
+    function permute(pIndex: number, currentCost: number) {
+      if (currentCost >= bestCost) return; // Prune worse branches
+      if (pIndex === n) {
+        bestCost = currentCost;
+        bestMapping = [...currentMapping];
+        return;
+      }
+
+      for (let s = 0; s < n; s++) {
+        if (!used[s]) {
+          used[s] = true;
+          currentMapping[pIndex] = s;
+          const cost = costMatrix[pIndex]?.[s] ?? 0;
+          permute(pIndex + 1, currentCost + cost);
+          used[s] = false;
+        }
+      }
+    }
+
+    permute(0, 0);
+
+    const avgPenalty = n > 0 ? bestCost / n : 0;
+    const score = Math.round(Math.max(0, Math.min(100, (1 - avgPenalty) * 100)));
+
+    return { mapping: bestMapping, score, avgCropPenalty: avgPenalty };
+  }
+
+  // Fast greedy matching for high photo counts (n >= 8)
+  const slotAssigned = new Array<boolean>(n).fill(false);
+  const greedyMapping = new Array<number>(n).fill(0);
+  let totalCost = 0;
+
+  const candidates: Array<{ p: number; s: number; cost: number }> = [];
+  for (let p = 0; p < n; p++) {
+    for (let s = 0; s < n; s++) {
+      const cost = costMatrix[p]?.[s] ?? 0;
+      candidates.push({ p, s, cost });
+    }
+  }
+  candidates.sort((a, b) => a.cost - b.cost);
+
+  const photoAssigned = new Array<boolean>(n).fill(false);
+  for (const c of candidates) {
+    if (!photoAssigned[c.p] && !slotAssigned[c.s]) {
+      photoAssigned[c.p] = true;
+      slotAssigned[c.s] = true;
+      greedyMapping[c.p] = c.s;
+      totalCost += c.cost;
+    }
+  }
+
+  // Fallback for any unassigned
+  for (let p = 0; p < n; p++) {
+    if (!photoAssigned[p]) {
+      for (let s = 0; s < n; s++) {
+        if (!slotAssigned[s]) {
+          slotAssigned[s] = true;
+          greedyMapping[p] = s;
+          totalCost += costMatrix[p]?.[s] ?? 0;
+          break;
+        }
+      }
+    }
+  }
+
+  const avgPenalty = n > 0 ? totalCost / n : 0;
+  const score = Math.round(Math.max(0, Math.min(100, (1 - avgPenalty) * 100)));
+  return { mapping: greedyMapping, score, avgCropPenalty: avgPenalty };
 }
 
 /**
@@ -38,7 +214,7 @@ export function partitionPageBoxIntoKRects(
   }
 
   if (count === 2) {
-    const v = variantIndex % 4;
+    const v = variantIndex % 6;
     if (v === 0) {
       // Horizontal 2-Stack (Top & Bottom)
       const h = round4((box.height - spacing) / 2);
@@ -56,7 +232,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 2) {
-      // Asymmetric: Top Hero (60%) + Bottom companion
+      // Asymmetric: Top Hero (62%) + Bottom companion
       const topH = round4((box.height - spacing) * 0.62);
       const botH = round4(box.height - spacing - topH);
       return [
@@ -64,9 +240,27 @@ export function partitionPageBoxIntoKRects(
         { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
       ];
     }
-    // Asymmetric: Left Hero (60%) + Right companion
-    const leftW = round4((box.width - spacing) * 0.62);
-    const rightW = round4(box.width - spacing - leftW);
+    if (v === 3) {
+      // Asymmetric Mirrored: Bottom Hero (62%) + Top companion
+      const botH = round4((box.height - spacing) * 0.62);
+      const topH = round4(box.height - spacing - botH);
+      return [
+        { x: box.x, y: box.y, width: box.width, height: topH },
+        { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
+      ];
+    }
+    if (v === 4) {
+      // Asymmetric: Left Hero (62%) + Right companion
+      const leftW = round4((box.width - spacing) * 0.62);
+      const rightW = round4(box.width - spacing - leftW);
+      return [
+        { x: box.x, y: box.y, width: leftW, height: box.height },
+        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
+      ];
+    }
+    // Asymmetric Mirrored: Right Hero (62%) + Left companion
+    const rightW = round4((box.width - spacing) * 0.62);
+    const leftW = round4(box.width - spacing - rightW);
     return [
       { x: box.x, y: box.y, width: leftW, height: box.height },
       { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
@@ -74,9 +268,9 @@ export function partitionPageBoxIntoKRects(
   }
 
   if (count === 3) {
-    const v = variantIndex % 6;
+    const v = variantIndex % 8;
     if (v === 0) {
-      // 1 Top Wide + 2 Bottom Columns
+      // 1 Top Landscape Hero + 2 Bottom Portrait Columns (great for 1L+2P)
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
       const colW = round4((box.width - spacing) / 2);
@@ -87,7 +281,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 1) {
-      // 2 Top Columns + 1 Bottom Wide
+      // 2 Top Portrait Columns + 1 Bottom Landscape Hero (great for 1L+2P)
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
       const colW = round4((box.width - spacing) / 2);
@@ -98,7 +292,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 2) {
-      // 1 Left Tall + 2 Right Stacks
+      // 1 Left Portrait Hero + 2 Right Landscape Stacks (great for 1P+2L)
       const leftW = round4((box.width - spacing) / 2);
       const rightW = round4(box.width - spacing - leftW);
       const stackH = round4((box.height - spacing) / 2);
@@ -109,7 +303,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 3) {
-      // 2 Left Stacks + 1 Right Tall
+      // 2 Left Landscape Stacks + 1 Right Portrait Hero (great for 1P+2L)
       const leftW = round4((box.width - spacing) / 2);
       const rightW = round4(box.width - spacing - leftW);
       const stackH = round4((box.height - spacing) / 2);
@@ -120,7 +314,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 4) {
-      // 3 Vertical Columns (Triptych)
+      // 3 Vertical Columns (Triptych - great for 3P)
       const colW = round4((box.width - spacing * 2) / 3);
       return [
         { x: box.x, y: box.y, width: colW, height: box.height },
@@ -128,17 +322,39 @@ export function partitionPageBoxIntoKRects(
         { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: box.height },
       ];
     }
-    // 3 Horizontal Rows
-    const rowH = round4((box.height - spacing * 2) / 3);
+    if (v === 5) {
+      // 3 Horizontal Rows (great for 3L)
+      const rowH = round4((box.height - spacing * 2) / 3);
+      return [
+        { x: box.x, y: box.y, width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + rowH + spacing), width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH },
+      ];
+    }
+    if (v === 6) {
+      // 1 Big Left Hero (60%) + 2 Right Stacks
+      const leftW = round4((box.width - spacing) * 0.60);
+      const rightW = round4(box.width - spacing - leftW);
+      const stackH = round4((box.height - spacing) / 2);
+      return [
+        { x: box.x, y: box.y, width: leftW, height: box.height },
+        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH },
+        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH + spacing), width: rightW, height: stackH },
+      ];
+    }
+    // 1 Big Top Hero (60%) + 2 Bottom Columns
+    const topH = round4((box.height - spacing) * 0.60);
+    const botH = round4(box.height - spacing - topH);
+    const colW = round4((box.width - spacing) / 2);
     return [
-      { x: box.x, y: box.y, width: box.width, height: rowH },
-      { x: box.x, y: round4(box.y + rowH + spacing), width: box.width, height: rowH },
-      { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH },
+      { x: box.x, y: box.y, width: box.width, height: topH },
+      { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
+      { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
     ];
   }
 
   if (count === 4) {
-    const v = variantIndex % 6;
+    const v = variantIndex % 8;
     if (v === 0) {
       // 2x2 Balanced Quadrant Grid
       const w = round4((box.width - spacing) / 2);
@@ -153,7 +369,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 1) {
-      // 1 Top Banner + 3 Bottom Columns
+      // 1 Top Banner + 3 Bottom Columns (great for 1L+3P)
       const topH = round4((box.height - spacing) * 0.48);
       const botH = round4(box.height - spacing - topH);
       const colW = round4((box.width - spacing * 2) / 3);
@@ -165,7 +381,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 2) {
-      // 3 Top Columns + 1 Bottom Banner
+      // 3 Top Columns + 1 Bottom Banner (great for 1L+3P)
       const topH = round4((box.height - spacing) * 0.52);
       const botH = round4(box.height - spacing - topH);
       const colW = round4((box.width - spacing * 2) / 3);
@@ -177,7 +393,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 3) {
-      // 1 Left Tower + 3 Right Stacks
+      // 1 Left Tower + 3 Right Stacks (great for 1P+3L)
       const leftW = round4((box.width - spacing) * 0.48);
       const rightW = round4(box.width - spacing - leftW);
       const stackH = round4((box.height - spacing * 2) / 3);
@@ -189,7 +405,7 @@ export function partitionPageBoxIntoKRects(
       ];
     }
     if (v === 4) {
-      // 3 Left Stacks + 1 Right Tower
+      // 3 Left Stacks + 1 Right Tower (great for 1P+3L)
       const leftW = round4((box.width - spacing) * 0.52);
       const rightW = round4(box.width - spacing - leftW);
       const stackH = round4((box.height - spacing * 2) / 3);
@@ -200,50 +416,42 @@ export function partitionPageBoxIntoKRects(
         { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
       ];
     }
-    // 4 Vertical Columns
-    const colW = round4((box.width - spacing * 3) / 4);
+    if (v === 5) {
+      // 4 Vertical Columns (great for 4P)
+      const colW = round4((box.width - spacing * 3) / 4);
+      return [
+        { x: box.x, y: box.y, width: colW, height: box.height },
+        { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: box.height },
+        { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: box.height },
+        { x: round4(box.x + (colW + spacing) * 3), y: box.y, width: colW, height: box.height },
+      ];
+    }
+    if (v === 6) {
+      // 4 Horizontal Rows (great for 4L)
+      const rowH = round4((box.height - spacing * 3) / 4);
+      return [
+        { x: box.x, y: box.y, width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + rowH + spacing), width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + (rowH + spacing) * 3), width: box.width, height: rowH },
+      ];
+    }
+    // 2-Row Asymmetric (1 Top Full + 3 Bottom)
+    const topH = round4((box.height - spacing) * 0.58);
+    const botH = round4(box.height - spacing - topH);
+    const colW = round4((box.width - spacing * 2) / 3);
     return [
-      { x: box.x, y: box.y, width: colW, height: box.height },
-      { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: box.height },
-      { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: box.height },
-      { x: round4(box.x + (colW + spacing) * 3), y: box.y, width: colW, height: box.height },
+      { x: box.x, y: box.y, width: box.width, height: topH },
+      { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
+      { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
+      { x: round4(box.x + (colW + spacing) * 2), y: round4(box.y + topH + spacing), width: colW, height: botH },
     ];
   }
 
   if (count === 5) {
-    const v = variantIndex % 5;
+    const v = variantIndex % 6;
     if (v === 0) {
-      // 1 Top Hero (48%) + 4-Grid (2x2 bottom)
-      const topH = round4((box.height - spacing) * 0.48);
-      const botH = round4(box.height - spacing - topH);
-      const gridW = round4((box.width - spacing) / 2);
-      const gridH = round4((botH - spacing) / 2);
-      const y2 = round4(box.y + topH + spacing);
-      return [
-        { x: box.x, y: box.y, width: box.width, height: topH },
-        { x: box.x, y: y2, width: gridW, height: gridH },
-        { x: round4(box.x + gridW + spacing), y: y2, width: gridW, height: gridH },
-        { x: box.x, y: round4(y2 + gridH + spacing), width: gridW, height: gridH },
-        { x: round4(box.x + gridW + spacing), y: round4(y2 + gridH + spacing), width: gridW, height: gridH },
-      ];
-    }
-    if (v === 1) {
-      // 1 Left Tower (48%) + 4-Grid (2x2 right)
-      const leftW = round4((box.width - spacing) * 0.48);
-      const rightW = round4(box.width - spacing - leftW);
-      const gridW = round4((rightW - spacing) / 2);
-      const gridH = round4((box.height - spacing) / 2);
-      const x2 = round4(box.x + leftW + spacing);
-      return [
-        { x: box.x, y: box.y, width: leftW, height: box.height },
-        { x: x2, y: box.y, width: gridW, height: gridH },
-        { x: round4(x2 + gridW + spacing), y: box.y, width: gridW, height: gridH },
-        { x: x2, y: round4(box.y + gridH + spacing), width: gridW, height: gridH },
-        { x: round4(x2 + gridW + spacing), y: round4(box.y + gridH + spacing), width: gridW, height: gridH },
-      ];
-    }
-    if (v === 2) {
-      // 2 Top Columns + 3 Bottom Columns
+      // 2 Top + 3 Bottom Mosaic
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
       const topW = round4((box.width - spacing) / 2);
@@ -257,8 +465,8 @@ export function partitionPageBoxIntoKRects(
         { x: round4(box.x + (botW + spacing) * 2), y: y2, width: botW, height: botH },
       ];
     }
-    if (v === 3) {
-      // 3 Top Columns + 2 Bottom Columns
+    if (v === 1) {
+      // 3 Top + 2 Bottom Mosaic
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
       const topW = round4((box.width - spacing * 2) / 3);
@@ -272,22 +480,70 @@ export function partitionPageBoxIntoKRects(
         { x: round4(box.x + botW + spacing), y: y2, width: botW, height: botH },
       ];
     }
-    // 4-Grid (2x2 top) + 1 Bottom Hero
-    const topH = round4((box.height - spacing) * 0.52);
-    const botH = round4(box.height - spacing - topH);
-    const gridW = round4((box.width - spacing) / 2);
-    const gridH = round4((topH - spacing) / 2);
+    if (v === 2) {
+      // 1 Left Hero (40%) + 4 Right Grid (2x2)
+      const leftW = round4((box.width - spacing) * 0.40);
+      const rightW = round4(box.width - spacing - leftW);
+      const halfH = round4((box.height - spacing) / 2);
+      const halfW = round4((rightW - spacing) / 2);
+      const xR = round4(box.x + leftW + spacing);
+      const y2 = round4(box.y + halfH + spacing);
+      return [
+        { x: box.x, y: box.y, width: leftW, height: box.height },
+        { x: xR, y: box.y, width: halfW, height: halfH },
+        { x: round4(xR + halfW + spacing), y: box.y, width: halfW, height: halfH },
+        { x: xR, y: y2, width: halfW, height: halfH },
+        { x: round4(xR + halfW + spacing), y: y2, width: halfW, height: halfH },
+      ];
+    }
+    if (v === 3) {
+      // 4 Left Grid (2x2) + 1 Right Hero (40%) (Mirrored)
+      const rightW = round4((box.width - spacing) * 0.40);
+      const leftW = round4(box.width - spacing - rightW);
+      const halfH = round4((box.height - spacing) / 2);
+      const halfW = round4((leftW - spacing) / 2);
+      const xR = round4(box.x + leftW + spacing);
+      const y2 = round4(box.y + halfH + spacing);
+      return [
+        { x: box.x, y: box.y, width: halfW, height: halfH },
+        { x: round4(box.x + halfW + spacing), y: box.y, width: halfW, height: halfH },
+        { x: box.x, y: y2, width: halfW, height: halfH },
+        { x: round4(box.x + halfW + spacing), y: y2, width: halfW, height: halfH },
+        { x: xR, y: box.y, width: rightW, height: box.height },
+      ];
+    }
+    if (v === 4) {
+      // 1 Top Hero (40%) + 4 Bottom Grid (2x2)
+      const topH = round4((box.height - spacing) * 0.40);
+      const botH = round4(box.height - spacing - topH);
+      const halfW = round4((box.width - spacing) / 2);
+      const halfH = round4((botH - spacing) / 2);
+      const yB = round4(box.y + topH + spacing);
+      return [
+        { x: box.x, y: box.y, width: box.width, height: topH },
+        { x: box.x, y: yB, width: halfW, height: halfH },
+        { x: round4(box.x + halfW + spacing), y: yB, width: halfW, height: halfH },
+        { x: box.x, y: round4(yB + halfH + spacing), width: halfW, height: halfH },
+        { x: round4(box.x + halfW + spacing), y: round4(yB + halfH + spacing), width: halfW, height: halfH },
+      ];
+    }
+    // 4 Top Grid (2x2) + 1 Bottom Hero (40%)
+    const botH = round4((box.height - spacing) * 0.40);
+    const topH = round4(box.height - spacing - botH);
+    const halfW = round4((box.width - spacing) / 2);
+    const halfH = round4((topH - spacing) / 2);
+    const yB = round4(box.y + topH + spacing);
     return [
-      { x: box.x, y: box.y, width: gridW, height: gridH },
-      { x: round4(box.x + gridW + spacing), y: box.y, width: gridW, height: gridH },
-      { x: box.x, y: round4(box.y + gridH + spacing), width: gridW, height: gridH },
-      { x: round4(box.x + gridW + spacing), y: round4(box.y + gridH + spacing), width: gridW, height: gridH },
-      { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
+      { x: box.x, y: box.y, width: halfW, height: halfH },
+      { x: round4(box.x + halfW + spacing), y: box.y, width: halfW, height: halfH },
+      { x: box.x, y: round4(box.y + halfH + spacing), width: halfW, height: halfH },
+      { x: round4(box.x + halfW + spacing), y: round4(box.y + halfH + spacing), width: halfW, height: halfH },
+      { x: box.x, y: yB, width: box.width, height: botH },
     ];
   }
 
   if (count === 6) {
-    const v = variantIndex % 4;
+    const v = variantIndex % 6;
     if (v === 0) {
       // 2x3 Grid (2 rows, 3 columns)
       const w = round4((box.width - spacing * 2) / 3);
@@ -333,22 +589,59 @@ export function partitionPageBoxIntoKRects(
         { x: round4(box.x + (botW + spacing) * 2), y: yBot, width: botW, height: botH },
       ];
     }
-    // 1 Left Tower (38%) + 5 Mosaic right (2 top, 3 bot)
-    const leftW = round4((box.width - spacing) * 0.38);
-    const rightW = round4(box.width - spacing - leftW);
-    const topH = round4((box.height - spacing) / 2);
-    const botH = round4(box.height - spacing - topH);
-    const topW = round4((rightW - spacing) / 2);
-    const botW = round4((rightW - spacing * 2) / 3);
-    const xR = round4(box.x + leftW + spacing);
-    const yB = round4(box.y + topH + spacing);
+    if (v === 3) {
+      // 1 Left Tower (38%) + 5 Mosaic right (2 top, 3 bot)
+      const leftW = round4((box.width - spacing) * 0.38);
+      const rightW = round4(box.width - spacing - leftW);
+      const topH = round4((box.height - spacing) / 2);
+      const botH = round4(box.height - spacing - topH);
+      const topW = round4((rightW - spacing) / 2);
+      const botW = round4((rightW - spacing * 2) / 3);
+      const xR = round4(box.x + leftW + spacing);
+      const yB = round4(box.y + topH + spacing);
+      return [
+        { x: box.x, y: box.y, width: leftW, height: box.height },
+        { x: xR, y: box.y, width: topW, height: topH },
+        { x: round4(xR + topW + spacing), y: box.y, width: topW, height: topH },
+        { x: xR, y: yB, width: botW, height: botH },
+        { x: round4(xR + botW + spacing), y: yB, width: botW, height: botH },
+        { x: round4(xR + (botW + spacing) * 2), y: yB, width: botW, height: botH },
+      ];
+    }
+    if (v === 4) {
+      // 5 Mosaic left (2 top, 3 bot) + 1 Right Tower (38%) (Mirrored)
+      const rightW = round4((box.width - spacing) * 0.38);
+      const leftW = round4(box.width - spacing - rightW);
+      const topH = round4((box.height - spacing) / 2);
+      const botH = round4(box.height - spacing - topH);
+      const topW = round4((leftW - spacing) / 2);
+      const botW = round4((leftW - spacing * 2) / 3);
+      const xR = round4(box.x + leftW + spacing);
+      const yB = round4(box.y + topH + spacing);
+      return [
+        { x: box.x, y: box.y, width: topW, height: topH },
+        { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
+        { x: box.x, y: yB, width: botW, height: botH },
+        { x: round4(box.x + botW + spacing), y: yB, width: botW, height: botH },
+        { x: round4(box.x + (botW + spacing) * 2), y: yB, width: botW, height: botH },
+        { x: xR, y: box.y, width: rightW, height: box.height },
+      ];
+    }
+    // 3 Top (35%) + 2 Mid (30%) + 1 Bot Wide (35%)
+    const topH = round4((box.height - spacing * 2) * 0.35);
+    const midH = round4((box.height - spacing * 2) * 0.30);
+    const botH = round4(box.height - spacing * 2 - topH - midH);
+    const topW = round4((box.width - spacing * 2) / 3);
+    const midW = round4((box.width - spacing) / 2);
+    const yMid = round4(box.y + topH + spacing);
+    const yBot = round4(yMid + midH + spacing);
     return [
-      { x: box.x, y: box.y, width: leftW, height: box.height },
-      { x: xR, y: box.y, width: topW, height: topH },
-      { x: round4(xR + topW + spacing), y: box.y, width: topW, height: topH },
-      { x: xR, y: yB, width: botW, height: botH },
-      { x: round4(xR + botW + spacing), y: yB, width: botW, height: botH },
-      { x: round4(xR + (botW + spacing) * 2), y: yB, width: botW, height: botH },
+      { x: box.x, y: box.y, width: topW, height: topH },
+      { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
+      { x: round4(box.x + (topW + spacing) * 2), y: box.y, width: topW, height: topH },
+      { x: box.x, y: yMid, width: midW, height: midH },
+      { x: round4(box.x + midW + spacing), y: yMid, width: midW, height: midH },
+      { x: box.x, y: yBot, width: box.width, height: botH },
     ];
   }
 
@@ -396,7 +689,8 @@ function recursiveBspPartition(
 }
 
 /**
- * Generates rich, dynamic, multi-photo adaptive layout variations for ANY photo count N.
+ * Generates rich, dynamic, multi-photo adaptive layout variations for ANY photo count N,
+ * automatically scoring and sorting them by visual aspect-ratio harmony and minimal crop penalty.
  */
 export function generateAdaptiveLayoutVariations(
   params: TemplateParams,
@@ -408,11 +702,29 @@ export function generateAdaptiveLayoutVariations(
   const { leftPageArea, rightPageArea, spreadArea } = getUsableAreas(params);
   const spacing = params.spacing;
   const isCover = !params.isSpread;
+  const fingerprint = getPhotosFingerprint(photos);
+
+  // Helper to score and enrich raw variations
+  const scoreAndSortVariations = (rawVariations: AdaptiveLayoutVariation[]): AdaptiveLayoutVariation[] => {
+    const enriched = rawVariations.map((v) => {
+      const matchRes = findOptimalPhotoSlotMapping(photos, v.rects);
+      return {
+        ...v,
+        score: matchRes.score,
+        cropPenalty: matchRes.avgCropPenalty,
+        fingerprint,
+        photoAssignments: matchRes.mapping,
+      };
+    });
+
+    // Sort descending by match score
+    return enriched.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  };
 
   // Single page / Cover mode
   if (isCover) {
     const variations: AdaptiveLayoutVariation[] = [];
-    const maxVariants = count === 1 ? 3 : count === 2 ? 4 : count === 3 ? 6 : count === 4 ? 6 : 4;
+    const maxVariants = count === 1 ? 3 : count === 2 ? 6 : count === 3 ? 8 : count === 4 ? 8 : 6;
 
     for (let v = 0; v < maxVariants; v++) {
       const rects = partitionPageBoxIntoKRects(spreadArea, count, spacing, v);
@@ -424,7 +736,7 @@ export function generateAdaptiveLayoutVariations(
         tags: ['cover', `${count}p`],
       });
     }
-    return variations;
+    return scoreAndSortVariations(variations);
   }
 
   // Spread Mode (2-Page Spread)
@@ -470,7 +782,7 @@ export function generateAdaptiveLayoutVariations(
         tags: ['hero', 'panorama', 'full-bleed'],
       }
     );
-    return variations;
+    return scoreAndSortVariations(variations);
   }
 
   // Multi-photo count >= 2: Generate all valid page split combinations (nLeft, nRight)
@@ -494,10 +806,10 @@ export function generateAdaptiveLayoutVariations(
 
   // For each split pair, create varied layout permutations
   splitPairs.forEach(({ nLeft, nRight }) => {
-    const leftVariants = nLeft === 1 ? 2 : nLeft === 2 ? 3 : nLeft === 3 ? 4 : nLeft === 4 ? 4 : 2;
-    const rightVariants = nRight === 1 ? 2 : nRight === 2 ? 3 : nRight === 3 ? 4 : nRight === 4 ? 4 : 2;
+    const leftVariants = nLeft === 1 ? 2 : nLeft === 2 ? 4 : nLeft === 3 ? 6 : nLeft === 4 ? 6 : 4;
+    const rightVariants = nRight === 1 ? 2 : nRight === 2 ? 4 : nRight === 3 ? 6 : nRight === 4 ? 6 : 4;
 
-    const maxCombos = Math.min(6, leftVariants * rightVariants);
+    const maxCombos = Math.min(8, leftVariants * rightVariants);
     for (let c = 0; c < maxCombos; c++) {
       const vLeft = c % leftVariants;
       const vRight = Math.floor(c / leftVariants) % rightVariants;
@@ -524,11 +836,11 @@ export function generateAdaptiveLayoutVariations(
     }
   });
 
-  return variations;
+  return scoreAndSortVariations(variations);
 }
 
 /**
- * Builds Konva PhotoFrameElements from an AdaptiveLayoutVariation.
+ * Builds Konva PhotoFrameElements from an AdaptiveLayoutVariation with optimal photo slot placement.
  */
 export function buildSpreadElementsFromVariation(
   variation: AdaptiveLayoutVariation,
@@ -537,8 +849,17 @@ export function buildSpreadElementsFromVariation(
   defaultBorderWidth = 1,
   defaultBorderColor = '#FFFFFF'
 ): PhotoFrameElement[] {
+  // If optimal photo assignments are available, slot index s gets photo[photoIndex]
+  const slotToPhotoMap = new Map<number, AdaptivePhoto>();
+  if (variation.photoAssignments && variation.photoAssignments.length === photos.length) {
+    variation.photoAssignments.forEach((slotIdx, photoIdx) => {
+      const p = photos[photoIdx];
+      if (p) slotToPhotoMap.set(slotIdx, p);
+    });
+  }
+
   return variation.rects.map((rect, index) => {
-    const photo = photos[index];
+    const photo = slotToPhotoMap.get(index) || photos[index];
     const frameId = `frame-${Date.now()}-${index + 1}-${Math.random().toString(36).substr(2, 4)}`;
 
     return {
