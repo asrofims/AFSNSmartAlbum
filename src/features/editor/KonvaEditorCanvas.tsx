@@ -34,6 +34,12 @@ interface KonvaEditorCanvasProps {
   onToast?: (msg: string) => void;
 }
 
+// High-Contrast Professional Rotation Cursor (Adobe InDesign / Figma style)
+// Crisp dark body with white outline to guarantee 100% visibility on all backgrounds (white, black, photos)
+const ROTATE_CURSOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round"/><path d="M19 4v4.5h-4.5M5 20v-4.5h4.5" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="#090d16" stroke-width="2" stroke-linecap="round"/><path d="M19 4v4.5h-4.5M5 20v-4.5h4.5" stroke="#090d16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(ROTATE_CURSOR_SVG)}") 12 12, crosshair`;
+
 // Module-level image cache to prevent solid-color flash when PhotoFrameNode remounts
 // during multi-selection mode switches (normal → group rendering and vice versa).
 const photoImageCache = new Map<string, HTMLImageElement>();
@@ -2099,7 +2105,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             rotateEnabled
             keepRatio={true}
             rotateAnchorOffset={20}
-            rotateAnchorCursor={'grab'}
+            rotateAnchorCursor={ROTATE_CURSOR}
               onContextMenu={(e) => {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
@@ -2150,9 +2156,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   anchor === 'bottom-right';
                 tr.keepRatio(isCorner || selectedFrameIds.length > 1);
 
-                // Switch to grabbing cursor during active rotation
+                // Lock to high-contrast curved rotation cursor during active rotation
                 if (anchor === 'rotater' && stageRef.current) {
-                  stageRef.current.container().style.cursor = 'grabbing';
+                  stageRef.current.container().style.cursor = ROTATE_CURSOR;
                 }
 
                 if (selectedFrameIds.length > 1 && activeSpread && multiGroupInfo) {
@@ -2180,6 +2186,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   if (!proxyNode) return;
 
                   if (activeAnchor === 'rotater') {
+                    if (stageRef.current) {
+                      stageRef.current.container().style.cursor = ROTATE_CURSOR;
+                    }
                     const currentGroupRot = proxyNode.rotation();
                     const currentGroupX = proxyNode.x() / scaleFactor;
                     const currentGroupY = proxyNode.y() / scaleFactor;
