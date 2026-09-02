@@ -21,6 +21,7 @@ import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
+import { LockedPhotosPanel } from '../editor/LockedPhotosPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
@@ -85,7 +86,7 @@ export function WorkspaceLayout() {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
-  const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout'>('properties');
+  const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout' | 'locks'>('properties');
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -705,44 +706,114 @@ export function WorkspaceLayout() {
             borderBottom: '1px solid var(--color-border)',
             background: 'var(--color-surface)',
           }}>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {/* Tab 1: Properties */}
               <button
                 type="button"
                 onClick={() => setInspectorTab('properties')}
                 style={{
-                  background: inspectorTab === 'properties' ? 'var(--color-bg-secondary)' : 'transparent',
-                  border: inspectorTab === 'properties' ? '1px solid var(--color-border)' : '1px solid transparent',
+                  width: '32px',
+                  height: '30px',
+                  background: inspectorTab === 'properties' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                  border: inspectorTab === 'properties' ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
                   color: inspectorTab === 'properties' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 600,
+                  borderRadius: '6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
                 }}
+                title="Properties — Frame, Spread & Margin Settings (P)"
               >
-                <span>⚙ Properties</span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                  <line x1="1" y1="14" x2="7" y2="14" />
+                  <line x1="9" y1="8" x2="15" y2="8" />
+                  <line x1="17" y1="16" x2="23" y2="16" />
+                </svg>
               </button>
+
+              {/* Tab 2: Smart Layout */}
               <button
                 type="button"
                 onClick={() => setInspectorTab('smart_layout')}
                 style={{
-                  background: inspectorTab === 'smart_layout' ? 'var(--color-bg-secondary)' : 'transparent',
-                  border: inspectorTab === 'smart_layout' ? '1px solid var(--color-border)' : '1px solid transparent',
+                  width: '32px',
+                  height: '30px',
+                  background: inspectorTab === 'smart_layout' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                  border: inspectorTab === 'smart_layout' ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
                   color: inspectorTab === 'smart_layout' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 600,
+                  borderRadius: '6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
                 }}
+                title="Smart Layout — Adaptive Templates & Dynamic Variations (L)"
               >
-                <span>✨ Smart Layout</span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+                </svg>
+              </button>
+
+              {/* Tab 3: Locked Photos Management */}
+              <button
+                type="button"
+                onClick={() => setInspectorTab('locks')}
+                style={{
+                  width: '32px',
+                  height: '30px',
+                  background: inspectorTab === 'locks' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
+                  border: inspectorTab === 'locks' ? '1px solid #f59e0b' : '1px solid transparent',
+                  color: inspectorTab === 'locks' ? '#fbbf24' : 'var(--color-text-muted)',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Locked Photos — Fixed Frames Management (Ctrl+L)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                {(() => {
+                  const lockCount = (activeSpread?.elements || []).filter((f) => f.locked).length;
+                  if (lockCount === 0) return null;
+                  return (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-2px',
+                        right: '-2px',
+                        background: '#f59e0b',
+                        color: '#000000',
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        minWidth: '14px',
+                        height: '14px',
+                        padding: '0 3px',
+                        borderRadius: '999px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 0 6px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      {lockCount}
+                    </span>
+                  );
+                })()}
               </button>
             </div>
             <button
@@ -768,6 +839,8 @@ export function WorkspaceLayout() {
             </div>
           ) : inspectorTab === 'smart_layout' ? (
             <TemplatesPanel onApplyToast={(msg) => showToast(msg)} />
+          ) : inspectorTab === 'locks' ? (
+            <LockedPhotosPanel onToast={(msg) => showToast(msg)} />
           ) : (
             <div className={styles.propertyList}>
               {/* Selected Photo Frame Properties / Multi-Selection Controls (Placed at TOP when active) */}
@@ -807,16 +880,18 @@ export function WorkspaceLayout() {
                                 gap: '4px',
                                 padding: '3px 8px',
                                 fontSize: '10px',
-                                fontWeight: 700,
-                                borderRadius: '999px',
-                                background: isAllLocked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                                fontWeight: 600,
+                                borderRadius: '4px',
+                                background: isAllLocked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
                                 border: isAllLocked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                                color: isAllLocked ? '#f59e0b' : 'var(--color-text-secondary)',
+                                color: isAllLocked ? '#fbbf24' : 'var(--color-text-secondary)',
                                 cursor: 'pointer',
+                                transition: 'all 0.15s ease',
                               }}
-                              title={hasUnlocked ? 'Lock all selected frames (Ctrl+L)' : 'Unlock all selected frames (Ctrl+Shift+L)'}
+                              title={hasUnlocked ? 'Lock selected frames (Ctrl+L)' : 'Unlock selected frames (Ctrl+Shift+L)'}
                             >
-                              {isAllLocked ? '🔒 Locked' : hasUnlocked ? '🔓 Lock All' : '🔒 Unlock All'}
+                              <span>{isAllLocked ? '🔒' : '🔓'}</span>
+                              <span>{isAllLocked ? 'Locked' : hasUnlocked ? 'Lock' : 'Unlock'}</span>
                             </button>
                           </div>
                         );
@@ -1021,16 +1096,18 @@ export function WorkspaceLayout() {
                           gap: '4px',
                           padding: '3px 8px',
                           fontSize: '10px',
-                          fontWeight: 700,
-                          borderRadius: '999px',
-                          background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                          fontWeight: 600,
+                          borderRadius: '4px',
+                          background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
                           border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                          color: selectedFrame.locked ? '#f59e0b' : 'var(--color-text-secondary)',
+                          color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
                           cursor: 'pointer',
+                          transition: 'all 0.15s ease',
                         }}
                         title={selectedFrame.locked ? 'Unlock Photo (Ctrl+Shift+L)' : 'Lock Photo (Ctrl+L)'}
                       >
-                        {selectedFrame.locked ? '🔒 Locked' : '🔓 Lock'}
+                        <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
+                        <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
                       </button>
                     </div>
 

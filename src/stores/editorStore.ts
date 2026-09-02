@@ -85,6 +85,8 @@ export interface EditorState {
   groupSelectedFrames: (spreadId: string) => void;
   ungroupSelectedFrames: (spreadId: string) => void;
   toggleLockSelectedFrames: (spreadId?: string, forceState?: boolean) => void;
+  toggleLockSingleFrame: (spreadId: string, frameId: string, forceState?: boolean) => void;
+  lockAllFramesOnSpread: (spreadId: string) => void;
   unlockAllFramesOnSpread: (spreadId: string) => void;
 
   // Batch Alignment & Distribution
@@ -1369,6 +1371,91 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       currentAlbum: {
         ...currentAlbum,
         coverSpread: updatedCover,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  toggleLockSingleFrame: (spreadId, frameId, forceState) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updateElem = (f: PhotoFrameElement): PhotoFrameElement => {
+      if (f.id === frameId) {
+        const nextState = forceState !== undefined ? forceState : !f.locked;
+        return { ...f, locked: nextState };
+      }
+      return f;
+    };
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: (currentAlbum.coverSpread.elements || []).map(updateElem),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === spreadId
+        ? { ...s, elements: (s.elements || []).map(updateElem) }
+        : s
+    );
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  lockAllFramesOnSpread: (spreadId) => {
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updateElem = (f: PhotoFrameElement): PhotoFrameElement => {
+      if (!f.locked) {
+        return { ...f, locked: true };
+      }
+      return f;
+    };
+
+    if (currentAlbum.coverSpread.id === spreadId) {
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            elements: (currentAlbum.coverSpread.elements || []).map(updateElem),
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === spreadId
+        ? { ...s, elements: (s.elements || []).map(updateElem) }
+        : s
+    );
+
+    useAlbumStore.setState({
+      currentAlbum: {
+        ...currentAlbum,
         spreads: updatedSpreads,
       },
       saveStatus: 'unsaved',
