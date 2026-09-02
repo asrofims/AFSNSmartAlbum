@@ -554,6 +554,13 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: transparent;
+}
+
+.thumbnailImgLoaded {
+  opacity: 1;
 }
 
 .processingBottomStrip {

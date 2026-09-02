@@ -544,11 +544,15 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                               <img
                                 key={`${photo.id}_${safeThumb}_${photo.updatedAt || ''}`}
                                 src={convertFileSrc(safeThumb)}
-                                alt={photo.fileName}
+                                alt=""
                                 className={styles.thumbnailImg}
                                 loading="lazy"
                                 draggable={false}
-                                onError={() => {
+                                onLoad={(e) => {
+                                  if (styles.thumbnailImgLoaded) e.currentTarget.classList.add(styles.thumbnailImgLoaded);
+                                }}
+                                onError={(e) => {
+                                  if (styles.thumbnailImgLoaded) e.currentTarget.classList.remove(styles.thumbnailImgLoaded);
                                   setFailedPhotoIds((prev) => new Set(prev).add(photo.id));
                                   if (!healingPhotoIdsRef.current.has(photo.id)) {
                                     healingPhotoIdsRef.current.add(photo.id);
