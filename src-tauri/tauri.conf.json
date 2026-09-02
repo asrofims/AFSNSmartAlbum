@@ -1,7 +1,7 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/2.0.0-rc/tooling/cli/schema.json",
   "productName": "AFSNSmartAlbum",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "identifier": "com.afsn.smartalbum",
   "build": {
     "frontendDist": "../dist",

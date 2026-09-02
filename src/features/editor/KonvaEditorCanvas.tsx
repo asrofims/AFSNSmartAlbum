@@ -1255,10 +1255,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     // Ignore middle & right clicks
     if ('button' in e.evt && (e.evt.button === 1 || e.evt.button === 2)) return;
 
+    const targetName = e.target.name() || '';
     const isBackground =
       e.target === e.target.getStage() ||
-      e.target.name() === 'background-sheet' ||
-      e.target.name() === 'canvas-bg';
+      targetName === 'background-sheet' ||
+      targetName.startsWith('background-') ||
+      targetName === 'canvas-bg';
 
     if (isBackground) {
       const pos = e.target.getStage()?.getPointerPosition();
@@ -1838,6 +1840,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             {/* Left Page Background */}
             <Rect
               name="background-left-page"
+              listening={false}
               x={0}
               y={0}
               width={leftPagePixelW}
@@ -1854,6 +1857,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             {gutterPixelW > 0 && (
               <Rect
                 name="background-gutter-spine"
+                listening={false}
                 x={leftPagePixelW}
                 y={0}
                 width={gutterPixelW}
@@ -1865,6 +1869,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             {/* Right Page Background */}
             <Rect
               name="background-right-page"
+              listening={false}
               x={leftPagePixelW + gutterPixelW}
               y={0}
               width={rightPagePixelW}
