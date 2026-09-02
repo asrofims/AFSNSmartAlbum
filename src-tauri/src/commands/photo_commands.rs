@@ -386,9 +386,11 @@ pub async fn generate_missing_previews(
     let photos_needing_preview: Vec<PhotoRow> = photos
         .into_iter()
         .filter(|photo| {
+            let is_thumb_missing = photo.thumbnail_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
+            let is_preview_missing = photo.preview_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
             !photo.is_missing
                 && Path::new(&photo.file_path).exists()
-                && photo.preview_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true)
+                && (is_thumb_missing || is_preview_missing)
         })
         .collect();
 
@@ -398,9 +400,29 @@ pub async fn generate_missing_previews(
 
     let cache_dir = get_cache_dir(&app);
     let app_clone = app.clone();
+
+    // PHASE 1: INSTANT EXIF THUMBNAIL RECOVERY (< 5ms total)
+    // If thumbnails were deleted from disk, quickly restore embedded EXIF thumbs if available
+    for photo in &photos_needing_preview {
+        let is_thumb_missing = photo.thumbnail_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
+        if is_thumb_missing {
+            if let Some(instant_thumb) = extract_embedded_thumbnail(Path::new(&photo.file_path), &cache_dir, &photo.id) {
+                let _ = db.update_photo_thumbnail(&photo.id, &instant_thumb);
+                let _ = app.emit(
+                    "photo-preview-ready",
+                    PhotoPreviewReadyPayload {
+                        id: photo.id.clone(),
+                        thumbnail_path: instant_thumb,
+                        preview_path: photo.preview_path.clone().unwrap_or_default(),
+                    },
+                );
+            }
+        }
+    }
+
+    // PHASE 2: BACKGROUND RESIZING WORKER (Runs progressively without blocking)
     tauri::async_runtime::spawn_blocking(move || {
         let db_thread = app_clone.state::<Database>();
-        // Backfill runs in the background but sequentially to keep peak memory bounded for old projects.
         for photo in photos_needing_preview {
             if let Ok(processed) = process_photo(Path::new(&photo.file_path), &cache_dir, &photo.id) {
                 let thumb_path_str = processed.thumbnail_path.clone().unwrap_or_default();
@@ -409,21 +431,19 @@ pub async fn generate_missing_previews(
                 }
                 if let Some(preview_path) = &processed.preview_path {
                     let _ = db_thread.update_photo_preview(&photo.id, preview_path);
-                    let _ = app_clone.emit(
-                        "photo-preview-ready",
-                        PhotoPreviewReadyPayload {
-                            id: photo.id.clone(),
-                            thumbnail_path: if thumb_path_str.is_empty() { preview_path.clone() } else { thumb_path_str },
-                            preview_path: preview_path.clone(),
-                        },
-                    );
                 }
+                let _ = app_clone.emit(
+                    "photo-preview-ready",
+                    PhotoPreviewReadyPayload {
+                        id: photo.id.clone(),
+                        thumbnail_path: if thumb_path_str.is_empty() { processed.preview_path.clone().unwrap_or_default() } else { thumb_path_str },
+                        preview_path: processed.preview_path.unwrap_or_default(),
+                    },
+                );
             }
         }
         trim_process_memory();
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    });
 
     let db = app.state::<Database>();
     db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
