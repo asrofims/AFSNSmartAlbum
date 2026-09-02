@@ -83,6 +83,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           ? (safeThumb || safePreview || null)
           : null;
 
+        const photoMeta = el.photoId ? photoById.get(el.photoId) : null;
+
         return (
           <div
             key={el.id}
@@ -104,7 +106,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           >
             {imgSrc && (
               <img
-                key={`${el.id}_${imgSrc}`}
+                key={`${el.id}_${imgSrc}_${photoMeta?.updatedAt || ''}`}
                 src={safeConvertFileSrc(imgSrc)}
                 alt=""
                 style={{
@@ -117,6 +119,9 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                 loading="lazy"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
+                  if (el.photoId) {
+                    void usePhotoStore.getState().healThumbnail(el.photoId);
+                  }
                 }}
               />
             )}

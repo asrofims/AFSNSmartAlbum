@@ -176,6 +176,9 @@ function PhotoFrameNode({
       if (isMounted) {
         deleteCachedPhotoImage(currentCacheKey);
         setImageObj(null);
+        if (frame.photoId) {
+          void usePhotoStore.getState().healThumbnail(frame.photoId);
+        }
       }
     };
 
