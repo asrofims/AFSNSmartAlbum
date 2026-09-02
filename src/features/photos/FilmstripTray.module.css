@@ -554,14 +554,6 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  opacity: 0;
-  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: transparent;
-  font-size: 0;
-}
-
-.thumbnailImgLoaded {
-  opacity: 1 !important;
 }
 
 .processingBottomStrip {

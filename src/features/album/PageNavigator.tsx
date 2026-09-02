@@ -115,17 +115,10 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                   objectFit: 'cover',
                   display: 'block',
                   pointerEvents: 'none',
-                  opacity: 0,
-                  transition: 'opacity 0.15s ease',
-                  color: 'transparent',
-                  fontSize: 0,
                 }}
                 loading="lazy"
-                onLoad={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                }}
                 onError={(e) => {
-                  e.currentTarget.style.opacity = '0';
+                  e.currentTarget.style.display = 'none';
                   if (el.photoId) {
                     void usePhotoStore.getState().healThumbnail(el.photoId);
                   }
