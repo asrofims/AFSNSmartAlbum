@@ -256,6 +256,9 @@ pub fn generate_photo_preview(
         image::imageops::FilterType::Triangle,
     );
 
+    // Instantly drop full-resolution uncompressed source bitmap from RAM immediately!
+    drop(img);
+
     // Also generate 320px thumbnail if missing
     let thumbs_dir = cache_dir.join("thumbnails");
     let thumb_file_path = thumbs_dir.join(format!("{}.{}", photo_id, ext));
@@ -272,8 +275,6 @@ pub fn generate_photo_preview(
         }
         let _ = fs::remove_file(&thumb_tmp_path); // Clean up if rename didn't happen
     }
-
-    drop(img); // Instantly drop full-resolution source bitmap!
 
     // Atomic write for canvas preview: write to .tmp then atomic rename
     if let Err(e) = resized.save_with_format(&tmp_file_path, target_format) {
@@ -317,6 +318,24 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
         preview_path: preview_path_str,
         thumbnail_base64: None,
     })
+}
+
+/// Forcefully trims and returns unused virtual memory pages from the process working set back to the OS.
+/// Crucial after large image-processing workloads on Windows to prevent allocator memory retention.
+pub fn trim_process_memory() {
+    #[cfg(target_os = "windows")]
+    {
+        extern "system" {
+            fn GetCurrentProcess() -> isize;
+            fn EmptyWorkingSet(hProcess: isize) -> i32;
+            fn SetProcessWorkingSetSize(hProcess: isize, dwMinimumWorkingSetSize: usize, dwMaximumWorkingSetSize: usize) -> i32;
+        }
+        unsafe {
+            let process = GetCurrentProcess();
+            EmptyWorkingSet(process);
+            SetProcessWorkingSetSize(process, usize::MAX, usize::MAX);
+        }
+    }
 }
 
 #[cfg(test)]

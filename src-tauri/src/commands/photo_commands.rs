@@ -9,7 +9,7 @@ use crate::asset_cache::cleanup_orphaned_photo_assets;
 use crate::db::{Database, PhotoFolderRow, PhotoRow};
 use crate::photo_engine::{
     extract_embedded_thumbnail, extract_photo_metadata, generate_photo_preview, process_photo,
-    scan_directory, SUPPORTED_EXTENSIONS,
+    scan_directory, trim_process_memory, SUPPORTED_EXTENSIONS,
 };
 
 #[derive(Clone, Default)]
@@ -306,6 +306,10 @@ async fn import_paths_internal(
                         let curr = counter_bg.fetch_add(1, Ordering::SeqCst) + 1;
                         let percent = ((curr as f64 / total_bg as f64) * 100.0).min(100.0) as u8;
 
+                        if curr % 25 == 0 {
+                            trim_process_memory();
+                        }
+
                         let _ = app_bg.emit(
                             "photo-preview-ready",
                             PhotoPreviewReadyPayload {
@@ -342,6 +346,9 @@ async fn import_paths_internal(
                 }
             });
         });
+
+        // Reclaim memory immediately after preview generation finishes
+        trim_process_memory();
 
         let is_cancelled = cancel_bg.load(Ordering::Relaxed);
         let _ = app_bg.emit(
@@ -413,6 +420,7 @@ pub async fn generate_missing_previews(
                 }
             }
         }
+        trim_process_memory();
     })
     .await
     .map_err(|e| e.to_string())?;

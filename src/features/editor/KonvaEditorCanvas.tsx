@@ -39,9 +39,48 @@ const ROTATE_CURSOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" he
 
 const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(ROTATE_CURSOR_SVG)}") 12 12, crosshair`;
 
-// Module-level image cache to prevent solid-color flash when PhotoFrameNode remounts
-// during multi-selection mode switches (normal → group rendering and vice versa).
+// Bounded LRU Image Cache for Konva Canvas (Max 24 active decoded bitmaps in RAM/VRAM)
+// Evicts oldest decoded HTMLImageElement and clears its src to allow instantaneous GC
+const MAX_CANVAS_IMAGE_CACHE = 24;
 const photoImageCache = new Map<string, HTMLImageElement>();
+
+function getCachedPhotoImage(key: string): HTMLImageElement | null {
+  const img = photoImageCache.get(key);
+  if (img) {
+    photoImageCache.delete(key);
+    photoImageCache.set(key, img);
+    return img;
+  }
+  return null;
+}
+
+function setCachedPhotoImage(key: string, img: HTMLImageElement) {
+  if (photoImageCache.has(key)) {
+    photoImageCache.delete(key);
+  } else if (photoImageCache.size >= MAX_CANVAS_IMAGE_CACHE) {
+    const oldestKey = photoImageCache.keys().next().value;
+    if (oldestKey) {
+      const evicted = photoImageCache.get(oldestKey);
+      if (evicted) {
+        evicted.onload = null;
+        evicted.onerror = null;
+        evicted.src = ''; // Release decoded bitmap texture immediately from GPU/RAM!
+      }
+      photoImageCache.delete(oldestKey);
+    }
+  }
+  photoImageCache.set(key, img);
+}
+
+function deleteCachedPhotoImage(key: string) {
+  const evicted = photoImageCache.get(key);
+  if (evicted) {
+    evicted.onload = null;
+    evicted.onerror = null;
+    evicted.src = '';
+  }
+  photoImageCache.delete(key);
+}
 
 // Single Photo Frame Component rendered with Konva
 function PhotoFrameNode({
@@ -90,7 +129,7 @@ function PhotoFrameNode({
   const safePreview = isCachePath(frame.previewPath) ? frame.previewPath : null;
   const imgPath = !frame.isMissing ? (safePreview || safeThumb || null) : null;
   const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
-  const cachedCandidate = cacheKey ? photoImageCache.get(cacheKey) ?? null : null;
+  const cachedCandidate = cacheKey ? getCachedPhotoImage(cacheKey) : null;
   const cachedImg = cachedCandidate && cachedCandidate.naturalWidth > 0 ? cachedCandidate : null;
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(cachedImg);
   const shapeRef = useRef<Konva.Group>(null);
@@ -112,7 +151,7 @@ function PhotoFrameNode({
     const currentCacheKey = `${frame.photoId}::${imgPath}`;
 
     // Check cache first – if already loaded, use immediately
-    const cached = photoImageCache.get(currentCacheKey);
+    const cached = getCachedPhotoImage(currentCacheKey);
     if (cached && cached.complete && cached.naturalWidth > 0) {
       setImageObj(cached);
       return;
@@ -124,7 +163,7 @@ function PhotoFrameNode({
     img.src = convertFileSrc(imgPath);
     img.onload = () => {
       if (!isMounted) return;
-      photoImageCache.set(currentCacheKey, img);
+      setCachedPhotoImage(currentCacheKey, img);
       setImageObj(img);
       if (img.naturalWidth > 0 && img.naturalHeight > 0) {
         const aspect = Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000;
@@ -135,7 +174,7 @@ function PhotoFrameNode({
     };
     img.onerror = () => {
       if (isMounted) {
-        photoImageCache.delete(currentCacheKey);
+        deleteCachedPhotoImage(currentCacheKey);
         setImageObj(null);
       }
     };
