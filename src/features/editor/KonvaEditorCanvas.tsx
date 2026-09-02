@@ -12,9 +12,8 @@ import {
   calculateResizeSnapping,
   calculateImageOffset,
   calculateRotatedMultiFrameResize,
+  calculateMultiFrameRotation,
   computeMultiFrameGroupInfo,
-  unprojectGroupChildToWorld,
-  FrameBounds,
   RectBounds,
   roundToHundredth,
   getPhotoAspect,
@@ -674,7 +673,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const multiGroupRef = useRef<Konva.Rect>(null);
-  const multiTransformInitialStateRef = useRef<{ frames: FrameBounds[]; bounds: RectBounds } | null>(null);
+  const multiTransformInitialStateRef = useRef<{
+    frames: PhotoFrameElement[];
+    initialGroupRot?: number;
+    bounds: RectBounds;
+  } | null>(null);
   const activeTransformAnchorRef = useRef<string | null>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
@@ -830,10 +833,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     return (activeSpread?.elements || []).filter((el) => selectedFrameIds.includes(el.id));
   }, [activeSpread?.elements, selectedFrameIds]);
 
+  const selectionGroupRotation = useEditorStore((s) => s.selectionGroupRotation);
   const multiGroupInfo = useMemo(() => {
     if (selectedFramesList.length <= 1) return null;
-    return computeMultiFrameGroupInfo(selectedFramesList);
-  }, [selectedFramesList]);
+    return computeMultiFrameGroupInfo(selectedFramesList, selectionGroupRotation ?? undefined);
+  }, [selectedFramesList, selectionGroupRotation]);
 
   const isSelectionFullyLocked = useMemo(() => {
     if (!activeSpread || selectedFrameIds.length === 0) return false;
@@ -2245,7 +2249,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   !anchor ||
                   anchor === 'top-left' ||
                   anchor === 'top-right' ||
-                  anchor === 'bottom-left' ||
+                          anchor === 'bottom-left' ||
                   anchor === 'bottom-right';
                 tr.keepRatio(isCorner || selectedFrameIds.length > 1);
 
@@ -2260,6 +2264,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     .map((f) => ({ ...f }));
                   multiTransformInitialStateRef.current = {
                     frames: selectedFrames,
+                    initialGroupRot: multiGroupInfo.groupRotation,
                     bounds: {
                       x: multiGroupInfo.groupX,
                       y: multiGroupInfo.groupY,
@@ -2283,25 +2288,35 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       stageRef.current.container().style.cursor = ROTATE_CURSOR;
                     }
                     const currentGroupRot = proxyNode.rotation();
-                    const currentGroupX = proxyNode.x() / scaleFactor;
-                    const currentGroupY = proxyNode.y() / scaleFactor;
+                    const initialGroupRot = (multiTransformInitialStateRef.current as any)?.initialGroupRot ?? multiGroupInfo.groupRotation;
+                    const deltaAngle = currentGroupRot - initialGroupRot;
 
-                    multiGroupInfo.childLocalFrames.forEach((child) => {
-                      const worldGeom = unprojectGroupChildToWorld(
-                        currentGroupX,
-                        currentGroupY,
-                        currentGroupRot,
-                        child.localX,
-                        child.localY,
-                        child.localRotation
-                      );
-                      const node = stageRef.current?.findOne(`#${child.id}`) as Konva.Node | undefined;
+                    const initialFrames = (multiTransformInitialStateRef.current?.frames ||
+                      (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id))) as PhotoFrameElement[];
+
+                    const updates = calculateMultiFrameRotation(initialFrames, deltaAngle);
+                    updates.forEach((u) => {
+                      const node = stageRef.current?.findOne(`#${u.id}`) as Konva.Node | undefined;
                       if (node) {
-                        node.x(worldGeom.x * scaleFactor);
-                        node.y(worldGeom.y * scaleFactor);
-                        node.rotation(worldGeom.rotation);
+                        node.x(u.geometry.x * scaleFactor);
+                        node.y(u.geometry.y * scaleFactor);
+                        node.rotation(u.geometry.rotation);
                       }
                     });
+
+                    const updatedLiveFrames = initialFrames.map((f) => {
+                      const u = updates.find((up) => up.id === f.id);
+                      return u ? { ...f, ...u.geometry } : f;
+                    });
+
+                    const liveGroupInfo = computeMultiFrameGroupInfo(updatedLiveFrames, currentGroupRot);
+                    proxyNode.x(liveGroupInfo.groupX * scaleFactor);
+                    proxyNode.y(liveGroupInfo.groupY * scaleFactor);
+                    proxyNode.width(liveGroupInfo.groupWidth * scaleFactor);
+                    proxyNode.height(liveGroupInfo.groupHeight * scaleFactor);
+                    proxyNode.rotation(liveGroupInfo.groupRotation);
+
+                    trRef.current?.update();
                     proxyNode.getLayer()?.batchDraw();
                   } else {
                     const sx = Math.abs(proxyNode.scaleX());
@@ -2404,29 +2419,22 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                   if (proxyNode) {
                     if (activeAnchor === 'rotater') {
-                      const newGroupRot = Math.round(proxyNode.rotation() * 10) / 10;
-                      const newGroupX = proxyNode.x() / scaleFactor;
-                      const newGroupY = proxyNode.y() / scaleFactor;
+                      const finalGroupRot = Math.round(proxyNode.rotation() * 10) / 10;
+                      const initialGroupRot = (multiTransformInitialStateRef.current as any)?.initialGroupRot ?? multiGroupInfo.groupRotation;
+                      const deltaAngle = finalGroupRot - initialGroupRot;
 
                       proxyNode.scaleX(1);
                       proxyNode.scaleY(1);
 
-                      const updates = multiGroupInfo.childLocalFrames.map((child) => {
-                        const worldGeom = unprojectGroupChildToWorld(
-                          newGroupX,
-                          newGroupY,
-                          newGroupRot,
-                          child.localX,
-                          child.localY,
-                          child.localRotation
-                        );
-                        return {
-                          id: child.id,
-                          geometry: worldGeom,
-                        };
-                      });
+                      const initialFrames = (multiTransformInitialStateRef.current?.frames ||
+                        (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id))) as PhotoFrameElement[];
 
-                      batchUpdateFrames(activeSpread.id, updates);
+                      const updates = calculateMultiFrameRotation(initialFrames, deltaAngle);
+                      if (updates.length > 0) {
+                        batchUpdateFrames(activeSpread.id, updates);
+                      }
+                      const newSelGroupRot = (((initialGroupRot + deltaAngle) % 360) + 360) % 360;
+                      useEditorStore.getState().setSelectionGroupRotation(newSelGroupRot);
                     } else {
                       const sx = Math.abs(proxyNode.scaleX());
                       const sy = Math.abs(proxyNode.scaleY());

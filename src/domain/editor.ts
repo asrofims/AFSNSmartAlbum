@@ -1991,6 +1991,92 @@ export function calculateCenterRotatedPosition(
 }
 
 /**
+ * Rotates multiple frames around their collective visual center by a given delta angle.
+ * Strictly preserves each frame's dimensions (width & height), relative gap distances,
+ * and handles any arbitrary initial rotations per frame without position or size distortion.
+ */
+export function calculateMultiFrameRotation(
+  frames: FrameBounds[],
+  deltaAngle: number
+): { id: string; geometry: { x: number; y: number; rotation: number } }[] {
+  if (frames.length === 0) return [];
+  if (frames.length === 1) {
+    const f = frames[0]!;
+    const targetRot = (((f.rotation || 0) + deltaAngle) % 360 + 360) % 360;
+    const rotated = calculateCenterRotatedPosition(f, targetRot);
+    return [{ id: f.id, geometry: rotated }];
+  }
+
+  // 1. Calculate the true visual center of the entire selection group
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const f of frames) {
+    const fRot = ((f.rotation || 0) * Math.PI) / 180;
+    const fCos = Math.cos(fRot);
+    const fSin = Math.sin(fRot);
+
+    const corners = [
+      { x: f.x, y: f.y },
+      { x: f.x + f.width * fCos, y: f.y + f.width * fSin },
+      { x: f.x + f.width * fCos - f.height * fSin, y: f.y + f.width * fSin + f.height * fCos },
+      { x: f.x - f.height * fSin, y: f.y + f.height * fCos },
+    ];
+
+    for (const pt of corners) {
+      minX = Math.min(minX, pt.x);
+      minY = Math.min(minY, pt.y);
+      maxX = Math.max(maxX, pt.x);
+      maxY = Math.max(maxY, pt.y);
+    }
+  }
+
+  const groupCenterX = (minX + maxX) / 2;
+  const groupCenterY = (minY + maxY) / 2;
+
+  const radDelta = (deltaAngle * Math.PI) / 180;
+  const cosDelta = Math.cos(radDelta);
+  const sinDelta = Math.sin(radDelta);
+
+  // 2. Rotate each frame's center around (groupCenterX, groupCenterY) by deltaAngle
+  return frames.map((f) => {
+    const fCurrentRot = f.rotation || 0;
+    const fRad = (fCurrentRot * Math.PI) / 180;
+    const halfW = f.width / 2;
+    const halfH = f.height / 2;
+
+    // Current visual center of frame f
+    const fcX = f.x + halfW * Math.cos(fRad) - halfH * Math.sin(fRad);
+    const fcY = f.y + halfW * Math.sin(fRad) + halfH * Math.cos(fRad);
+
+    // Rotate center around group center
+    const dx = fcX - groupCenterX;
+    const dy = fcY - groupCenterY;
+    const newFcX = groupCenterX + dx * cosDelta - dy * sinDelta;
+    const newFcY = groupCenterY + dx * sinDelta + dy * cosDelta;
+
+    // New frame rotation
+    const newRot = ((fCurrentRot + deltaAngle) % 360 + 360) % 360;
+    const newRad = (newRot * Math.PI) / 180;
+
+    // New top-left (x, y) from new center
+    const newX = newFcX - (halfW * Math.cos(newRad) - halfH * Math.sin(newRad));
+    const newY = newFcY - (halfW * Math.sin(newRad) + halfH * Math.cos(newRad));
+
+    return {
+      id: f.id,
+      geometry: {
+        x: roundToHundredth(newX),
+        y: roundToHundredth(newY),
+        rotation: Math.round(newRot * 10) / 10,
+      },
+    };
+  });
+}
+
+/**
  * Computes the tight rotated bounding box for a group of frames.
  * If all frames share the same rotation angle, the returned group box inherits
  * that rotation angle, keeping the Transformer bounding box and its rotation handle

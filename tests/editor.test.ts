@@ -17,6 +17,7 @@ import {
   applyFixedGap,
   calculateMultiFrameResize,
   calculateRotatedMultiFrameResize,
+  calculateMultiFrameRotation,
   doesMarqueeIntersectFrame,
   calculateCenterRotatedPosition,
   computeMultiFrameGroupBounds,
@@ -996,4 +997,55 @@ console.assert(doesMarqueeIntersectFrame(hitMarquee, testRotFrame) === true, 'Ma
 const ghostMarquee: RectBounds = { x: 120, y: 110, width: 20, height: 20 };
 console.assert(doesMarqueeIntersectFrame(ghostMarquee, testRotFrame) === false, 'Marquee in ghost unrotated space must NOT intersect');
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');
+// 18k. Mixed-Rotation Multi-Frame Batch Rotation (Bugfix Verification)
+// Frame 1 was independently rotated to 90°, Frame 2 is unrotated at 0°
+const mixedFrames: PhotoFrameElement[] = [
+  {
+    id: 'f-indep-90',
+    type: 'photo',
+    x: 100,
+    y: 100,
+    width: 100,
+    height: 80,
+    rotation: 90, // visual: cx = 100 + 0 - (-40) = 140, cy = 100 + 50 + 0 = 150
+    zIndex: 1,
+  },
+  {
+    id: 'f-indep-0',
+    type: 'photo',
+    x: 250,
+    y: 100,
+    width: 100,
+    height: 80,
+    rotation: 0, // visual: cx = 250 + 50 = 300, cy = 100 + 40 = 140
+    zIndex: 1,
+  },
+];
+
+// Rotate both frames collectively +90° CW
+const rotatedMixed = calculateMultiFrameRotation(mixedFrames, 90);
+console.assert(rotatedMixed.length === 2, 'Should return 2 rotated frames');
+console.assert(rotatedMixed[0].geometry.rotation === 180, `f1 should rotate from 90° to 180°, got ${rotatedMixed[0].geometry.rotation}`);
+console.assert(rotatedMixed[1].geometry.rotation === 90, `f2 should rotate from 0° to 90°, got ${rotatedMixed[1].geometry.rotation}`);
+
+// 18l. Verify Full 360° Cyclic Rotation Returns Exactly to Starting Coordinates
+let cyclicFrames = mixedFrames;
+for (let step = 1; step <= 4; step++) {
+  const stepUpdates = calculateMultiFrameRotation(cyclicFrames, 90);
+  cyclicFrames = cyclicFrames.map((f) => {
+    const u = stepUpdates.find((up) => up.id === f.id)!;
+    return { ...f, ...u.geometry };
+  });
+}
+console.assert(Math.abs(cyclicFrames[0].x - mixedFrames[0].x) < 0.1, `f1 X after 360° must match original, got ${cyclicFrames[0].x} vs ${mixedFrames[0].x}`);
+console.assert(Math.abs(cyclicFrames[0].y - mixedFrames[0].y) < 0.1, `f1 Y after 360° must match original, got ${cyclicFrames[0].y} vs ${mixedFrames[0].y}`);
+console.assert(cyclicFrames[0].rotation === 90, `f1 rotation after 360° must be 90°, got ${cyclicFrames[0].rotation}`);
+console.assert(Math.abs(cyclicFrames[1].x - mixedFrames[1].x) < 0.1, `f2 X after 360° must match original, got ${cyclicFrames[1].x} vs ${mixedFrames[1].x}`);
+console.assert(Math.abs(cyclicFrames[1].y - mixedFrames[1].y) < 0.1, `f2 Y after 360° must match original, got ${cyclicFrames[1].y} vs ${mixedFrames[1].y}`);
+console.assert(cyclicFrames[1].rotation === 0, `f2 rotation after 360° must be 0°, got ${cyclicFrames[1].rotation}`);
+
+// 18m. Preferred Rotation on Multi-Frame Group Info
+const groupInfoPreferred = computeMultiFrameGroupInfo(mixedFrames, 90);
+console.assert(groupInfoPreferred.groupRotation === 90, `Group rotation should honor preferredRotation 90°, got ${groupInfoPreferred.groupRotation}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');

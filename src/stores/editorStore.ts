@@ -3,6 +3,7 @@ import {
   alignFrames,
   applyFixedGap,
   calculateCenterRotatedPosition,
+  calculateMultiFrameRotation,
   clampCropTransform,
   loadSavedSnappingConfig,
   saveSnappingConfig,
@@ -14,8 +15,6 @@ import {
   SafeMarginBounds,
   SnapLine,
   SnappingConfig,
-  computeMultiFrameGroupInfo,
-  unprojectGroupChildToWorld,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { getAllAlbumSpreads } from '../domain/album';
@@ -27,7 +26,9 @@ import { useHistoryStore } from './historyStore';
 
 export interface EditorState {
   selectedFrameIds: string[];
+  selectionGroupRotation: number | null;
   editingCropFrameId: string | null;
+  setSelectionGroupRotation: (rot: number | null) => void;
   activeSnapLines: SnapLine[];
   activeGapGuides: GapGuide[];
   clipboardFrames: PhotoFrameElement[];
@@ -130,6 +131,7 @@ export interface EditorState {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   selectedFrameIds: [],
+  selectionGroupRotation: null,
   editingCropFrameId: null,
   activeSnapLines: [],
   activeGapGuides: [],
@@ -140,6 +142,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isDragging: false,
   isResizing: false,
 
+  setSelectionGroupRotation: (rot: number | null) => set({ selectionGroupRotation: rot }),
   setMultiResizeGapMode: (mode: 'proportional' | 'fixed_gap') => set({ multiResizeGapMode: mode }),
 
   selectFrame: (frameId: string, multi = false) => {
@@ -155,25 +158,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? (activeSpread?.elements || []).filter((el) => el.groupId === targetGroupId).map((el) => el.id)
       : [frameId];
 
+    let newSelectedIds: string[];
     if (multi) {
       const allSelected = targetIds.every((id) => selectedFrameIds.includes(id));
       if (allSelected) {
-        set({ selectedFrameIds: selectedFrameIds.filter((id) => !targetIds.includes(id)) });
+        newSelectedIds = selectedFrameIds.filter((id) => !targetIds.includes(id));
       } else {
         const uniqueSet = new Set([...selectedFrameIds, ...targetIds]);
-        set({ selectedFrameIds: Array.from(uniqueSet) });
+        newSelectedIds = Array.from(uniqueSet);
       }
     } else {
-      set({ selectedFrameIds: targetIds, editingCropFrameId: null });
+      newSelectedIds = targetIds;
     }
+
+    const selectedFrames = (activeSpread?.elements || []).filter((f) => newSelectedIds.includes(f.id));
+    let initialGroupRot: number | null = null;
+    if (selectedFrames.length > 1) {
+      const firstRot = (((selectedFrames[0]?.rotation || 0) % 360) + 360) % 360;
+      const allSameRot = selectedFrames.every(
+        (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
+      );
+      initialGroupRot = allSameRot ? firstRot : 0;
+    }
+
+    set({
+      selectedFrameIds: newSelectedIds,
+      selectionGroupRotation: initialGroupRot,
+      editingCropFrameId: null,
+    });
   },
 
   selectFrames: (frameIds: string[]) => {
-    set({ selectedFrameIds: frameIds, editingCropFrameId: null });
+    const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
+    const spreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
+    const activeSpread = spreads.find((s) => s.id === activeSpreadId) || spreads[0];
+    const selectedFrames = (activeSpread?.elements || []).filter((f) => frameIds.includes(f.id));
+
+    let initialGroupRot: number | null = null;
+    if (selectedFrames.length > 1) {
+      const firstRot = (((selectedFrames[0]?.rotation || 0) % 360) + 360) % 360;
+      const allSameRot = selectedFrames.every(
+        (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
+      );
+      initialGroupRot = allSameRot ? firstRot : 0;
+    }
+
+    set({
+      selectedFrameIds: frameIds,
+      selectionGroupRotation: initialGroupRot,
+      editingCropFrameId: null,
+    });
   },
 
   clearSelection: () => {
-    set({ selectedFrameIds: [], editingCropFrameId: null, activeSnapLines: [] });
+    set({
+      selectedFrameIds: [],
+      selectionGroupRotation: null,
+      editingCropFrameId: null,
+      activeSnapLines: [],
+    });
   },
 
   addPhotoToSpread: (spreadId, photo, pos, customSize) => {
@@ -994,6 +1037,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           targetRotation = (((f.rotation || 0) + delta) % 360 + 360) % 360;
         }
         const rotatedGeo = calculateCenterRotatedPosition(f, targetRotation);
+        set({ selectionGroupRotation: targetRotation });
 
         return elements.map((el) => {
           if (el.id !== f.id) return el;
@@ -1006,39 +1050,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         });
       }
 
-      // Multi-Frame Group Rotation around Group Center
-      const groupInfo = computeMultiFrameGroupInfo(selectedFrames);
-      const currentGroupRot = groupInfo.groupRotation;
-      let targetGroupRot: number;
-      if (isAbsolute && typeof deltaOrAngle === 'number') {
-        targetGroupRot = ((deltaOrAngle % 360) + 360) % 360;
-      } else {
-        targetGroupRot = (((currentGroupRot + delta) % 360) + 360) % 360;
-      }
+      // Multi-Frame Group Rotation with Invariant Centers, Dimensions, and Gaps
+      const deltaDeg = typeof delta === 'number' ? delta : 90;
+      const updates = calculateMultiFrameRotation(selectedFrames, deltaDeg);
+      const updatedMap = new Map(updates.map((u) => [u.id, u.geometry]));
 
-      // Group center is invariant
-      const rad = (currentGroupRot * Math.PI) / 180;
-      const halfW = groupInfo.groupWidth / 2;
-      const halfH = groupInfo.groupHeight / 2;
-      const centerX = groupInfo.groupX + halfW * Math.cos(rad) - halfH * Math.sin(rad);
-      const centerY = groupInfo.groupY + halfW * Math.sin(rad) + halfH * Math.cos(rad);
-
-      const newRad = (targetGroupRot * Math.PI) / 180;
-      const newGroupX = centerX - (halfW * Math.cos(newRad) - halfH * Math.sin(newRad));
-      const newGroupY = centerY - (halfW * Math.sin(newRad) + halfH * Math.cos(newRad));
-
-      const updatedMap = new Map<string, { x: number; y: number; rotation: number }>();
-      groupInfo.childLocalFrames.forEach((child) => {
-        const worldGeom = unprojectGroupChildToWorld(
-          newGroupX,
-          newGroupY,
-          targetGroupRot,
-          child.localX,
-          child.localY,
-          child.localRotation
-        );
-        updatedMap.set(child.id, worldGeom);
-      });
+      const prevRot = get().selectionGroupRotation ?? 0;
+      const nextRot = (((prevRot + deltaDeg) % 360) + 360) % 360;
+      set({ selectionGroupRotation: nextRot });
 
       return elements.map((el) => {
         const geom = updatedMap.get(el.id);
