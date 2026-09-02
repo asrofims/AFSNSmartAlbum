@@ -446,15 +446,6 @@ export function WorkspaceLayout() {
             )}
           </div>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => confirmSafeAction(() => openNewProject())}
-            title="Create a new album project"
-          >
-            + New Project
-          </Button>
-
           {currentProject && (
             <div className={styles.activeProjectBadge}>
               {isEditingProjectName ? (
@@ -526,7 +517,13 @@ export function WorkspaceLayout() {
                 </button>
                 <button
                   type="button"
-                  className={styles.historyBtn}
+                  className={`${styles.historyBtn} ${
+                    saveStatus === 'unsaved'
+                      ? styles.historyBtnUnsaved
+                      : saveStatus === 'saving'
+                      ? styles.historyBtnSaving
+                      : ''
+                  }`}
                   onClick={async () => {
                     const res = await saveProject();
                     if (res.success) {
@@ -537,7 +534,13 @@ export function WorkspaceLayout() {
                       }
                     }
                   }}
-                  title="Save Project (Ctrl+S)"
+                  title={
+                    saveStatus === 'unsaved'
+                      ? 'Unsaved changes (Click to Save / Ctrl+S)'
+                      : saveStatus === 'saving'
+                      ? 'Saving changes...'
+                      : `All changes saved${lastSavedAt ? ` (${lastSavedAt})` : ''} (Ctrl+S)`
+                  }
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
@@ -560,32 +563,6 @@ export function WorkspaceLayout() {
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                 </button>
-              </div>
-
-              {/* Auto-Save Status Badge */}
-              <div
-                className={`${styles.saveBadge} ${
-                  saveStatus === 'saved'
-                    ? styles.saveBadgeSaved
-                    : saveStatus === 'saving'
-                    ? styles.saveBadgeSaving
-                    : styles.saveBadgeUnsaved
-                }`}
-                title={
-                  saveStatus === 'saved'
-                    ? `All changes saved to database${lastSavedAt ? ` (${lastSavedAt})` : ''}`
-                    : saveStatus === 'saving'
-                    ? 'Saving changes to database...'
-                    : 'Unsaved modifications (auto-saving...)'
-                }
-                onClick={() => {
-                  if (saveStatus === 'unsaved') saveAlbumToDb();
-                }}
-                style={{ cursor: saveStatus === 'unsaved' ? 'pointer' : 'default' }}
-              >
-                {saveStatus === 'saved' && <span>✓ Saved</span>}
-                {saveStatus === 'saving' && <span>↻ Saving...</span>}
-                {saveStatus === 'unsaved' && <span>● Unsaved</span>}
               </div>
 
               <div className={styles.toolbarSeparator} />

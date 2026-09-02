@@ -27,7 +27,7 @@ export function useTauriInfo(): void {
       } catch {
         // Fallback for browser development
         setAppInfo({
-          version: 'v1.0.15',
+          version: 'v1.0.16',
           buildNumber: '1',
           platform: 'browser',
         });

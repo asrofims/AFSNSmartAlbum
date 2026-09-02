@@ -445,36 +445,6 @@
   opacity: 0.85;
 }
 
-.saveBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  user-select: none;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.saveBadgeSaved {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
-.saveBadgeSaving {
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-}
-
-.saveBadgeUnsaved {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
 .historyBtn {
   display: inline-flex;
   align-items: center;
@@ -499,6 +469,18 @@
 .historyBtn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.historyBtnUnsaved {
+  color: #eab308 !important; /* Yellow icon only */
+}
+
+.historyBtnUnsaved:hover:not(:disabled) {
+  color: #facc15 !important;
+}
+
+.historyBtnSaving {
+  color: #3b82f6 !important;
 }
 
 .menuContainer {
