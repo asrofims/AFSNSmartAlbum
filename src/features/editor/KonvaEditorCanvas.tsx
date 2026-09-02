@@ -856,6 +856,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     } else if (selectedFrameIds.length === 1) {
       const singleNode = stageRef.current.findOne(`#${selectedFrameIds[0]}`);
       if (singleNode) {
+        singleNode.scaleX(1);
+        singleNode.scaleY(1);
         trRef.current.nodes([singleNode]);
         trRef.current.update();
         trRef.current.forceUpdate();
@@ -867,7 +869,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       }
     } else if (selectedFrameIds.length > 1) {
       const proxyNode = multiGroupRef.current || stageRef.current.findOne('#multi-selection-proxy');
-      if (proxyNode) {
+      if (proxyNode && multiGroupInfo) {
+        proxyNode.x(multiGroupInfo.groupX * scaleFactor);
+        proxyNode.y(multiGroupInfo.groupY * scaleFactor);
+        proxyNode.width(multiGroupInfo.groupWidth * scaleFactor);
+        proxyNode.height(multiGroupInfo.groupHeight * scaleFactor);
+        proxyNode.rotation(multiGroupInfo.groupRotation);
+        proxyNode.scaleX(1);
+        proxyNode.scaleY(1);
         trRef.current.nodes([proxyNode]);
         trRef.current.update();
         trRef.current.forceUpdate();
@@ -888,7 +897,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize, multiGroupInfo, isSelectionFullyLocked]);
+  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize, multiGroupInfo, selectionGroupRotation, isSelectionFullyLocked]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
@@ -2141,7 +2150,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           if (onToast) {
                             onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
                           }
-                        } else {
+                        } else if (Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05) {
                           const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
                             id,
                             geometry: {

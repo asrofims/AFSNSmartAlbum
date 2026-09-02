@@ -21,6 +21,7 @@ import {
   shuffleElementsPhotos,
 } from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
+import { useEditorStore } from './editorStore';
 import type { PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
@@ -282,6 +283,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         activeSpreadIndex: Math.max(0, validIndex),
         saveStatus: 'unsaved',
       });
+
+      // Sync editorStore selection and group rotation with the restored state
+      useEditorStore.getState().syncSelectionWithSpread(validActiveId || '', previousAlbum);
     }
   },
 
@@ -304,6 +308,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         activeSpreadIndex: Math.max(0, validIndex),
         saveStatus: 'unsaved',
       });
+
+      // Sync editorStore selection and group rotation with the restored state
+      useEditorStore.getState().syncSelectionWithSpread(validActiveId || '', nextAlbum);
     }
   },
 

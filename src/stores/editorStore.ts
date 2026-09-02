@@ -17,7 +17,7 @@ import {
   SnappingConfig,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
-import { getAllAlbumSpreads } from '../domain/album';
+import { Album, getAllAlbumSpreads } from '../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
@@ -41,6 +41,7 @@ export interface EditorState {
   // Selection
   selectFrame: (frameId: string, multi?: boolean) => void;
   selectFrames: (frameIds: string[]) => void;
+  syncSelectionWithSpread: (spreadId: string, album?: Album) => void;
   clearSelection: () => void;
 
   // Frame Operations
@@ -172,40 +173,75 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     const selectedFrames = (activeSpread?.elements || []).filter((f) => newSelectedIds.includes(f.id));
-    let initialGroupRot: number | null = null;
-    if (selectedFrames.length > 1) {
+    const sameSelection =
+      newSelectedIds.length === selectedFrameIds.length &&
+      newSelectedIds.every((id) => selectedFrameIds.includes(id));
+
+    const firstGroupRot = selectedFrames[0]?.groupRotation;
+    const allSameGroupRot =
+      typeof firstGroupRot === 'number' &&
+      selectedFrames.every(
+        (f) =>
+          typeof f.groupRotation === 'number' &&
+          Math.abs(((((f.groupRotation % 360) + 360) % 360) - (((firstGroupRot % 360) + 360) % 360))) < 0.1
+      );
+
+    let groupRot: number | null = null;
+    if (sameSelection && get().selectionGroupRotation !== null) {
+      groupRot = get().selectionGroupRotation;
+    } else if (allSameGroupRot && typeof firstGroupRot === 'number') {
+      groupRot = (((firstGroupRot % 360) + 360) % 360);
+    } else if (selectedFrames.length > 1) {
       const firstRot = (((selectedFrames[0]?.rotation || 0) % 360) + 360) % 360;
       const allSameRot = selectedFrames.every(
         (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
       );
-      initialGroupRot = allSameRot ? firstRot : 0;
+      groupRot = allSameRot ? firstRot : 0;
     }
 
     set({
       selectedFrameIds: newSelectedIds,
-      selectionGroupRotation: initialGroupRot,
+      selectionGroupRotation: groupRot,
       editingCropFrameId: null,
     });
   },
 
   selectFrames: (frameIds: string[]) => {
+    const { selectedFrameIds } = get();
     const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
     const spreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
     const activeSpread = spreads.find((s) => s.id === activeSpreadId) || spreads[0];
     const selectedFrames = (activeSpread?.elements || []).filter((f) => frameIds.includes(f.id));
 
-    let initialGroupRot: number | null = null;
-    if (selectedFrames.length > 1) {
+    const sameSelection =
+      frameIds.length === selectedFrameIds.length &&
+      frameIds.every((id) => selectedFrameIds.includes(id));
+
+    const firstGroupRot = selectedFrames[0]?.groupRotation;
+    const allSameGroupRot =
+      typeof firstGroupRot === 'number' &&
+      selectedFrames.every(
+        (f) =>
+          typeof f.groupRotation === 'number' &&
+          Math.abs(((((f.groupRotation % 360) + 360) % 360) - (((firstGroupRot % 360) + 360) % 360))) < 0.1
+      );
+
+    let groupRot: number | null = null;
+    if (sameSelection && get().selectionGroupRotation !== null) {
+      groupRot = get().selectionGroupRotation;
+    } else if (allSameGroupRot && typeof firstGroupRot === 'number') {
+      groupRot = (((firstGroupRot % 360) + 360) % 360);
+    } else if (selectedFrames.length > 1) {
       const firstRot = (((selectedFrames[0]?.rotation || 0) % 360) + 360) % 360;
       const allSameRot = selectedFrames.every(
         (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
       );
-      initialGroupRot = allSameRot ? firstRot : 0;
+      groupRot = allSameRot ? firstRot : 0;
     }
 
     set({
       selectedFrameIds: frameIds,
-      selectionGroupRotation: initialGroupRot,
+      selectionGroupRotation: groupRot,
       editingCropFrameId: null,
     });
   },
@@ -216,6 +252,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionGroupRotation: null,
       editingCropFrameId: null,
       activeSnapLines: [],
+    });
+  },
+
+  syncSelectionWithSpread: (spreadId: string, album?: Album) => {
+    const currentAlbum = album || useAlbumStore.getState().currentAlbum;
+    if (!currentAlbum) return;
+    const spreads = getAllAlbumSpreads(currentAlbum);
+    const spread = spreads.find((s) => s.id === spreadId);
+    if (!spread) return;
+
+    const { selectedFrameIds } = get();
+    const validSelectedIds = selectedFrameIds.filter((id) =>
+      (spread.elements || []).some((el) => el.id === id)
+    );
+
+    const selectedFrames = (spread.elements || []).filter((f) =>
+      validSelectedIds.includes(f.id)
+    );
+
+    let groupRot: number | null = null;
+    if (selectedFrames.length === 1) {
+      groupRot = selectedFrames[0]?.rotation || 0;
+    } else if (selectedFrames.length > 1) {
+      const firstGroupRot = selectedFrames[0]?.groupRotation;
+      const allSameGroupRot =
+        typeof firstGroupRot === 'number' &&
+        selectedFrames.every(
+          (f) =>
+            typeof f.groupRotation === 'number' &&
+            Math.abs(((((f.groupRotation % 360) + 360) % 360) - (((firstGroupRot % 360) + 360) % 360))) < 0.1
+        );
+
+      if (allSameGroupRot && typeof firstGroupRot === 'number') {
+        groupRot = (((firstGroupRot % 360) + 360) % 360);
+      } else {
+        const firstRot = (((selectedFrames[0]?.rotation || 0) % 360) + 360) % 360;
+        const allSameRot = selectedFrames.every(
+          (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
+        );
+        groupRot = allSameRot ? firstRot : 0;
+      }
+    }
+
+    set({
+      selectedFrameIds: validSelectedIds,
+      selectionGroupRotation: groupRot,
     });
   },
 
@@ -1017,29 +1099,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
-    // Push history once for the entire batch operation
-    useHistoryStore.getState().pushState(currentAlbum);
-
     const delta =
       deltaOrAngle === 'cw' ? 90 : deltaOrAngle === 'ccw' ? -90 : deltaOrAngle;
 
-    const updateElements = (elements: PhotoFrameElement[]) => {
-      const selectedFrames = elements.filter((f) => selectedFrameIds.includes(f.id));
-      if (selectedFrames.length === 0) return elements;
+    const spreads = getAllAlbumSpreads(currentAlbum);
+    const targetSpread = spreads.find((s) => s.id === spreadId);
+    if (!targetSpread) return;
 
-      if (selectedFrames.length === 1) {
-        const f = selectedFrames[0];
-        if (!f) return elements;
-        let targetRotation: number;
-        if (isAbsolute && typeof deltaOrAngle === 'number') {
-          targetRotation = ((deltaOrAngle % 360) + 360) % 360;
-        } else {
-          targetRotation = (((f.rotation || 0) + delta) % 360 + 360) % 360;
-        }
-        const rotatedGeo = calculateCenterRotatedPosition(f, targetRotation);
-        set({ selectionGroupRotation: targetRotation });
+    const selectedFrames = (targetSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+    if (selectedFrames.length === 0) return;
 
-        return elements.map((el) => {
+    if (selectedFrames.length === 1) {
+      const f = selectedFrames[0];
+      if (!f) return;
+      let targetRotation: number;
+      if (isAbsolute && typeof deltaOrAngle === 'number') {
+        targetRotation = ((deltaOrAngle % 360) + 360) % 360;
+      } else {
+        targetRotation = (((f.rotation || 0) + delta) % 360 + 360) % 360;
+      }
+
+      if (Math.abs((f.rotation || 0) - targetRotation) < 0.001) {
+        return;
+      }
+
+      useHistoryStore.getState().pushState(currentAlbum);
+      const rotatedGeo = calculateCenterRotatedPosition(f, targetRotation);
+      set({ selectionGroupRotation: targetRotation });
+
+      const updateElements = (elements: PhotoFrameElement[]) =>
+        elements.map((el) => {
           if (el.id !== f.id) return el;
           return {
             ...el,
@@ -1048,18 +1137,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             rotation: rotatedGeo.rotation,
           };
         });
+
+      if (currentAlbum.coverSpread.id === spreadId) {
+        useAlbumStore.setState({
+          currentAlbum: {
+            ...currentAlbum,
+            coverSpread: {
+              ...currentAlbum.coverSpread,
+              elements: updateElements(currentAlbum.coverSpread.elements || []),
+            },
+          },
+          saveStatus: 'unsaved',
+        });
+      } else {
+        const updatedSpreads = currentAlbum.spreads.map((s) =>
+          s.id === spreadId ? { ...s, elements: updateElements(s.elements || []) } : s
+        );
+        useAlbumStore.setState({
+          currentAlbum: { ...currentAlbum, spreads: updatedSpreads },
+          saveStatus: 'unsaved',
+        });
       }
+      return;
+    }
 
-      // Multi-Frame Group Rotation with Invariant Centers, Dimensions, and Gaps
-      const deltaDeg = typeof delta === 'number' ? delta : 90;
-      const updates = calculateMultiFrameRotation(selectedFrames, deltaDeg);
-      const updatedMap = new Map(updates.map((u) => [u.id, u.geometry]));
-
+    // Multi-Frame Group Rotation with Invariant Centers, Dimensions, and Gaps
+    let deltaDeg: number;
+    let nextGroupRot: number;
+    if (isAbsolute && typeof deltaOrAngle === 'number') {
+      const targetGroupRot = ((deltaOrAngle % 360) + 360) % 360;
+      const currentGroupRot = get().selectionGroupRotation ?? 0;
+      deltaDeg = targetGroupRot - currentGroupRot;
+      nextGroupRot = targetGroupRot;
+    } else {
+      deltaDeg = typeof delta === 'number' ? delta : 90;
       const prevRot = get().selectionGroupRotation ?? 0;
-      const nextRot = (((prevRot + deltaDeg) % 360) + 360) % 360;
-      set({ selectionGroupRotation: nextRot });
+      nextGroupRot = (((prevRot + deltaDeg) % 360) + 360) % 360;
+    }
 
-      return elements.map((el) => {
+    if (Math.abs(deltaDeg) < 0.001) {
+      return;
+    }
+
+    useHistoryStore.getState().pushState(currentAlbum);
+    const updates = calculateMultiFrameRotation(selectedFrames, deltaDeg);
+    const updatedMap = new Map(updates.map((u) => [u.id, u.geometry]));
+    set({ selectionGroupRotation: nextGroupRot });
+
+    const updateElements = (elements: PhotoFrameElement[]) =>
+      elements.map((el) => {
         const geom = updatedMap.get(el.id);
         if (!geom) return el;
         return {
@@ -1067,9 +1193,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           x: geom.x,
           y: geom.y,
           rotation: geom.rotation,
+          groupRotation: geom.groupRotation ?? nextGroupRot,
         };
       });
-    };
 
     if (currentAlbum.coverSpread.id === spreadId) {
       useAlbumStore.setState({

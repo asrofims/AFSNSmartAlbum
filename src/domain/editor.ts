@@ -15,6 +15,7 @@ export interface PhotoFrameElement {
   rotation: number; // 0 - 360 degrees
   zIndex: number;
   groupId?: string | null;
+  groupRotation?: number; // collective rotation orientation for multi-selection / layout grouping
 
   // Original photo metadata for Aspect Ratio restoration
   photoAspect?: number; // width / height of original master photo
@@ -1494,6 +1495,7 @@ export interface FrameBounds {
   width: number;
   height: number;
   rotation?: number;
+  groupRotation?: number;
 }
 
 /**
@@ -1998,13 +2000,13 @@ export function calculateCenterRotatedPosition(
 export function calculateMultiFrameRotation(
   frames: FrameBounds[],
   deltaAngle: number
-): { id: string; geometry: { x: number; y: number; rotation: number } }[] {
+): { id: string; geometry: { x: number; y: number; rotation: number; groupRotation?: number } }[] {
   if (frames.length === 0) return [];
   if (frames.length === 1) {
     const f = frames[0]!;
     const targetRot = (((f.rotation || 0) + deltaAngle) % 360 + 360) % 360;
     const rotated = calculateCenterRotatedPosition(f, targetRot);
-    return [{ id: f.id, geometry: rotated }];
+    return [{ id: f.id, geometry: { ...rotated, groupRotation: rotated.rotation } }];
   }
 
   // 1. Calculate the true visual center of the entire selection group
@@ -2065,12 +2067,16 @@ export function calculateMultiFrameRotation(
     const newX = newFcX - (halfW * Math.cos(newRad) - halfH * Math.sin(newRad));
     const newY = newFcY - (halfW * Math.sin(newRad) + halfH * Math.cos(newRad));
 
+    const currentGroupRot = f.groupRotation ?? 0;
+    const newGroupRot = (((currentGroupRot + deltaAngle) % 360) + 360) % 360;
+
     return {
       id: f.id,
       geometry: {
         x: roundToHundredth(newX),
         y: roundToHundredth(newY),
         rotation: Math.round(newRot * 10) / 10,
+        groupRotation: Math.round(newGroupRot * 10) / 10,
       },
     };
   });
@@ -2134,11 +2140,24 @@ export function computeMultiFrameGroupInfo(
   if (typeof preferredRotation === 'number') {
     groupRot = ((preferredRotation % 360) + 360) % 360;
   } else {
-    const firstRot = (((firstFrame?.rotation || 0) % 360) + 360) % 360;
-    const allSameRot = frames.every(
-      (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
-    );
-    groupRot = allSameRot ? firstRot : 0;
+    const firstGroupRot = frames[0]?.groupRotation;
+    const allSameGroupRot =
+      typeof firstGroupRot === 'number' &&
+      frames.every(
+        (f) =>
+          typeof f.groupRotation === 'number' &&
+          Math.abs(((((f.groupRotation % 360) + 360) % 360) - (((firstGroupRot % 360) + 360) % 360))) < 0.1
+      );
+
+    if (allSameGroupRot && typeof firstGroupRot === 'number') {
+      groupRot = ((firstGroupRot % 360) + 360) % 360;
+    } else {
+      const firstRot = (((firstFrame?.rotation || 0) % 360) + 360) % 360;
+      const allSameRot = frames.every(
+        (f) => Math.abs(((((f.rotation || 0) % 360) + 360) % 360) - firstRot) < 0.1
+      );
+      groupRot = allSameRot ? firstRot : 0;
+    }
   }
 
   const rad = (groupRot * Math.PI) / 180;
@@ -2287,6 +2306,7 @@ export function calculateRotatedMultiFrameResize(
         width: newWidth,
         height: newHeight,
         rotation: worldGeom.rotation,
+        groupRotation: groupInfo.groupRotation,
       },
     };
   });

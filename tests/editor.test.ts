@@ -1048,4 +1048,9 @@ console.assert(cyclicFrames[1].rotation === 0, `f2 rotation after 360° must be 
 const groupInfoPreferred = computeMultiFrameGroupInfo(mixedFrames, 90);
 console.assert(groupInfoPreferred.groupRotation === 90, `Group rotation should honor preferredRotation 90°, got ${groupInfoPreferred.groupRotation}`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');
+// 18n. Persistent Group Rotation Propagation
+const rotatedWithGroup = calculateMultiFrameRotation(mixedFrames, 45);
+console.assert(rotatedWithGroup[0].geometry.groupRotation === 45, `f1 should have groupRotation 45, got ${rotatedWithGroup[0].geometry.groupRotation}`);
+console.assert(rotatedWithGroup[1].geometry.groupRotation === 45, `f2 should have groupRotation 45, got ${rotatedWithGroup[1].geometry.groupRotation}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');

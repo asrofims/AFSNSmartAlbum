@@ -70,6 +70,7 @@ export function WorkspaceLayout() {
   const resetCrop = useEditorStore((s) => s.resetCrop);
   const resetSelectedCrop = useEditorStore((s) => s.resetSelectedCrop);
   const rotateSelectedFrames = useEditorStore((s) => s.rotateSelectedFrames);
+  const selectionGroupRotation = useEditorStore((s) => s.selectionGroupRotation);
   const editingCropFrameId = useEditorStore((s) => s.editingCropFrameId);
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
   const exitCropMode = useEditorStore((s) => s.exitCropMode);
@@ -940,9 +941,10 @@ export function WorkspaceLayout() {
                           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={
-                                selectedFrameIds.length > 0
+                                selectionGroupRotation ??
+                                (selectedFrameIds.length > 0
                                   ? ((activeSpread.elements || []).find((f) => f.id === selectedFrameIds[0])?.rotation || 0)
-                                  : 0
+                                  : 0)
                               }
                               onChange={(newRot) =>
                                 rotateSelectedFrames(activeSpread.id, newRot, true)
