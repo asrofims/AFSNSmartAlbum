@@ -38,6 +38,7 @@
 
 ## Phase 3 — Album Structure
 - [x] Spread Model (Left Page, Center Gutter/Crease, Spine Width, Right Page)
+- [x] **Dynamic Multi-Scope Background Color System** (Full Spread Canvas, Left Page Only, Right Page Only, and Global Album Propagation)
 - [x] Bleed Cut Line Guides (Red overlay)
 - [x] Safe Zone Margin Guides (Blue overlay)
 - [x] Spread Navigator (Bottom bar, jump selector, thumbnail drawer)

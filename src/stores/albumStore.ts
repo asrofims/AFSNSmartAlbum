@@ -63,6 +63,8 @@ export interface AlbumState {
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
   updatePhotoInset: (photoInset: number, side?: 'all' | 'top' | 'bottom' | 'left' | 'right') => void;
+  updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
+  applyBackgroundColorToAllSpreads: (color: string) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
   selectPage: (pageId: string | null) => void;
   setSpreadDrawerOpen: (isOpen: boolean) => void;
@@ -587,6 +589,100 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     set({
       currentAlbum: {
         ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  updateSpreadBackgroundColor: (
+    spreadId: string,
+    color: string,
+    scope: 'spread' | 'left' | 'right' = 'spread'
+  ) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+
+    if (isCover) {
+      const cover = currentAlbum.coverSpread;
+      const updatedLeft = cover.leftPage
+        ? { ...cover.leftPage, backgroundColor: scope === 'right' ? cover.leftPage.backgroundColor : color }
+        : cover.leftPage;
+      const updatedRight = cover.rightPage
+        ? { ...cover.rightPage, backgroundColor: scope === 'left' ? cover.rightPage.backgroundColor : color }
+        : cover.rightPage;
+      const updatedCover: Spread = {
+        ...cover,
+        backgroundColor: scope === 'spread' ? color : cover.backgroundColor,
+        leftPage: updatedLeft,
+        rightPage: updatedRight,
+      };
+
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: updatedCover,
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) => {
+      if (s.id !== spreadId) return s;
+
+      const updatedLeft = s.leftPage
+        ? { ...s.leftPage, backgroundColor: scope === 'right' ? s.leftPage.backgroundColor : color }
+        : s.leftPage;
+      const updatedRight = s.rightPage
+        ? { ...s.rightPage, backgroundColor: scope === 'left' ? s.rightPage.backgroundColor : color }
+        : s.rightPage;
+
+      return {
+        ...s,
+        backgroundColor: scope === 'spread' ? color : s.backgroundColor,
+        leftPage: updatedLeft,
+        rightPage: updatedRight,
+      };
+    });
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  applyBackgroundColorToAllSpreads: (color: string) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updatedCover: Spread = {
+      ...currentAlbum.coverSpread,
+      backgroundColor: color,
+      leftPage: currentAlbum.coverSpread.leftPage ? { ...currentAlbum.coverSpread.leftPage, backgroundColor: color } : currentAlbum.coverSpread.leftPage,
+      rightPage: currentAlbum.coverSpread.rightPage ? { ...currentAlbum.coverSpread.rightPage, backgroundColor: color } : currentAlbum.coverSpread.rightPage,
+    };
+
+    const updatedSpreads = currentAlbum.spreads.map((s) => ({
+      ...s,
+      backgroundColor: color,
+      leftPage: s.leftPage ? { ...s.leftPage, backgroundColor: color } : s.leftPage,
+      rightPage: s.rightPage ? { ...s.rightPage, backgroundColor: color } : s.rightPage,
+    }));
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
         spreads: updatedSpreads,
       },
       saveStatus: 'unsaved',

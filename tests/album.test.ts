@@ -223,4 +223,33 @@ if (movedRight) {
 const invalidMoveLeft = moveAlbumSpread(recalculated, spread1.id, 'left');
 console.assert(invalidMoveLeft === null, 'Moving first spread left should return null');
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering)!');
+// 10. Test Background Color Propagation from Project Default
+const darkProject: Project = {
+  ...mockProject,
+  id: 'test-proj-dark',
+  backgroundColor: '#1E293B',
+};
+const darkAlbum = createInitialAlbum(darkProject);
+console.assert(darkAlbum.spreads[0].backgroundColor === '#1E293B', 'Initial spread should inherit project backgroundColor');
+console.assert(darkAlbum.spreads[0].leftPage?.backgroundColor === '#1E293B', 'Initial left page should inherit project backgroundColor');
+console.assert(darkAlbum.spreads[0].rightPage?.backgroundColor === '#1E293B', 'Initial right page should inherit project backgroundColor');
+
+const darkSpread2 = createInteriorSpread(darkAlbum, darkProject, 2);
+console.assert(darkSpread2.backgroundColor === '#1E293B', 'New interior spread should inherit project backgroundColor');
+console.assert(darkSpread2.leftPage?.backgroundColor === '#1E293B', 'New left page should inherit project backgroundColor');
+console.assert(darkSpread2.rightPage?.backgroundColor === '#1E293B', 'New right page should inherit project backgroundColor');
+
+// Test Duplicating Spread with custom page background colors
+darkSpread2.leftPage!.backgroundColor = '#FDFBF7'; // Cream
+darkSpread2.rightPage!.backgroundColor = '#000000'; // Black
+darkAlbum.spreads.push(darkSpread2);
+
+const dupResult = duplicateAlbumSpread(darkAlbum, darkProject, darkSpread2.id);
+console.assert(dupResult !== null, 'duplicateAlbumSpread should succeed');
+if (dupResult) {
+  const clonedSpread = dupResult.updatedAlbum.spreads.find((s) => s.id === dupResult.newSpreadId);
+  console.assert(clonedSpread?.leftPage?.backgroundColor === '#FDFBF7', 'Duplicated spread should preserve left page background color');
+  console.assert(clonedSpread?.rightPage?.backgroundColor === '#000000', 'Duplicated spread should preserve right page background color');
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation)!');

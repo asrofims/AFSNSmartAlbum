@@ -27,6 +27,16 @@ import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
 import styles from './WorkspaceLayout.module.css';
 
+const BG_PRESET_PALETTE = [
+  { name: 'Pure White', color: '#FFFFFF' },
+  { name: 'Off-White', color: '#F8FAFC' },
+  { name: 'Warm Cream', color: '#FDFBF7' },
+  { name: 'Neutral Gray', color: '#E2E8F0' },
+  { name: 'Slate Neutral', color: '#64748B' },
+  { name: 'Dark Charcoal', color: '#1E293B' },
+  { name: 'Rich Black', color: '#000000' },
+];
+
 export function WorkspaceLayout() {
   useAutoSave();
 
@@ -40,6 +50,7 @@ export function WorkspaceLayout() {
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
   const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
   const updateProjectPhotoInset = useProjectStore((s) => s.updateProjectPhotoInset);
+  const updateProjectBackgroundColor = useProjectStore((s) => s.updateProjectBackgroundColor);
   const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
   const exportCompleteProjectPackageWithPhotos = useProjectStore((s) => s.exportCompleteProjectPackageWithPhotos);
@@ -54,6 +65,8 @@ export function WorkspaceLayout() {
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
   const updatePhotoInset = useAlbumStore((s) => s.updatePhotoInset);
+  const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
+  const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
   const lastSavedAt = useAlbumStore((s) => s.lastSavedAt);
   const saveAlbumToDb = useAlbumStore((s) => s.saveAlbumToDb);
@@ -87,6 +100,7 @@ export function WorkspaceLayout() {
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
   const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout' | 'locks'>('properties');
+  const [bgScope, setBgScope] = useState<'spread' | 'left' | 'right'>('spread');
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -1685,6 +1699,229 @@ export function WorkspaceLayout() {
                   <span className={styles.propValue}>{currentProject.canvasDpi} DPI</span>
                 </div>
               </div>
+
+              {/* Background Color Section */}
+              {(() => {
+                const activeSpreadBg = activeSpread?.backgroundColor || currentProject?.backgroundColor || '#FFFFFF';
+                const currentScopeColor =
+                  bgScope === 'left'
+                    ? (activeSpread?.leftPage?.backgroundColor || activeSpreadBg)
+                    : bgScope === 'right'
+                    ? (activeSpread?.rightPage?.backgroundColor || activeSpreadBg)
+                    : activeSpreadBg;
+
+                return (
+                  <div className={styles.propSection}>
+                    <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Background Color</span>
+                    </div>
+
+                    {/* Scope Selector (Full Spread, Left Page, Right Page) */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr 1fr',
+                        gap: '4px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        padding: '3px',
+                        borderRadius: 'var(--radius-md)',
+                        marginBottom: '10px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'spread' ? 600 : 400,
+                          color: bgScope === 'spread' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'spread' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('spread')}
+                        title="Apply background color to the entire canvas (both pages & spine)"
+                      >
+                        ◫ Spread
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'left' ? 600 : 400,
+                          color: bgScope === 'left' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'left' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('left')}
+                        title="Apply background color to Left Page only"
+                      >
+                        ◧ Left
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'right' ? 600 : 400,
+                          color: bgScope === 'right' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'right' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('right')}
+                        title="Apply background color to Right Page only"
+                      >
+                        ◨ Right
+                      </button>
+                    </div>
+
+                    {/* Color Swatch & Hex Input (Fixed layout, zero jitter) */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '26px',
+                            height: '26px',
+                            flexShrink: 0,
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: currentScopeColor,
+                            border: '1px solid var(--color-border)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                          }}
+                          title="Click to choose custom color"
+                        >
+                          <input
+                            type="color"
+                            value={currentScopeColor.startsWith('#') && currentScopeColor.length === 7 ? currentScopeColor : '#FFFFFF'}
+                            onChange={(e) => {
+                              if (activeSpread) {
+                                updateSpreadBackgroundColor(activeSpread.id, e.target.value, bgScope);
+                              }
+                            }}
+                            style={{
+                              position: 'absolute',
+                              inset: '-4px',
+                              width: '36px',
+                              height: '36px',
+                              opacity: 0,
+                              cursor: 'pointer',
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                          Color Code
+                        </span>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={currentScopeColor.toUpperCase()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (activeSpread) {
+                            updateSpreadBackgroundColor(activeSpread.id, val, bgScope);
+                          }
+                        }}
+                        style={{
+                          width: '78px',
+                          padding: '4px 6px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          textAlign: 'center',
+                          backgroundColor: 'rgba(0,0,0,0.2)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-text-primary)',
+                        }}
+                      />
+                    </div>
+
+                    {/* Preset Palette Swatches */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                      {BG_PRESET_PALETTE.map((item) => (
+                        <button
+                          key={item.color}
+                          type="button"
+                          onClick={() => {
+                            if (activeSpread) {
+                              updateSpreadBackgroundColor(activeSpread.id, item.color, bgScope);
+                            }
+                          }}
+                          title={`${item.name} (${item.color})`}
+                          style={{
+                            flex: 1,
+                            height: '22px',
+                            backgroundColor: item.color,
+                            border: currentScopeColor.toLowerCase() === item.color.toLowerCase()
+                              ? '2px solid var(--color-accent)'
+                              : '1px solid var(--color-border)',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.1s ease',
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Quick Propagation Actions */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{
+                          fontSize: '10px',
+                          padding: '5px 6px',
+                          justifyContent: 'center',
+                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        }}
+                        onClick={() => {
+                          applyBackgroundColorToAllSpreads(currentScopeColor);
+                          showToast(`Applied ${currentScopeColor} to all spreads`);
+                        }}
+                        title="Apply current color to all spreads in the album"
+                      >
+                        Apply to All Spreads
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        style={{
+                          fontSize: '10px',
+                          padding: '5px 6px',
+                          justifyContent: 'center',
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          color: 'var(--color-accent)',
+                        }}
+                        onClick={async () => {
+                          await updateProjectBackgroundColor(currentScopeColor);
+                          showToast(`Set ${currentScopeColor} as project default`);
+                        }}
+                        title="Set this color as default for newly created spreads & project settings"
+                      >
+                        Set as Default
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
               <div className={styles.propSection}>

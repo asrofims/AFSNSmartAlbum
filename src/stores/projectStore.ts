@@ -16,6 +16,7 @@ interface ProjectState {
   updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
   updateProjectMargin: (marginValue: number, marginUnit?: Unit) => Promise<void>;
   updateProjectPhotoInset: (photoInset: number, photoInsetUnit?: Unit) => Promise<void>;
+  updateProjectBackgroundColor: (backgroundColor: string) => Promise<void>;
   closeProject: () => void;
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
@@ -161,6 +162,32 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentProject: updatedProject,
       recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
     }));
+  },
+
+  updateProjectBackgroundColor: async (backgroundColor: string) => {
+    const current = get().currentProject;
+    if (!current) return;
+    const cleanColor = backgroundColor.trim();
+    if (!cleanColor) return;
+    const updatedProject: Project = {
+      ...current,
+      backgroundColor: cleanColor,
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      currentProject: updatedProject,
+      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
+    }));
+
+    // Update in localStorage recents
+    try {
+      const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
+      const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
+      localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
+    } catch (e) {
+      console.warn('[AFSN] localStorage write error:', e);
+    }
   },
 
   closeProject: async () => {

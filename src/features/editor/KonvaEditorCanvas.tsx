@@ -1822,17 +1822,59 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         >
           {/* Layer 1: Background & Page Sheet */}
           <Layer>
-            {/* Spread Sheet Board */}
+            {/* Spread Sheet Board (Drop Shadow & Base) */}
             <Rect
               name="background-sheet"
               x={0}
               y={0}
               width={screenSpreadW}
               height={screenSpreadH}
-              fill={activeSpread.backgroundColor || '#FFFFFF'}
+              fill={activeSpread.backgroundColor || currentProject?.backgroundColor || '#FFFFFF'}
               shadowColor="rgba(0,0,0,0.6)"
               shadowBlur={16}
               shadowOffset={{ x: 0, y: 8 }}
+            />
+
+            {/* Left Page Background */}
+            <Rect
+              name="background-left-page"
+              x={0}
+              y={0}
+              width={leftPagePixelW}
+              height={screenSpreadH}
+              fill={
+                activeSpread.leftPage?.backgroundColor ||
+                activeSpread.backgroundColor ||
+                currentProject?.backgroundColor ||
+                '#FFFFFF'
+              }
+            />
+
+            {/* Center Gutter / Spine Background (if gutter > 0) */}
+            {gutterPixelW > 0 && (
+              <Rect
+                name="background-gutter-spine"
+                x={leftPagePixelW}
+                y={0}
+                width={gutterPixelW}
+                height={screenSpreadH}
+                fill={activeSpread.backgroundColor || currentProject?.backgroundColor || '#FFFFFF'}
+              />
+            )}
+
+            {/* Right Page Background */}
+            <Rect
+              name="background-right-page"
+              x={leftPagePixelW + gutterPixelW}
+              y={0}
+              width={rightPagePixelW}
+              height={screenSpreadH}
+              fill={
+                activeSpread.rightPage?.backgroundColor ||
+                activeSpread.backgroundColor ||
+                currentProject?.backgroundColor ||
+                '#FFFFFF'
+              }
             />
 
             {/* Center Gutter / Spine Fold Guide */}

@@ -182,6 +182,8 @@ export function createInitialAlbum(project: Project): Album {
     elements: [],
   };
 
+  const defaultBgColor = project.backgroundColor || '#FFFFFF';
+
   // 2. Initial Interior Spread (Spread 1: Page 1 & Page 2)
   const page1: Page = {
     id: `${albumId}-page-1`,
@@ -192,7 +194,7 @@ export function createInitialAlbum(project: Project): Album {
     unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     backgroundType: 'solid',
   };
 
@@ -205,7 +207,7 @@ export function createInitialAlbum(project: Project): Album {
     unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     backgroundType: 'solid',
   };
 
@@ -220,7 +222,7 @@ export function createInitialAlbum(project: Project): Album {
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     elements: [],
   };
 
@@ -250,6 +252,7 @@ export function createInteriorSpread(
   const pageH = project.canvasHeight;
   const marginVal = project.marginValue || 10;
   const bleedVal = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
+  const defaultBgColor = project.backgroundColor || '#FFFFFF';
 
   const leftPageNum = (spreadNumber - 1) * 2 + 1;
   const rightPageNum = leftPageNum + 1;
@@ -264,7 +267,7 @@ export function createInteriorSpread(
     unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     backgroundType: 'solid',
   };
 
@@ -277,7 +280,7 @@ export function createInteriorSpread(
     unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     backgroundType: 'solid',
   };
 
@@ -292,7 +295,7 @@ export function createInteriorSpread(
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: defaultBgColor,
     elements: [],
   };
 }

@@ -38,7 +38,9 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
   const actualSpreadW = Math.round(totalPhysicalW * scale);
   const actualSpreadH = Math.round(totalPhysicalH * scale);
   const spineX = (spread.leftPage ? spread.leftPage.width : totalPhysicalW / 2) * scale;
-  const bgStyle = project.backgroundType === 'color' ? project.backgroundColor || '#ffffff' : '#ffffff';
+  const spreadBgColor = spread.backgroundColor || project.backgroundColor || '#FFFFFF';
+  const leftPageBg = spread.leftPage?.backgroundColor || spreadBgColor;
+  const rightPageBg = spread.rightPage?.backgroundColor || spreadBgColor;
 
   return (
     <div
@@ -47,10 +49,34 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         position: 'relative',
         width: `${actualSpreadW}px`,
         height: `${actualSpreadH}px`,
-        backgroundColor: bgStyle,
+        backgroundColor: spreadBgColor,
         overflow: 'hidden',
       }}
     >
+      {/* Left Page Background */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: `${spineX}px`,
+          backgroundColor: leftPageBg,
+        }}
+      />
+
+      {/* Right Page Background */}
+      <div
+        style={{
+          position: 'absolute',
+          left: `${spineX}px`,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          backgroundColor: rightPageBg,
+        }}
+      />
+
       {/* Spine / Gutter Line */}
       <div
         style={{
@@ -59,7 +85,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           top: 0,
           bottom: 0,
           width: '1px',
-          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          backgroundColor: 'rgba(0, 0, 0, 0.25)',
           zIndex: 1,
         }}
       />

@@ -423,6 +423,33 @@ where
     let bg_color = parse_hex_color(&spread.background_color);
     let mut canvas: RgbaImage = ImageBuffer::from_pixel(canvas_w_px, canvas_h_px, bg_color);
 
+    // Fill Left Page and Right Page distinct backgrounds if configured
+    let left_bg = spread.left_page.as_ref().map(|p| parse_hex_color(&p.background_color)).unwrap_or(bg_color);
+    let right_bg = spread.right_page.as_ref().map(|p| parse_hex_color(&p.background_color)).unwrap_or(bg_color);
+
+    let left_page_w_px = ((single_page_w + if include_bleed { bleed } else { 0.0 }) * scale).round() as u32;
+    let right_page_start_x = if include_bleed {
+        ((single_page_w + bleed + gutter_w) * scale).round() as u32
+    } else {
+        ((single_page_w + gutter_w) * scale).round() as u32
+    };
+
+    if left_bg != bg_color {
+        for y in 0..canvas_h_px {
+            for x in 0..left_page_w_px.min(canvas_w_px) {
+                canvas.put_pixel(x, y, left_bg);
+            }
+        }
+    }
+
+    if right_bg != bg_color {
+        for y in 0..canvas_h_px {
+            for x in right_page_start_x.min(canvas_w_px)..canvas_w_px {
+                canvas.put_pixel(x, y, right_bg);
+            }
+        }
+    }
+
     // Sort elements by z_index
     let mut sorted_elements = spread.elements.clone();
     sorted_elements.sort_by_key(|e| e.z_index);
@@ -450,7 +477,7 @@ pub fn render_spread_to_image(
     render_spread_to_image_with_progress(project, spread, dpi, include_bleed, |_, _| true)
 }
 
-/// Slices a spread image into Left Page and Right Page
+/// Slices a spread image into Left Page and Right Page with zero cross-page bleed overlap
 pub fn split_spread_into_pages(
     spread_img: &RgbaImage,
     project: &ProjectRow,
@@ -462,15 +489,17 @@ pub fn split_spread_into_pages(
     let single_page_w = project.canvas_width;
     let gutter_w = spread.gutter_width;
     let bleed = spread.bleed;
+    let total_w = spread_img.width();
+    let total_h = spread_img.height();
 
-    let page_w_px = (if include_bleed { (single_page_w + bleed * 1.5) * scale } else { (single_page_w + gutter_w * 0.5) * scale }).round() as u32;
-    let page_h_px = spread_img.height();
+    let spine_center_x = (((if include_bleed { bleed } else { 0.0 }) + single_page_w + gutter_w * 0.5) * scale).round() as u32;
+    let spine_center_x = spine_center_x.min(total_w);
 
-    let left_x = 0;
-    let right_x = (spread_img.width().saturating_sub(page_w_px)).max(0);
+    let left_w = spine_center_x;
+    let right_w = total_w.saturating_sub(spine_center_x);
 
-    let left_page = image::imageops::crop_imm(spread_img, left_x, 0, page_w_px.min(spread_img.width()), page_h_px).to_image();
-    let right_page = image::imageops::crop_imm(spread_img, right_x, 0, page_w_px.min(spread_img.width() - right_x), page_h_px).to_image();
+    let left_page = image::imageops::crop_imm(spread_img, 0, 0, left_w, total_h).to_image();
+    let right_page = image::imageops::crop_imm(spread_img, spine_center_x, 0, right_w, total_h).to_image();
 
     (left_page, right_page)
 }

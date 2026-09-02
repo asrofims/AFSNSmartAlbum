@@ -293,6 +293,10 @@ impl Database {
             Self::migrate_v8(conn)?;
         }
 
+        if current_version < 9 {
+            Self::migrate_v9(conn)?;
+        }
+
         Ok(())
     }
 
@@ -558,6 +562,30 @@ impl Database {
         }
 
         log::info!("Applied database migration v8");
+        Ok(())
+    }
+
+    /// Schema version 9: Add left_page_background_color and right_page_background_color to album_spreads table.
+    fn migrate_v9(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(album_spreads)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"left_page_background_color".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE album_spreads ADD COLUMN left_page_background_color TEXT;
+                ALTER TABLE album_spreads ADD COLUMN right_page_background_color TEXT;
+                INSERT INTO schema_version (version) VALUES (9);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (9)", [])?;
+        }
+
+        log::info!("Applied database migration v9");
         Ok(())
     }
 
@@ -1285,14 +1313,17 @@ impl Database {
         fn insert_spread_record(tx: &rusqlite::Transaction, project_id: &str, spread: &SpreadPayload, is_cover: bool) -> SqliteResult<()> {
             let left_id = spread.left_page.as_ref().map(|p| p.id.clone());
             let right_id = spread.right_page.as_ref().map(|p| p.id.clone());
+            let left_bg = spread.left_page.as_ref().map(|p| p.background_color.clone()).unwrap_or_else(|| spread.background_color.clone());
+            let right_bg = spread.right_page.as_ref().map(|p| p.background_color.clone()).unwrap_or_else(|| spread.background_color.clone());
 
             tx.execute(
                 "INSERT INTO album_spreads (
                     id, project_id, spread_index, spread_type, name,
                     left_page_id, right_page_id, gutter_width, gutter_unit,
                     bleed, safe_area, background_color, is_cover,
+                    left_page_background_color, right_page_background_color,
                     created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'), datetime('now'))",
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, datetime('now'), datetime('now'))",
                 rusqlite::params![
                     spread.id,
                     project_id,
@@ -1307,6 +1338,8 @@ impl Database {
                     spread.safe_area,
                     spread.background_color,
                     if is_cover { 1 } else { 0 },
+                    left_bg,
+                    right_bg,
                 ],
             )?;
 
@@ -1424,6 +1457,7 @@ impl Database {
             "SELECT id, project_id, spread_index, spread_type, name,
                     left_page_id, right_page_id, gutter_width, gutter_unit,
                     bleed, safe_area, background_color, is_cover,
+                    left_page_background_color, right_page_background_color,
                     created_at, updated_at
              FROM album_spreads
              WHERE project_id = ?1
@@ -1444,6 +1478,9 @@ impl Database {
 
         let spread_rows = spread_stmt.query_map([project_id], |row| {
             let is_cover_int: i32 = row.get(12).unwrap_or(0);
+            let bg: String = row.get::<_, String>(11).unwrap_or_else(|_| "#FFFFFF".to_string());
+            let left_bg: String = row.get::<_, Option<String>>(13).ok().flatten().unwrap_or_else(|| bg.clone());
+            let right_bg: String = row.get::<_, Option<String>>(14).ok().flatten().unwrap_or_else(|| bg.clone());
             Ok((
                 row.get::<_, String>(0)?, // id
                 row.get::<_, String>(1).unwrap_or_default(), // project_id
@@ -1456,8 +1493,10 @@ impl Database {
                 row.get::<_, String>(8).unwrap_or_else(|_| "mm".to_string()), // gutter_unit
                 row.get::<_, f64>(9).unwrap_or(3.0),    // bleed
                 row.get::<_, f64>(10).unwrap_or(10.0),   // safe_area
-                row.get::<_, String>(11).unwrap_or_else(|_| "#FFFFFF".to_string()), // background_color
-                is_cover_int != 0,        // is_cover
+                bg,                                     // background_color
+                is_cover_int != 0,                      // is_cover
+                left_bg,                                // left_page_background_color
+                right_bg,                               // right_page_background_color
             ))
         })?;
 
@@ -1465,7 +1504,7 @@ impl Database {
         let mut interior_spreads: Vec<SpreadPayload> = Vec::new();
 
         for s_res in spread_rows {
-            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, background_color, is_cover) = s_res?;
+            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, background_color, is_cover, left_bg, right_bg) = s_res?;
 
             // Load elements for this spread
             let elem_rows = elem_stmt.query_map([&id], |er| {
@@ -1519,7 +1558,7 @@ impl Database {
                     unit: project.canvas_unit.clone(),
                     bleed,
                     safe_area,
-                    background_color: background_color.clone(),
+                    background_color: left_bg,
                     background_type: "solid".to_string(),
                 };
                 let right = PagePayload {
@@ -1531,7 +1570,7 @@ impl Database {
                     unit: project.canvas_unit.clone(),
                     bleed,
                     safe_area,
-                    background_color: background_color.clone(),
+                    background_color: right_bg,
                     background_type: "solid".to_string(),
                 };
                 (Some(left), Some(right))
@@ -1547,7 +1586,7 @@ impl Database {
                     unit: project.canvas_unit.clone(),
                     bleed,
                     safe_area,
-                    background_color: background_color.clone(),
+                    background_color: left_bg,
                     background_type: "solid".to_string(),
                 };
                 let right = PagePayload {
@@ -1559,7 +1598,7 @@ impl Database {
                     unit: project.canvas_unit.clone(),
                     bleed,
                     safe_area,
-                    background_color: background_color.clone(),
+                    background_color: right_bg,
                     background_type: "solid".to_string(),
                 };
                 (Some(left), Some(right))
