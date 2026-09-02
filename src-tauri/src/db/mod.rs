@@ -848,6 +848,63 @@ impl Database {
         Ok(())
     }
 
+    pub fn add_photos_batch(&self, photos: &[PhotoRow], folder_id: Option<&str>) -> SqliteResult<()> {
+        if photos.is_empty() {
+            return Ok(());
+        }
+
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO photos (
+                    id, project_id, file_path, file_name, file_size,
+                    width, height, format, thumbnail_path, thumbnail_base64,
+                    preview_path, is_favorite, used_count, is_missing,
+                    created_at, updated_at
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5,
+                    ?6, ?7, ?8, ?9, ?10,
+                    ?11, ?12, ?13, ?14,
+                    datetime('now'), datetime('now')
+                )",
+            )?;
+
+            for photo in photos {
+                stmt.execute(rusqlite::params![
+                    photo.id,
+                    photo.project_id,
+                    photo.file_path,
+                    photo.file_name,
+                    photo.file_size,
+                    photo.width,
+                    photo.height,
+                    photo.format,
+                    photo.thumbnail_path,
+                    photo.thumbnail_base64,
+                    photo.preview_path,
+                    photo.is_favorite as i32,
+                    photo.used_count,
+                    photo.is_missing as i32,
+                ])?;
+            }
+        }
+
+        if let Some(fid) = folder_id {
+            let mut folder_stmt = tx.prepare(
+                "INSERT OR IGNORE INTO photo_folder_members (folder_id, photo_id, created_at)
+                 VALUES (?1, ?2, datetime('now'))",
+            )?;
+            for photo in photos {
+                folder_stmt.execute(rusqlite::params![fid, photo.id])?;
+            }
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn get_photos_for_project(&self, project_id: &str) -> SqliteResult<Vec<PhotoRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -2153,6 +2210,65 @@ mod tests {
         let zip_imported = db.import_project_package(zip_path.to_str().unwrap()).expect("Failed import zip bundle");
         assert_eq!(zip_imported.project.id, "test-id-1");
         assert!(zip_imported.photos.iter().any(|p| p.file_name == "sample_img.jpg"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_batch_photo_insertion() {
+        let temp_dir = std::env::temp_dir().join("afsn_test_db_batch");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let db = Database::init(temp_dir.join("test_batch.db")).expect("Failed to init DB");
+
+        db.ensure_project_exists("proj-batch", "Batch Test Album").unwrap();
+        let folder = db.create_folder("folder-1", "proj-batch", "Portraits").unwrap();
+
+        let photos = vec![
+            PhotoRow {
+                id: "p-batch-1".to_string(),
+                project_id: "proj-batch".to_string(),
+                file_path: "/dummy/path1.jpg".to_string(),
+                file_name: "path1.jpg".to_string(),
+                file_size: 1024,
+                width: 1920,
+                height: 1080,
+                format: "jpg".to_string(),
+                thumbnail_path: None,
+                thumbnail_base64: None,
+                preview_path: None,
+                is_favorite: false,
+                used_count: 0,
+                is_missing: false,
+                created_at: "now".to_string(),
+                updated_at: "now".to_string(),
+            },
+            PhotoRow {
+                id: "p-batch-2".to_string(),
+                project_id: "proj-batch".to_string(),
+                file_path: "/dummy/path2.jpg".to_string(),
+                file_name: "path2.jpg".to_string(),
+                file_size: 2048,
+                width: 1920,
+                height: 1080,
+                format: "jpg".to_string(),
+                thumbnail_path: None,
+                thumbnail_base64: None,
+                preview_path: None,
+                is_favorite: false,
+                used_count: 0,
+                is_missing: false,
+                created_at: "now".to_string(),
+                updated_at: "now".to_string(),
+            },
+        ];
+
+        db.add_photos_batch(&photos, Some(&folder.id)).expect("Batch insert failed");
+
+        let project_photos = db.get_photos_for_project("proj-batch").unwrap();
+        assert_eq!(project_photos.len(), 2);
+
+        let folder_photos = db.get_photos_for_folder(&folder.id).unwrap();
+        assert_eq!(folder_photos.len(), 2);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

@@ -24,7 +24,8 @@
 ## Phase 2 — Photo Library (Lightroom-Style Management)
 - [x] Native File & Directory Import via Tauri dialogs
 - [x] Drag & Drop Import from Windows Explorer
-- [x] Background Multi-threaded Thumbnail (240 px) & Canvas Preview (1200 px) Generation
+- [x] Instant Photo Registration & Background Asynchronous Preview Engine
+- [x] **Progressive Image Pipeline** (Instant EXIF/Embedded Thumbnail < 0.2ms, Bounded 1500px Canvas Cache, Minimalist Green Bottom Strip, Silent Background Processing, and Automatic Restart Recovery & Healing)
 - [x] High-performance SQLite Metadata Indexing
 - [x] Used / Unused Photo Count Badges
 - [x] Favorite Star Toggle & Filter

@@ -72,14 +72,8 @@ export function mergeFramePhotoAsset(frame: PhotoFrameElement, photo?: PhotoAsse
   }
 
   const nextFilePath = photo.filePath || frame.filePath || '';
-  const nextPreviewPath = photo.previewPath
-    || (!photo.isMissing ? photo.filePath : '')
-    || photo.thumbnailPath
-    || frame.thumbnailPath
-    || frame.previewPath
-    || frame.filePath
-    || '';
-  const nextThumbnailPath = photo.thumbnailPath || frame.thumbnailPath || '';
+  const nextPreviewPath = photo.previewPath || photo.thumbnailPath || '';
+  const nextThumbnailPath = photo.thumbnailPath || '';
   const nextPhotoAspect = photo.width > 0 && photo.height > 0
     ? Math.round((photo.width / photo.height) * 1000) / 1000
     : frame.photoAspect;
@@ -91,6 +85,7 @@ export function mergeFramePhotoAsset(frame: PhotoFrameElement, photo?: PhotoAsse
     previewPath: nextPreviewPath,
     thumbnailPath: nextThumbnailPath,
     photoAspect: nextPhotoAspect,
+    isMissing: photo.isMissing,
   };
 
   return isDifferentFrameAsset(frame, nextFrame) ? nextFrame : frame;

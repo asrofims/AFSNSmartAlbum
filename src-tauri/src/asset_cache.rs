@@ -66,11 +66,18 @@ fn is_generated_cache_asset(path: &Path) -> bool {
         && path
             .extension()
             .and_then(|extension| extension.to_str())
-            .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "webp"))
+            .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "webp" | "tmp"))
             .unwrap_or(false)
 }
 
 fn cache_file_is_referenced(path: &Path, live_photo_ids: &HashSet<String>) -> bool {
+    // Any .tmp file is an incomplete temporary artifact and should always be cleaned up
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        if ext.eq_ignore_ascii_case("tmp") {
+            return false;
+        }
+    }
+
     path.file_stem()
         .and_then(|file_name| file_name.to_str())
         .map(|photo_id| live_photo_ids.contains(photo_id))
@@ -92,16 +99,18 @@ mod tests {
 
         fs::write(thumbnails.join("photo-live.jpg"), b"thumb").unwrap();
         fs::write(previews.join("photo-orphan.jpg"), b"preview").unwrap();
+        fs::write(previews.join("photo-interrupted.tmp"), b"junk_tmp_bytes").unwrap();
         fs::write(previews.join("readme.txt"), b"keep").unwrap();
 
         let live_photo_ids = HashSet::from(["photo-live".to_string()]);
         let report = cleanup_asset_directories(&[thumbnails.clone(), previews.clone()], &live_photo_ids)
             .expect("Cache cleanup should succeed");
 
-        assert_eq!(report.removed_files, 1);
-        assert_eq!(report.reclaimed_bytes, 7);
+        assert_eq!(report.removed_files, 2);
+        assert_eq!(report.reclaimed_bytes, 7 + 14);
         assert!(thumbnails.join("photo-live.jpg").exists());
         assert!(!previews.join("photo-orphan.jpg").exists());
+        assert!(!previews.join("photo-interrupted.tmp").exists());
         assert!(previews.join("readme.txt").exists());
 
         let _ = fs::remove_dir_all(&temp_dir);

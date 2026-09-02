@@ -37,6 +37,7 @@ export interface PhotoFrameElement {
   borderColor: string;
   opacity: number;
   locked?: boolean;
+  isMissing?: boolean;
 }
 
 export interface SnapLine {

@@ -186,7 +186,7 @@ const recoveredWithoutPreview = mergeFramePhotoAsset(staleFrame, {
   ...recoveredPhoto,
   previewPath: null,
 });
-console.assert(recoveredWithoutPreview.previewPath === recoveredPhoto.filePath, 'Recovered frame should use the original only while a canvas preview is unavailable');
+console.assert(recoveredWithoutPreview.previewPath === recoveredPhoto.thumbnailPath, 'Recovered frame should use the thumbnail without loading heavy raw original when preview is unavailable');
 
 const missingFrame = mergeFramePhotoAsset(staleFrame, {
   ...recoveredPhoto,

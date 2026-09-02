@@ -33,14 +33,13 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     sortBy,
     searchQuery,
     isImporting,
-    isCancelling,
-    importProgress,
+    importNotice,
     loadPhotos,
     loadFolders,
     importFiles,
     importFolder,
     importPaths,
-    cancelImport,
+    dismissImportNotice,
     toggleFavorite,
     removePhoto,
     checkMissing,
@@ -57,7 +56,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     setSortBy,
     setSearchQuery,
     openRelink,
-    healThumbnail,
   } = usePhotoStore();
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -67,11 +65,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const filmstripRef = useRef<HTMLElement>(null);
   const isHoveredRef = useRef(false);
 
-  // Lazy Thumbnail Healing & Broken Cache Fallback States
-  const [brokenPhotoIds, setBrokenPhotoIds] = useState<Set<string>>(new Set());
-  const [healingPhotoIds, setHealingPhotoIds] = useState<Set<string>>(new Set());
-  const [photoVersions, setPhotoVersions] = useState<Record<string, number>>({});
-  const healingQueueRef = useRef<Set<string>>(new Set());
+  // Failed / Missing Thumbnail Cache Fallback (Zero background decoding)
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set());
 
   // Context Menu State
   const [contextMenuState, setContextMenuState] = useState<{
@@ -84,37 +79,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   // Single / Target Photo Deletion Confirm State
   const [photoToDelete, setPhotoToDelete] = useState<{ ids: string[]; name: string } | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
-
-  // On-Demand Thumbnail Healing Handler (Instant 0.2ms EXIF restoration)
-  const handleThumbnailError = (photo: Photo) => {
-    // 1. Immediately replace broken <img> with sleek skeleton placeholder
-    setBrokenPhotoIds((prev) => new Set(prev).add(photo.id));
-
-    // 2. Guard against duplicate healing requests
-    if (healingQueueRef.current.has(photo.id)) return;
-    healingQueueRef.current.add(photo.id);
-
-    setHealingPhotoIds((prev) => new Set(prev).add(photo.id));
-
-    // 3. Lazy background regeneration from original source file
-    healThumbnail(photo.id).then((newPath) => {
-      healingQueueRef.current.delete(photo.id);
-      setHealingPhotoIds((prev) => {
-        const next = new Set(prev);
-        next.delete(photo.id);
-        return next;
-      });
-
-      if (newPath) {
-        setPhotoVersions((prev) => ({ ...prev, [photo.id]: Date.now() }));
-        setBrokenPhotoIds((prev) => {
-          const next = new Set(prev);
-          next.delete(photo.id);
-          return next;
-        });
-      }
-    });
-  };
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
@@ -135,6 +99,16 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       checkMissing(currentProject.id);
     }
   }, [currentProject?.id, loadPhotos, loadFolders, checkMissing]);
+
+  // Auto-dismiss import notice after 6 seconds
+  useEffect(() => {
+    if (importNotice) {
+      const timer = setTimeout(() => {
+        dismissImportNotice();
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [importNotice, dismissImportNotice]);
 
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
 
@@ -345,7 +319,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     }
   };
 
-  const showProgressBar = isImporting && importProgress && importProgress.total > 0;
   const activeFolderName = activeFolderId
     ? folders.find((f) => f.id === activeFolderId)?.name || 'Folder'
     : null;
@@ -365,43 +338,48 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
       <BatchActionBar />
 
-      {/* Real-time Import Progress Bar Banner */}
-      {showProgressBar && (
-        <div className={styles.progressBarContainer}>
-          <div className={styles.progressTopRow}>
-            <div className={styles.progressInfo}>
-              <div className={styles.spinner} />
-              <span className={styles.progressTitle}>
-                Importing {importProgress.current} of {importProgress.total} photos {activeFolderName ? `to [${activeFolderName}]` : ''}...
-              </span>
-            </div>
-
-            <div className={styles.progressRightControls}>
-              <span className={styles.progressPercent}>{importProgress.percent}%</span>
-              <button
-                type="button"
-                className={styles.cancelImportBtn}
-                onClick={cancelImport}
-                disabled={isCancelling}
-                title="Safely cancel photo import"
-              >
-                {isCancelling ? 'Cancelling...' : '✕ Cancel'}
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.progressBarTrack}>
-            <div
-              className={styles.progressBarFill}
-              style={{ width: `${Math.max(4, importProgress.percent)}%` }}
-            />
-          </div>
-
-          {importProgress.currentFile && (
-            <span className={styles.progressFileName}>
-              {importProgress.currentFile}
+      {/* Import Notice Banner (Duplicates / Overwrite / Relink info) */}
+      {importNotice && (
+        <div className={styles.importNoticeBanner}>
+          <div className={styles.importNoticeLeft}>
+            <span className={styles.importNoticeIcon}>
+              {importNotice.existing > 0 && importNotice.imported === 0 ? 'ℹ️' : '✓'}
             </span>
-          )}
+            <span className={styles.importNoticeText}>
+              {importNotice.existing > 0 && importNotice.imported === 0 && (
+                <>
+                  <strong className={styles.importNoticeHighlight}>Already in Library:</strong>{' '}
+                  All {importNotice.existing} selected photo{importNotice.existing > 1 ? 's already exist' : ' already exists'} in your project library.
+                </>
+              )}
+              {importNotice.imported > 0 && importNotice.existing > 0 && (
+                <>
+                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
+                  Registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}. ({importNotice.existing} duplicate file{importNotice.existing > 1 ? 's were' : ' was'} already in library).
+                </>
+              )}
+              {importNotice.imported > 0 && importNotice.existing === 0 && importNotice.relinked === 0 && (
+                <>
+                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
+                  Successfully registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}.
+                </>
+              )}
+              {importNotice.relinked > 0 && (
+                <>
+                  {' '}• Relinked/overwrote {importNotice.relinked} existing missing photo{importNotice.relinked > 1 ? 's' : ''}.
+                </>
+              )}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={styles.importNoticeCloseBtn}
+            onClick={dismissImportNotice}
+            title="Dismiss notice"
+            aria-label="Dismiss notice"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -545,74 +523,103 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                         : `${photo.fileName}\n${photo.width} × ${photo.height} px • ${formatFileSize(photo.fileSize)}\nDouble-click to add or drag onto canvas to place/replace\nRight-click for options`
                     }
                   >
-                    {/* Thumbnail Image with On-Demand Healing & Graceful Fallback */}
+                    {/* Thumbnail Image with Lightroom-Style Lightweight Placeholder */}
                     <div className={styles.thumbnailWrapper} draggable={false}>
                       {(() => {
-                        const isBroken = brokenPhotoIds.has(photo.id);
-                        const isHealing = healingPhotoIds.has(photo.id);
-                        const version = photoVersions[photo.id];
-                        const thumbSrc = photo.thumbnailPath
-                          ? `${convertFileSrc(photo.thumbnailPath)}${version ? `?v=${version}` : ''}`
-                          : photo.thumbnailBase64 || null;
+                        const isCachePath = (p?: string | null) => {
+                          if (!p) return false;
+                          const norm = p.replace(/\\/g, '/').toLowerCase();
+                          return norm.includes('/thumbnails/') || norm.includes('/previews/');
+                        };
+                        const safeThumb = isCachePath(photo.thumbnailPath) ? photo.thumbnailPath : null;
+                        const isMissing = Boolean(photo.isMissing);
+                        const isFailed = failedPhotoIds.has(photo.id);
+                        const isThumbAvailable = Boolean(safeThumb && !isFailed && !isMissing);
 
-                        if (thumbSrc && !isBroken) {
+                        if (isThumbAvailable && safeThumb) {
                           return (
-                            <img
-                              src={thumbSrc}
-                              alt={photo.fileName}
-                              className={styles.thumbnailImg}
-                              loading="lazy"
-                              draggable={false}
-                              onError={() => handleThumbnailError(photo)}
-                            />
+                            <>
+                              <img
+                                src={convertFileSrc(safeThumb)}
+                                alt={photo.fileName}
+                                className={styles.thumbnailImg}
+                                loading="lazy"
+                                draggable={false}
+                                onError={() => setFailedPhotoIds((prev) => new Set(prev).add(photo.id))}
+                              />
+
+                              {/* Progressive Background Canvas Compression Indicator: Minimalist Green Bottom Strip */}
+                              {!photo.previewPath && !isMissing && (
+                                <div
+                                  className={styles.processingBottomStrip}
+                                  title="Generating high-resolution canvas preview in background..."
+                                />
+                              )}
+
+                              {/* Used Protective Lock Badge */}
+                              {isUsed && (
+                                <div className={styles.usedLockBadge}>
+                                  ✓ Used
+                                </div>
+                              )}
+
+                              {/* Top Right: Favorite Star */}
+                              <button
+                                type="button"
+                                className={`${styles.favBtn} ${photo.isFavorite ? styles.favActive : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(photo.id);
+                                }}
+                                title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                              >
+                                ★
+                              </button>
+
+                              {/* Bottom Status Overlay */}
+                              <div className={styles.bottomOverlay}>
+                                <span className={`${styles.usedTag} ${isUsed ? styles.usedActive : ''}`}>
+                                  {isUsed ? 'Used' : 'Unused'}
+                                </span>
+                                <span className={styles.dimTag}>
+                                  {photo.width > photo.height ? 'Landscape' : photo.width < photo.height ? 'Portrait' : 'Square'}
+                                </span>
+                              </div>
+                            </>
                           );
                         }
 
                         return (
                           <div className={styles.thumbnailPlaceholder} draggable={false}>
                             <div className={styles.placeholderShimmer} />
-                            <span className={styles.placeholderBadge}>{photo.format.toUpperCase()}</span>
-                            {isHealing && <span className={styles.placeholderStatus}>Restoring...</span>}
+                            {isMissing ? (
+                              <span
+                                style={{
+                                  background: '#ef4444',
+                                  color: '#ffffff',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  padding: '2px 5px',
+                                  borderRadius: '3px',
+                                  position: 'absolute',
+                                  top: '6px',
+                                  left: '6px',
+                                  zIndex: 2,
+                                }}
+                              >
+                                ⚠️ Missing
+                              </span>
+                            ) : (
+                              <>
+                                <div className={styles.processingBottomStrip} />
+                                <span className={styles.placeholderQueueBadge}>
+                                  {photo.format.toUpperCase()}
+                                </span>
+                              </>
+                            )}
                           </div>
                         );
                       })()}
-
-                      {/* Used Protective Lock Badge */}
-                      {isUsed && (
-                        <div className={styles.usedLockBadge}>
-                          ✓ Used
-                        </div>
-                      )}
-
-                      {/* Missing Banner */}
-                      {photo.isMissing && (
-                        <div className={styles.missingBadge} onClick={openRelink}>
-                          ⚠️ Missing
-                        </div>
-                      )}
-
-                      {/* Top Right: Favorite Star */}
-                      <button
-                        type="button"
-                        className={`${styles.favBtn} ${photo.isFavorite ? styles.favActive : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(photo.id);
-                        }}
-                        title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        ★
-                      </button>
-
-                      {/* Bottom Status Overlay */}
-                      <div className={styles.bottomOverlay}>
-                        <span className={`${styles.usedTag} ${isUsed ? styles.usedActive : ''}`}>
-                          {isUsed ? 'Used' : 'Unused'}
-                        </span>
-                        <span className={styles.dimTag}>
-                          {photo.width > photo.height ? 'Landscape' : photo.width < photo.height ? 'Portrait' : 'Square'}
-                        </span>
-                      </div>
                     </div>
 
                     {/* Filename under thumbnail */}

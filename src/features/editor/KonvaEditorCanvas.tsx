@@ -80,9 +80,19 @@ function PhotoFrameNode({
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
 }) {
-  const imgPath = frame.previewPath || frame.thumbnailPath || frame.filePath;
+  // Strict guard: NEVER load raw full-resolution camera original (filePath).
+  // Only generated thumbnails/previews in cache are permitted.
+  const isCachePath = (p?: string | null) => {
+    if (!p) return false;
+    const norm = p.replace(/\\/g, '/').toLowerCase();
+    return norm.includes('/thumbnails/') || norm.includes('/previews/');
+  };
+  const safeThumb = isCachePath(frame.thumbnailPath) ? frame.thumbnailPath : null;
+  const safePreview = isCachePath(frame.previewPath) ? frame.previewPath : null;
+  const imgPath = !frame.isMissing ? (safePreview || safeThumb || null) : null;
   const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
-  const cachedImg = cacheKey ? photoImageCache.get(cacheKey) ?? null : null;
+  const cachedCandidate = cacheKey ? photoImageCache.get(cacheKey) ?? null : null;
+  const cachedImg = cachedCandidate && cachedCandidate.naturalWidth > 0 ? cachedCandidate : null;
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(cachedImg);
   const shapeRef = useRef<Konva.Group>(null);
   const ghostImgRef = useRef<Konva.Image>(null);
@@ -90,7 +100,7 @@ function PhotoFrameNode({
 
   // Load preview or thumbnail image (uses cache to avoid flash on remount)
   useEffect(() => {
-    if (!frame.photoId) {
+    if (!frame.photoId || frame.isMissing) {
       setImageObj(null);
       return;
     }
@@ -126,6 +136,7 @@ function PhotoFrameNode({
     };
     img.onerror = () => {
       if (isMounted) {
+        photoImageCache.delete(currentCacheKey);
         setImageObj(null);
       }
     };
@@ -133,7 +144,7 @@ function PhotoFrameNode({
     return () => {
       isMounted = false;
     };
-  }, [frame.photoId, frame.previewPath, frame.thumbnailPath, frame.filePath]);
+  }, [frame.photoId, frame.previewPath, frame.thumbnailPath, frame.isMissing]);
 
   // Convert physical geometry (mm/cm) to screen pixels (px)
   const pixelX = frame.x * scaleFactor;
@@ -453,7 +464,8 @@ function PhotoFrameNode({
           <Rect
             width={pixelW}
             height={pixelH}
-            fill="#334155"
+            fill="#1e293b"
+            listening={false}
           />
         )}
       </Group>

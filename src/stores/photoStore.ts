@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Photo, PhotoFolder, ImportProgress, PhotoFilter, PhotoSortBy, getRangeSelection } from '../domain/photo';
+import { Photo, PhotoFolder, ImportProgress, ImportNotice, PhotoFilter, PhotoSortBy, getRangeSelection } from '../domain/photo';
 
 async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promise<void> {
   if (!Array.isArray(photos) || photos.length === 0) return;
@@ -28,6 +28,7 @@ interface PhotoState {
   isImporting: boolean;
   isCancelling: boolean;
   importProgress: ImportProgress | null;
+  importNotice: ImportNotice | null;
   isRelinkOpen: boolean;
   isFolderDialogOpen: boolean;
   folderDialogMode: 'create' | 'rename';
@@ -40,6 +41,7 @@ interface PhotoState {
   importFolder: (projectId: string) => Promise<void>;
   importPaths: (projectId: string, paths: string[]) => Promise<void>;
   cancelImport: () => Promise<void>;
+  dismissImportNotice: () => void;
   toggleFavorite: (photoId: string) => Promise<void>;
   removePhoto: (photoId: string) => Promise<void>;
   checkMissing: (projectId: string) => Promise<void>;
@@ -97,11 +99,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   isImporting: false,
   isCancelling: false,
   importProgress: null,
+  importNotice: null,
   isRelinkOpen: false,
   isFolderDialogOpen: false,
   folderDialogMode: 'create',
   folderDialogTarget: null,
   error: null,
+
+  dismissImportNotice: () => set({ importNotice: null }),
 
   setupListeners: async () => {
     try {
@@ -128,13 +133,38 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         });
       });
 
-      const unlistenComplete = await listen<{ total: number; imported: number; cancelled?: boolean }>('photo-import-complete', () => {
-        set({ isImporting: false, isCancelling: false, importProgress: null });
-      });
+      const unlistenPreview = await listen<{ id: string; thumbnailPath: string; previewPath: string }>(
+        'photo-preview-ready',
+        (event) => {
+          if (event.payload && event.payload.id) {
+            const { id, thumbnailPath, previewPath } = event.payload;
+            set((s) => ({
+              photos: s.photos.map((p) =>
+                p.id === id ? { ...p, thumbnailPath, previewPath } : p
+              ),
+            }));
+          }
+        }
+      );
+
+      const unlistenComplete = await listen<ImportNotice>(
+        'photo-import-complete',
+        (event) => {
+          set({ isImporting: false, isCancelling: false, importProgress: null });
+          const payload = event.payload;
+          if (
+            payload &&
+            (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))
+          ) {
+            set({ importNotice: payload });
+          }
+        }
+      );
 
       return () => {
         unlistenProgress();
         unlistenItem();
+        unlistenPreview();
         unlistenComplete();
       };
     } catch (e) {
@@ -178,14 +208,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('select_and_import_files', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
-        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
-      await get().loadFolders(projectId);
+      void get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] select_and_import_files error:', err);
-      set({ error: String(err) });
-    } finally {
-      set({ isImporting: false, isCancelling: false, importProgress: null });
+      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
     }
   },
 
@@ -197,14 +224,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('select_and_import_folder', { projectId, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
-        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
-      await get().loadFolders(projectId);
+      void get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] select_and_import_folder error:', err);
-      set({ error: String(err) });
-    } finally {
-      set({ isImporting: false, isCancelling: false, importProgress: null });
+      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
     }
   },
 
@@ -217,14 +241,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const updatedPhotos = await invoke<Photo[]>('import_file_paths', { projectId, paths, folderId });
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
-        await syncAlbumFramePhotoAssets(updatedPhotos);
       }
-      await get().loadFolders(projectId);
+      void get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] import_file_paths error:', err);
-      set({ error: String(err) });
-    } finally {
-      set({ isImporting: false, isCancelling: false, importProgress: null });
+      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
     }
   },
 

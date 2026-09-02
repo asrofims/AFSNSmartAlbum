@@ -34,6 +34,14 @@ export interface ImportProgress {
   percent: number;
 }
 
+export interface ImportNotice {
+  total: number;
+  imported: number;
+  existing: number;
+  relinked: number;
+  cancelled?: boolean;
+}
+
 export type PhotoFilter = 'all' | 'unused' | 'used' | 'favorites';
 export type PhotoSortBy = 'name' | 'date' | 'size';
 

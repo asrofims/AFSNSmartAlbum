@@ -72,8 +72,15 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         const w = el.width * scale;
         const h = el.height * scale;
         const rot = el.rotation || 0;
-        const imgSrc = hydratedElement.photoId
-          ? (hydratedElement.thumbnailPath || hydratedElement.previewPath || hydratedElement.filePath)
+        const isCachePath = (p?: string | null) => {
+          if (!p) return false;
+          const norm = p.replace(/\\/g, '/').toLowerCase();
+          return norm.includes('/thumbnails/') || norm.includes('/previews/');
+        };
+        const safeThumb = isCachePath(hydratedElement.thumbnailPath) ? hydratedElement.thumbnailPath : null;
+        const safePreview = isCachePath(hydratedElement.previewPath) ? hydratedElement.previewPath : null;
+        const imgSrc = (hydratedElement.photoId && !hydratedElement.isMissing)
+          ? (safeThumb || safePreview || null)
           : null;
 
         return (
@@ -88,15 +95,16 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               transform: rot ? `rotate(${rot}deg)` : undefined,
               transformOrigin: '0 0',
               overflow: 'hidden',
-              backgroundColor: '#1e293b',
+              background: 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: el.opacity ?? 1,
               border: el.borderEnabled && el.borderWidth ? `1px solid ${el.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
               borderRadius: '1px',
               zIndex: 2,
             }}
           >
-            {imgSrc ? (
+            {imgSrc && (
               <img
+                key={`${el.id}_${imgSrc}`}
                 src={safeConvertFileSrc(imgSrc)}
                 alt=""
                 style={{
@@ -107,13 +115,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                   pointerEvents: 'none',
                 }}
                 loading="lazy"
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(135deg, #334155, #1e293b)',
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
                 }}
               />
             )}
