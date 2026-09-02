@@ -85,6 +85,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [format, setFormat] = useState<'jpeg' | 'png' | 'pdf'>('jpeg');
   const [dpi, setDpi] = useState<number>(currentProject?.canvasDpi || 300);
   const [isCustomDpi, setIsCustomDpi] = useState<boolean>(false);
+  const [customDpiText, setCustomDpiText] = useState<string>(String(currentProject?.canvasDpi || 300));
   const [jpegQuality, setJpegQuality] = useState<number>(95);
   const [includeBleed, setIncludeBleed] = useState<boolean>(true);
   const [splitPages, setSplitPages] = useState<boolean>(false);
@@ -391,6 +392,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                   const val = e.target.value;
                   if (val === 'custom') {
                     setIsCustomDpi(true);
+                    setCustomDpiText(String(dpi));
                   } else {
                     setIsCustomDpi(false);
                     setDpi(Number(val));
@@ -414,9 +416,27 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                     style={{ flex: 1, padding: '0 8px' }}
                     min={72}
                     max={1200}
-                    step={10}
-                    value={dpi}
-                    onChange={(e) => setDpi(Math.max(72, Math.min(1200, Number(e.target.value) || 300)))}
+                    step={1}
+                    value={customDpiText}
+                    onChange={(e) => {
+                      setCustomDpiText(e.target.value);
+                      const num = Number(e.target.value);
+                      if (num >= 72 && num <= 1200) {
+                        setDpi(num);
+                      }
+                    }}
+                    onBlur={() => {
+                      const num = Number(customDpiText);
+                      const clamped = Math.max(72, Math.min(1200, Math.round(num) || 300));
+                      setDpi(clamped);
+                      setCustomDpiText(String(clamped));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    autoFocus
                   />
                   <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>DPI</span>
                 </div>
