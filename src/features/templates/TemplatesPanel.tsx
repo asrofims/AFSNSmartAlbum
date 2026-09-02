@@ -202,8 +202,14 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
       {adaptiveVariations.length === 0 && (
         <div className={styles.emptyState}>
-          <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>No photos on active spread</p>
-          <p>Drag photos from the tray onto the canvas to generate Smart Layout variations automatically.</p>
+          <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>
+            {currentPhotoCount > 0 ? 'No Layout Variations for Available Space' : 'No Photos on Active Spread'}
+          </p>
+          <p>
+            {currentPhotoCount > 0
+              ? 'The remaining free space around locked frames is too constrained to fit all unlocked photos. Try unlocking a frame or resizing locked frames.'
+              : 'Drag photos from the tray onto the canvas to generate Smart Layout variations automatically.'}
+          </p>
         </div>
       )}
     </div>

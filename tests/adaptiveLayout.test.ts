@@ -235,7 +235,91 @@ function runTests() {
       console.assert(!collides, `Generated rect [${r.x}, ${r.y}, ${r.width}, ${r.height}] collides with locked frame!`);
     }
   }
-  console.log('✓ Smart layout cleanly utilizes free surrounding space around locked photos without any collision.');
+  // Test 13: 2-Page Simultaneous Locks (Left top-half locked + Right bottom-half locked)
+  const leftTopLock: any = {
+    id: 'lock-left-top',
+    x: 10,
+    y: 10,
+    width: 180,
+    height: 80,
+    locked: true,
+  };
+  const rightBottomLock: any = {
+    id: 'lock-right-bot',
+    x: 216,
+    y: 110,
+    width: 180,
+    height: 80,
+    locked: true,
+  };
+  const paramsTwoPageLock = {
+    ...baseParams,
+    lockedElements: [leftTopLock, rightBottomLock],
+  };
+  const twoPageLockVariations = generateAdaptiveLayoutVariations(paramsTwoPageLock, unlockedTwoPhotos);
+  console.assert(twoPageLockVariations.length > 0, 'Must produce variations when both pages have locked frames!');
+  for (const v of twoPageLockVariations) {
+    for (const r of v.rects) {
+      const collidesLeft = !(
+        r.x >= leftTopLock.x + leftTopLock.width ||
+        r.x + r.width <= leftTopLock.x ||
+        r.y >= leftTopLock.y + leftTopLock.height ||
+        r.y + r.height <= leftTopLock.y
+      );
+      const collidesRight = !(
+        r.x >= rightBottomLock.x + rightBottomLock.width ||
+        r.x + r.width <= rightBottomLock.x ||
+        r.y >= rightBottomLock.y + rightBottomLock.height ||
+        r.y + r.height <= rightBottomLock.y
+      );
+      console.assert(!collidesLeft, `Rect ${JSON.stringify(r)} collides with left locked frame!`);
+      console.assert(!collidesRight, `Rect ${JSON.stringify(r)} collides with right locked frame!`);
+    }
+  }
+  console.log('✓ Smart layout generates rich non-colliding variations when BOTH pages have locked frames simultaneously.');
+
+  // Test 14: Multiple Locked Frames on Same Page (2D Spatial Subtraction / Slicing)
+  const leftTopLeftLock: any = {
+    id: 'lock-tl',
+    x: 10,
+    y: 10,
+    width: 80,
+    height: 80,
+    locked: true,
+  };
+  const leftBottomRightLock: any = {
+    id: 'lock-br',
+    x: 110,
+    y: 110,
+    width: 80,
+    height: 80,
+    locked: true,
+  };
+  const paramsMultiSamePageLock = {
+    ...baseParams,
+    lockedElements: [leftTopLeftLock, leftBottomRightLock],
+  };
+  const multiLockVariations = generateAdaptiveLayoutVariations(paramsMultiSamePageLock, unlockedTwoPhotos);
+  console.assert(multiLockVariations.length > 0, 'Must produce variations for multiple locked frames on same page!');
+  for (const v of multiLockVariations) {
+    for (const r of v.rects) {
+      const collidesTL = !(
+        r.x >= leftTopLeftLock.x + leftTopLeftLock.width ||
+        r.x + r.width <= leftTopLeftLock.x ||
+        r.y >= leftTopLeftLock.y + leftTopLeftLock.height ||
+        r.y + r.height <= leftTopLeftLock.y
+      );
+      const collidesBR = !(
+        r.x >= leftBottomRightLock.x + leftBottomRightLock.width ||
+        r.x + r.width <= leftBottomRightLock.x ||
+        r.y >= leftBottomRightLock.y + leftBottomRightLock.height ||
+        r.y + r.height <= leftBottomRightLock.y
+      );
+      console.assert(!collidesTL, `Rect ${JSON.stringify(r)} collides with Top-Left locked frame!`);
+      console.assert(!collidesBR, `Rect ${JSON.stringify(r)} collides with Bottom-Right locked frame!`);
+    }
+  }
+  console.log('✓ 2D Spatial Subtraction successfully carves and fills non-colliding zones around multiple complex locks.');
 
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
 }

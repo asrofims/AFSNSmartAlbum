@@ -706,7 +706,7 @@ function rectsIntersect(
 
 /**
  * Computes all maximal unoccupied rectangular sub-boxes inside a page container
- * that do not intersect any locked frame (with proper spacing padding).
+ * that do not intersect any locked frame using 2D Spatial Subtraction (Maximal Empty Rectangles).
  */
 function computeFreePageSubBoxes(
   pageArea: RectBounds,
@@ -718,61 +718,109 @@ function computeFreePageSubBoxes(
     return [{ ...pageArea }];
   }
 
-  const minDimension = 15; // Minimum 15mm width/height to be a usable photo frame slot
-  const freeBoxes: RectBounds[] = [];
+  // Dynamic unit-agnostic minimum dimension (5% of page dimension or 1.5x spacing)
+  const minDimension = Math.max(spacing * 1.5, Math.min(pageArea.width, pageArea.height) * 0.05);
+  let candidateBoxes: RectBounds[] = [{ ...pageArea }];
 
-  const minX = Math.min(...intersectingLocked.map((f) => f.x));
-  const minY = Math.min(...intersectingLocked.map((f) => f.y));
-  const maxX = Math.max(...intersectingLocked.map((f) => f.x + f.width));
-  const maxY = Math.max(...intersectingLocked.map((f) => f.y + f.height));
+  for (const locked of intersectingLocked) {
+    const nextBoxes: RectBounds[] = [];
 
-  // 1. Bottom Sub-box (Below locked frames on the same page)
-  const bottomY = round4(maxY + spacing);
-  const bottomH = round4(pageArea.y + pageArea.height - bottomY);
-  if (bottomH >= minDimension) {
-    freeBoxes.push({
-      x: pageArea.x,
-      y: bottomY,
-      width: pageArea.width,
-      height: bottomH,
-    });
+    for (const box of candidateBoxes) {
+      if (!rectsIntersect(box, locked)) {
+        // Box is completely unaffected by this locked frame
+        nextBoxes.push(box);
+        continue;
+      }
+
+      // Box intersects locked frame: slice box into up to 4 maximal sub-rectangles
+      // 1. Top Slice (above locked frame)
+      const topH = round4(locked.y - spacing - box.y);
+      if (topH >= minDimension) {
+        nextBoxes.push({
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: topH,
+        });
+      }
+
+      // 2. Bottom Slice (below locked frame)
+      const bottomY = round4(locked.y + locked.height + spacing);
+      const bottomH = round4(box.y + box.height - bottomY);
+      if (bottomH >= minDimension) {
+        nextBoxes.push({
+          x: box.x,
+          y: bottomY,
+          width: box.width,
+          height: bottomH,
+        });
+      }
+
+      // 3. Left Slice (left of locked frame)
+      const leftW = round4(locked.x - spacing - box.x);
+      if (leftW >= minDimension) {
+        nextBoxes.push({
+          x: box.x,
+          y: box.y,
+          width: leftW,
+          height: box.height,
+        });
+      }
+
+      // 4. Right Slice (right of locked frame)
+      const rightX = round4(locked.x + locked.width + spacing);
+      const rightW = round4(box.x + box.width - rightX);
+      if (rightW >= minDimension) {
+        nextBoxes.push({
+          x: rightX,
+          y: box.y,
+          width: rightW,
+          height: box.height,
+        });
+      }
+    }
+
+    candidateBoxes = nextBoxes;
   }
 
-  // 2. Top Sub-box (Above locked frames on the same page)
-  const topH = round4(minY - spacing - pageArea.y);
-  if (topH >= minDimension) {
-    freeBoxes.push({
-      x: pageArea.x,
-      y: pageArea.y,
-      width: pageArea.width,
-      height: topH,
-    });
+  // Remove subsumed/duplicate boxes (a box completely contained inside another larger box)
+  const maximalBoxes: RectBounds[] = [];
+  for (let i = 0; i < candidateBoxes.length; i++) {
+    const a = candidateBoxes[i];
+    if (!a) continue;
+    let isSubsumed = false;
+
+    for (let j = 0; j < candidateBoxes.length; j++) {
+      if (i === j) continue;
+      const b = candidateBoxes[j];
+      if (!b) continue;
+      if (
+        a.x >= b.x - 0.01 &&
+        a.y >= b.y - 0.01 &&
+        a.x + a.width <= b.x + b.width + 0.01 &&
+        a.y + a.height <= b.y + b.height + 0.01
+      ) {
+        if (
+          Math.abs(a.width * a.height - b.width * b.height) < 0.01 &&
+          i > j
+        ) {
+          isSubsumed = true;
+          break;
+        }
+        if (b.width * b.height > a.width * a.height + 0.01) {
+          isSubsumed = true;
+          break;
+        }
+      }
+    }
+
+    if (!isSubsumed) {
+      maximalBoxes.push(a);
+    }
   }
 
-  // 3. Right Sub-box (To the right of locked frames on the same page)
-  const rightX = round4(maxX + spacing);
-  const rightW = round4(pageArea.x + pageArea.width - rightX);
-  if (rightW >= minDimension) {
-    freeBoxes.push({
-      x: rightX,
-      y: pageArea.y,
-      width: rightW,
-      height: pageArea.height,
-    });
-  }
-
-  // 4. Left Sub-box (To the left of locked frames on the same page)
-  const leftW = round4(minX - spacing - pageArea.x);
-  if (leftW >= minDimension) {
-    freeBoxes.push({
-      x: pageArea.x,
-      y: pageArea.y,
-      width: leftW,
-      height: pageArea.height,
-    });
-  }
-
-  return freeBoxes;
+  // Sort by area descending so largest zones are prioritized
+  return maximalBoxes.sort((a, b) => b.width * b.height - a.width * a.height);
 }
 
 export function generateAdaptiveLayoutVariations(
@@ -859,29 +907,119 @@ export function generateAdaptiveLayoutVariations(
       }
     });
 
-    // 2. Multi-Zone split placement (if count >= 2 and we have available free space on BOTH sides)
-    if (count >= 2 && freeLeftBoxes.length > 0 && freeRightBoxes.length > 0) {
-      for (const leftBox of freeLeftBoxes) {
-        for (const rightBox of freeRightBoxes) {
-          for (let nLeft = 1; nLeft < count; nLeft++) {
-            const nRight = count - nLeft;
-            const leftVariants = nLeft === 1 ? 2 : nLeft === 2 ? 4 : 4;
-            const rightVariants = nRight === 1 ? 2 : nRight === 2 ? 4 : 4;
-            const maxCombos = Math.min(6, leftVariants * rightVariants);
+    // 2. Multi-Zone split placement (if count >= 2):
+    // Pairwise non-overlapping free boxes (across Left + Right or within the same page)
+    if (count >= 2 && allFreeBoxes.length >= 2) {
+      for (let i = 0; i < allFreeBoxes.length; i++) {
+        for (let j = i + 1; j < allFreeBoxes.length; j++) {
+          const boxA = allFreeBoxes[i];
+          const boxB = allFreeBoxes[j];
+          if (!boxA || !boxB) continue;
+          if (rectsIntersect(boxA, boxB)) continue;
+
+          for (let nA = 1; nA < count; nA++) {
+            const nB = count - nA;
+            const aVariants = nA === 1 ? 2 : nA === 2 ? 4 : 4;
+            const bVariants = nB === 1 ? 2 : nB === 2 ? 4 : 4;
+            const maxCombos = Math.min(6, aVariants * bVariants);
 
             for (let c = 0; c < maxCombos; c++) {
-              const vLeft = c % leftVariants;
-              const vRight = Math.floor(c / leftVariants) % rightVariants;
+              const vA = c % aVariants;
+              const vB = Math.floor(c / aVariants) % bVariants;
 
-              const rectsLeft = partitionPageBoxIntoKRects(leftBox, nLeft, spacing, vLeft);
-              const rectsRight = partitionPageBoxIntoKRects(rightBox, nRight, spacing, vRight);
+              const rectsA = partitionPageBoxIntoKRects(boxA, nA, spacing, vA);
+              const rectsB = partitionPageBoxIntoKRects(boxB, nB, spacing, vB);
 
-              const allRects = [...rectsLeft, ...rectsRight];
+              const allRects = [...rectsA, ...rectsB];
+              if (allRects.length === count) {
+                const isALeft = boxA.x < leftPageArea.x + leftPageArea.width;
+                const isBLeft = boxB.x < leftPageArea.x + leftPageArea.width;
+                const zoneDesc =
+                  isALeft && isBLeft
+                    ? 'Left Page Multi-Zone'
+                    : !isALeft && !isBLeft
+                    ? 'Right Page Multi-Zone'
+                    : 'Left & Right Spread Split';
+
+                variations.push({
+                  id: `split_free_${nA}A_${nB}B_i${i}_j${j}_c${c + 1}`,
+                  name: `${nA} Photo${nA > 1 ? 's' : ''} + ${nB} Photo${nB > 1 ? 's' : ''} (${zoneDesc})`,
+                  description: `Arranged into available spaces across ${zoneDesc} around locked photos.`,
+                  rects: allRects,
+                  tags: ['split-free', `${count}p`],
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Multi-Zone 3-way distribution (if count >= 3 and allFreeBoxes.length >= 3):
+    if (count >= 3 && allFreeBoxes.length >= 3) {
+      for (let i = 0; i < allFreeBoxes.length; i++) {
+        for (let j = i + 1; j < allFreeBoxes.length; j++) {
+          for (let k = j + 1; k < allFreeBoxes.length; k++) {
+            const boxA = allFreeBoxes[i];
+            const boxB = allFreeBoxes[j];
+            const boxC = allFreeBoxes[k];
+            if (!boxA || !boxB || !boxC) continue;
+            if (rectsIntersect(boxA, boxB) || rectsIntersect(boxA, boxC) || rectsIntersect(boxB, boxC)) continue;
+
+            for (let nA = 1; nA <= count - 2; nA++) {
+              for (let nB = 1; nB <= count - nA - 1; nB++) {
+                const nC = count - nA - nB;
+                const rectsA = partitionPageBoxIntoKRects(boxA, nA, spacing, 0);
+                const rectsB = partitionPageBoxIntoKRects(boxB, nB, spacing, 0);
+                const rectsC = partitionPageBoxIntoKRects(boxC, nC, spacing, 0);
+                const allRects = [...rectsA, ...rectsB, ...rectsC];
+                if (allRects.length === count) {
+                  variations.push({
+                    id: `split_free3_${nA}_${nB}_${nC}_i${i}_j${j}_k${k}`,
+                    name: `Spread Multi-Zone (${nA}+${nB}+${nC} Photos)`,
+                    description: `Arranged cleanly into 3 available zones around locked photos.`,
+                    rects: allRects,
+                    tags: ['split-free', `${count}p`],
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Multi-Zone 4-way distribution (if count >= 4 and allFreeBoxes.length >= 4):
+    if (count >= 4 && allFreeBoxes.length >= 4) {
+      for (let i = 0; i < allFreeBoxes.length; i++) {
+        for (let j = i + 1; j < allFreeBoxes.length; j++) {
+          for (let k = j + 1; k < allFreeBoxes.length; k++) {
+            for (let l = k + 1; l < allFreeBoxes.length; l++) {
+              const boxA = allFreeBoxes[i];
+              const boxB = allFreeBoxes[j];
+              const boxC = allFreeBoxes[k];
+              const boxD = allFreeBoxes[l];
+              if (!boxA || !boxB || !boxC || !boxD) continue;
+              if (
+                rectsIntersect(boxA, boxB) ||
+                rectsIntersect(boxA, boxC) ||
+                rectsIntersect(boxA, boxD) ||
+                rectsIntersect(boxB, boxC) ||
+                rectsIntersect(boxB, boxD) ||
+                rectsIntersect(boxC, boxD)
+              )
+                continue;
+
+              const rectsA = partitionPageBoxIntoKRects(boxA, 1, spacing, 0);
+              const rectsB = partitionPageBoxIntoKRects(boxB, 1, spacing, 0);
+              const rectsC = partitionPageBoxIntoKRects(boxC, 1, spacing, 0);
+              const rectsD = partitionPageBoxIntoKRects(boxD, count - 3, spacing, 0);
+              const allRects = [...rectsA, ...rectsB, ...rectsC, ...rectsD];
               if (allRects.length === count) {
                 variations.push({
-                  id: `split_free_${nLeft}L_${nRight}R_c${c + 1}`,
-                  name: `${nLeft} Photo${nLeft > 1 ? 's' : ''} Left + ${nRight} Right Spread (${count} Photos)`,
-                  description: `Arranged into available spaces across both pages around locked photos.`,
+                  id: `split_free4_i${i}_j${j}_k${k}_l${l}`,
+                  name: `Spread Multi-Zone Quad (${count} Photos)`,
+                  description: `Arranged cleanly into 4 available zones around locked photos.`,
                   rects: allRects,
                   tags: ['split-free', `${count}p`],
                 });
