@@ -68,6 +68,22 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   // Failed / Missing Thumbnail Cache Fallback (Zero background decoding)
   const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set());
 
+  // Auto-heal / clear failed state whenever a photo's thumbnail or preview becomes ready
+  useEffect(() => {
+    setFailedPhotoIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      let changed = false;
+      for (const photo of photos) {
+        if (next.has(photo.id) && (photo.thumbnailPath || photo.previewPath)) {
+          next.delete(photo.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [photos]);
+
   // Context Menu State
   const [contextMenuState, setContextMenuState] = useState<{
     isOpen: boolean;
@@ -540,6 +556,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                           return (
                             <>
                               <img
+                                key={`${photo.id}_${safeThumb}`}
                                 src={convertFileSrc(safeThumb)}
                                 alt={photo.fileName}
                                 className={styles.thumbnailImg}

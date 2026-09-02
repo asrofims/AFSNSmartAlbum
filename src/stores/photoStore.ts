@@ -138,11 +138,13 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         (event) => {
           if (event.payload && event.payload.id) {
             const { id, thumbnailPath, previewPath } = event.payload;
-            set((s) => ({
-              photos: s.photos.map((p) =>
+            set((s) => {
+              const nextPhotos = s.photos.map((p) =>
                 p.id === id ? { ...p, thumbnailPath, previewPath } : p
-              ),
-            }));
+              );
+              void syncAlbumFramePhotoAssets(nextPhotos, false);
+              return { photos: nextPhotos };
+            });
           }
         }
       );
