@@ -277,6 +277,24 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
         }
     };
 
+    // 0. First check if exact font filename is registered in Windows system fonts
+    if let Ok(sys_fonts) = crate::commands::app_commands::get_system_fonts() {
+        if let Some(font_info) = sys_fonts.iter().find(|f| f.family.eq_ignore_ascii_case(family)) {
+            if !font_info.file_name.is_empty() {
+                for dir in &dirs {
+                    let p = dir.join(&font_info.file_name);
+                    if p.exists() {
+                        return Some(p);
+                    }
+                }
+                let direct_p = PathBuf::from(&font_info.file_name);
+                if direct_p.exists() {
+                    return Some(direct_p);
+                }
+            }
+        }
+    }
+
     // 1. First search explicit candidate names
     for dir in &dirs {
         for name in &candidate_names {

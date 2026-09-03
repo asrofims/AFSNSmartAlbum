@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useEditorStore } from '../../stores/editorStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -25,12 +26,75 @@ interface TypographyPanelProps {
 
 
 
+interface SystemFontInfo {
+  family: string;
+  fullName: string;
+  fileName: string;
+}
+
+/** Cached system fonts - loaded once, shared across all TypographyPanel instances */
+let _cachedSystemFonts: SystemFontInfo[] | null = null;
+let _loadingPromise: Promise<SystemFontInfo[]> | null = null;
+
 export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
   const currentProject = useProjectStore((s) => s.currentProject);
   const updateTextElement = useEditorStore((s) => s.updateTextElement);
   const setEditingTextElementId = useEditorStore((s) => s.setEditingTextElementId);
   const panelTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // System fonts state
+  const [systemFonts, setSystemFonts] = useState<SystemFontInfo[]>(_cachedSystemFonts || []);
+  const [fontSearch, setFontSearch] = useState('');
+  const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
+  const fontDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load system fonts once from OS via Tauri
+  useEffect(() => {
+    if (_cachedSystemFonts) {
+      setSystemFonts(_cachedSystemFonts);
+      return;
+    }
+    if (!_loadingPromise) {
+      _loadingPromise = invoke<SystemFontInfo[]>('get_system_fonts').catch((err) => {
+        console.warn('Failed to load system fonts:', err);
+        return [] as SystemFontInfo[];
+      });
+    }
+    _loadingPromise.then((fonts) => {
+      _cachedSystemFonts = fonts;
+      setSystemFonts(fonts);
+    });
+  }, []);
+
+  // Close font dropdown on outside click
+  useEffect(() => {
+    if (!fontDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (fontDropdownRef.current && !fontDropdownRef.current.contains(e.target as Node)) {
+        setFontDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [fontDropdownOpen]);
+
+  // Filtered & combined font list: curated first, then system fonts
+  const filteredFonts = useMemo(() => {
+    const searchLower = fontSearch.toLowerCase().trim();
+    const curatedSet = new Set(ALBUM_FONT_FAMILIES.map((f) => f.value.toLowerCase()));
+
+    const curated = ALBUM_FONT_FAMILIES
+      .filter((f) => !searchLower || f.value.toLowerCase().includes(searchLower) || f.label.toLowerCase().includes(searchLower))
+      .map((f) => ({ value: f.value, label: f.label, group: 'album' as const }));
+
+    const system = systemFonts
+      .filter((f) => !curatedSet.has(f.family.toLowerCase()))
+      .filter((f) => !searchLower || f.family.toLowerCase().includes(searchLower))
+      .map((f) => ({ value: f.family, label: f.family, group: 'system' as const }));
+
+    return { curated, system };
+  }, [fontSearch, systemFonts]);
 
   if (!activeSpreadId) return null;
 
@@ -395,33 +459,179 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         </div>
       </div>
 
-      {/* 3. Font Family Selector */}
-      <div>
+      {/* 3. Font Family Selector — Searchable Dropdown with System Fonts */}
+      <div ref={fontDropdownRef} style={{ position: 'relative' }}>
         <label style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.5px' }}>
           Font Family
         </label>
-        <select
-          value={style.fontFamily}
-          onChange={(e) => handleUpdateStyle({ fontFamily: e.target.value })}
+        {/* Current font display / toggle button */}
+        <button
+          type="button"
+          onClick={() => { setFontDropdownOpen((prev) => !prev); setFontSearch(''); }}
           style={{
             width: '100%',
             padding: '6px 8px',
             fontSize: '12px',
             fontWeight: 500,
+            fontFamily: `"${style.fontFamily}", sans-serif`,
             borderRadius: '4px',
             background: 'var(--color-surface-raised, #1e293b)',
-            border: '1px solid var(--color-border, #334155)',
+            border: `1px solid ${fontDropdownOpen ? 'var(--color-accent, #3b82f6)' : 'var(--color-border, #334155)'}`,
             color: 'var(--color-text-primary, #f8fafc)',
             cursor: 'pointer',
             outline: 'none',
+            textAlign: 'left',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          {ALBUM_FONT_FAMILIES.map((font) => (
-            <option key={font.value} value={font.value}>
-              {font.label}
-            </option>
-          ))}
-        </select>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{style.fontFamily}</span>
+          <span style={{ fontSize: '8px', opacity: 0.5, flexShrink: 0, marginLeft: '4px' }}>▼</span>
+        </button>
+
+        {/* Dropdown panel */}
+        {fontDropdownOpen && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            marginTop: '2px',
+            background: 'var(--color-surface-raised, #1e293b)',
+            border: '1px solid var(--color-accent, #3b82f6)',
+            borderRadius: '6px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            overflow: 'hidden',
+          }}>
+            {/* Search input */}
+            <div style={{ padding: '6px' }}>
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search fonts…"
+                value={fontSearch}
+                onChange={(e) => setFontSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  background: 'var(--color-surface, #0f172a)',
+                  border: '1px solid var(--color-border, #334155)',
+                  color: 'var(--color-text-primary, #f8fafc)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            {/* Font list */}
+            <div style={{ maxHeight: '280px', overflowY: 'auto', padding: '0 4px 4px' }}>
+              {/* Album Fonts section */}
+              {filteredFonts.curated.length > 0 && (
+                <>
+                  <div style={{ padding: '4px 8px 2px', fontSize: '9px', textTransform: 'uppercase', color: 'var(--color-accent, #3b82f6)', fontWeight: 700, letterSpacing: '0.8px' }}>
+                    ★ Album Fonts
+                  </div>
+                  {filteredFonts.curated.map((font) => (
+                    <button
+                      key={`album-${font.value}`}
+                      type="button"
+                      onClick={() => {
+                        handleUpdateStyle({ fontFamily: font.value });
+                        setFontDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '5px 8px',
+                        fontSize: '12px',
+                        fontFamily: `"${font.value}", sans-serif`,
+                        background: font.value === style.fontFamily ? 'var(--color-accent, #3b82f6)' : 'transparent',
+                        color: font.value === style.fontFamily ? '#fff' : 'var(--color-text-primary, #f8fafc)',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (font.value !== style.fontFamily)
+                          (e.currentTarget.style.background = 'rgba(255,255,255,0.06)');
+                      }}
+                      onMouseLeave={(e) => {
+                        if (font.value !== style.fontFamily)
+                          (e.currentTarget.style.background = 'transparent');
+                      }}
+                    >
+                      {font.label}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* System Fonts section */}
+              {filteredFonts.system.length > 0 && (
+                <>
+                  <div style={{
+                    padding: '6px 8px 2px',
+                    fontSize: '9px',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-muted, #94a3b8)',
+                    fontWeight: 700,
+                    letterSpacing: '0.8px',
+                    borderTop: filteredFonts.curated.length > 0 ? '1px solid var(--color-border, #334155)' : 'none',
+                    marginTop: filteredFonts.curated.length > 0 ? '4px' : '0',
+                  }}>
+                    System Fonts ({filteredFonts.system.length})
+                  </div>
+                  {filteredFonts.system.map((font) => (
+                    <button
+                      key={`sys-${font.value}`}
+                      type="button"
+                      onClick={() => {
+                        handleUpdateStyle({ fontFamily: font.value });
+                        setFontDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '5px 8px',
+                        fontSize: '12px',
+                        fontFamily: `"${font.value}", sans-serif`,
+                        background: font.value === style.fontFamily ? 'var(--color-accent, #3b82f6)' : 'transparent',
+                        color: font.value === style.fontFamily ? '#fff' : 'var(--color-text-primary, #f8fafc)',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (font.value !== style.fontFamily)
+                          (e.currentTarget.style.background = 'rgba(255,255,255,0.06)');
+                      }}
+                      onMouseLeave={(e) => {
+                        if (font.value !== style.fontFamily)
+                          (e.currentTarget.style.background = 'transparent');
+                      }}
+                    >
+                      {font.label}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* Empty state */}
+              {filteredFonts.curated.length === 0 && filteredFonts.system.length === 0 && (
+                <div style={{ padding: '12px 8px', fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                  No fonts found for "{fontSearch}"
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 4. Font Size Slider & Direct Input Field */}

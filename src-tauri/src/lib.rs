@@ -97,6 +97,7 @@ pub fn run() {
             commands::app_commands::get_app_info,
             commands::app_commands::get_db_status,
             commands::app_commands::sample_screen_color,
+            commands::app_commands::get_system_fonts,
             commands::project_commands::get_initial_open_path,
             commands::project_commands::create_project,
             commands::project_commands::get_project,

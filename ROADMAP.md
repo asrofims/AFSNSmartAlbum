@@ -71,7 +71,7 @@
 - [x] Relaxed Auto-Save Background Timer & Crash Snapshots
 - [x] History Manager (Undo / Redo with `Ctrl+Z` / `Ctrl+Y`)
 - [x] Modern 2-Column Split-Hero Welcome Screen with Visual Hero Artwork
-- [x] Custom Application Branding (`iconafsnsa.png`) & File Association
+- [x] Custom Application Branding (`logosmartalbumafsn2.png`) & File Association
 - [x] Project Migration & Schema Versioning
 
 ## Phase 6 — Templates & Layout Generator

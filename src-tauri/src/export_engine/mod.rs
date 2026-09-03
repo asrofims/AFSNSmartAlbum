@@ -845,32 +845,105 @@ mod tests {
 
     #[test]
     fn test_generate_installer_graphics() {
-        use image::DynamicImage;
+        use image::{DynamicImage, RgbaImage, ImageBuffer, Rgba};
         let icons_dir = std::path::Path::new("icons");
-        let _ = fs::create_dir_all(icons_dir);
+        let _ = std::fs::create_dir_all(icons_dir);
 
         let logo_path = std::path::Path::new("../src/assets/app-logo.png");
         let hero_path = std::path::Path::new("../src/assets/welcome-hero.jpg");
 
         // 1. Generate Header Image (150x57) for NSIS (BMP Format)
-        let mut header: RgbaImage = ImageBuffer::from_pixel(150, 57, Rgba([24, 24, 27, 255]));
+        // Clean dark theme background (#0d1117) with refined 38x38 logo with comfortable margins
+        let mut header: RgbaImage = ImageBuffer::from_pixel(150, 57, Rgba([13, 17, 23, 255]));
         if let Ok(logo) = image::open(logo_path) {
-            let resized_logo = image::imageops::resize(&logo, 44, 44, image::imageops::FilterType::Lanczos3);
-            image::imageops::overlay(&mut header, &resized_logo, 150 - 44 - 8, (57 - 44) / 2);
+            let logo_size = 38;
+            let resized_logo = image::imageops::resize(&logo, logo_size, logo_size, image::imageops::FilterType::Lanczos3);
+            let x = 150 - logo_size - 12;
+            let y = (57 - logo_size) / 2;
+            image::imageops::overlay(&mut header, &resized_logo, x as i64, y as i64);
         }
-        let header_rgb = DynamicImage::ImageRgba8(header).to_rgb8();
+        let header_rgb = DynamicImage::ImageRgba8(header.clone()).to_rgb8();
         let _ = header_rgb.save_with_format(icons_dir.join("header.bmp"), image::ImageFormat::Bmp);
+        let _ = header.save_with_format(icons_dir.join("header.png"), image::ImageFormat::Png);
 
         // 2. Generate Sidebar Image (164x314) for NSIS (BMP Format)
-        let mut sidebar: RgbaImage = ImageBuffer::from_pixel(164, 314, Rgba([24, 24, 27, 255]));
+        // Full-height cover photo with natural tree proportions
+        let mut sidebar: RgbaImage = ImageBuffer::from_pixel(164, 314, Rgba([13, 17, 23, 255]));
+
         if let Ok(hero) = image::open(hero_path) {
-            let resized_hero = image::imageops::resize(&hero, 164, 200, image::imageops::FilterType::Lanczos3);
-            image::imageops::overlay(&mut sidebar, &resized_hero, 0, 0);
+            let (orig_w, orig_h) = (hero.width() as f64, hero.height() as f64);
+            let target_w = 164.0;
+            let target_h = 314.0;
+            let scale = (target_w / orig_w).max(target_h / orig_h);
+            let scaled_w = (orig_w * scale).round() as u32;
+            let scaled_h = (orig_h * scale).round() as u32;
+
+            let scaled_hero = image::imageops::resize(&hero, scaled_w, scaled_h, image::imageops::FilterType::Lanczos3);
+            let crop_x = (scaled_w.saturating_sub(164)) / 2;
+            let crop_y = (scaled_h.saturating_sub(314)) / 2;
+            let cropped = image::imageops::crop_imm(&scaled_hero, crop_x, crop_y, 164, 314).to_image();
+            image::imageops::overlay(&mut sidebar, &cropped, 0, 0);
         }
+
+        // Apply subtle dark vignette at top and bottom to ground the layout without obscuring tree
+        for y in 0..314 {
+            // Top subtle vignette (y: 0..80) to give logo subtle depth
+            let top_alpha = if y < 70 {
+                (0.35 * (1.0 - (y as f64 / 70.0))).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+
+            // Bottom subtle vignette (y: 250..314) to blend into installer base
+            let bottom_alpha = if y > 240 {
+                (0.45 * ((y - 240) as f64 / 74.0)).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+
+            let alpha = top_alpha.max(bottom_alpha);
+            if alpha > 0.0 {
+                for x in 0..164 {
+                    let p = sidebar.get_pixel_mut(x, y);
+                    let dark = [13.0, 17.0, 23.0]; // #0d1117
+                    p[0] = ((p[0] as f64) * (1.0 - alpha) + dark[0] * alpha).round() as u8;
+                    p[1] = ((p[1] as f64) * (1.0 - alpha) + dark[1] * alpha).round() as u8;
+                    p[2] = ((p[2] as f64) * (1.0 - alpha) + dark[2] * alpha).round() as u8;
+                }
+            }
+        }
+
+        // Overlay Logo in the open sky area at the top (y = 20..72)
+        // Center x = (164 - 52) / 2 = 56. Leaves plenty of open breathing room before tree starts at y = 125.
         if let Ok(logo) = image::open(logo_path) {
-            let resized_logo = image::imageops::resize(&logo, 72, 72, image::imageops::FilterType::Lanczos3);
-            image::imageops::overlay(&mut sidebar, &resized_logo, (164 - 72) / 2, 215);
+            let logo_size = 52;
+            let resized_logo = image::imageops::resize(&logo, logo_size, logo_size, image::imageops::FilterType::Lanczos3);
+            let logo_x = (164 - logo_size) / 2;
+            let logo_y = 22;
+
+            // Render soft drop shadow behind logo for studio pop
+            for dy in 0..logo_size {
+                for dx in 0..logo_size {
+                    let lp = resized_logo.get_pixel(dx, dy);
+                    let a = lp[3] as f64 / 255.0;
+                    if a > 0.05 {
+                        let sx = logo_x + dx + 1;
+                        let sy = logo_y + dy + 2;
+                        if sx < 164 && sy < 314 {
+                            let p = sidebar.get_pixel_mut(sx, sy);
+                            let shadow_factor = a * 0.35;
+                            p[0] = ((p[0] as f64) * (1.0 - shadow_factor)).round() as u8;
+                            p[1] = ((p[1] as f64) * (1.0 - shadow_factor)).round() as u8;
+                            p[2] = ((p[2] as f64) * (1.0 - shadow_factor)).round() as u8;
+                        }
+                    }
+                }
+            }
+
+            image::imageops::overlay(&mut sidebar, &resized_logo, logo_x as i64, logo_y as i64);
         }
+
+        let _ = sidebar.save_with_format(icons_dir.join("sidebar.png"), image::ImageFormat::Png);
         let sidebar_rgb = DynamicImage::ImageRgba8(sidebar).to_rgb8();
         let _ = sidebar_rgb.save_with_format(icons_dir.join("sidebar.bmp"), image::ImageFormat::Bmp);
     }
