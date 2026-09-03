@@ -5,6 +5,9 @@ use image::{GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use crate::db::{ElementPayload, ProjectRow, SpreadPayload};
 
+pub mod text_rasterizer;
+pub use text_rasterizer::render_text_element;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportOptions {
@@ -460,7 +463,11 @@ where
         if !keep_running {
             break;
         }
-        render_photo_element(&mut canvas, elem, offset_x_px, offset_y_px, scale);
+        if elem.r#type == "text" || elem.text_payload.is_some() {
+            render_text_element(&mut canvas, elem, offset_x_px, offset_y_px, scale, dpi);
+        } else {
+            render_photo_element(&mut canvas, elem, offset_x_px, offset_y_px, scale);
+        }
     }
 
     canvas

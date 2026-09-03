@@ -23,18 +23,7 @@ interface TypographyPanelProps {
   onToast?: (msg: string) => void;
 }
 
-const COMMON_TEXT_COLORS = [
-  '#000000',
-  '#1e293b',
-  '#475569',
-  '#94a3b8',
-  '#ffffff',
-  '#b91c1c',
-  '#d97706',
-  '#2563eb',
-  '#059669',
-  '#7c3aed',
-];
+
 
 export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
@@ -739,35 +728,12 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         </div>
       </div>
 
-      {/* 6. Text Color Swatches & Picker */}
+      {/* 6. Text Color Picker */}
       <div>
-        <label style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '6px', letterSpacing: '0.5px' }}>
-          Text Color
-        </label>
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
-          {COMMON_TEXT_COLORS.map((hex) => (
-            <button
-              key={hex}
-              type="button"
-              onClick={() => handleUpdateStyle({ fill: hex })}
-              style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                backgroundColor: hex,
-                border: style.fill?.toLowerCase() === hex.toLowerCase() ? '2px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.2)',
-                cursor: 'pointer',
-                padding: 0,
-                outline: 'none',
-              }}
-              title={hex}
-            />
-          ))}
-        </div>
         <ColorPicker
           value={style.fill || '#1e293b'}
           onChange={(newColor) => handleUpdateStyle({ fill: newColor })}
-          label="Custom Color"
+          label="Text Color"
         />
       </div>
 
@@ -779,11 +745,14 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
           </label>
           <input
             type="number"
-            min={0.8}
+            min={0.1}
             max={3.0}
             step={0.1}
             value={style.lineHeight || 1.3}
-            onChange={(e) => handleUpdateStyle({ lineHeight: Number(e.target.value) || 1.3 })}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              handleUpdateStyle({ lineHeight: Number.isFinite(val) ? Math.max(0.1, val) : 1.3 });
+            }}
             style={{
               width: '100%',
               padding: '4px 6px',

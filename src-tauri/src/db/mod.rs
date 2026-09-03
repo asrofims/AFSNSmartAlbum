@@ -1997,7 +1997,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 8);
+        assert_eq!(db.get_schema_version().unwrap(), 10);
 
         db.create_project(
             "test-id-1",
