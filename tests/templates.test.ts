@@ -35,22 +35,7 @@ function runTests() {
   }
   console.log('✓ Exact Safe Margin Box alignment (left & right page blue dashed boxes) verified.');
 
-  // 2. Verify Inset variations
-  const insetParams: TemplateParams = {
-    ...params,
-    photoInset: 5,
-    photoInsetTop: 4,
-    photoInsetBottom: 6,
-    photoInsetLeft: 8,
-    photoInsetRight: 10,
-  };
-  const withInsets = getUsableAreas(insetParams);
-  if (withInsets.leftPageArea.x !== 18 || withInsets.leftPageArea.y !== 14) {
-    throw new Error(`Incorrect Left Inset box: ${JSON.stringify(withInsets.leftPageArea)}`);
-  }
-  console.log('✓ Dynamic 4-side photoInset safe area padding verified.');
-
-  // 3. Verify Photo Centered Fitting
+  // 2. Verify Photo Centered Fitting
   const fitted = fitInsideBoxCentered(rightPageArea, 1.5, 1.0);
   if (fitted.width <= 0 || fitted.height <= 0) {
     throw new Error('fitInsideBoxCentered produced invalid dimensions');
@@ -60,7 +45,7 @@ function runTests() {
   }
   console.log('✓ Aspect-ratio preserving centered box fitting verified.');
 
-  // 4. Verify Project Dimensions In Canvas Unit Converter
+  // 3. Verify Project Dimensions In Canvas Unit Converter
   const mockProject: Project = {
     id: 'proj-1',
     name: 'Test Project',
@@ -72,8 +57,6 @@ function runTests() {
     marginUnit: 'mm',
     spacingValue: 5,
     spacingUnit: 'mm',
-    photoInset: 10,
-    photoInsetUnit: 'mm',
     borderEnabled: false,
     borderWidth: 1,
     borderUnit: 'mm',

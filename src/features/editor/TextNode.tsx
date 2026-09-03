@@ -120,7 +120,14 @@ export function TextNode({
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
-      onContextMenu={onContextMenu}
+      onContextMenu={(e) => {
+        e.evt.preventDefault();
+        e.cancelBubble = true;
+        if (!isSelected) {
+          onSelect?.(e);
+        }
+        onContextMenu?.(e);
+      }}
       onTransformEnd={() => {
         if (isMultiSelectActive) return;
 

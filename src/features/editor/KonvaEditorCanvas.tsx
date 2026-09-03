@@ -1445,10 +1445,36 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       ];
     }
 
-    const items: ContextMenuItem[] = [
+    const selectedElements = (activeSpread.elements || []).filter((f) =>
+      selectedFrameIds.includes(f.id)
+    );
+    const textCount = selectedElements.filter((el) => el.type === 'text').length;
+    const photoCount = selectedElements.filter((el) => el.type === 'photo').length;
+    const isAllText = textCount > 0 && photoCount === 0;
+    const isAllPhotos = photoCount > 0 && textCount === 0;
+
+    const itemNounSingular = isAllText ? 'Text' : isAllPhotos ? 'Photo' : 'Item';
+    const itemNounPlural = isAllText ? 'Texts' : isAllPhotos ? 'Photos' : 'Elements';
+    const itemNoun = count > 1 ? itemNounPlural : itemNounSingular;
+
+    const items: ContextMenuItem[] = [];
+
+    // If single text element selected, allow direct edit via context menu
+    if (count === 1 && isAllText && selectedElements[0]) {
+      const textId = selectedElements[0].id;
+      items.push({
+        id: 'edit-text',
+        label: 'Edit Text',
+        icon: '✏️',
+        shortcut: 'Double-Click',
+        onClick: () => setEditingTextElementId(textId),
+      });
+    }
+
+    items.push(
       {
         id: 'delete',
-        label: count > 1 ? `Delete ${count} Selected Photos` : 'Delete Photo',
+        label: count > 1 ? `Delete ${count} Selected ${itemNounPlural}` : `Delete ${itemNounSingular}`,
         icon: '🗑️',
         shortcut: 'Del',
         danger: true,
@@ -1456,14 +1482,14 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       },
       {
         id: 'copy',
-        label: count > 1 ? `Copy ${count} Photos` : 'Copy Photo',
+        label: count > 1 ? `Copy ${count} ${itemNounPlural}` : `Copy ${itemNounSingular}`,
         icon: '📋',
         shortcut: 'Ctrl+C',
         onClick: () => copySelectedFrames(activeSpread.id),
       },
       {
         id: 'paste',
-        label: 'Paste Photo',
+        label: isAllText ? 'Paste' : 'Paste Photo',
         icon: '📥',
         shortcut: 'Ctrl+V',
         disabled: !hasClipboard,
@@ -1495,16 +1521,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       },
       {
         id: 'duplicate',
-        label: count > 1 ? `Duplicate ${count} Photos` : 'Duplicate Photo',
+        label: count > 1 ? `Duplicate ${count} ${itemNounPlural}` : `Duplicate ${itemNounSingular}`,
         icon: '⧉',
         shortcut: 'Ctrl+D',
         onClick: () => duplicateSelectedFrames(activeSpread.id),
-      },
-    ];
-
-    const selectedElements = (activeSpread.elements || []).filter((f) =>
-      selectedFrameIds.includes(f.id)
+      }
     );
+
     const distinctGroupIds = new Set(selectedElements.map((f) => f.groupId).filter(Boolean));
     const hasUngrouped = selectedElements.some((f) => !f.groupId);
     const canGroup = selectedElements.length >= 2 && (distinctGroupIds.size > 1 || hasUngrouped);
@@ -1512,8 +1535,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     if (canGroup) {
       items.push({
-        id: 'group-photos',
-        label: `Group ${count} Photos`,
+        id: 'group-elements',
+        label: `Group ${count} ${itemNounPlural}`,
         icon: '👥',
         shortcut: 'Ctrl+G',
         onClick: () => groupSelectedFrames(activeSpread.id),
@@ -1522,8 +1545,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     if (canUngroup) {
       items.push({
-        id: 'ungroup-photos',
-        label: 'Ungroup Photos',
+        id: 'ungroup-elements',
+        label: `Ungroup ${itemNounPlural}`,
         icon: '⊘',
         shortcut: 'Ctrl+Shift+G',
         onClick: () => ungroupSelectedFrames(activeSpread.id),
@@ -1535,31 +1558,31 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     if (count >= 1 && hasUnlocked) {
       items.push({
-        id: 'lock-photos',
-        label: count > 1 ? `Lock ${count} Photos` : 'Lock Photo',
+        id: 'lock-elements',
+        label: count > 1 ? `Lock ${count} ${itemNounPlural}` : `Lock ${itemNounSingular}`,
         icon: '🔒',
         shortcut: 'Ctrl+L',
         onClick: () => {
           useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
-          if (onToast) onToast(`🔒 Locked ${count} photo(s)`);
+          if (onToast) onToast(`🔒 Locked ${count} ${itemNoun.toLowerCase()}`);
         },
       });
     }
 
     if (count >= 1 && hasLocked) {
       items.push({
-        id: 'unlock-photos',
-        label: count > 1 ? `Unlock ${count} Photos` : 'Unlock Photo',
+        id: 'unlock-elements',
+        label: count > 1 ? `Unlock ${count} ${itemNounPlural}` : `Unlock ${itemNounSingular}`,
         icon: '🔓',
         shortcut: 'Ctrl+Shift+L',
         onClick: () => {
           useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
-          if (onToast) onToast(`🔓 Unlocked ${count} photo(s)`);
+          if (onToast) onToast(`🔓 Unlocked ${count} ${itemNoun.toLowerCase()}`);
         },
       });
     }
 
-    if (count === 2 && !hasLocked) {
+    if (count === 2 && !hasLocked && isAllPhotos) {
       items.push({
         id: 'swap-photos',
         label: 'Swap 2 Photos',
@@ -1728,22 +1751,26 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               rotateSelectedFrames(activeSpread.id, 'ccw');
             },
           },
-          {
-            id: 'reset-ratio',
-            label: '↺ Reset Aspect Ratio',
-            icon: '⇱',
-            onClick: () => {
-              resetSelectedRatio(activeSpread.id);
-            },
-          },
-          {
-            id: 'reset-crop',
-            label: '↺ Reset Crop & Center',
-            icon: '🎯',
-            onClick: () => {
-              resetSelectedCrop(activeSpread.id);
-            },
-          },
+          ...(photoCount > 0
+            ? [
+                {
+                  id: 'reset-ratio',
+                  label: '↺ Reset Aspect Ratio',
+                  icon: '⇱',
+                  onClick: () => {
+                    resetSelectedRatio(activeSpread.id);
+                  },
+                },
+                {
+                  id: 'reset-crop',
+                  label: '↺ Reset Crop & Center',
+                  icon: '🎯',
+                  onClick: () => {
+                    resetSelectedCrop(activeSpread.id);
+                  },
+                },
+              ]
+            : []),
         ],
       },
       { divider: true, id: 'div-clear', label: '' },
@@ -2013,30 +2040,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   strokeWidth={1}
                   dash={[5, 4]}
                 />
-
-                {/* Inner Safe Inset (Teal Guide) */}
-                {(dims.photoInsetTop > 0 || dims.photoInsetBottom > 0 || dims.photoInsetLeft > 0 || dims.photoInsetRight > 0) && (
-                  <>
-                    <Rect
-                      x={safeAreaPixel + Math.round(dims.photoInsetLeft * scaleFactor)}
-                      y={safeAreaPixel + Math.round(dims.photoInsetTop * scaleFactor)}
-                      width={leftPagePixelW - safeAreaPixel * 2 - Math.round(dims.photoInsetLeft * scaleFactor)}
-                      height={screenSpreadH - safeAreaPixel * 2 - Math.round((dims.photoInsetTop + dims.photoInsetBottom) * scaleFactor)}
-                      stroke="rgba(20, 184, 166, 0.75)"
-                      strokeWidth={1}
-                      dash={[3, 3]}
-                    />
-                    <Rect
-                      x={leftPagePixelW + gutterPixelW + safeAreaPixel}
-                      y={safeAreaPixel + Math.round(dims.photoInsetTop * scaleFactor)}
-                      width={rightPagePixelW - safeAreaPixel * 2 - Math.round(dims.photoInsetRight * scaleFactor)}
-                      height={screenSpreadH - safeAreaPixel * 2 - Math.round((dims.photoInsetTop + dims.photoInsetBottom) * scaleFactor)}
-                      stroke="rgba(20, 184, 166, 0.75)"
-                      strokeWidth={1}
-                      dash={[3, 3]}
-                    />
-                  </>
-                )}
               </Group>
             )}
           </Layer>
@@ -2239,6 +2242,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       dragInitialPhysicalPositionsRef.current.clear();
                     }}
                     onContextMenu={(e) => {
+                      e.evt.preventDefault();
+                      e.cancelBubble = true;
+                      if (!isSelected) {
+                        selectFrame(textEl.id);
+                      }
                       openContextMenuAt(e.evt.clientX, e.evt.clientY);
                     }}
                     onElementChange={(updates) => updateTextElement(activeSpread.id, textEl.id, updates)}

@@ -19,7 +19,6 @@ function runTests() {
     spreadHeight: 200,
     isSpread: true,
     safeMargin: 10,
-    photoInset: 0,
     gutterWidth: 6,
     spacing: 4,
   };
@@ -77,22 +76,7 @@ function runTests() {
   }
   console.log('✓ All multi-photo rects strictly bounded inside Left & Right Blue Safe Margin Boxes.');
 
-  // Test 3: Verify photoInset adds exact breathing room to outer edges
-  const insetParams: TemplateParams = {
-    ...baseParams,
-    photoInset: 5, // 5mm breathing room on outer edges
-  };
-  const { leftPageArea: insetLeft, rightPageArea: insetRight } = getUsableAreas(insetParams);
-
-  if (insetLeft.x !== 15 || insetLeft.width !== 175 || insetLeft.height !== 170) {
-    throw new Error(`Inset Left area mismatch: ${JSON.stringify(insetLeft)}`);
-  }
-  if (insetRight.x !== 216 || insetRight.width !== 175 || insetRight.height !== 170) {
-    throw new Error(`Inset Right area mismatch: ${JSON.stringify(insetRight)}`);
-  }
-  console.log('✓ Dynamic photoInset creates exact outer 4-edge breathing room while anchoring the spine.');
-
-  // Test 4: Single Page Partitioning (K = 1 to 6)
+  // Test 3: Single Page Partitioning (K = 1 to 6)
   const singleBox = { x: 10, y: 10, width: 180, height: 180 };
   for (let k = 1; k <= 6; k++) {
     const rects = partitionPageBoxIntoKRects(singleBox, k, 4, 0);

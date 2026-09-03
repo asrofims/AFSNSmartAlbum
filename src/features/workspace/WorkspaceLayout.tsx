@@ -42,7 +42,6 @@ export function WorkspaceLayout() {
   const updateProjectName = useProjectStore((s) => s.updateProjectName);
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
   const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
-  const updateProjectPhotoInset = useProjectStore((s) => s.updateProjectPhotoInset);
   const updateProjectBackgroundColor = useProjectStore((s) => s.updateProjectBackgroundColor);
   const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
@@ -57,7 +56,6 @@ export function WorkspaceLayout() {
   const toggleGuide = useAlbumStore((s) => s.toggleGuide);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
-  const updatePhotoInset = useAlbumStore((s) => s.updatePhotoInset);
   const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
   const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
@@ -228,7 +226,6 @@ export function WorkspaceLayout() {
   // Collapsible Right Properties & Bottom Filmstrip
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
   const [isFilmstripOpen, setIsFilmstripOpen] = useState(true);
-  const [isInsetExpanded, setIsInsetExpanded] = useState(false);
 
   useTauriInfo();
 
@@ -2111,165 +2108,6 @@ export function WorkspaceLayout() {
                       suffix={currentProject.canvasUnit}
                     />
                   </div>
-                </div>
-
-                {/* Inner Safe Inset Card with Sleek 4S Multi-Directional Switcher */}
-                <div
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    marginBottom: '10px',
-                  }}
-                >
-                  {/* Inset Header with Mode Switcher */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <rect x="7" y="7" width="10" height="10" />
-                      </svg>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }} title="Additional breathing room distance of photos inside the blue safe margin box">
-                        Inner Safe Inset
-                      </span>
-                    </div>
-
-                    {/* Segmented Pill Switcher: All Sides vs 4 Sides */}
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '2px',
-                        gap: '2px',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setIsInsetExpanded(false)}
-                        style={{
-                          padding: '3px 7px',
-                          fontSize: '10px',
-                          fontWeight: !isInsetExpanded ? 600 : 400,
-                          color: !isInsetExpanded ? '#ffffff' : 'var(--color-text-muted)',
-                          backgroundColor: !isInsetExpanded ? 'var(--color-accent)' : 'transparent',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                        title="Uniform inset for all sides (Linked)"
-                      >
-                        All Sides
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsInsetExpanded(true)}
-                        style={{
-                          padding: '3px 7px',
-                          fontSize: '10px',
-                          fontWeight: isInsetExpanded ? 600 : 400,
-                          color: isInsetExpanded ? '#ffffff' : 'var(--color-text-muted)',
-                          backgroundColor: isInsetExpanded ? 'var(--color-accent)' : 'transparent',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                        title="Individual 4-sided insets (Top, Bottom, Left, Right)"
-                      >
-                        4 Sides
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Inset Body */}
-                  {!isInsetExpanded ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        Uniform Inset
-                      </span>
-                      <div style={{ width: '110px' }}>
-                        <NumberInput
-                          value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
-                          onChange={(val) => {
-                            updatePhotoInset(val, 'all');
-                            updateProjectPhotoInset(val);
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '2px' }}>
-                      {/* Top Inset */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.photoInsetTop ?? activeSpread?.photoInset ?? 0}
-                          onChange={(val) => updatePhotoInset(val, 'top')}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-
-                      {/* Bottom Inset */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.photoInsetBottom ?? activeSpread?.photoInset ?? 0}
-                          onChange={(val) => updatePhotoInset(val, 'bottom')}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-
-                      {/* Left Inset */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Left</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.photoInsetLeft ?? activeSpread?.photoInset ?? 0}
-                          onChange={(val) => updatePhotoInset(val, 'left')}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-
-                      {/* Right Inset */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Right</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.photoInsetRight ?? activeSpread?.photoInset ?? 0}
-                          onChange={(val) => updatePhotoInset(val, 'right')}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Smart Snapping Card & Granular Config Button */}

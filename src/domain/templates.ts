@@ -15,11 +15,6 @@ export interface TemplateParams {
   spreadHeight: number;
   isSpread: boolean; // true for 2-page spread, false for single-page cover
   safeMargin: number; // in canvasUnit
-  photoInset?: number;
-  photoInsetTop?: number;
-  photoInsetBottom?: number;
-  photoInsetLeft?: number;
-  photoInsetRight?: number; // in canvasUnit (extra dynamic breathing room inside safeMargin)
   gutterWidth: number; // in canvasUnit
   spacing: number; // in canvasUnit
   currentPhotos?: Array<{
@@ -52,11 +47,6 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   unit: Unit;
   dpi: number;
   safeMargin: number;
-  photoInset: number;
-  photoInsetTop: number;
-  photoInsetBottom: number;
-  photoInsetLeft: number;
-  photoInsetRight: number;
   gutterWidth: number;
   spacing: number;
   bleed: number;
@@ -71,20 +61,6 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const rawMargin = spread?.safeArea ?? project.marginValue ?? 10;
   const marginUnit = project.marginUnit || 'mm';
   const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));
-
-  // Inset / Photo Padding: convert from project.photoInsetUnit (or 0) to project.canvasUnit
-  const rawInset = spread?.photoInset ?? project.photoInset ?? 0;
-  const rawInsetTop = spread?.photoInsetTop ?? project.photoInsetTop ?? rawInset;
-  const rawInsetBottom = spread?.photoInsetBottom ?? project.photoInsetBottom ?? rawInset;
-  const rawInsetLeft = spread?.photoInsetLeft ?? project.photoInsetLeft ?? rawInset;
-  const rawInsetRight = spread?.photoInsetRight ?? project.photoInsetRight ?? rawInset;
-
-  const insetUnit = project.photoInsetUnit || project.marginUnit || 'mm';
-  const photoInset = round4(convertUnit(rawInset, insetUnit, unit, dpi, 4));
-  const photoInsetTop = round4(convertUnit(rawInsetTop, insetUnit, unit, dpi, 4));
-  const photoInsetBottom = round4(convertUnit(rawInsetBottom, insetUnit, unit, dpi, 4));
-  const photoInsetLeft = round4(convertUnit(rawInsetLeft, insetUnit, unit, dpi, 4));
-  const photoInsetRight = round4(convertUnit(rawInsetRight, insetUnit, unit, dpi, 4));
 
   // Spacing: convert from project.spacingUnit (or 'mm') to project.canvasUnit
   const rawSpacing = project.spacingValue ?? 4;
@@ -104,11 +80,6 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
     unit,
     dpi,
     safeMargin,
-    photoInset,
-    photoInsetTop,
-    photoInsetBottom,
-    photoInsetLeft,
-    photoInsetRight,
     gutterWidth,
     spacing,
     bleed,
@@ -149,7 +120,7 @@ export function fitInsideBoxCentered(
 
 /**
  * Computes exact printable and designable Safe Margin boxes for Left Page and Right Page.
- * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas + dynamic photoInset.
+ * Conforms 100% with the Blue Dashed Safe Guide Lines on the canvas.
  */
 export function getUsableAreas(params: TemplateParams): {
   spreadArea: RectBounds;
@@ -163,25 +134,15 @@ export function getUsableAreas(params: TemplateParams): {
     spreadHeight,
     isSpread,
     safeMargin,
-    photoInset = 0,
-    photoInsetTop,
-    photoInsetBottom,
-    photoInsetLeft,
-    photoInsetRight,
     gutterWidth,
   } = params;
 
-  const insetTop = photoInsetTop !== undefined ? photoInsetTop : photoInset;
-  const insetBottom = photoInsetBottom !== undefined ? photoInsetBottom : photoInset;
-  const insetLeft = photoInsetLeft !== undefined ? photoInsetLeft : photoInset;
-  const insetRight = photoInsetRight !== undefined ? photoInsetRight : photoInset;
-
   if (!isSpread) {
     const singleArea: RectBounds = {
-      x: round4(safeMargin + insetLeft),
-      y: round4(safeMargin + insetTop),
-      width: Math.max(0.1, round4(spreadWidth - safeMargin * 2 - insetLeft - insetRight)),
-      height: Math.max(0.1, round4(spreadHeight - safeMargin * 2 - insetTop - insetBottom)),
+      x: round4(safeMargin),
+      y: round4(safeMargin),
+      width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
+      height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
     };
     return {
       spreadArea: singleArea,
@@ -195,30 +156,28 @@ export function getUsableAreas(params: TemplateParams): {
   // On a 2-page spread: spreadWidth = leftPageWidth + gutterWidth + rightPageWidth
   const pageWidth = round4((spreadWidth - gutterWidth) / 2);
 
-  // Left Page: outer left edge insets by insetLeft, top by insetTop, bottom by insetBottom.
-  // Inner spine edge stays anchored at safeMargin before gutter.
+  // Left Page: fully bounded by safeMargin inside page
   const leftPageArea: RectBounds = {
-    x: round4(safeMargin + insetLeft),
-    y: round4(safeMargin + insetTop),
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2 - insetLeft)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2 - insetTop - insetBottom)),
+    x: round4(safeMargin),
+    y: round4(safeMargin),
+    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
-  // Right Page: inner spine edge stays anchored at safeMargin after gutter.
-  // Outer right edge insets by insetRight, top by insetTop, bottom by insetBottom.
+  // Right Page: fully bounded by safeMargin inside page
   const rightPageArea: RectBounds = {
     x: round4(pageWidth + gutterWidth + safeMargin),
-    y: round4(safeMargin + insetTop),
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2 - insetRight)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2 - insetTop - insetBottom)),
+    y: round4(safeMargin),
+    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
   // Full Spread Area across both pages
   const spreadArea: RectBounds = {
-    x: round4(safeMargin + insetLeft),
-    y: round4(safeMargin + insetTop),
-    width: Math.max(0.1, round4(spreadWidth - safeMargin * 2 - insetLeft - insetRight)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2 - insetTop - insetBottom)),
+    x: round4(safeMargin),
+    y: round4(safeMargin),
+    width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
   };
 
   return { spreadArea, leftPageArea, rightPageArea, pageWidth, gutterWidth };

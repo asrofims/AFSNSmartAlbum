@@ -69,7 +69,6 @@ export interface AlbumState {
   reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
   updateSafeArea: (safeArea: number) => void;
-  updatePhotoInset: (photoInset: number, side?: 'all' | 'top' | 'bottom' | 'left' | 'right') => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
@@ -644,53 +643,6 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
       s.id === activeSpreadId ? { ...s, safeArea } : s
-    );
-
-    set({
-      currentAlbum: {
-        ...currentAlbum,
-        spreads: updatedSpreads,
-      },
-      saveStatus: 'unsaved',
-    });
-  },
-
-  updatePhotoInset: (photoInset: number, side: 'all' | 'top' | 'bottom' | 'left' | 'right' = 'all') => {
-    const { currentAlbum, activeSpreadId } = get();
-    if (!currentAlbum || !activeSpreadId) return;
-
-    useHistoryStore.getState().pushState(currentAlbum);
-
-    const patch: Partial<Spread> = {};
-    if (side === 'all') {
-      patch.photoInset = photoInset;
-      patch.photoInsetTop = photoInset;
-      patch.photoInsetBottom = photoInset;
-      patch.photoInsetLeft = photoInset;
-      patch.photoInsetRight = photoInset;
-    } else if (side === 'top') {
-      patch.photoInsetTop = photoInset;
-    } else if (side === 'bottom') {
-      patch.photoInsetBottom = photoInset;
-    } else if (side === 'left') {
-      patch.photoInsetLeft = photoInset;
-    } else if (side === 'right') {
-      patch.photoInsetRight = photoInset;
-    }
-
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
-      set({
-        currentAlbum: {
-          ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, ...patch },
-        },
-        saveStatus: 'unsaved',
-      });
-      return;
-    }
-
-    const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, ...patch } : s
     );
 
     set({

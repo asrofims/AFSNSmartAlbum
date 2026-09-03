@@ -15,7 +15,6 @@ interface ProjectState {
   updateProjectName: (name: string) => Promise<void>;
   updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
   updateProjectMargin: (marginValue: number, marginUnit?: Unit) => Promise<void>;
-  updateProjectPhotoInset: (photoInset: number, photoInsetUnit?: Unit) => Promise<void>;
   updateProjectBackgroundColor: (backgroundColor: string) => Promise<void>;
   closeProject: () => void;
   loadRecentProjects: () => Promise<void>;
@@ -147,23 +146,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
   },
 
-  updateProjectPhotoInset: async (photoInset: number, photoInsetUnit?: Unit) => {
-    const current = get().currentProject;
-    if (!current) return;
-    const unit = photoInsetUnit || current.photoInsetUnit || 'mm';
-    const updatedProject: Project = {
-      ...current,
-      photoInset: Number(photoInset),
-      photoInsetUnit: unit,
-      updatedAt: new Date().toISOString(),
-    };
-
-    set((state) => ({
-      currentProject: updatedProject,
-      recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
-    }));
-  },
-
   updateProjectBackgroundColor: async (backgroundColor: string) => {
     const current = get().currentProject;
     if (!current) return;
@@ -238,12 +220,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       marginEnabled: Boolean(settings.margin.enabled),
       marginValue: Number(settings.margin.value),
       marginUnit: settings.margin.unit,
-      photoInset: settings.photoInset ? Number(settings.photoInset.value) : 2,
-      photoInsetTop: settings.photoInset?.top !== undefined ? Number(settings.photoInset.top) : (settings.photoInset ? Number(settings.photoInset.value) : 2),
-      photoInsetBottom: settings.photoInset?.bottom !== undefined ? Number(settings.photoInset.bottom) : (settings.photoInset ? Number(settings.photoInset.value) : 2),
-      photoInsetLeft: settings.photoInset?.left !== undefined ? Number(settings.photoInset.left) : (settings.photoInset ? Number(settings.photoInset.value) : 2),
-      photoInsetRight: settings.photoInset?.right !== undefined ? Number(settings.photoInset.right) : (settings.photoInset ? Number(settings.photoInset.value) : 2),
-      photoInsetUnit: settings.photoInset?.unit || settings.canvas.unit,
       borderEnabled: Boolean(settings.border.enabled),
       borderWidth: Number(settings.border.width),
       borderUnit: settings.border.unit,
