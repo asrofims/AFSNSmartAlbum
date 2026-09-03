@@ -27,9 +27,10 @@ import {
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
 } from '../domain/adaptiveLayout';
+import { convertUnit } from '../domain/units';
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
-import type { PhotoFrameElement } from '../domain/editor';
+import { applyFixedGap, type PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
 export interface AlbumState {
@@ -68,7 +69,7 @@ export interface AlbumState {
   moveSpread: (spreadId: string, direction: 'left' | 'right') => void;
   reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
-  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit) => void;
+  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => void;
   updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
@@ -635,20 +636,160 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     });
   },
 
-  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit) => {
-    const { currentAlbum, activeSpreadId } = get();
+  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => {
+    const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
+    const isCover = currentAlbum.coverSpread.id === activeSpreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === activeSpreadId);
+
+    if (!targetSpread) return;
+
+    const unit = spacingUnit || targetSpread.spacingUnit || (project ? project.spacingUnit : 'mm');
+    const updatedTargetSpread: Spread = {
+      ...targetSpread,
+      spacingValue,
+      spacingUnit: unit,
+    };
+
+    let newElements = targetSpread.elements;
+
+    // Real-time canvas frame spacing update:
+    // If project is available and there are 2 or more unlocked photos on the spread,
+    // immediately re-position and size the frames so the gap changes in real time on the canvas!
+    if (project && targetSpread.elements.length >= 2) {
+      const lockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
+      const unlockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
+      const textElements = targetSpread.elements.filter((el) => el.type === 'text');
+
+      if (unlockedElements.length >= 2) {
+        const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
+          id: el.id,
+          photoId: el.photoId,
+          filePath: el.filePath,
+          fileName: el.fileName,
+          previewPath: el.previewPath,
+          thumbnailPath: el.thumbnailPath,
+          photoAspect: el.photoAspect,
+        }));
+
+        const isSpread = !isCover;
+        const dims = getProjectDimensionsInCanvasUnit(project, updatedTargetSpread);
+        const spreadWidth = isCover
+          ? (targetSpread.leftPage ? targetSpread.leftPage.width : dims.pageWidth) +
+            (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
+            dims.gutterWidth
+          : dims.pageWidth * 2 + dims.gutterWidth;
+        const spreadHeight = dims.pageHeight;
+
+        const variations = generateAdaptiveLayoutVariations(
+          {
+            spreadWidth,
+            spreadHeight,
+            isSpread,
+            safeMargin: dims.safeMargin,
+            safeMarginTop: dims.safeMarginTop,
+            safeMarginBottom: dims.safeMarginBottom,
+            safeMarginOutside: dims.safeMarginOutside,
+            safeMarginSpine: dims.safeMarginSpine,
+            gutterWidth: dims.gutterWidth,
+            spacing: dims.spacing,
+            lockedElements,
+          },
+          unlockedPhotos
+        );
+
+        if (variations.length > 0) {
+          const currentIndex = spreadLayoutIndices[targetSpread.id] || 0;
+          const chosenVariation = variations[currentIndex % variations.length];
+          if (chosenVariation) {
+            const slotToPhotoMap = new Map<number, AdaptivePhoto>();
+            if (chosenVariation.photoAssignments && chosenVariation.photoAssignments.length === unlockedPhotos.length) {
+              chosenVariation.photoAssignments.forEach((slotIdx, photoIdx) => {
+                const p = unlockedPhotos[photoIdx];
+                if (p) slotToPhotoMap.set(slotIdx, p);
+              });
+            }
+
+            const newUnlockedElements: PhotoFrameElement[] = chosenVariation.rects.map((rect, index) => {
+              const photo = slotToPhotoMap.get(index) || unlockedPhotos[index];
+              const existingFrame = unlockedElements.find((f) =>
+                (photo?.id && f.id === photo.id) ||
+                (photo?.photoId && f.photoId === photo.photoId) ||
+                (photo?.filePath && f.filePath === photo.filePath)
+              ) || unlockedElements[index];
+
+              if (existingFrame) {
+                return {
+                  ...existingFrame,
+                  x: rect.x,
+                  y: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  originalWidth: rect.width,
+                  originalHeight: rect.height,
+                };
+              }
+
+              return {
+                id: `frame-${Date.now()}-${index + 1}-${Math.random().toString(36).substr(2, 4)}`,
+                type: 'photo',
+                photoId: photo?.photoId || null,
+                filePath: photo?.filePath || '',
+                fileName: photo?.fileName || '',
+                previewPath: photo?.previewPath || '',
+                thumbnailPath: photo?.thumbnailPath || '',
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                rotation: 0,
+                zIndex: index + 1,
+                photoAspect: photo?.photoAspect || (rect.width / rect.height),
+                originalWidth: rect.width,
+                originalHeight: rect.height,
+                cropX: 0,
+                cropY: 0,
+                cropScale: 1.0,
+                cropRotation: 0,
+                borderEnabled: project.borderEnabled,
+                borderWidth: project.borderWidth,
+                borderColor: project.borderColor,
+                opacity: 1.0,
+              };
+            });
+
+            newElements = [...lockedElements, ...newUnlockedElements, ...textElements];
+          }
+        } else {
+          // Fallback for custom placed frames: apply fixed gap along primary axis
+          const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
+          const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
+          const gapInMm = convertUnit(spacingValue, unit, 'mm');
+          const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
+          if (gapUpdates.length > 0) {
+            const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
+            const updatedUnlocked = unlockedElements.map((f) => {
+              const geom = updateMap.get(f.id);
+              return geom ? { ...f, ...geom } : f;
+            });
+            newElements = [...lockedElements, ...updatedUnlocked, ...textElements];
+          }
+        }
+      }
+    }
+
+    if (isCover) {
       set({
         currentAlbum: {
           ...currentAlbum,
           coverSpread: {
-            ...currentAlbum.coverSpread,
-            spacingValue,
-            spacingUnit: spacingUnit || currentAlbum.coverSpread.spacingUnit,
+            ...updatedTargetSpread,
+            elements: newElements,
           },
         },
         saveStatus: 'unsaved',
@@ -657,11 +798,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? {
-        ...s,
-        spacingValue,
-        spacingUnit: spacingUnit || s.spacingUnit,
-      } : s
+      s.id === activeSpreadId
+        ? {
+            ...updatedTargetSpread,
+            elements: newElements,
+          }
+        : s
     );
 
     set({

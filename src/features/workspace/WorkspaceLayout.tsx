@@ -2010,8 +2010,23 @@ export function WorkspaceLayout() {
                         onChange={(val) => {
                           const num = Math.max(0, val);
                           const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
-                          updateSpreadSpacing(num, unit);
+                          updateSpreadSpacing(num, unit, currentProject);
                           setCustomGapValue(num);
+
+                          // Also real-time adjust specifically selected frames if a subset is selected
+                          if (selectedFrameIds.length >= 2 && activeSpread) {
+                            const gapInMm = convertUnit(num, unit, 'mm');
+                            const frames = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
+                            if (frames.length >= 2) {
+                              const minX = Math.min(...frames.map((f) => f.x));
+                              const maxX = Math.max(...frames.map((f) => f.x + f.width));
+                              const minY = Math.min(...frames.map((f) => f.y));
+                              const maxY = Math.max(...frames.map((f) => f.y + f.height));
+                              const spanX = maxX - minX;
+                              const spanY = maxY - minY;
+                              applyFixedGapToSelected(activeSpread.id, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
+                            }
+                          }
                         }}
                         min={0}
                         max={100}
