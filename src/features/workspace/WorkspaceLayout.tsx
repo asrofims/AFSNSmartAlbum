@@ -1412,7 +1412,7 @@ export function WorkspaceLayout() {
                                 zoomCropAtPoint(
                                   selectedFrame,
                                   { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
-                                  cropTransform.cropScale - 0.1
+                                  cropTransform.cropScale - 0.01
                                 )
                               )
                             }
@@ -1431,7 +1431,7 @@ export function WorkspaceLayout() {
                               opacity: cropTransform.cropScale <= 1.0 ? 0.35 : 1,
                               padding: 0,
                             }}
-                            title="Zoom Out (−10%)"
+                            title="Zoom Out (−1%)"
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="5" y1="12" x2="19" y2="12" />
@@ -1442,7 +1442,7 @@ export function WorkspaceLayout() {
                             type="range"
                             min={1}
                             max={3.5}
-                            step={0.05}
+                            step={0.01}
                             value={cropTransform.cropScale}
                             onChange={(e) =>
                               updateCrop(
@@ -1467,7 +1467,7 @@ export function WorkspaceLayout() {
                                 zoomCropAtPoint(
                                   selectedFrame,
                                   { x: selectedFrame.width / 2, y: selectedFrame.height / 2 },
-                                  cropTransform.cropScale + 0.1
+                                  cropTransform.cropScale + 0.01
                                 )
                               )
                             }
@@ -1486,7 +1486,7 @@ export function WorkspaceLayout() {
                               opacity: cropTransform.cropScale >= 3.5 ? 0.35 : 1,
                               padding: 0,
                             }}
-                            title="Zoom In (+10%)"
+                            title="Zoom In (+1%)"
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="12" y1="5" x2="12" y2="19" />

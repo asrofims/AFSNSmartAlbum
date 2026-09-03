@@ -201,7 +201,7 @@ export function clampCropTransform(
   return {
     cropX: Math.round(panX * 1000) / 1000,
     cropY: Math.round(panY * 1000) / 1000,
-    cropScale: roundToTenth(zoom),
+    cropScale: roundToHundredth(zoom),
   };
 }
 

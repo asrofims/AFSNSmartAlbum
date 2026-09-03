@@ -75,9 +75,9 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => updateCropZoom(0.1)}
+            onClick={() => updateCropZoom(0.01)}
             disabled={(frame.cropScale || 1.0) >= 3.5}
-            title="Zoom In Inside Frame (+10%)"
+            title="Zoom In Inside Frame (+1%)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
@@ -96,9 +96,9 @@ export function FrameToolbar() {
           <button
             type="button"
             className={styles.toolBtn}
-            onClick={() => updateCropZoom(-0.1)}
+            onClick={() => updateCropZoom(-0.01)}
             disabled={(frame.cropScale || 1.0) <= 1.0}
-            title="Zoom Out Inside Frame (−10%)"
+            title="Zoom Out Inside Frame (−1%)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />

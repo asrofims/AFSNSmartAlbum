@@ -262,15 +262,16 @@ export function PageNavigator() {
 
   const handleDeleteRequest = (e: React.MouseEvent, spread: Spread) => {
     e.stopPropagation();
-    const photoCount = (spread.elements || []).filter((el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)).length;
+    const elements = spread.elements || [];
 
-    if (photoCount === 0) {
-      // Empty spread without photos -> delete immediately without confirmation modal
+    if (elements.length === 0) {
+      // Completely empty spread -> delete immediately without modal
       deleteSpread(spread.id);
-    } else {
-      // Spread has placed photos -> prompt confirmation dialog to protect user content
-      setSpreadToDelete(spread);
+      return;
     }
+
+    // Spread has elements (photos, text, or frames) -> prompt confirmation dialog
+    setSpreadToDelete(spread);
   };
 
   const handleConfirmDelete = () => {
@@ -507,16 +508,30 @@ export function PageNavigator() {
         </button>
       </div>
 
-      {/* Confirm Delete Spread Dialog (only shown when spread has photos) */}
+      {/* Confirm Delete Spread Dialog (shown whenever a spread with any elements is about to be deleted) */}
       <ConfirmDialog
         isOpen={spreadToDelete !== null}
         title="Delete Album Spread?"
         message={`Are you sure you want to delete "${spreadToDelete?.name}"?`}
-        detail={
-          spreadToDelete
-            ? `This spread contains ${(spreadToDelete.elements || []).filter((el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)).length} photo(s). Deleting it will remove this spread from your album.`
-            : 'The two facing pages and any layout elements on this spread will be removed from your album.'
-        }
+        detail={(() => {
+          if (!spreadToDelete) return '';
+          const elements = spreadToDelete.elements || [];
+          const photoCount = elements.filter(
+            (el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)
+          ).length;
+          const textCount = elements.filter((el) => el.type === 'text').length;
+          const emptyFrameCount = elements.filter(
+            (el) => el.type === 'photo' && !el.photoId && !el.filePath
+          ).length;
+
+          const parts: string[] = [];
+          if (photoCount > 0) parts.push(`${photoCount} photo(s)`);
+          if (textCount > 0) parts.push(`${textCount} text element(s)`);
+          if (emptyFrameCount > 0) parts.push(`${emptyFrameCount} placeholder frame(s)`);
+
+          const summary = parts.length > 0 ? parts.join(', ') : `${elements.length} element(s)`;
+          return `This spread still contains ${summary}. Deleting it will permanently remove this spread and all its contents from your album.`;
+        })()}
         confirmText="Delete Spread"
         cancelText="Cancel"
         variant="danger"

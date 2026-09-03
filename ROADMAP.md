@@ -55,7 +55,8 @@
 - [x] In-Frame Cropping (Double-click, Pan, Zoom Slider HUD, Done)
 - [x] **Dual Entity Reset System** (`↺ Reset Ratio` & `↺ Reset Crop`)
 - [x] 90° Clockwise & Counter-Clockwise Frame Rotation
-- [x] Viewport Zoom & Smooth Pan Navigation
+- [x] Viewport Zoom & Smooth Pan Navigation with Auto-Center Spine Focus & Full Left/Right Page Accessibility
+- [x] Granular 1% Sequential Photo Crop Zoom (`0.01` step / 100%-350% range across Toolbar, Slider HUD, and Mouse Wheel)
 - [x] Smart Magnetic Snapping with Visual HUD Distance Lines & Match Dimensions Badges
 - [x] Multi-Selection Alignment Tools (Left, Center H, Right, Top, Middle V, Bottom)
 - [x] Match Dimensions (Match Width, Match Height, Match Both)

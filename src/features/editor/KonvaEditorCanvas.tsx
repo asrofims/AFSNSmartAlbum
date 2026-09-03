@@ -443,8 +443,8 @@ function PhotoFrameNode({
               if (isCropMode) {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
-                const scaleDelta = e.evt.deltaY < 0 ? 0.1 : -0.1;
-                const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 10) / 10, 1.0, 3.5);
+                const scaleDelta = e.evt.deltaY < 0 ? 0.01 : -0.01;
+                const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 100) / 100, 1.0, 3.5);
                 onCropChange({ cropScale: newScale });
               }
             }}
@@ -978,6 +978,31 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       trRef.current.getLayer()?.batchDraw();
     }
   }, [editingTextElementId, editingCropFrameId]);
+
+  // When zooming in, center scroll position so the view remains focused and both left & right pages are accessible
+  const prevZoomRef = useRef(zoomLevel);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (prevZoomRef.current !== zoomLevel) {
+      if (zoomLevel > 100 && prevZoomRef.current <= 100) {
+        const targetScrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+        const targetScrollTop = (container.scrollHeight - container.clientHeight) / 2;
+        container.scrollLeft = Math.max(0, targetScrollLeft);
+        container.scrollTop = Math.max(0, targetScrollTop);
+      } else if (zoomLevel > 100 && prevZoomRef.current > 100) {
+        const ratio = zoomLevel / prevZoomRef.current;
+        const currentCenterX = container.scrollLeft + container.clientWidth / 2;
+        const currentCenterY = container.scrollTop + container.clientHeight / 2;
+        const newCenterX = currentCenterX * ratio;
+        const newCenterY = currentCenterY * ratio;
+        container.scrollLeft = Math.max(0, newCenterX - container.clientWidth / 2);
+        container.scrollTop = Math.max(0, newCenterY - container.clientHeight / 2);
+      }
+      prevZoomRef.current = zoomLevel;
+    }
+  }, [zoomLevel]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
