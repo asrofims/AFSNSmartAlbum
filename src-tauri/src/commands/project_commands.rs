@@ -306,6 +306,57 @@ pub async fn export_afsn_with_dialog(
 }
 
 #[tauri::command]
+pub async fn save_project_as_with_dialog(
+    db: State<'_, Database>,
+    project_id: String,
+    suggested_name: Option<String>,
+) -> Result<Option<ProjectRow>, String> {
+    let default_name = suggested_name.unwrap_or_else(|| "Album-Project".to_string());
+    let fallback_name = default_name.clone();
+    let file_path = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_title("Save AFSNSmartAlbum Project As (.afsn)")
+            .set_file_name(&format!("{}.afsn", default_name))
+            .add_filter("AFSNSmartAlbum Package (*.afsn)", &["afsn"])
+            .save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some(mut path) = file_path {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("afsn") {
+            path.set_extension("afsn");
+        }
+        let path_str = path.to_string_lossy().to_string();
+        let new_name = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| fallback_name);
+
+        let new_id = Uuid::new_v4().to_string();
+        log::info!("save_project_as_with_dialog: forking project {} -> {} ({}) at {}", project_id, new_id, new_name, path_str);
+
+        // Duplicate the project in SQLite with new_id
+        let new_proj = db.duplicate_project(&project_id, &new_id, &new_name, &path_str)
+            .map_err(|e| {
+                log::error!("Failed to duplicate project in save_project_as: {:?}", e);
+                e.to_string()
+            })?;
+
+        // Export package for new_id
+        db.export_project_package(&new_id, &path_str)
+            .map_err(|e| {
+                log::error!("Failed export_project_package in save_project_as: {:?}", e);
+                e.to_string()
+            })?;
+
+        Ok(Some(new_proj))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
 pub async fn export_bundled_package_with_dialog(
     db: State<'_, Database>,
     project_id: String,
@@ -361,4 +412,28 @@ pub async fn import_afsn_with_dialog(
     } else {
         Ok(None)
     }
+}
+
+#[tauri::command]
+pub fn duplicate_project(
+    db: State<'_, Database>,
+    source_id: String,
+    new_id: String,
+    new_name: String,
+    new_file_path: String,
+) -> Result<ProjectRow, String> {
+    log::info!("duplicate_project: source_id={}, new_id={}, new_name={}", source_id, new_id, new_name);
+    db.duplicate_project(&source_id, &new_id, &new_name, &new_file_path)
+        .map_err(|e| {
+            log::error!("Failed to duplicate project: {:?}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub fn check_path_exists(path: String) -> bool {
+    if path.trim().is_empty() {
+        return false;
+    }
+    std::path::Path::new(&path).exists()
 }

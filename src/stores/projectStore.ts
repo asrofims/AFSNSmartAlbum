@@ -21,7 +21,7 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
   openProjectById: (id: string) => Promise<void>;
-  saveProject: () => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean }>;
+  saveProject: () => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }>;
   exportProjectAsAfsn: () => Promise<string | null>;
   exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
   importProjectFromAfsn: () => Promise<boolean>;
@@ -373,7 +373,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  saveProject: async (): Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean }> => {
+  saveProject: async (): Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }> => {
     const current = get().currentProject;
     if (!current) return { success: false, filePath: null, isSaveAs: false };
 
@@ -385,6 +385,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (current.filePath) {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
+        const fileExists = await invoke<boolean>('check_path_exists', { path: current.filePath });
+
         await invoke('export_afsn_package', {
           projectId: current.id,
           targetPath: current.filePath,
@@ -407,13 +409,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
         } catch {}
 
-        return { success: true, filePath: current.filePath, isSaveAs: false };
+        return {
+          success: true,
+          filePath: current.filePath,
+          isSaveAs: false,
+          reCreated: !fileExists,
+        };
       } catch (err) {
         console.warn('[AFSN] Direct save to filePath failed, fallback to dialog:', err);
       }
     }
 
-    // 3. If no filePath exists yet (first save), prompt Save As (.afsn) dialog
+    // 3. If no filePath exists yet (first save) or folder was unreachable, prompt Save As (.afsn) dialog
     const savedPath = await get().exportProjectAsAfsn();
     return { success: Boolean(savedPath), filePath: savedPath, isSaveAs: true };
   },
@@ -425,10 +432,43 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       // 1. Ensure latest album state in memory is flushed to SQLite
       const { useAlbumStore } = await import('./albumStore');
+      const { usePhotoStore } = await import('./photoStore');
       await useAlbumStore.getState().saveAlbumToDb();
 
-      // 2. Open native Save File Dialog and write .afsn
       const { invoke } = await import('@tauri-apps/api/core');
+
+      // If project has already been saved to a file previously, "Save As" forks into a separate independent project!
+      if (current.filePath) {
+        const forkedProject = await invoke<Project | null>('save_project_as_with_dialog', {
+          projectId: current.id,
+          suggestedName: current.name,
+        });
+
+        if (forkedProject) {
+          // Prepend new forked project while KEEPING the old project in recent projects!
+          set((state) => ({
+            currentProject: forkedProject,
+            recentProjects: [
+              forkedProject,
+              ...state.recentProjects.filter((p) => p.id !== forkedProject.id),
+            ].slice(0, 10),
+          }));
+
+          try {
+            localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
+          } catch {}
+
+          // Switch active stores to load the newly forked project
+          await usePhotoStore.getState().loadPhotos(forkedProject.id);
+          await usePhotoStore.getState().loadFolders(forkedProject.id);
+          await useAlbumStore.getState().loadAlbumFromDb(forkedProject.id);
+
+          return forkedProject.filePath || null;
+        }
+        return null;
+      }
+
+      // First-time save (project was in memory / SQLite without .afsn file):
       const savedPath = await invoke<string | null>('export_afsn_with_dialog', {
         projectId: current.id,
         suggestedName: current.name,

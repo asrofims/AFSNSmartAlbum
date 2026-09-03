@@ -33,12 +33,18 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     sortBy,
     searchQuery,
     isImporting,
+    isCancelling,
+    importProgress,
     importNotice,
+    importQueue,
+    currentImportTask,
     loadPhotos,
     loadFolders,
     importFiles,
     importFolder,
     importPaths,
+    cancelImport,
+    cancelAllImports,
     dismissImportNotice,
     toggleFavorite,
     removePhoto,
@@ -454,11 +460,13 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 type="button"
                 className={`${styles.importDropdownBtn} ${isImportMenuOpen ? styles.importDropdownBtnActive : ''}`}
                 onClick={handleToggleImportMenu}
-                disabled={isImporting}
                 title={activeFolderName ? `Import photos into ${activeFolderName}` : 'Import photos into project library'}
                 aria-label="Import options"
               >
                 <span>+ Import</span>
+                {importQueue.length > 0 && (
+                  <span className={styles.activeQueueDot} title={`${importQueue.length} batch(es) queued`} />
+                )}
                 <span className={styles.dropdownArrow}>▾</span>
               </button>
             </>
@@ -475,6 +483,60 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           </Button>
         </div>
       </div>
+
+      {/* Active Photo Import Progress & Queue Bar */}
+      {isImporting && importProgress && (
+        <div className={styles.progressBarContainer}>
+          <div className={styles.progressTopRow}>
+            <div className={styles.progressInfo}>
+              <span className={styles.progressTitle}>
+                {currentImportTask?.label
+                  ? `Importing: ${currentImportTask.label}`
+                  : 'Importing photos...'}
+              </span>
+              <span className={styles.progressPercent}>
+                {importProgress.current} / {importProgress.total} ({importProgress.percent}%)
+              </span>
+              {importQueue.length > 0 && (
+                <span
+                  className={styles.queueBadge}
+                  title={`Queued batches:\n${importQueue.map((t, idx) => `${idx + 1}. ${t.label}`).join('\n')}`}
+                >
+                  +{importQueue.length} queued ({importQueue.reduce((acc, t) => acc + t.totalCount, 0)} photos)
+                </span>
+              )}
+            </div>
+            <div className={styles.progressRightControls}>
+              <button
+                type="button"
+                className={styles.cancelImportBtn}
+                onClick={cancelImport}
+                disabled={isCancelling}
+                title="Cancel current import batch"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel'}
+              </button>
+              {importQueue.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.cancelAllBtn}
+                  onClick={cancelAllImports}
+                  disabled={isCancelling}
+                  title="Cancel all current and queued imports"
+                >
+                  Cancel All
+                </button>
+              )}
+            </div>
+          </div>
+          <div className={styles.progressBarTrack}>
+            <div
+              className={styles.progressBarFill}
+              style={{ width: `${importProgress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* External Drag & Drop Visual Overlay */}
       {isDragOver && (

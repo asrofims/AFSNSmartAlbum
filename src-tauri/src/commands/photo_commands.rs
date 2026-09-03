@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use rayon::prelude::*;
+use tauri::async_runtime::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
@@ -15,6 +16,7 @@ use crate::photo_engine::{
 #[derive(Clone, Default)]
 pub struct ImportState {
     pub cancel_flag: Arc<AtomicBool>,
+    pub is_busy: Arc<Mutex<()>>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -104,6 +106,41 @@ pub async fn import_file_paths(
 }
 
 #[tauri::command]
+pub async fn pick_photo_files_dialog() -> Result<Option<Vec<String>>, String> {
+    let files: Option<Vec<PathBuf>> = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Select Photos to Import")
+            .add_filter("Images", SUPPORTED_EXTENSIONS)
+            .pick_files()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(files.map(|paths| paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect()))
+}
+
+#[tauri::command]
+pub async fn pick_photo_folder_dialog() -> Result<Option<Vec<String>>, String> {
+    let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Select Folder to Import Photos")
+            .pick_folder()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    match folder {
+        Some(dir_path) => {
+            let paths: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&dir_path))
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(Some(paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect()))
+        }
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
 pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> {
     state.cancel_flag.store(true, Ordering::SeqCst);
     log::info!("Photo import cancellation requested by user");
@@ -122,6 +159,9 @@ async fn import_paths_internal(
     }
 
     let import_state = app.state::<ImportState>();
+    // Acquire sequential queue lock to prevent concurrent import conflicts
+    let _busy_guard = import_state.is_busy.lock().await;
+
     import_state.cancel_flag.store(false, Ordering::SeqCst);
     let cancel_flag = import_state.cancel_flag.clone();
 

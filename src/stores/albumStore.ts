@@ -76,6 +76,7 @@ export interface AlbumState {
   reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
   updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => void;
+  applySpacingToAllSpreads: (spacingValue: number, spacingUnit?: Unit, project?: Project) => void;
   updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
@@ -526,6 +527,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     // Must have at least 1 spread
     if (currentAlbum.spreads.length <= 1) return;
 
+    const oldAll = getAllAlbumSpreads(currentAlbum);
+    const deletedIndex = oldAll.findIndex((s) => s.id === spreadId);
+
     useHistoryStore.getState().pushState(currentAlbum);
 
     const filtered = currentAlbum.spreads.filter((s) => s.id !== spreadId);
@@ -539,13 +543,19 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     let nextIndex = 0;
 
     if (activeSpreadId === spreadId) {
-      const fallbackSpread = all[0];
-      if (fallbackSpread) {
-        nextActiveId = fallbackSpread.id;
-        nextIndex = 0;
+      // If the active spread was deleted:
+      // If the deleted spread was the last spread (or at/beyond all.length), select the previous spread
+      // Otherwise select the spread that shifted into this position
+      const candidateIndex = deletedIndex >= all.length
+        ? Math.max(0, all.length - 1)
+        : Math.max(0, deletedIndex);
+      const targetSpread = all[candidateIndex] || all[all.length - 1] || all[0];
+      if (targetSpread) {
+        nextActiveId = targetSpread.id;
+        nextIndex = all.findIndex((s) => s.id === targetSpread.id);
       }
     } else {
-      nextIndex = all.findIndex((s) => s.id === activeSpreadId);
+      nextIndex = Math.max(0, all.findIndex((s) => s.id === activeSpreadId));
     }
 
     set({
@@ -570,6 +580,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       return;
     }
 
+    const oldAll = getAllAlbumSpreads(currentAlbum);
+    const activeOldIndex = activeSpreadId ? oldAll.findIndex((s) => s.id === activeSpreadId) : -1;
+
     useHistoryStore.getState().pushState(currentAlbum);
 
     const updatedAlbum = recalculateAlbumPageNumbers({
@@ -582,10 +595,14 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     let nextIndex = 0;
 
     if (activeSpreadId && toDeleteSet.has(activeSpreadId)) {
-      const fallbackSpread = all[0];
-      if (fallbackSpread) {
-        nextActiveId = fallbackSpread.id;
-        nextIndex = 0;
+      // Fallback to nearest spread: if at/beyond the end, select previous spread
+      const candidateIndex = activeOldIndex >= all.length
+        ? Math.max(0, all.length - 1)
+        : Math.max(0, activeOldIndex);
+      const targetSpread = all[candidateIndex] || all[all.length - 1] || all[0];
+      if (targetSpread) {
+        nextActiveId = targetSpread.id;
+        nextIndex = all.findIndex((s) => s.id === targetSpread.id);
       }
     } else if (activeSpreadId) {
       nextIndex = Math.max(0, all.findIndex((s) => s.id === activeSpreadId));
@@ -594,7 +611,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     set({
       currentAlbum: updatedAlbum,
       activeSpreadId: nextActiveId,
-      activeSpreadIndex: nextIndex,
+      activeSpreadIndex: Math.max(0, nextIndex),
       selectedSpreadIds: nextActiveId ? [nextActiveId] : [],
       selectedPageId: null,
       saveStatus: 'unsaved',
@@ -771,7 +788,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => {
-    const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
+    const { currentAlbum, activeSpreadId } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
@@ -794,125 +811,24 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     // Real-time canvas frame spacing update:
     // If project is available and there are 2 or more unlocked photos on the spread,
-    // immediately re-position and size the frames so the gap changes in real time on the canvas!
+    // adjust the inter-frame gaps in-place along their primary axis without regenerating or shuffling the layout!
     if (project && targetSpread.elements.length >= 2) {
       const lockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
       const unlockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
       const textElements = targetSpread.elements.filter((el) => el.type === 'text');
 
       if (unlockedElements.length >= 2) {
-        const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
-          id: el.id,
-          photoId: el.photoId,
-          filePath: el.filePath,
-          fileName: el.fileName,
-          previewPath: el.previewPath,
-          thumbnailPath: el.thumbnailPath,
-          photoAspect: el.photoAspect,
-        }));
-
-        const isSpread = !isCover;
-        const dims = getProjectDimensionsInCanvasUnit(project, updatedTargetSpread);
-        const spreadWidth = isCover
-          ? (targetSpread.leftPage ? targetSpread.leftPage.width : dims.pageWidth) +
-            (targetSpread.rightPage ? targetSpread.rightPage.width : 0) +
-            dims.gutterWidth
-          : dims.pageWidth * 2 + dims.gutterWidth;
-        const spreadHeight = dims.pageHeight;
-
-        const variations = generateAdaptiveLayoutVariations(
-          {
-            spreadWidth,
-            spreadHeight,
-            isSpread,
-            safeMargin: dims.safeMargin,
-            safeMarginTop: dims.safeMarginTop,
-            safeMarginBottom: dims.safeMarginBottom,
-            safeMarginOutside: dims.safeMarginOutside,
-            safeMarginSpine: dims.safeMarginSpine,
-            gutterWidth: dims.gutterWidth,
-            spacing: dims.spacing,
-            lockedElements,
-          },
-          unlockedPhotos
-        );
-
-        if (variations.length > 0) {
-          const currentIndex = spreadLayoutIndices[targetSpread.id] || 0;
-          const chosenVariation = variations[currentIndex % variations.length];
-          if (chosenVariation) {
-            const slotToPhotoMap = new Map<number, AdaptivePhoto>();
-            if (chosenVariation.photoAssignments && chosenVariation.photoAssignments.length === unlockedPhotos.length) {
-              chosenVariation.photoAssignments.forEach((slotIdx, photoIdx) => {
-                const p = unlockedPhotos[photoIdx];
-                if (p) slotToPhotoMap.set(slotIdx, p);
-              });
-            }
-
-            const newUnlockedElements: PhotoFrameElement[] = chosenVariation.rects.map((rect, index) => {
-              const photo = slotToPhotoMap.get(index) || unlockedPhotos[index];
-              const existingFrame = unlockedElements.find((f) =>
-                (photo?.id && f.id === photo.id) ||
-                (photo?.photoId && f.photoId === photo.photoId) ||
-                (photo?.filePath && f.filePath === photo.filePath)
-              ) || unlockedElements[index];
-
-              if (existingFrame) {
-                return {
-                  ...existingFrame,
-                  x: rect.x,
-                  y: rect.y,
-                  width: rect.width,
-                  height: rect.height,
-                  originalWidth: rect.width,
-                  originalHeight: rect.height,
-                };
-              }
-
-              return {
-                id: `frame-${Date.now()}-${index + 1}-${Math.random().toString(36).substr(2, 4)}`,
-                type: 'photo',
-                photoId: photo?.photoId || null,
-                filePath: photo?.filePath || '',
-                fileName: photo?.fileName || '',
-                previewPath: photo?.previewPath || '',
-                thumbnailPath: photo?.thumbnailPath || '',
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-                rotation: 0,
-                zIndex: index + 1,
-                photoAspect: photo?.photoAspect || (rect.width / rect.height),
-                originalWidth: rect.width,
-                originalHeight: rect.height,
-                cropX: 0,
-                cropY: 0,
-                cropScale: 1.0,
-                cropRotation: 0,
-                borderEnabled: project.borderEnabled,
-                borderWidth: project.borderWidth,
-                borderColor: project.borderColor,
-                opacity: 1.0,
-              };
-            });
-
-            newElements = [...lockedElements, ...newUnlockedElements, ...textElements];
-          }
-        } else {
-          // Fallback for custom placed frames: apply fixed gap along primary axis
-          const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
-          const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
-          const gapInMm = convertUnit(spacingValue, unit, 'mm');
-          const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
-          if (gapUpdates.length > 0) {
-            const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
-            const updatedUnlocked = unlockedElements.map((f) => {
-              const geom = updateMap.get(f.id);
-              return geom ? { ...f, ...geom } : f;
-            });
-            newElements = [...lockedElements, ...updatedUnlocked, ...textElements];
-          }
+        const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
+        const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
+        const gapInMm = convertUnit(spacingValue, unit, 'mm');
+        const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
+        if (gapUpdates.length > 0) {
+          const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
+          const updatedUnlocked = unlockedElements.map((f) => {
+            const geom = updateMap.get(f.id);
+            return geom ? { ...f, ...geom } : f;
+          });
+          newElements = [...lockedElements, ...updatedUnlocked, ...textElements];
         }
       }
     }
@@ -943,6 +859,56 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     set({
       currentAlbum: {
         ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  applySpacingToAllSpreads: (spacingValue: number, spacingUnit?: Unit, project?: Project) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const unit = spacingUnit || currentAlbum.coverSpread.spacingUnit || (project ? project.spacingUnit : 'mm');
+    const gapInMm = convertUnit(spacingValue, unit, 'mm');
+
+    const updateSpreadGap = (spread: Spread): Spread => {
+      let elements = spread.elements;
+      const lockedElements = elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
+      const unlockedElements = elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
+      const textElements = elements.filter((el) => el.type === 'text');
+
+      if (unlockedElements.length >= 2) {
+        const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
+        const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
+        const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
+        if (gapUpdates.length > 0) {
+          const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
+          const updatedUnlocked = unlockedElements.map((f) => {
+            const geom = updateMap.get(f.id);
+            return geom ? { ...f, ...geom } : f;
+          });
+          elements = [...lockedElements, ...updatedUnlocked, ...textElements];
+        }
+      }
+
+      return {
+        ...spread,
+        spacingValue,
+        spacingUnit: unit,
+        elements,
+      };
+    };
+
+    const updatedCover = updateSpreadGap(currentAlbum.coverSpread);
+    const updatedSpreads = currentAlbum.spreads.map(updateSpreadGap);
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
         spreads: updatedSpreads,
       },
       saveStatus: 'unsaved',

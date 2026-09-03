@@ -218,6 +218,17 @@
   border-radius: 10px;
 }
 
+.missingBadge {
+  background-color: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
 .clearAllBtn {
   background: transparent;
   border: none;

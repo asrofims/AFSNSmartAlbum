@@ -1964,6 +1964,141 @@ impl Database {
 
         Ok(package)
     }
+
+    /// Duplicates an entire project including folders, photos, album spreads, and elements with a new UUID.
+    pub fn duplicate_project(
+        &self,
+        source_id: &str,
+        new_id: &str,
+        new_name: &str,
+        new_file_path: &str,
+    ) -> SqliteResult<ProjectRow> {
+        let orig_project = self.get_project(source_id)?.ok_or_else(|| {
+            rusqlite::Error::QueryReturnedNoRows
+        })?;
+
+        let file_path_opt = if new_file_path.is_empty() {
+            None
+        } else {
+            Some(new_file_path.to_string())
+        };
+
+        // 1. Insert new project
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO projects (
+                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
+                    spacing_value, spacing_unit,
+                    margin_enabled, margin_value, margin_unit,
+                    border_enabled, border_width, border_unit, border_color,
+                    background_type, background_color, file_path,
+                    created_at, updated_at
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6,
+                    ?7, ?8,
+                    ?9, ?10, ?11,
+                    ?12, ?13, ?14, ?15,
+                    ?16, ?17, ?18,
+                    datetime('now'), datetime('now')
+                )",
+                rusqlite::params![
+                    new_id,
+                    new_name,
+                    orig_project.canvas_width,
+                    orig_project.canvas_height,
+                    orig_project.canvas_unit,
+                    orig_project.canvas_dpi,
+                    orig_project.spacing_value,
+                    orig_project.spacing_unit,
+                    orig_project.margin_enabled as i32,
+                    orig_project.margin_value,
+                    orig_project.margin_unit,
+                    orig_project.border_enabled as i32,
+                    orig_project.border_width,
+                    orig_project.border_unit,
+                    orig_project.border_color,
+                    orig_project.background_type,
+                    orig_project.background_color,
+                    file_path_opt,
+                ],
+            )?;
+        }
+
+        // 2. Duplicate photo folders
+        let folders = self.get_folders_for_project(source_id)?;
+        let mut folder_id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        for f in folders {
+            let new_folder_id = format!("{}-{}", new_id, uuid::Uuid::new_v4());
+            folder_id_map.insert(f.id.clone(), new_folder_id.clone());
+            let _ = self.create_folder(&new_folder_id, new_id, &f.name);
+        }
+
+        // 3. Duplicate photos
+        let photos = self.get_photos_for_project(source_id)?;
+        let mut photo_id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        for mut p in photos {
+            let old_photo_id = p.id.clone();
+            let new_photo_id = format!("{}-{}", new_id, uuid::Uuid::new_v4());
+            photo_id_map.insert(old_photo_id, new_photo_id.clone());
+            p.id = new_photo_id;
+            p.project_id = new_id.to_string();
+            let _ = self.add_photo(&p);
+        }
+
+        // 4. Copy folder membership
+        for (old_fid, new_fid) in &folder_id_map {
+            if let Ok(members) = self.get_photos_for_folder(old_fid) {
+                let new_member_ids: Vec<String> = members
+                    .iter()
+                    .filter_map(|m| photo_id_map.get(&m.id).cloned())
+                    .collect();
+                if !new_member_ids.is_empty() {
+                    let _ = self.add_photos_to_folder(new_fid, &new_member_ids);
+                }
+            }
+        }
+
+        // 5. Duplicate album structure
+        if let Some(mut album) = self.load_album_structure(source_id)? {
+            album.id = format!("album-{}", new_id);
+            album.project_id = new_id.to_string();
+
+            album.cover_spread.id = format!("album-{}-spread-cover", new_id);
+            for elem in &mut album.cover_spread.elements {
+                elem.id = format!("elem-{}-{}", new_id, uuid::Uuid::new_v4());
+                if let Some(ref pid) = elem.photo_id {
+                    if let Some(new_pid) = photo_id_map.get(pid) {
+                        elem.photo_id = Some(new_pid.clone());
+                    }
+                }
+            }
+
+            for (idx, spread) in album.spreads.iter_mut().enumerate() {
+                let spread_idx = idx + 1;
+                let new_spread_id = format!("album-{}-spread-{}", new_id, spread_idx);
+                spread.id = new_spread_id.clone();
+                if let Some(ref mut lp) = spread.left_page {
+                    lp.id = format!("{}-page-{}", new_spread_id, (spread_idx - 1) * 2 + 1);
+                }
+                if let Some(ref mut rp) = spread.right_page {
+                    rp.id = format!("{}-page-{}", new_spread_id, (spread_idx - 1) * 2 + 2);
+                }
+                for elem in &mut spread.elements {
+                    elem.id = format!("elem-{}-{}", new_id, uuid::Uuid::new_v4());
+                    if let Some(ref pid) = elem.photo_id {
+                        if let Some(new_pid) = photo_id_map.get(pid) {
+                            elem.photo_id = Some(new_pid.clone());
+                        }
+                    }
+                }
+            }
+
+            self.save_album_structure(&album)?;
+        }
+
+        self.get_project(new_id)?.ok_or_else(|| rusqlite::Error::QueryReturnedNoRows)
+    }
 }
 
 #[cfg(test)]
@@ -2340,6 +2475,32 @@ mod tests {
 
         let folder_photos = db.get_photos_for_folder(&folder.id).unwrap();
         assert_eq!(folder_photos.len(), 2);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_duplicate_project() {
+        let temp_dir = std::env::temp_dir().join(format!("afsn_test_dup_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let db_path = temp_dir.join("test.db");
+        let db = Database::init(db_path).expect("Failed to init db");
+
+        db.create_project(
+            "proj-orig", "Original Album", 300.0, 300.0, "mm", 300,
+            2.0, "mm", true, 10.0, "mm", false, 0.0, "mm", "#FFFFFF", "solid", "#FFFFFF"
+        ).unwrap();
+
+        let dup = db.duplicate_project(
+            "proj-orig", "proj-copy", "Copied Album", "/path/to/copied.afsn"
+        ).expect("Duplication failed");
+
+        assert_eq!(dup.id, "proj-copy");
+        assert_eq!(dup.name, "Copied Album");
+        assert_eq!(dup.file_path, Some("/path/to/copied.afsn".to_string()));
+
+        let orig = db.get_project("proj-orig").unwrap().unwrap();
+        assert_eq!(orig.name, "Original Album");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

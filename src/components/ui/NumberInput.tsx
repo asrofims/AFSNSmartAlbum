@@ -86,7 +86,9 @@ export function NumberInput({
     const finalNum = parseFloat(formatted);
 
     setLocalValue(formatted);
-    onChange(finalNum);
+    if (finalNum !== value) {
+      onChange(finalNum);
+    }
   };
 
   const handleFocus = () => {

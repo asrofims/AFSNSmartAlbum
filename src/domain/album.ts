@@ -290,7 +290,7 @@ export function createInteriorSpread(
 
   const leftPageNum = (spreadNumber - 1) * 2 + 1;
   const rightPageNum = leftPageNum + 1;
-  const spreadId = `${album.id}-spread-${Date.now()}`;
+  const spreadId = `${album.id}-spread-${Date.now()}-${spreadNumber}-${Math.random().toString(36).substring(2, 6)}`;
 
   const leftPage: Page = {
     id: `${spreadId}-page-${leftPageNum}`,

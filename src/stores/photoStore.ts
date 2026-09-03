@@ -12,6 +12,15 @@ async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promi
   }
 }
 
+export interface ImportTask {
+  id: string;
+  projectId: string;
+  paths: string[];
+  folderId: string | null;
+  label: string;
+  totalCount: number;
+}
+
 interface PhotoState {
   photos: Photo[];
   folders: PhotoFolder[];
@@ -29,6 +38,8 @@ interface PhotoState {
   isCancelling: boolean;
   importProgress: ImportProgress | null;
   importNotice: ImportNotice | null;
+  importQueue: ImportTask[];
+  currentImportTask: ImportTask | null;
   isRelinkOpen: boolean;
   isFolderDialogOpen: boolean;
   folderDialogMode: 'create' | 'rename';
@@ -37,10 +48,14 @@ interface PhotoState {
 
   // Photo actions
   loadPhotos: (projectId: string) => Promise<void>;
+  enqueueImport: (projectId: string, paths: string[], folderId: string | null, label: string) => void;
+  executeImportTask: (task: ImportTask) => Promise<void>;
+  processNextQueueItem: () => Promise<void>;
   importFiles: (projectId: string) => Promise<void>;
   importFolder: (projectId: string) => Promise<void>;
   importPaths: (projectId: string, paths: string[]) => Promise<void>;
   cancelImport: () => Promise<void>;
+  cancelAllImports: () => Promise<void>;
   dismissImportNotice: () => void;
   toggleFavorite: (photoId: string) => Promise<void>;
   removePhoto: (photoId: string) => Promise<void>;
@@ -100,6 +115,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   isCancelling: false,
   importProgress: null,
   importNotice: null,
+  importQueue: [],
+  currentImportTask: null,
   isRelinkOpen: false,
   isFolderDialogOpen: false,
   folderDialogMode: 'create',
@@ -152,7 +169,6 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const unlistenComplete = await listen<ImportNotice>(
         'photo-import-complete',
         (event) => {
-          set({ isImporting: false, isCancelling: false, importProgress: null });
           const payload = event.payload;
           if (
             payload &&
@@ -202,53 +218,139 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     }
   },
 
-  importFiles: async (projectId: string) => {
-    set({ error: null, isCancelling: false });
+  enqueueImport: (projectId: string, paths: string[], folderId: string | null, label: string) => {
+    if (!paths || paths.length === 0) return;
+    const task: ImportTask = {
+      id: crypto.randomUUID(),
+      projectId,
+      paths,
+      folderId,
+      label,
+      totalCount: paths.length,
+    };
+
+    const isRunning = get().isImporting;
+    if (!isRunning) {
+      set({
+        isImporting: true,
+        isCancelling: false,
+        currentImportTask: task,
+        importProgress: { current: 0, total: paths.length, currentFile: '', percent: 0 },
+      });
+      void get().executeImportTask(task);
+    } else {
+      set((s) => ({
+        importQueue: [...s.importQueue, task],
+      }));
+    }
+  },
+
+  executeImportTask: async (task: ImportTask) => {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || null;
-      const updatedPhotos = await invoke<Photo[]>('select_and_import_files', { projectId, folderId });
+      const updatedPhotos = await invoke<Photo[]>('import_file_paths', {
+        projectId: task.projectId,
+        paths: task.paths,
+        folderId: task.folderId,
+      });
+
       if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
         set({ photos: updatedPhotos });
       }
-      void get().loadFolders(projectId);
+      void get().loadFolders(task.projectId);
     } catch (err) {
-      console.error('[AFSN] select_and_import_files error:', err);
-      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
+      console.error('[AFSN] executeImportTask error:', err);
+      set({ error: String(err) });
+    } finally {
+      void get().processNextQueueItem();
+    }
+  },
+
+  processNextQueueItem: async () => {
+    const queue = get().importQueue;
+    if (queue.length > 0) {
+      const nextTask = queue[0];
+      if (nextTask) {
+        set({
+          importQueue: queue.slice(1),
+          currentImportTask: nextTask,
+          isImporting: true,
+          isCancelling: false,
+          importProgress: { current: 0, total: nextTask.paths.length, currentFile: '', percent: 0 },
+        });
+        void get().executeImportTask(nextTask);
+      }
+    } else {
+      set({
+        isImporting: false,
+        isCancelling: false,
+        currentImportTask: null,
+        importProgress: null,
+      });
+    }
+  },
+
+  importFiles: async (projectId: string) => {
+    set({ error: null });
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const paths = await invoke<string[] | null>('pick_photo_files_dialog');
+      if (paths && paths.length > 0) {
+        const folderId = get().activeFolderId || null;
+        const activeFolderName = folderId
+          ? get().folders.find((f) => f.id === folderId)?.name || 'Folder'
+          : 'Library';
+        get().enqueueImport(
+          projectId,
+          paths,
+          folderId,
+          `${paths.length} file${paths.length > 1 ? 's' : ''} to ${activeFolderName}`
+        );
+      }
+    } catch (err) {
+      console.error('[AFSN] importFiles error:', err);
+      set({ error: String(err) });
     }
   },
 
   importFolder: async (projectId: string) => {
-    set({ error: null, isCancelling: false });
+    set({ error: null });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || null;
-      const updatedPhotos = await invoke<Photo[]>('select_and_import_folder', { projectId, folderId });
-      if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
-        set({ photos: updatedPhotos });
+      const paths = await invoke<string[] | null>('pick_photo_folder_dialog');
+      if (paths && paths.length > 0) {
+        const folderId = get().activeFolderId || null;
+        const activeFolderName = folderId
+          ? get().folders.find((f) => f.id === folderId)?.name || 'Folder'
+          : 'Library';
+        const firstPath = paths[0] || '';
+        const folderName = firstPath ? firstPath.replace(/[\\/][^\\/]+$/, '').replace(/^.*[\\/]/, '') || 'Folder' : 'Folder';
+        get().enqueueImport(
+          projectId,
+          paths,
+          folderId,
+          `"${folderName}" (${paths.length} photos) to ${activeFolderName}`
+        );
       }
-      void get().loadFolders(projectId);
     } catch (err) {
-      console.error('[AFSN] select_and_import_folder error:', err);
-      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
+      console.error('[AFSN] importFolder error:', err);
+      set({ error: String(err) });
     }
   },
 
   importPaths: async (projectId: string, paths: string[]) => {
-    if (paths.length === 0) return;
-    set({ error: null, isCancelling: false });
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const folderId = get().activeFolderId || null;
-      const updatedPhotos = await invoke<Photo[]>('import_file_paths', { projectId, paths, folderId });
-      if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
-        set({ photos: updatedPhotos });
-      }
-      void get().loadFolders(projectId);
-    } catch (err) {
-      console.error('[AFSN] import_file_paths error:', err);
-      set({ error: String(err), isImporting: false, isCancelling: false, importProgress: null });
-    }
+    if (!paths || paths.length === 0) return;
+    set({ error: null });
+    const folderId = get().activeFolderId || null;
+    const activeFolderName = folderId
+      ? get().folders.find((f) => f.id === folderId)?.name || 'Folder'
+      : 'Library';
+    get().enqueueImport(
+      projectId,
+      paths,
+      folderId,
+      `${paths.length} dropped file${paths.length > 1 ? 's' : ''} to ${activeFolderName}`
+    );
   },
 
   cancelImport: async () => {
@@ -258,6 +360,16 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       await invoke('cancel_photo_import');
     } catch (err) {
       console.warn('[AFSN] cancel_photo_import error:', err);
+    }
+  },
+
+  cancelAllImports: async () => {
+    set({ isCancelling: true, importQueue: [] });
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cancel_photo_import');
+    } catch (err) {
+      console.warn('[AFSN] cancelAllImports error:', err);
     }
   },
 

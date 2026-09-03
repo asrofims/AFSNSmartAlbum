@@ -40,6 +40,7 @@ export function WorkspaceLayout() {
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
   const updateProjectName = useProjectStore((s) => s.updateProjectName);
+  const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
   const updateProjectBackgroundColor = useProjectStore((s) => s.updateProjectBackgroundColor);
   const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
@@ -54,6 +55,7 @@ export function WorkspaceLayout() {
   const toggleGuide = useAlbumStore((s) => s.toggleGuide);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSpreadSpacing = useAlbumStore((s) => s.updateSpreadSpacing);
+  const applySpacingToAllSpreads = useAlbumStore((s) => s.applySpacingToAllSpreads);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
   const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
   const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
@@ -386,8 +388,11 @@ export function WorkspaceLayout() {
           // Save
           saveProject().then((res) => {
             if (res.success) {
-              if (res.filePath) {
-                showToast(`✓ Project saved to: ${res.filePath.split(/[\\/]/).pop() || res.filePath}`);
+              const fileName = res.filePath ? (res.filePath.split(/[\\/]/).pop() || res.filePath) : '';
+              if (res.reCreated) {
+                showToast(`✓ Project file re-created at: ${fileName} (restored from working memory)`);
+              } else if (res.filePath) {
+                showToast(`✓ Project saved to: ${fileName}`);
               } else {
                 showToast('✓ Project saved to database');
               }
@@ -495,8 +500,11 @@ export function WorkspaceLayout() {
                         setIsFileMenuOpen(false);
                         const res = await saveProject();
                         if (res.success) {
-                          if (res.filePath) {
-                            showToast(`✓ Project saved to: ${res.filePath.split(/[\\/]/).pop() || res.filePath}`);
+                          const fileName = res.filePath ? (res.filePath.split(/[\\/]/).pop() || res.filePath) : '';
+                          if (res.reCreated) {
+                            showToast(`✓ Project file re-created at: ${fileName} (restored from working memory)`);
+                          } else if (res.filePath) {
+                            showToast(`✓ Project saved to: ${fileName}`);
                           } else {
                             showToast('✓ Project saved to database');
                           }
@@ -513,7 +521,7 @@ export function WorkspaceLayout() {
                       onClick={async () => {
                         setIsFileMenuOpen(false);
                         const path = await exportProjectAsAfsn();
-                        if (path) showToast(`✓ Project saved to: ${path.split(/[\\/]/).pop() || path}`);
+                        if (path) showToast(`✓ Project saved as: ${path.split(/[\\/]/).pop() || path}`);
                       }}
                     >
                       <span>📑 Save As (.afsn)...</span>
@@ -1955,41 +1963,35 @@ export function WorkspaceLayout() {
                     </div>
 
                     {/* Quick Propagation Actions */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <div className={styles.propActionsGrid}>
                       <button
                         type="button"
-                        className={styles.toolBtn}
-                        style={{
-                          fontSize: '10px',
-                          padding: '5px 6px',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                        }}
+                        className={styles.propActionButton}
                         onClick={() => {
                           applyBackgroundColorToAllSpreads(currentScopeColor);
                           showToast(`Applied ${currentScopeColor} to all spreads`);
                         }}
-                        title="Apply current color to all spreads in the album"
+                        title="Apply current background color to all spreads in the album"
                       >
-                        Apply to All Spreads
+                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                        <span>Apply to All Spreads</span>
                       </button>
                       <button
                         type="button"
-                        className={styles.toolBtn}
-                        style={{
-                          fontSize: '10px',
-                          padding: '5px 6px',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                          color: 'var(--color-accent)',
-                        }}
+                        className={`${styles.propActionButton} ${styles.propActionButtonPrimary}`}
                         onClick={async () => {
                           await updateProjectBackgroundColor(currentScopeColor);
                           showToast(`Set ${currentScopeColor} as project default`);
                         }}
                         title="Set this color as default for newly created spreads & project settings"
                       >
-                        Set as Default
+                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span>Set as Default</span>
                       </button>
                     </div>
                   </div>
@@ -2039,13 +2041,49 @@ export function WorkspaceLayout() {
                     </div>
                   </div>
 
+                  {/* Quick Propagation Actions for Photo Spacing */}
+                  <div className={styles.propActionsGrid}>
+                    <button
+                      type="button"
+                      className={styles.propActionButton}
+                      onClick={() => {
+                        const val = activeSpread?.spacingValue ?? currentProject.spacingValue;
+                        const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
+                        applySpacingToAllSpreads(val, unit, currentProject);
+                        showToast(`Applied ${val} ${unit} spacing to all spreads`);
+                      }}
+                      title="Apply current photo spacing to all spreads in the album"
+                    >
+                      <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
+                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                      </svg>
+                      <span>Apply to All Spreads</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.propActionButton} ${styles.propActionButtonPrimary}`}
+                      onClick={async () => {
+                        const val = activeSpread?.spacingValue ?? currentProject.spacingValue;
+                        const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
+                        await updateProjectSpacing(val, unit);
+                        showToast(`Set ${val} ${unit} as project default spacing`);
+                      }}
+                      title="Set this spacing as project default for newly created spreads & project settings"
+                    >
+                      <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                      </svg>
+                      <span>Set as Default</span>
+                    </button>
+                  </div>
+
                   {/* Quick Action to apply spread spacing to currently selected frames */}
                   {selectedFrameIds.length >= 2 && activeSpread && (
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                    <div className={styles.propActionsGrid} style={{ marginTop: '4px' }}>
                       <button
                         type="button"
-                        className={styles.toolBtn}
-                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        className={styles.propActionButton}
                         onClick={() => {
                           const spreadGap = activeSpread.spacingValue ?? currentProject.spacingValue;
                           const spreadUnit = activeSpread.spacingUnit ?? currentProject.spacingUnit;
@@ -2054,12 +2092,11 @@ export function WorkspaceLayout() {
                         }}
                         title={`Apply gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit}) horizontally`}
                       >
-                        ⇿ Apply Gap H
+                        <span>⇿ Apply Gap H</span>
                       </button>
                       <button
                         type="button"
-                        className={styles.toolBtn}
-                        style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
+                        className={styles.propActionButton}
                         onClick={() => {
                           const spreadGap = activeSpread.spacingValue ?? currentProject.spacingValue;
                           const spreadUnit = activeSpread.spacingUnit ?? currentProject.spacingUnit;
@@ -2068,7 +2105,7 @@ export function WorkspaceLayout() {
                         }}
                         title={`Apply gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit}) vertically`}
                       >
-                        ⇳ Apply Gap V
+                        <span>⇳ Apply Gap V</span>
                       </button>
                     </div>
                   )}

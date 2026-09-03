@@ -20,10 +20,56 @@ export function WelcomeScreen() {
 
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [missingFileProject, setMissingFileProject] = useState<Project | null>(null);
+  const [missingProjectIds, setMissingProjectIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadRecentProjects();
   }, [loadRecentProjects]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkMissingFiles = async () => {
+      const missing = new Set<string>();
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        for (const proj of recentProjects) {
+          if (proj.filePath) {
+            try {
+              const exists = await invoke<boolean>('check_path_exists', { path: proj.filePath });
+              if (!exists) {
+                missing.add(proj.id);
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+      if (isMounted) {
+        setMissingProjectIds(missing);
+      }
+    };
+
+    if (recentProjects.length > 0) {
+      checkMissingFiles();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [recentProjects]);
+
+  const handleOpenProject = async (proj: Project) => {
+    if (proj.filePath) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const exists = await invoke<boolean>('check_path_exists', { path: proj.filePath });
+        if (!exists) {
+          setMissingFileProject(proj);
+          return;
+        }
+      } catch {}
+    }
+    openProjectById(proj.id);
+  };
 
   return (
     <div className={styles.welcomeContainer}>
@@ -127,8 +173,8 @@ export function WelcomeScreen() {
                   <div
                     key={proj.id}
                     className={styles.recentItem}
-                    onClick={() => openProjectById(proj.id)}
-                    title={`Open ${proj.name}`}
+                    onClick={() => handleOpenProject(proj)}
+                    title={missingProjectIds.has(proj.id) ? `Project file missing from disk: ${proj.filePath}` : `Open ${proj.name}`}
                   >
                     <div className={styles.projectIconBadge}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,6 +190,11 @@ export function WelcomeScreen() {
                       </span>
                     </div>
                     <div className={styles.itemRight}>
+                      {missingProjectIds.has(proj.id) && (
+                        <span className={styles.missingBadge} title="Original .afsn file was not found on disk">
+                          Missing File
+                        </span>
+                      )}
                       <span className={styles.projectDate}>
                         {new Date(proj.updatedAt).toLocaleDateString(undefined, {
                           month: 'short',
@@ -208,6 +259,34 @@ export function WelcomeScreen() {
           }
         }}
         onCancel={() => setProjectToDelete(null)}
+      />
+
+      {/* Modern Recovery Dialog: Missing .afsn File */}
+      <ConfirmDialog
+        isOpen={missingFileProject !== null}
+        title="Project File Not Found"
+        message={`The file for "${missingFileProject?.name}" was moved or deleted.`}
+        detail={`Original location: ${missingFileProject?.filePath || 'Unknown'}\n\nYou can restore this album layout directly from the internal local cache, or remove this entry from your recent list.`}
+        confirmText="Open from Local Cache"
+        cancelText="Cancel"
+        secondaryText="Remove from List"
+        secondaryVariant="danger"
+        variant="warning"
+        onConfirm={async () => {
+          if (missingFileProject) {
+            const pid = missingFileProject.id;
+            setMissingFileProject(null);
+            openProjectById(pid);
+          }
+        }}
+        onSecondary={async () => {
+          if (missingFileProject) {
+            const pid = missingFileProject.id;
+            setMissingFileProject(null);
+            await removeRecentProject(pid);
+          }
+        }}
+        onCancel={() => setMissingFileProject(null)}
       />
     </div>
   );

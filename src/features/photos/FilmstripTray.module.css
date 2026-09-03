@@ -144,6 +144,50 @@
   cursor: not-allowed;
 }
 
+.cancelAllBtn {
+  background-color: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cancelAllBtn:hover:not(:disabled) {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.cancelAllBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.queueBadge {
+  background-color: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.activeQueueDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  margin-left: 2px;
+}
+
 .progressBarTrack {
   height: 6px;
   width: 100%;

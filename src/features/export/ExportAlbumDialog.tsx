@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Dialog } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { getAllAlbumSpreads, Spread } from '../../domain/album';
-import { calculateExportPixels } from '../../domain/units';
+import { ExportSpreadPreview, ExportPreviewViewMode } from './ExportSpreadPreview';
 import styles from './ExportAlbumDialog.module.css';
 
 export interface ExportOptions {
@@ -118,6 +118,41 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
 
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
+  // Live Preview Navigation & Inspection State
+  const [activePreviewSpreadId, setActivePreviewSpreadId] = useState<string>('');
+  const [previewViewMode, setPreviewViewMode] = useState<ExportPreviewViewMode>('spread');
+  const [showBleedGuide, setShowBleedGuide] = useState<boolean>(true);
+
+  // Sync initial preview spread
+  useEffect(() => {
+    if (!activePreviewSpreadId && allSpreads.length > 0) {
+      setActivePreviewSpreadId(activeSpread?.id || allSpreads[0]?.id || '');
+    }
+  }, [allSpreads, activeSpread, activePreviewSpreadId]);
+
+  const previewSpread = useMemo(() => {
+    return allSpreads.find((s) => s.id === activePreviewSpreadId) || activeSpread || allSpreads[0];
+  }, [allSpreads, activePreviewSpreadId, activeSpread]);
+
+  const currentSpreadIdx = useMemo(() => {
+    return allSpreads.findIndex((s) => s.id === previewSpread?.id);
+  }, [allSpreads, previewSpread]);
+
+  const hasPrev = currentSpreadIdx > 0;
+  const hasNext = currentSpreadIdx >= 0 && currentSpreadIdx < allSpreads.length - 1;
+
+  const goToPrev = () => {
+    if (hasPrev && allSpreads[currentSpreadIdx - 1]) {
+      setActivePreviewSpreadId(allSpreads[currentSpreadIdx - 1]!.id);
+    }
+  };
+
+  const goToNext = () => {
+    if (hasNext && allSpreads[currentSpreadIdx + 1]) {
+      setActivePreviewSpreadId(allSpreads[currentSpreadIdx + 1]!.id);
+    }
+  };
+
   // Resolve target spreads to export based on scope
   const targetSpreads = useMemo(() => {
     if (scope === 'all') {
@@ -145,21 +180,6 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   }, [scope, customRange, rangeMode, allSpreads, activeSpread]);
 
   if (!isOpen || !currentProject) return null;
-
-  // Calculate live output dimensions
-  const singlePageW = currentProject.canvasWidth;
-  const singlePageH = currentProject.canvasHeight;
-  const gutterW = activeSpread?.gutterWidth || 0;
-  const bleed = activeSpread?.bleed || 0;
-
-  const totalSpreadW = singlePageW * 2 + gutterW;
-  const totalSpreadH = singlePageH;
-
-  const spreadWWithBleed = includeBleed ? totalSpreadW + bleed * 2 : totalSpreadW;
-  const spreadHWithBleed = includeBleed ? totalSpreadH + bleed * 2 : totalSpreadH;
-
-  const pixelW = calculateExportPixels(spreadWWithBleed, currentProject.canvasUnit, dpi, currentProject.canvasDpi);
-  const pixelH = calculateExportPixels(spreadHWithBleed, currentProject.canvasUnit, dpi, currentProject.canvasDpi);
 
   const targetSpreadCount = targetSpreads.length;
   const targetPageCount = splitPages ? targetSpreadCount * 2 : targetSpreadCount;
@@ -279,441 +299,631 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
         isOpen={isOpen}
         onClose={onClose}
         title="Export Album for Print"
-        width={560}
+        width={1040}
         closeOnOverlayClick={false}
+        bodyClassName={styles.dialogBodyCustom}
       >
-        <div className={styles.container}>
-          {/* 1. Format Selection */}
-          <div className={styles.section}>
-          <label className={styles.sectionTitle}>Export Format</label>
-          <div className={styles.formatGrid}>
-            <div
-              className={`${styles.formatCard} ${format === 'jpeg' ? styles.formatCardActive : ''}`}
-              onClick={() => {
-                setFormat('jpeg');
-                setPreflightReport(null);
-              }}
-            >
-              <span className={styles.formatIcon}>🖼️</span>
-              <span className={styles.formatName}>High-Res JPEG</span>
-              <span className={styles.formatDesc}>Standard Print Lab</span>
-            </div>
-            <div
-              className={`${styles.formatCard} ${format === 'png' ? styles.formatCardActive : ''}`}
-              onClick={() => {
-                setFormat('png');
-                setPreflightReport(null);
-              }}
-            >
-              <span className={styles.formatIcon}>🎨</span>
-              <span className={styles.formatName}>Lossless PNG</span>
-              <span className={styles.formatDesc}>Highest Precision</span>
-            </div>
-            <div
-              className={`${styles.formatCard} ${format === 'pdf' ? styles.formatCardActive : ''}`}
-              onClick={() => {
-                setFormat('pdf');
-                setPreflightReport(null);
-              }}
-            >
-              <span className={styles.formatIcon}>📑</span>
-              <span className={styles.formatName}>Print PDF</span>
-              <span className={styles.formatDesc}>Multi-Page Book</span>
-            </div>
-          </div>
-        </div>
+        <div className={styles.scrollableContent}>
+          <div className={styles.studioLayout}>
+          {/* Left Column: Interactive Live Preview & Navigation */}
+          <div className={styles.previewSection}>
+            {/* Preview Toolbar */}
+            <div className={styles.previewToolbar}>
+              <div className={styles.viewModePills}>
+                <button
+                  type="button"
+                  className={`${styles.viewPill} ${previewViewMode === 'spread' ? styles.viewPillActive : ''}`}
+                  onClick={() => setPreviewViewMode('spread')}
+                  title="View full facing spread"
+                >
+                  <span>◫</span>
+                  <span>Full Spread</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.viewPill} ${previewViewMode === 'left-page' ? styles.viewPillActive : ''}`}
+                  onClick={() => setPreviewViewMode('left-page')}
+                  title="Inspect left page only"
+                >
+                  <span>◧</span>
+                  <span>Left Page</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.viewPill} ${previewViewMode === 'right-page' ? styles.viewPillActive : ''}`}
+                  onClick={() => setPreviewViewMode('right-page')}
+                  title="Inspect right page only"
+                >
+                  <span>◨</span>
+                  <span>Right Page</span>
+                </button>
+              </div>
 
-        {/* 2. Page Layout & Bleed Trimming */}
-        <div className={styles.optionsGrid}>
-          <div className={styles.optionField}>
-            <label className={styles.label}>Page Layout</label>
-            <div className={styles.radioGroup}>
-              <label className={styles.radioItem}>
-                <input
-                  type="radio"
-                  name="pageLayout"
-                  checked={!splitPages}
-                  onChange={() => {
-                    setSplitPages(false);
-                    setPreflightReport(null);
-                  }}
-                />
-                Full Spreads (Facing)
-              </label>
-              <label className={styles.radioItem}>
-                <input
-                  type="radio"
-                  name="pageLayout"
-                  checked={splitPages}
-                  onChange={() => {
-                    setSplitPages(true);
-                    setPreflightReport(null);
-                  }}
-                />
-                Single Pages (Split L/R)
-              </label>
+              {includeBleed && (
+                <button
+                  type="button"
+                  className={`${styles.guideToggleBtn} ${showBleedGuide ? styles.guideToggleBtnActive : ''}`}
+                  onClick={() => setShowBleedGuide(!showBleedGuide)}
+                  title="Toggle dashed red line showing print lab trim cut line"
+                >
+                  <span>✂</span>
+                  <span>Trim Guide</span>
+                </button>
+              )}
             </div>
-          </div>
 
-          <div className={styles.optionField}>
-            <label className={styles.label}>Bleed Allowance</label>
-            <div className={styles.radioGroup}>
-              <label className={styles.radioItem} title="Export image matching the exact canvas size without outer cut margins">
-                <input
-                  type="radio"
-                  name="bleedOption"
-                  checked={!includeBleed}
-                  onChange={() => setIncludeBleed(false)}
-                />
-                Trim to Page Boundary (Exact Canvas Size)
-              </label>
-              <label className={styles.radioItem} title="Includes extra cut margin for print lab trimming; edge-aligned photos will auto-extend into bleed">
-                <input
-                  type="radio"
-                  name="bleedOption"
-                  checked={includeBleed}
-                  onChange={() => setIncludeBleed(true)}
-                />
-                Include Bleed ({activeSpread?.bleed || 0} {currentProject.canvasUnit} for Print Lab)
-              </label>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
-              {includeBleed
-                ? `✂️ Adds +${activeSpread?.bleed || 0} ${currentProject.canvasUnit} cut margin on all sides; edge-aligned photos automatically extend into bleed.`
-                : '📐 Output dimensions match the canvas display 100% with no outer bleed margins.'}
-            </div>
-          </div>
-        </div>
+            {/* Interactive Live Scaled Preview */}
+            {previewSpread && (
+              <ExportSpreadPreview
+                spread={previewSpread}
+                project={currentProject}
+                viewMode={previewViewMode}
+                includeBleed={includeBleed}
+                showBleedGuide={showBleedGuide}
+                splitPages={splitPages}
+                dpi={dpi}
+                format={format}
+              />
+            )}
 
-        {/* 3. Resolution & Quality */}
-        <div className={styles.optionsGrid}>
-          <div className={styles.optionField}>
-            <label className={styles.label}>Print Resolution</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <select
-                className={styles.select}
-                value={isCustomDpi ? 'custom' : dpi}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'custom') {
-                    setIsCustomDpi(true);
-                    setCustomDpiText(String(dpi));
-                  } else {
-                    setIsCustomDpi(false);
-                    setDpi(Number(val));
-                  }
-                }}
-                style={{ flex: isCustomDpi ? '0 0 140px' : '1' }}
+            {/* Spread Navigation Bar (Arrow buttons only) */}
+            <div className={styles.spreadNavigator}>
+              <button
+                type="button"
+                className={styles.navBtn}
+                onClick={goToPrev}
+                disabled={!hasPrev}
+                title="Previous spread"
               >
-                <option value={300}>300 DPI (Production Print)</option>
-                <option value={240}>240 DPI (Standard Print)</option>
-                <option value={600}>600 DPI (Ultra Fine Print)</option>
-                {currentProject.canvasDpi !== 300 && currentProject.canvasDpi !== 240 && currentProject.canvasDpi !== 600 && (
-                  <option value={currentProject.canvasDpi}>Project DPI ({currentProject.canvasDpi} DPI)</option>
+                ◀ Prev Spread
+              </button>
+              <div className={styles.spreadNavInfo}>
+                <span className={styles.spreadNavIndex}>
+                  Spread {currentSpreadIdx + 1} of {allSpreads.length}
+                </span>
+                {previewSpread && (
+                  <span className={styles.spreadNavName}>
+                    {previewSpread.name || (previewSpread.type === 'cover' ? 'Cover Spread' : `Pages ${(previewSpread.spreadIndex - 1) * 2 + 1}–${(previewSpread.spreadIndex - 1) * 2 + 2}`)}
+                  </span>
                 )}
-                <option value="custom">Custom DPI...</option>
-              </select>
+              </div>
+              <button
+                type="button"
+                className={styles.navBtn}
+                onClick={goToNext}
+                disabled={!hasNext}
+                title="Next spread"
+              >
+                Next Spread ▶
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Configuration & Options */}
+          <div className={styles.configSection}>
+            {/* 1. Format Selection */}
+            <div className={styles.section}>
+              <label className={styles.sectionTitle}>Export Format</label>
+              <div className={styles.formatGrid}>
+                <div
+                  className={`${styles.formatCard} ${format === 'jpeg' ? styles.formatCardActive : ''}`}
+                  onClick={() => {
+                    setFormat('jpeg');
+                    setPreflightReport(null);
+                  }}
+                >
+                  <span className={styles.formatIcon}>🖼️</span>
+                  <span className={styles.formatName}>High-Res JPEG</span>
+                  <span className={styles.formatDesc}>Standard Print Lab</span>
+                </div>
+                <div
+                  className={`${styles.formatCard} ${format === 'png' ? styles.formatCardActive : ''}`}
+                  onClick={() => {
+                    setFormat('png');
+                    setPreflightReport(null);
+                  }}
+                >
+                  <span className={styles.formatIcon}>🎨</span>
+                  <span className={styles.formatName}>Lossless PNG</span>
+                  <span className={styles.formatDesc}>Highest Precision</span>
+                </div>
+                <div
+                  className={`${styles.formatCard} ${format === 'pdf' ? styles.formatCardActive : ''}`}
+                  onClick={() => {
+                    setFormat('pdf');
+                    setPreflightReport(null);
+                  }}
+                >
+                  <span className={styles.formatIcon}>📑</span>
+                  <span className={styles.formatName}>Print PDF</span>
+                  <span className={styles.formatDesc}>Multi-Page Book</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Page Layout & Bleed Trimming */}
+            <div className={styles.optionsGrid}>
+              <div className={styles.optionField}>
+                <label className={styles.label}>Page Layout</label>
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioItem}>
+                    <input
+                      type="radio"
+                      name="pageLayout"
+                      checked={!splitPages}
+                      onChange={() => {
+                        setSplitPages(false);
+                        setPreflightReport(null);
+                      }}
+                    />
+                    Full Spreads (Facing)
+                  </label>
+                  <label className={styles.radioItem}>
+                    <input
+                      type="radio"
+                      name="pageLayout"
+                      checked={splitPages}
+                      onChange={() => {
+                        setSplitPages(true);
+                        setPreflightReport(null);
+                      }}
+                    />
+                    Single Pages (Split L/R)
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles.optionField}>
+                <label className={styles.label}>Bleed Cut Margins</label>
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioItem} title="Export image matching the exact canvas size without outer cut margins">
+                    <input
+                      type="radio"
+                      name="bleedOption"
+                      checked={!includeBleed}
+                      onChange={() => setIncludeBleed(false)}
+                    />
+                    Trim to Page Boundary
+                  </label>
+                  <label className={styles.radioItem} title="Includes extra cut margin for print lab trimming; edge-aligned photos will auto-extend into bleed">
+                    <input
+                      type="radio"
+                      name="bleedOption"
+                      checked={includeBleed}
+                      onChange={() => setIncludeBleed(true)}
+                    />
+                    Include Bleed (+{activeSpread?.bleed || 0} {currentProject.canvasUnit})
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Print Resolution & Sharpening */}
+            {/* 3. Print Resolution & Quality */}
+            <div className={styles.section}>
+              <div className={styles.labelRow}>
+                <label className={styles.sectionTitle}>Print Resolution</label>
+                <span className={styles.dpiBadge}>{dpi} DPI</span>
+              </div>
+              <div className={styles.dpiSegmentGroup}>
+                <button
+                  type="button"
+                  className={`${styles.dpiSegmentBtn} ${!isCustomDpi && dpi === 240 ? styles.dpiSegmentBtnActive : ''}`}
+                  onClick={() => {
+                    setIsCustomDpi(false);
+                    setDpi(240);
+                    setPreflightReport(null);
+                  }}
+                  title="240 DPI - Fast draft printing"
+                >
+                  240
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.dpiSegmentBtn} ${!isCustomDpi && dpi === 300 ? styles.dpiSegmentBtnActive : ''}`}
+                  onClick={() => {
+                    setIsCustomDpi(false);
+                    setDpi(300);
+                    setPreflightReport(null);
+                  }}
+                  title="300 DPI - Standard print lab production"
+                >
+                  300
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.dpiSegmentBtn} ${!isCustomDpi && dpi === 600 ? styles.dpiSegmentBtnActive : ''}`}
+                  onClick={() => {
+                    setIsCustomDpi(false);
+                    setDpi(600);
+                    setPreflightReport(null);
+                  }}
+                  title="600 DPI - Ultra fine art & gallery print"
+                >
+                  600
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.dpiSegmentBtn} ${isCustomDpi ? styles.dpiSegmentBtnActive : ''}`}
+                  onClick={() => {
+                    setIsCustomDpi(true);
+                    setPreflightReport(null);
+                  }}
+                  title="Custom DPI value"
+                >
+                  Custom
+                </button>
+              </div>
+
               {isCustomDpi && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                <div className={styles.customDpiRow}>
+                  <div className={styles.customDpiInputWrap}>
+                    <input
+                      type="number"
+                      className={styles.customDpiInput}
+                      min={72}
+                      max={1200}
+                      value={customDpiText}
+                      onChange={(e) => {
+                        setCustomDpiText(e.target.value);
+                        const n = parseInt(e.target.value, 10);
+                        if (!isNaN(n) && n >= 72 && n <= 1200) {
+                          setDpi(n);
+                          setPreflightReport(null);
+                        }
+                      }}
+                      placeholder="300"
+                      autoFocus
+                    />
+                    <span className={styles.customDpiSuffix}>DPI</span>
+                  </div>
+                  <span className={styles.customDpiHint}>(72–1200)</span>
+                </div>
+              )}
+
+              {/* Image Quality Slider - Located directly beneath DPI controls */}
+              {format === 'jpeg' && (
+                <div className={styles.qualityRow}>
+                  <div className={styles.labelRow}>
+                    <label className={styles.label}>JPEG Image Quality</label>
+                    <span className={styles.qualityValBadge}>
+                      {jpegQuality}% • {jpegQuality >= 95 ? 'Maximum' : jpegQuality >= 85 ? 'High' : 'Standard'}
+                    </span>
+                  </div>
+                  <div className={styles.sliderRow}>
+                    <input
+                      type="range"
+                      className={styles.slider}
+                      min={70}
+                      max={100}
+                      value={jpegQuality}
+                      onChange={(e) => setJpegQuality(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modern Output Sharpening Card */}
+            <div className={`${styles.modernSharpenCard} ${sharpenEnabled ? styles.modernSharpenCardActive : ''}`}>
+              <div className={styles.sharpenCardHeader}>
+                <div className={styles.sharpenHeaderInfo}>
+                  <div className={styles.sharpenTitleRow}>
+                    <span className={styles.sharpenIcon}>✨</span>
+                    <span className={styles.sharpenTitle}>Output Print Sharpening</span>
+                  </div>
+                  <span className={styles.sharpenSubtitle}>
+                    Unsharp masking tailored for photo paper (libvips)
+                  </span>
+                </div>
+
+                <label className={styles.switchLabel} title="Toggle output print sharpening">
                   <input
-                    type="number"
-                    className={styles.select}
-                    style={{ flex: 1, padding: '0 8px' }}
-                    min={72}
-                    max={1200}
-                    step={1}
-                    value={customDpiText}
-                    onChange={(e) => {
-                      setCustomDpiText(e.target.value);
-                      const num = Number(e.target.value);
-                      if (num >= 72 && num <= 1200) {
-                        setDpi(num);
-                      }
-                    }}
-                    onBlur={() => {
-                      const num = Number(customDpiText);
-                      const clamped = Math.max(72, Math.min(1200, Math.round(num) || 300));
-                      setDpi(clamped);
-                      setCustomDpiText(String(clamped));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    autoFocus
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={sharpenEnabled}
+                    onChange={(e) => setSharpenEnabled(e.target.checked)}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>DPI</span>
+                  <span className={styles.switchTrack}>
+                    <span className={styles.switchThumb} />
+                  </span>
+                </label>
+              </div>
+
+              {sharpenEnabled && (
+                <div className={styles.sharpenIntensityGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.sharpenIntensityBtn} ${sharpenAmount === 'standard' ? styles.sharpenIntensityBtnActive : ''}`}
+                    onClick={() => setSharpenAmount('standard')}
+                  >
+                    <span className={styles.intensityLevel}>Standard</span>
+                    <span className={styles.intensityDesc}>Lustre / Matte Paper</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sharpenIntensityBtn} ${sharpenAmount === 'high' ? styles.sharpenIntensityBtnActive : ''}`}
+                    onClick={() => setSharpenAmount('high')}
+                  >
+                    <span className={styles.intensityLevel}>High</span>
+                    <span className={styles.intensityDesc}>Glossy / Fine Art</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Export Scope (Modern Horizontal Button Model) */}
+            <div className={styles.section}>
+              <div className={styles.labelRow}>
+                <label className={styles.sectionTitle}>Export Scope</label>
+                <span className={styles.scopeCountBadge}>
+                  {targetSpreadCount} {targetSpreadCount === 1 ? 'Spread' : 'Spreads'} ({targetPageCount} {targetPageCount === 1 ? 'Page' : 'Pages'})
+                </span>
+              </div>
+
+              <div className={styles.horizontalScopeBar}>
+                <button
+                  type="button"
+                  className={`${styles.scopeBtn} ${scope === 'all' ? styles.scopeBtnActive : ''}`}
+                  onClick={() => {
+                    setScope('all');
+                    setPreflightReport(null);
+                  }}
+                  title="Export all spreads in this album"
+                >
+                  <span className={styles.scopeBtnTitle}>All Spreads</span>
+                  <span className={styles.scopeBtnSub}>{allSpreads.length} Spreads</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`${styles.scopeBtn} ${scope === 'current' ? styles.scopeBtnActive : ''}`}
+                  onClick={() => {
+                    setScope('current');
+                    setPreflightReport(null);
+                  }}
+                  title="Export currently active spread"
+                >
+                  <span className={styles.scopeBtnTitle}>Current Spread</span>
+                  <span className={styles.scopeBtnSub}>
+                    {activeSpread ? (activeSpread.type === 'cover' ? 'Cover' : `Spread ${activeSpread.spreadIndex}`) : 'Spread 1'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`${styles.scopeBtn} ${scope === 'custom' ? styles.scopeBtnActive : ''}`}
+                  onClick={() => {
+                    setScope('custom');
+                    setPreflightReport(null);
+                  }}
+                  title="Export custom selection of spreads or pages"
+                >
+                  <span className={styles.scopeBtnTitle}>Custom Range</span>
+                  <span className={styles.scopeBtnSub}>
+                    {scope === 'custom' && customRange.trim() ? `${targetSpreadCount} Spreads` : 'Pick Spreads / Pages'}
+                  </span>
+                </button>
+              </div>
+
+              {scope === 'custom' && (
+                <div className={styles.customScopeCard}>
+                  <div className={styles.customScopeHeader}>
+                    <span className={styles.customScopeHint}>
+                      Enter {rangeMode === 'spreads' ? 'spread numbers' : 'page numbers'} to export:
+                    </span>
+                    <div className={styles.rangeModeToggle}>
+                      <button
+                        type="button"
+                        className={`${styles.rangeModeBtn} ${rangeMode === 'spreads' ? styles.rangeModeBtnActive : ''}`}
+                        onClick={() => {
+                          setRangeMode('spreads');
+                          setPreflightReport(null);
+                        }}
+                        title="Specify range by Spread numbers"
+                      >
+                        By Spreads (1–{allSpreads.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.rangeModeBtn} ${rangeMode === 'pages' ? styles.rangeModeBtnActive : ''}`}
+                        onClick={() => {
+                          setRangeMode('pages');
+                          setPreflightReport(null);
+                        }}
+                        title="Specify range by individual Page numbers"
+                      >
+                        By Pages (1–{allSpreads.length * 2})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={styles.customRangeInputRow}>
+                    <input
+                      type="text"
+                      className={styles.customRangeInput}
+                      placeholder={rangeMode === 'spreads' ? "e.g. 1-3, 5, 8" : "e.g. 1-6, 9-10"}
+                      value={customRange}
+                      onChange={(e) => {
+                        setCustomRange(e.target.value);
+                        setPreflightReport(null);
+                      }}
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className={styles.customScopeResult}>
+                    {targetSpreads.length > 0 ? (
+                      <span className={styles.customScopeSuccess}>
+                        ✓ Will export {targetSpreads.length} {targetSpreads.length === 1 ? 'Spread' : 'Spreads'}:{' '}
+                        {targetSpreads.map((s) => s.type === 'cover' ? 'Cover' : `Spread ${s.spreadIndex}`).join(', ')}
+                      </span>
+                    ) : (
+                      <span className={styles.customScopeWarning}>
+                        ⚠️ No spreads selected. Enter comma-separated numbers or ranges (e.g. 1-3, 5).
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 5. Filename Pattern & Prefix */}
+            <div className={styles.section}>
+              <div className={styles.labelRow}>
+                <label className={styles.sectionTitle}>Filename Prefix</label>
+                {currentProject?.name && (
+                  <button
+                    type="button"
+                    className={styles.useProjectNameBtn}
+                    onClick={() => {
+                      setFilePrefix(currentProject.name.replace(/[^a-zA-Z0-9_-]/g, '_'));
+                      setPreflightReport(null);
+                    }}
+                    title="Apply current project name as prefix"
+                  >
+                    <span>↺</span>
+                    <span>Use Project Name</span>
+                  </button>
+                )}
+              </div>
+
+              <div className={styles.modernInputWrapper}>
+                <span className={styles.inputPrefixIcon}>🏷️</span>
+                <input
+                  type="text"
+                  className={styles.modernInput}
+                  placeholder="Prefix (e.g. Wedding_Album, leave blank for default)"
+                  value={filePrefix}
+                  onChange={(e) => {
+                    setFilePrefix(e.target.value);
+                    setPreflightReport(null);
+                  }}
+                />
+                {filePrefix && (
+                  <button
+                    type="button"
+                    className={styles.inputClearBtn}
+                    onClick={() => {
+                      setFilePrefix('');
+                      setPreflightReport(null);
+                    }}
+                    title="Clear prefix"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className={styles.namingOutputTag}>
+                <span className={styles.outputTagIcon}>📄</span>
+                <span className={styles.outputTagLabel}>Example Output:</span>
+                {(() => {
+                  const ext = format === 'png' ? 'png' : format === 'pdf' ? 'pdf' : 'jpg';
+                  const clean = filePrefix.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                  let filename = `Spread_01.${ext}`;
+                  if (format === 'pdf') {
+                    filename = clean ? (clean.toLowerCase().endsWith('.pdf') ? clean : `${clean}.pdf`) : `${currentProject?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Album'}_Print_Ready.pdf`;
+                  } else if (splitPages) {
+                    filename = clean ? `${clean}_Page_001.${ext}` : `Page_001.${ext}`;
+                  } else {
+                    filename = clean ? `${clean}_Spread_01.${ext}` : `Spread_01.${ext}`;
+                  }
+                  return (
+                    <span className={styles.outputTagValue} title={filename}>
+                      {filename}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* 6. Destination Folder */}
+            <div className={styles.section}>
+              <div className={styles.labelRow}>
+                <label className={styles.sectionTitle}>Destination Folder</label>
+                {outputDir && (
+                  <span className={styles.folderStatusBadge}>✓ Selected</span>
+                )}
+              </div>
+
+              <div
+                className={`${styles.modernFolderCard} ${!outputDir ? styles.modernFolderCardEmpty : ''}`}
+                onClick={handleSelectFolder}
+                title={outputDir ? `Target: ${outputDir}` : 'Click to choose destination folder'}
+              >
+                <div className={styles.folderCardIconWrap}>
+                  <span className={styles.folderCardIcon}>{outputDir ? '📂' : '📁'}</span>
+                </div>
+
+                <div className={styles.folderCardContent}>
+                  {outputDir ? (
+                    <>
+                      <span className={styles.folderPrimaryName}>
+                        {outputDir.split(/[\\/]/).filter(Boolean).pop() || outputDir}
+                      </span>
+                      <span className={styles.folderFullPath} title={outputDir}>
+                        {outputDir}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className={styles.folderEmptyTitle}>Choose Export Destination</span>
+                      <span className={styles.folderEmptyHint}>Click to select folder where print files will be saved</span>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.browseActionBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectFolder();
+                  }}
+                >
+                  Browse...
+                </button>
+              </div>
+
+              {errorMsg && (
+                <div className={styles.errorBanner}>
+                  <span>⚠️</span>
+                  <span>{errorMsg}</span>
                 </div>
               )}
             </div>
           </div>
-
-          {format !== 'png' ? (
-            <div className={styles.optionField}>
-              <label className={styles.label}>JPEG Quality ({jpegQuality}%)</label>
-              <div className={styles.sliderRow}>
-                <input
-                  type="range"
-                  className={styles.slider}
-                  min={80}
-                  max={100}
-                  step={1}
-                  value={jpegQuality}
-                  onChange={(e) => setJpegQuality(Number(e.target.value))}
-                />
-                <span className={styles.sliderVal}>{jpegQuality}%</span>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.optionField}>
-              <label className={styles.label}>Compression</label>
-              <div className={styles.sliderRow}>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                  Lossless 24-bit RGBA
-                </span>
-              </div>
-            </div>
-          )}
         </div>
-
-        {/* 4. Print Output Sharpening */}
-        <div className={styles.section}>
-          <label className={styles.sectionTitle}>Print Output Sharpening</label>
-          <div className={styles.sharpenBox}>
-            <label className={styles.sharpenToggle}>
-              <input
-                type="checkbox"
-                checked={sharpenEnabled}
-                onChange={(e) => setSharpenEnabled(e.target.checked)}
-              />
-              <span>Enhance Micro-Detail for Print (Unsharp Masking)</span>
-            </label>
-            <div className={styles.sharpenHelp}>
-              Compensates for downscale pixel softening and printer dot gain, giving extra crispness to hair, eyes, jewelry, and textures.
-            </div>
-
-            {sharpenEnabled && (
-              <div className={styles.sharpenSubGroup}>
-                <label className={styles.radioItem} style={{ cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="sharpenAmount"
-                    value="standard"
-                    checked={sharpenAmount === 'standard'}
-                    onChange={() => setSharpenAmount('standard')}
-                  />
-                  <span>Standard (Glossy / Luster Photo Lab)</span>
-                </label>
-                <label className={styles.radioItem} style={{ cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="sharpenAmount"
-                    value="high"
-                    checked={sharpenAmount === 'high'}
-                    onChange={() => setSharpenAmount('high')}
-                  />
-                  <span>High (Matte / Velvet / Canvas)</span>
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 5. Scope (All / Current / Custom Range) */}
-        <div className={styles.section}>
-          <label className={styles.sectionTitle}>Export Scope</label>
-          <div className={styles.radioGroup}>
-            <label className={styles.radioItem}>
-              <input
-                type="radio"
-                name="exportScope"
-                checked={scope === 'all'}
-                onChange={() => {
-                  setScope('all');
-                  setPreflightReport(null);
-                }}
-              />
-              All Spreads ({allSpreads.length} Spreads / {allSpreads.length * 2} Pages)
-            </label>
-            <label className={styles.radioItem}>
-              <input
-                type="radio"
-                name="exportScope"
-                checked={scope === 'current'}
-                onChange={() => {
-                  setScope('current');
-                  setPreflightReport(null);
-                }}
-              />
-              Current Spread ({activeSpread?.name || 'Spread 1'})
-            </label>
-            <label className={styles.radioItem}>
-              <input
-                type="radio"
-                name="exportScope"
-                checked={scope === 'custom'}
-                onChange={() => {
-                  setScope('custom');
-                  setPreflightReport(null);
-                }}
-              />
-              Custom Range...
-            </label>
-
-            {scope === 'custom' && (
-              <div className={styles.rangeBox}>
-                <div className={styles.rangeRow}>
-                  <span className={styles.rangeHint}>Specify by:</span>
-                  <select
-                    className={styles.select}
-                    style={{ height: '28px', fontSize: '11px', padding: '0 4px' }}
-                    value={rangeMode}
-                    onChange={(e) => {
-                      setRangeMode(e.target.value as any);
-                      setPreflightReport(null);
-                    }}
-                  >
-                    <option value="spreads">Spread Numbers (1-{allSpreads.length})</option>
-                    <option value="pages">Page Numbers (1-{allSpreads.length * 2})</option>
-                  </select>
-                  <input
-                    type="text"
-                    className={styles.rangeInput}
-                    placeholder={rangeMode === 'spreads' ? 'e.g. 3-6 or 1,3,5' : 'e.g. 3-8 or 1,4'}
-                    value={customRange}
-                    onChange={(e) => {
-                      setCustomRange(e.target.value);
-                      setPreflightReport(null);
-                    }}
-                  />
-                </div>
-                <div className={styles.rangeBadge}>
-                  ✓ Selected {targetSpreads.length} Spread(s): {targetSpreads.map((s) => `Spread ${s.spreadIndex}`).join(', ') || 'None'}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 5. File Naming & Custom Prefix */}
-        <div className={styles.section}>
-          <label className={styles.sectionTitle}>File Naming & Custom Prefix</label>
-          <div className={styles.namingRow}>
-            <input
-              type="text"
-              className={styles.pathInput}
-              placeholder="e.g. Wedding_Budi_Ani (Optional prefix)"
-              value={filePrefix}
-              onChange={(e) => {
-                setFilePrefix(e.target.value);
-                setPreflightReport(null);
-              }}
-            />
-            {currentProject?.name && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setFilePrefix(currentProject.name.replace(/[^a-zA-Z0-9_-]/g, '_'));
-                  setPreflightReport(null);
-                }}
-                title="Use current project name as prefix"
-              >
-                Use Project Name
-              </Button>
-            )}
-            {filePrefix && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setFilePrefix('');
-                  setPreflightReport(null);
-                }}
-                title="Reset to default naming"
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-          <div className={styles.namingPreview}>
-            <span className={styles.previewLabel}>Example Output:</span>
-            <span className={styles.previewFilename}>
-              {(() => {
-                const ext = format === 'png' ? 'png' : format === 'pdf' ? 'pdf' : 'jpg';
-                const clean = filePrefix.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-                if (format === 'pdf') {
-                  return clean ? (clean.toLowerCase().endsWith('.pdf') ? clean : `${clean}.pdf`) : `${currentProject?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Album'}_Print_Ready.pdf`;
-                }
-                if (splitPages) {
-                  return clean ? `${clean}_Page_001.${ext}, ${clean}_Page_002.${ext}` : `Page_001.${ext}, Page_002.${ext}`;
-                }
-                return clean ? `${clean}_Spread_01.${ext}` : `Spread_01.${ext}`;
-              })()}
-            </span>
-          </div>
-        </div>
-
-        {/* 6. Destination Folder */}
-        <div className={styles.section}>
-          <label className={styles.sectionTitle}>Destination Folder</label>
-          <div className={styles.pathRow}>
-            <input
-              type="text"
-              className={styles.pathInput}
-              placeholder="Click Browse to select export folder..."
-              value={outputDir}
-              onChange={(e) => {
-                setOutputDir(e.target.value);
-                setErrorMsg(null);
-                setPreflightReport(null);
-              }}
-            />
-            <Button variant="secondary" onClick={handleSelectFolder}>
-              Browse...
-            </Button>
-          </div>
-          {errorMsg && (
-            <span style={{ color: 'var(--color-danger, #ef4444)', fontSize: '11px' }}>
-              ⚠️ {errorMsg}
-            </span>
-          )}
-        </div>
-
-        {/* 6. Live Summary Box */}
-        <div className={styles.summaryBox}>
-          <div className={styles.summaryRow}>
-            <span>Spread Dimensions:</span>
-            <span className={styles.summaryVal}>
-              {pixelW} × {pixelH} px ({spreadWWithBleed} × {spreadHWithBleed} {currentProject.canvasUnit} @ {dpi} DPI)
-            </span>
-          </div>
-          <div className={styles.summaryRow}>
-            <span>Total Outputs:</span>
-            <span className={styles.summaryVal}>
-              {format === 'pdf'
-                ? `1 Multi-Page PDF (${targetSpreadCount} Spreads)`
-                : `${targetPageCount} ${format.toUpperCase()} Image File(s)`}
-            </span>
-          </div>
-        </div>
+      </div>
 
         {/* Footer Actions */}
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleInitiateExport}
-            disabled={isVerifyingPreflight}
-          >
-            {isVerifyingPreflight ? 'Verifying Files...' : 'Export Album 📤'}
-          </Button>
+          <div className={styles.footerSummary}>
+            <span className={styles.readyBadge}>✓ Ready</span>
+            <span className={styles.summaryDot}>•</span>
+            <span>
+              {targetSpreadCount} {targetSpreadCount === 1 ? 'Spread' : 'Spreads'} ({targetPageCount} {targetPageCount === 1 ? 'Page' : 'Pages'})
+            </span>
+            <span className={styles.summaryDot}>•</span>
+            <span>{format.toUpperCase()} @ {dpi} DPI</span>
+            {includeBleed && <span> (+Bleed)</span>}
+          </div>
+          <div className={styles.footerActions}>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleInitiateExport}
+              disabled={isVerifyingPreflight}
+            >
+              {isVerifyingPreflight ? 'Verifying Files...' : `Export Album (${targetSpreadCount}) 📤`}
+            </Button>
+          </div>
         </div>
-      </div>
-    </Dialog>
+      </Dialog>
 
     {/* Dedicated Overwrite Confirmation Modal Popup */}
     {isOverwriteModalOpen && preflightReport && preflightReport.existingFiles && preflightReport.existingFiles.length > 0 && (

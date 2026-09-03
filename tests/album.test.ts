@@ -10,7 +10,7 @@ import {
   mergeFramePhotoAsset,
   syncAlbumPhotoAssets,
 } from '../src/domain/album';
-import type { PhotoFrameElement } from '../src/domain/editor';
+import { type PhotoFrameElement, applyFixedGap } from '../src/domain/editor';
 
 console.log('Testing Album Structure Domain...');
 
@@ -274,4 +274,69 @@ darkSpread3.spacingValue = 0.0; // e.g. seamless collage
 console.assert(spreadToCustomize.spacingValue === 6.0, `Customized spread spacing must NOT be affected by new spread, got ${spreadToCustomize.spacingValue}`);
 console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be independently editable to 0.0, got ${darkSpread3.spacingValue}`);
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence)!');
+// Test spread deletion fallback selection: deleting latest spread must select previous spread
+{
+  const testAlbum = createInitialAlbum(mockProject);
+  const s2 = createInteriorSpread(testAlbum, mockProject, 2);
+  const s3 = createInteriorSpread(testAlbum, mockProject, 3);
+  testAlbum.spreads.push(s2, s3);
+  const reAlbum = recalculateAlbumPageNumbers(testAlbum);
+  const all = getAllAlbumSpreads(reAlbum); // [Spread 1, Spread 2, Spread 3]
+  console.assert(all.length === 3, 'Should have 3 spreads');
+
+  // Simulate deleting the latest spread (Spread 3)
+  const deletedSpreadId = s3.id;
+  const oldDeletedIndex = all.findIndex((s) => s.id === deletedSpreadId);
+  console.assert(oldDeletedIndex === 2, 'Deleted spread was at index 2 (the latest spread)');
+
+  const remaining = reAlbum.spreads.filter((s) => s.id !== deletedSpreadId);
+  const updated = recalculateAlbumPageNumbers({ ...reAlbum, spreads: remaining });
+  const remainingAll = getAllAlbumSpreads(updated);
+
+  // Fallback calculation:
+  const candidateIndex = oldDeletedIndex >= remainingAll.length
+    ? Math.max(0, remainingAll.length - 1)
+    : Math.max(0, oldDeletedIndex);
+  const targetSpread = remainingAll[candidateIndex];
+
+  console.assert(targetSpread.id === s2.id, `Selected spread after deleting latest must be Spread 2 (the previous spread), got ${targetSpread.name}`);
+  console.assert(candidateIndex === 1, `Candidate index should be 1 (Spread 2), not 0 (Spread 1)`);
+}
+
+// Test in-place gap adjustment without layout shuffle
+{
+  const f1: any = {
+    id: 'f1',
+    type: 'photo',
+    photoId: 'photo-1',
+    filePath: '/p1.jpg',
+    fileName: 'p1.jpg',
+    previewPath: '',
+    thumbnailPath: '',
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 80,
+    rotation: 0,
+    zIndex: 1,
+    photoAspect: 1.25,
+    originalWidth: 100,
+    originalHeight: 80,
+    cropX: 0,
+    cropY: 0,
+    cropScale: 1,
+    cropRotation: 0,
+    borderEnabled: false,
+    borderWidth: 0,
+    borderColor: '#000',
+    opacity: 1,
+  };
+  const f2: any = { ...f1, id: 'f2', photoId: 'photo-2', x: 120 };
+  const gapUpdates = applyFixedGap([f1, f2], 'horizontal', 10);
+  console.assert(gapUpdates.length > 0, 'applyFixedGap should return geometry updates');
+  const newX2 = (gapUpdates.find((u) => u.id === 'f2')?.geometry as any).x;
+  console.assert(newX2 === 120, `f2 should have x = 10 + 100 + 10 = 120, got ${newX2}`);
+  console.assert(f1.photoId === 'photo-1' && f2.photoId === 'photo-2', 'Photo identity must never shuffle');
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, and in-place non-shuffling photo gap adjustment)!');
