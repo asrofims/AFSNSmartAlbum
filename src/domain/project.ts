@@ -16,6 +16,10 @@ export interface ProjectSettings {
     enabled: boolean;
     value: number;
     unit: Unit;
+    top?: number;
+    bottom?: number;
+    outside?: number;
+    spine?: number;
   };
   border: {
     enabled: boolean;
@@ -41,6 +45,10 @@ export interface Project {
   marginEnabled?: boolean;
   marginValue?: number;
   marginUnit?: Unit;
+  marginTop?: number;
+  marginBottom?: number;
+  marginOutside?: number;
+  marginSpine?: number;
   photoInset?: number;
   photoInsetTop?: number;
   photoInsetBottom?: number;
@@ -74,6 +82,10 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
     enabled: true,
     value: 2,
     unit: 'cm',
+    top: 2,
+    bottom: 2,
+    outside: 2,
+    spine: 2,
   },
   border: {
     enabled: false, // Default disabled

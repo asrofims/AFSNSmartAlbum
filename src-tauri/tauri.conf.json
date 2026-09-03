@@ -61,12 +61,6 @@
         "name": "AFSNSmartAlbum Project",
         "description": "AFSNSmartAlbum Project File",
         "role": "Editor"
-      },
-      {
-        "ext": ["afsnz"],
-        "name": "AFSNSmartAlbum Complete Archive",
-        "description": "AFSNSmartAlbum Complete Project Archive",
-        "role": "Editor"
       }
     ]
   },

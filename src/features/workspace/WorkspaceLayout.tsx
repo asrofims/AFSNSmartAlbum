@@ -94,6 +94,7 @@ export function WorkspaceLayout() {
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
   const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout' | 'locks'>('properties');
   const [bgScope, setBgScope] = useState<'spread' | 'left' | 'right'>('spread');
+  const [isMarginExpanded, setIsMarginExpanded] = useState<boolean>(false);
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -2048,57 +2049,213 @@ export function WorkspaceLayout() {
                   </button>
                 </div>
 
-                {/* Side-by-Side Cards: Safe Zone Margin & Bleed Allowance */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                  {/* Safe Zone Margin Card */}
-                  <div
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', flexShrink: 0 }} />
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                {/* Safe Margin Card with Sleek 4S Multi-Directional Switcher */}
+                <div
+                  style={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#3b82f6"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <rect x="7" y="7" width="10" height="10" strokeDasharray="3 2" />
+                      </svg>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }} title="Safe margins protecting layout from print trimming">
                         Safe Margin
                       </span>
                     </div>
-                    <NumberInput
-                      value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                      onChange={(val) => {
-                        updateSafeArea(val);
-                        updateProjectMargin(val);
+
+                    {/* Segmented Pill Switcher: All Sides vs 4 Sides */}
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '2px',
+                        gap: '2px',
                       }}
-                      min={0}
-                      max={999}
-                      step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                      suffix={currentProject.canvasUnit}
-                    />
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsMarginExpanded(false)}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontWeight: !isMarginExpanded ? 600 : 400,
+                          color: !isMarginExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          backgroundColor: !isMarginExpanded ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="Uniform safe margin for all sides (Linked)"
+                      >
+                        All Sides
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsMarginExpanded(true)}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontWeight: isMarginExpanded ? 600 : 400,
+                          color: isMarginExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          backgroundColor: isMarginExpanded ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="Individual 4-sided margins (Top, Bottom, Outside, Spine)"
+                      >
+                        4 Sides
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Bleed Allowance Card */}
-                  <div
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                        Bleed Cut
+                  {/* Margin Body */}
+                  {!isMarginExpanded ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        Uniform Margin
                       </span>
+                      <div style={{ width: '110px' }}>
+                        <NumberInput
+                          value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'all');
+                            updateProjectMargin(val, undefined, 'all');
+                          }}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
                     </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '2px' }}>
+                      {/* Top Margin */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop || 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'top');
+                            updateProjectMargin(val, undefined, 'top');
+                          }}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+
+                      {/* Bottom Margin */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom || 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'bottom');
+                            updateProjectMargin(val, undefined, 'bottom');
+                          }}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+
+                      {/* Outside Margin */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Outer trim margin (protected from paper cutting)">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Outside</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside || 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'outside');
+                            updateProjectMargin(val, undefined, 'outside');
+                          }}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+
+                      {/* Spine Margin */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Spine</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine || 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'spine');
+                            updateProjectMargin(val, undefined, 'spine');
+                          }}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {isMarginExpanded && (activeSpread?.safeAreaSpine === 0 || (!activeSpread && currentProject.marginSpine === 0)) && (
+                    <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', padding: '5px 8px', borderRadius: '4px' }}>
+                      ✓ Seamless Spread: Pages 1 & 2 connect continuously across spine (0 gap)
+                    </div>
+                  )}
+                </div>
+
+                {/* Bleed Allowance Card */}
+                <div
+                  style={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      Bleed Cut
+                    </span>
+                  </div>
+                  <div style={{ width: '110px' }}>
                     <NumberInput
                       value={activeSpread?.bleed ?? 3}
                       onChange={(val) => updateBleed(val)}

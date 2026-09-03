@@ -41,7 +41,12 @@ export function NewProjectDialog() {
 
   // Safe Margin
   const [marginEnabled, setMarginEnabled] = useState(true);
+  const [isMargin4S, setIsMargin4S] = useState(false);
   const [marginValue, setMarginValue] = useState(2);
+  const [marginTop, setMarginTop] = useState(2);
+  const [marginBottom, setMarginBottom] = useState(2);
+  const [marginOutside, setMarginOutside] = useState(2);
+  const [marginSpine, setMarginSpine] = useState(2);
   const [marginUnit, setMarginUnit] = useState<Unit>('cm');
 
   // Border
@@ -77,7 +82,12 @@ export function NewProjectDialog() {
       setSpacingValue(2);
       setSpacingUnit('cm');
       setMarginEnabled(true);
+      setIsMargin4S(false);
       setMarginValue(2);
+      setMarginTop(2);
+      setMarginBottom(2);
+      setMarginOutside(2);
+      setMarginSpine(2);
       setMarginUnit('cm');
       setBorderEnabled(false); // Default disabled
       setBorderWidth(0.1);
@@ -189,6 +199,10 @@ export function NewProjectDialog() {
     // Convert Safe Margin
     const convertedMargin = roundUnit(convertUnit(marginValue, marginUnit, newUnit, canvasDpi), newUnit);
     setMarginValue(convertedMargin);
+    setMarginTop(roundUnit(convertUnit(marginTop, marginUnit, newUnit, canvasDpi), newUnit));
+    setMarginBottom(roundUnit(convertUnit(marginBottom, marginUnit, newUnit, canvasDpi), newUnit));
+    setMarginOutside(roundUnit(convertUnit(marginOutside, marginUnit, newUnit, canvasDpi), newUnit));
+    setMarginSpine(roundUnit(convertUnit(marginSpine, marginUnit, newUnit, canvasDpi), newUnit));
     setMarginUnit(newUnit);
 
     // Convert Spacing
@@ -312,6 +326,10 @@ export function NewProjectDialog() {
         enabled: marginEnabled,
         value: marginValue,
         unit: marginUnit,
+        top: isMargin4S ? marginTop : marginValue,
+        bottom: isMargin4S ? marginBottom : marginValue,
+        outside: isMargin4S ? marginOutside : marginValue,
+        spine: isMargin4S ? marginSpine : marginValue,
       },
       border: {
         enabled: borderEnabled,
@@ -607,7 +625,47 @@ export function NewProjectDialog() {
 
             {/* Safe Margin */}
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Safe Zone Margins</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div className={styles.sectionTitle} style={{ margin: 0 }}>Safe Zone Margins</div>
+                {marginEnabled && (
+                  <div style={{ display: 'flex', gap: '2px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', padding: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsMargin4S(false)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        borderRadius: '3px',
+                        border: 'none',
+                        background: !isMargin4S ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                        color: !isMargin4S ? '#60a5fa' : 'var(--color-text-muted)',
+                        cursor: 'pointer',
+                      }}
+                      title="Equal safe margin on all sides"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsMargin4S(true)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        borderRadius: '3px',
+                        border: 'none',
+                        background: isMargin4S ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                        color: isMargin4S ? '#60a5fa' : 'var(--color-text-muted)',
+                        cursor: 'pointer',
+                      }}
+                      title="Configure Top, Bottom, Outside, and Spine independently"
+                    >
+                      4S
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={{ padding: '2px 0 6px 0' }}>
                 <Switch
                   checked={marginEnabled}
@@ -617,7 +675,7 @@ export function NewProjectDialog() {
                 />
               </div>
 
-              {marginEnabled && (
+              {marginEnabled && !isMargin4S && (
                 <div className={styles.row}>
                   <div className={styles.flex1}>
                     <NumberInput
@@ -637,6 +695,68 @@ export function NewProjectDialog() {
                       onChange={handleUnitChange}
                     />
                   </div>
+                </div>
+              )}
+
+              {marginEnabled && isMargin4S && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.row}>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Top (⤒)"
+                        value={marginTop}
+                        onChange={setMarginTop}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Bottom (⤓)"
+                        value={marginBottom}
+                        onChange={setMarginBottom}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.row}>
+                    <div className={styles.flex1} title="Outer trim margin protected from paper cutting">
+                      <NumberInput
+                        label="Outside (⇤)"
+                        value={marginOutside}
+                        onChange={setMarginOutside}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div className={styles.flex1} title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
+                      <NumberInput
+                        label="Spine (⇥)"
+                        value={marginSpine}
+                        onChange={setMarginSpine}
+                        min={0}
+                        max={1000}
+                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                      />
+                    </div>
+                    <div style={{ width: '90px' }}>
+                      <Select
+                        label="Unit"
+                        value={marginUnit}
+                        options={UNIT_OPTIONS}
+                        onChange={handleUnitChange}
+                      />
+                    </div>
+                  </div>
+                  {marginSpine === 0 && (
+                    <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ✓ Seamless Spread: Pages 1 & 2 connect continuously across spine
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -746,8 +866,9 @@ export function NewProjectDialog() {
                         top: '8px',
                         bottom: '8px',
                         left: '12px',
-                        right: '8px',
+                        right: isMargin4S && marginSpine === 0 ? '0px' : '8px',
                         border: '1px dashed rgba(59, 130, 246, 0.45)',
+                        borderRight: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(59, 130, 246, 0.45)',
                         pointerEvents: 'none',
                       }}
                       title="Safe Margin Guide"
@@ -773,9 +894,10 @@ export function NewProjectDialog() {
                         position: 'absolute',
                         top: '8px',
                         bottom: '8px',
-                        left: '8px',
-                        right: '8px',
+                        left: isMargin4S && marginSpine === 0 ? '0px' : '8px',
+                        right: '12px',
                         border: '1px dashed rgba(59, 130, 246, 0.45)',
+                        borderLeft: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(59, 130, 246, 0.45)',
                         pointerEvents: 'none',
                       }}
                       title="Safe Margin Guide"
@@ -818,7 +940,11 @@ export function NewProjectDialog() {
               <div className={styles.specRow}>
                 <span>Safe Margin:</span>
                 <span className={styles.specValue}>
-                  {marginEnabled ? `${marginValue} ${marginUnit}` : 'None'}
+                  {marginEnabled
+                    ? isMargin4S
+                      ? `T:${marginTop} B:${marginBottom} O:${marginOutside} S:${marginSpine} ${marginUnit}`
+                      : `${marginValue} ${marginUnit}`
+                    : 'None'}
                 </span>
               </div>
               <div className={styles.specRow}>

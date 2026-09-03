@@ -105,10 +105,34 @@ export function TextNode({
       height={pixelH}
       rotation={element.rotation || 0}
       draggable={!element.locked && !isEditing}
-      onClick={onSelect}
+      onMouseDown={(e) => {
+        // Ignore right clicks (button 2) or middle clicks (button 1)
+        if ('button' in e.evt && (e.evt.button === 2 || e.evt.button === 1)) {
+          return;
+        }
+        if ('which' in e.evt && (e.evt.which === 3 || e.evt.which === 2)) {
+          return;
+        }
+      }}
+      onClick={(e) => {
+        // Ignore right clicks or secondary clicks on onClick
+        if ('button' in e.evt && e.evt.button !== 0) {
+          return;
+        }
+        if ('which' in e.evt && e.evt.which !== 1) {
+          return;
+        }
+        onSelect?.(e);
+      }}
       onTap={onSelect}
       onDblClick={(e) => {
         e.cancelBubble = true;
+        if ('button' in e.evt && e.evt.button !== 0) {
+          return;
+        }
+        if ('which' in e.evt && e.evt.which !== 1) {
+          return;
+        }
         onDoubleClick();
       }}
       onDblTap={(e) => {
@@ -123,9 +147,6 @@ export function TextNode({
       onContextMenu={(e) => {
         e.evt.preventDefault();
         e.cancelBubble = true;
-        if (!isSelected) {
-          onSelect?.(e);
-        }
         onContextMenu?.(e);
       }}
       onTransformEnd={() => {

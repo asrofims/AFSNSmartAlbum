@@ -1137,6 +1137,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
   const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
   const unit = dims.unit;
+  const safeAreaMargins = {
+    top: dims.safeMarginTop,
+    bottom: dims.safeMarginBottom,
+    outside: dims.safeMarginOutside,
+    spine: dims.safeMarginSpine,
+  };
 
   // Single page physical dimensions (strictly in canvasUnit)
   const singlePageW = dims.pageWidth;
@@ -1174,7 +1180,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const gutterPixelW = 0;
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
-  const safeAreaPixel = Math.max(1, Math.round(dims.safeMargin * scaleFactor));
 
   // Multi-selection status
   const selectedElements = (activeSpread.elements || []).filter((f) =>
@@ -1539,7 +1544,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         label: `Group ${count} ${itemNounPlural}`,
         icon: '👥',
         shortcut: 'Ctrl+G',
-        onClick: () => groupSelectedFrames(activeSpread.id),
+        onClick: () => {
+          groupSelectedFrames(activeSpread.id);
+          if (onToast) onToast(`👥 Grouped ${count} ${itemNounPlural.toLowerCase()}`);
+        },
       });
     }
 
@@ -1549,7 +1557,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         label: `Ungroup ${itemNounPlural}`,
         icon: '⊘',
         shortcut: 'Ctrl+Shift+G',
-        onClick: () => ungroupSelectedFrames(activeSpread.id),
+        onClick: () => {
+          ungroupSelectedFrames(activeSpread.id);
+          if (onToast) onToast(`⊘ Ungrouped ${itemNounPlural.toLowerCase()}`);
+        },
       });
     }
 
@@ -1862,6 +1873,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openContextMenuAt(e.clientX, e.clientY);
+        }}
       >
         {/* Outer Bleed Guide Boundary */}
         {showBleedGuide && (
@@ -1901,6 +1916,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               shadowColor="rgba(0,0,0,0.6)"
               shadowBlur={16}
               shadowOffset={{ x: 0, y: 8 }}
+              onContextMenu={(e) => {
+                e.evt.preventDefault();
+                openContextMenuAt(e.evt.clientX, e.evt.clientY);
+              }}
             />
 
             {/* Left Page Background */}
@@ -2022,20 +2041,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               <Group listening={false}>
                 {/* Left Page Safe Area (Blue) */}
                 <Rect
-                  x={safeAreaPixel}
-                  y={safeAreaPixel}
-                  width={leftPagePixelW - safeAreaPixel * 2}
-                  height={screenSpreadH - safeAreaPixel * 2}
+                  x={Math.round(dims.safeMarginOutside * scaleFactor)}
+                  y={Math.round(dims.safeMarginTop * scaleFactor)}
+                  width={Math.max(1, Math.round((dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scaleFactor))}
+                  height={Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor))}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}
                   dash={[5, 4]}
                 />
                 {/* Right Page Safe Area (Blue) */}
                 <Rect
-                  x={leftPagePixelW + gutterPixelW + safeAreaPixel}
-                  y={safeAreaPixel}
-                  width={rightPagePixelW - safeAreaPixel * 2}
-                  height={screenSpreadH - safeAreaPixel * 2}
+                  x={Math.round((dims.pageWidth + dims.gutterWidth + dims.safeMarginSpine) * scaleFactor)}
+                  y={Math.round(dims.safeMarginTop * scaleFactor)}
+                  width={Math.max(1, Math.round((dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scaleFactor))}
+                  height={Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor))}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}
                   dash={[5, 4]}
@@ -2066,6 +2085,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       if (justDroppedRef.current) return;
                       if (e) {
                         e.cancelBubble = true;
+                        if ('button' in e.evt && e.evt.button !== 0) return;
+                        if ('which' in e.evt && e.evt.which !== 1) return;
                         const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
                         selectFrame(textEl.id, isMulti);
                       } else {
@@ -2127,7 +2148,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height },
                           totalSpreadPhysicalW,
                           totalSpreadPhysicalH,
-                          activeSpread.safeArea,
+                          safeAreaMargins,
                           gutterPhysicalW,
                           otherRects,
                           { ...snappingConfig, threshold: thresholdUnits },
@@ -2188,7 +2209,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                                 { x: finalCurrentPhysX, y: finalCurrentPhysY, width: textEl.width, height: textEl.height },
                                 totalSpreadPhysicalW,
                                 totalSpreadPhysicalH,
-                                activeSpread.safeArea,
+                                safeAreaMargins,
                                 gutterPhysicalW,
                                 otherRects,
                                 snappingConfig,
@@ -2336,7 +2357,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
                         totalSpreadPhysicalW,
                         totalSpreadPhysicalH,
-                        activeSpread.safeArea,
+                        safeAreaMargins,
                         gutterPhysicalW,
                         otherRects,
                         { ...snappingConfig, threshold: thresholdUnits },
@@ -2452,7 +2473,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                             { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
                             totalSpreadPhysicalW,
                             totalSpreadPhysicalH,
-                            activeSpread.safeArea,
+                            safeAreaMargins,
                             gutterPhysicalW,
                             otherRects,
                             snappingConfig,

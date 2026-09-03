@@ -18,6 +18,10 @@ export interface Page {
   unit: Unit;
   bleed: number;
   safeArea: number;
+  safeAreaTop?: number;
+  safeAreaBottom?: number;
+  safeAreaOutside?: number;
+  safeAreaSpine?: number;
   photoInset?: number;
   photoInsetTop?: number;
   photoInsetBottom?: number;
@@ -39,6 +43,10 @@ export interface Spread {
   gutterUnit: Unit;
   bleed: number;
   safeArea: number;
+  safeAreaTop?: number;
+  safeAreaBottom?: number;
+  safeAreaOutside?: number;
+  safeAreaSpine?: number;
   photoInset?: number;
   photoInsetTop?: number;
   photoInsetBottom?: number;

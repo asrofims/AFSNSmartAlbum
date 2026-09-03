@@ -14,7 +14,11 @@ export interface TemplateParams {
   spreadWidth: number;
   spreadHeight: number;
   isSpread: boolean; // true for 2-page spread, false for single-page cover
-  safeMargin: number; // in canvasUnit
+  safeMargin: number; // default/fallback in canvasUnit
+  safeMarginTop?: number;
+  safeMarginBottom?: number;
+  safeMarginOutside?: number;
+  safeMarginSpine?: number;
   gutterWidth: number; // in canvasUnit
   spacing: number; // in canvasUnit
   currentPhotos?: Array<{
@@ -47,6 +51,10 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   unit: Unit;
   dpi: number;
   safeMargin: number;
+  safeMarginTop: number;
+  safeMarginBottom: number;
+  safeMarginOutside: number;
+  safeMarginSpine: number;
   gutterWidth: number;
   spacing: number;
   bleed: number;
@@ -59,8 +67,17 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
 
   // Margin: convert from project.marginUnit (or 'mm') to project.canvasUnit
   const rawMargin = spread?.safeArea ?? project.marginValue ?? 10;
+  const rawMarginTop = spread?.safeAreaTop ?? project.marginTop ?? rawMargin;
+  const rawMarginBottom = spread?.safeAreaBottom ?? project.marginBottom ?? rawMargin;
+  const rawMarginOutside = spread?.safeAreaOutside ?? project.marginOutside ?? rawMargin;
+  const rawMarginSpine = spread?.safeAreaSpine ?? project.marginSpine ?? rawMargin;
+
   const marginUnit = project.marginUnit || 'mm';
   const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));
+  const safeMarginTop = round4(convertUnit(rawMarginTop, marginUnit, unit, dpi, 4));
+  const safeMarginBottom = round4(convertUnit(rawMarginBottom, marginUnit, unit, dpi, 4));
+  const safeMarginOutside = round4(convertUnit(rawMarginOutside, marginUnit, unit, dpi, 4));
+  const safeMarginSpine = round4(convertUnit(rawMarginSpine, marginUnit, unit, dpi, 4));
 
   // Spacing: convert from project.spacingUnit (or 'mm') to project.canvasUnit
   const rawSpacing = project.spacingValue ?? 4;
@@ -80,6 +97,10 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
     unit,
     dpi,
     safeMargin,
+    safeMarginTop,
+    safeMarginBottom,
+    safeMarginOutside,
+    safeMarginSpine,
     gutterWidth,
     spacing,
     bleed,
@@ -109,13 +130,15 @@ export function fitInsideBoxCentered(
     w = h * photoAspect;
   }
 
-  w = round4(w);
-  h = round4(h);
+  const x = container.x + (container.width - w) / 2;
+  const y = container.y + (container.height - h) / 2;
 
-  const x = round4(container.x + (container.width - w) / 2);
-  const y = round4(container.y + (container.height - h) / 2);
-
-  return { x, y, width: w, height: h };
+  return {
+    x: round4(x),
+    y: round4(y),
+    width: round4(w),
+    height: round4(h),
+  };
 }
 
 /**
@@ -134,15 +157,19 @@ export function getUsableAreas(params: TemplateParams): {
     spreadHeight,
     isSpread,
     safeMargin,
+    safeMarginTop = safeMargin,
+    safeMarginBottom = safeMargin,
+    safeMarginOutside = safeMargin,
+    safeMarginSpine = safeMargin,
     gutterWidth,
   } = params;
 
   if (!isSpread) {
     const singleArea: RectBounds = {
-      x: round4(safeMargin),
-      y: round4(safeMargin),
-      width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
-      height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+      x: round4(safeMarginOutside),
+      y: round4(safeMarginTop),
+      width: Math.max(0.1, round4(spreadWidth - safeMarginOutside * 2)),
+      height: Math.max(0.1, round4(spreadHeight - safeMarginTop - safeMarginBottom)),
     };
     return {
       spreadArea: singleArea,
@@ -156,28 +183,28 @@ export function getUsableAreas(params: TemplateParams): {
   // On a 2-page spread: spreadWidth = leftPageWidth + gutterWidth + rightPageWidth
   const pageWidth = round4((spreadWidth - gutterWidth) / 2);
 
-  // Left Page: fully bounded by safeMargin inside page
+  // Left Page: outer edge is safeMarginOutside, spine edge is safeMarginSpine
   const leftPageArea: RectBounds = {
-    x: round4(safeMargin),
-    y: round4(safeMargin),
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: round4(safeMarginOutside),
+    y: round4(safeMarginTop),
+    width: Math.max(0.1, round4(pageWidth - safeMarginOutside - safeMarginSpine)),
+    height: Math.max(0.1, round4(spreadHeight - safeMarginTop - safeMarginBottom)),
   };
 
-  // Right Page: fully bounded by safeMargin inside page
+  // Right Page: spine edge starts at pageWidth + gutterWidth + safeMarginSpine, outer edge is safeMarginOutside
   const rightPageArea: RectBounds = {
-    x: round4(pageWidth + gutterWidth + safeMargin),
-    y: round4(safeMargin),
-    width: Math.max(0.1, round4(pageWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: round4(pageWidth + gutterWidth + safeMarginSpine),
+    y: round4(safeMarginTop),
+    width: Math.max(0.1, round4(pageWidth - safeMarginSpine - safeMarginOutside)),
+    height: Math.max(0.1, round4(spreadHeight - safeMarginTop - safeMarginBottom)),
   };
 
   // Full Spread Area across both pages
   const spreadArea: RectBounds = {
-    x: round4(safeMargin),
-    y: round4(safeMargin),
-    width: Math.max(0.1, round4(spreadWidth - safeMargin * 2)),
-    height: Math.max(0.1, round4(spreadHeight - safeMargin * 2)),
+    x: round4(safeMarginOutside),
+    y: round4(safeMarginTop),
+    width: Math.max(0.1, round4(spreadWidth - safeMarginOutside * 2)),
+    height: Math.max(0.1, round4(spreadHeight - safeMarginTop - safeMarginBottom)),
   };
 
   return { spreadArea, leftPageArea, rightPageArea, pageWidth, gutterWidth };

@@ -35,7 +35,33 @@ function runTests() {
   }
   console.log('✓ Exact Safe Margin Box alignment (left & right page blue dashed boxes) verified.');
 
-  // 2. Verify Photo Centered Fitting
+  // 2. Verify 4-Sided Margins & Seamless Spine (Spine = 0)
+  const seamlessParams: TemplateParams = {
+    ...params,
+    safeMargin: 10,
+    safeMarginTop: 20,
+    safeMarginBottom: 25,
+    safeMarginOutside: 15,
+    safeMarginSpine: 0, // Zero spine margin for seamless layout across pages
+  };
+  const seamlessAreas = getUsableAreas(seamlessParams);
+  if (seamlessAreas.leftPageArea.x !== 15 || seamlessAreas.leftPageArea.width !== 185) {
+    throw new Error(`Incorrect Seamless Left Box: ${JSON.stringify(seamlessAreas.leftPageArea)}`);
+  }
+  // Left page right edge meets spine at x = 200
+  if (seamlessAreas.leftPageArea.x + seamlessAreas.leftPageArea.width !== 200) {
+    throw new Error('Left Page does not touch spine at 0 gap');
+  }
+  // Right page left edge starts directly at spine (pageWidth + gutterWidth = 205)
+  if (seamlessAreas.rightPageArea.x !== 205 || seamlessAreas.rightPageArea.width !== 185) {
+    throw new Error(`Incorrect Seamless Right Box: ${JSON.stringify(seamlessAreas.rightPageArea)}`);
+  }
+  if (seamlessAreas.leftPageArea.y !== 20 || seamlessAreas.leftPageArea.height !== 155) {
+    throw new Error(`Incorrect Top/Bottom margins: ${JSON.stringify(seamlessAreas.leftPageArea)}`);
+  }
+  console.log('✓ 4-Sided Safe Margins & Zero Spine Gap Seamless Spread math verified.');
+
+  // 3. Verify Photo Centered Fitting
   const fitted = fitInsideBoxCentered(rightPageArea, 1.5, 1.0);
   if (fitted.width <= 0 || fitted.height <= 0) {
     throw new Error('fitInsideBoxCentered produced invalid dimensions');

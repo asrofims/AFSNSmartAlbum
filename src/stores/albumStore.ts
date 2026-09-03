@@ -68,7 +68,7 @@ export interface AlbumState {
   moveSpread: (spreadId: string, direction: 'left' | 'right') => void;
   reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
-  updateSafeArea: (safeArea: number) => void;
+  updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
@@ -624,17 +624,34 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     });
   },
 
-  updateSafeArea: (safeArea: number) => {
+  updateSafeArea: (safeArea: number, side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all') => {
     const { currentAlbum, activeSpreadId } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
+    const patch: Partial<Spread> = {};
+    if (side === 'all') {
+      patch.safeArea = safeArea;
+      patch.safeAreaTop = safeArea;
+      patch.safeAreaBottom = safeArea;
+      patch.safeAreaOutside = safeArea;
+      patch.safeAreaSpine = safeArea;
+    } else if (side === 'top') {
+      patch.safeAreaTop = safeArea;
+    } else if (side === 'bottom') {
+      patch.safeAreaBottom = safeArea;
+    } else if (side === 'outside') {
+      patch.safeAreaOutside = safeArea;
+    } else if (side === 'spine') {
+      patch.safeAreaSpine = safeArea;
+    }
+
     if (currentAlbum.coverSpread.id === activeSpreadId) {
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, safeArea },
+          coverSpread: { ...currentAlbum.coverSpread, ...patch },
         },
         saveStatus: 'unsaved',
       });
@@ -642,7 +659,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, safeArea } : s
+      s.id === activeSpreadId ? { ...s, ...patch } : s
     );
 
     set({
@@ -805,6 +822,10 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         spreadHeight,
         isSpread,
         safeMargin: dims.safeMargin,
+        safeMarginTop: dims.safeMarginTop,
+        safeMarginBottom: dims.safeMarginBottom,
+        safeMarginOutside: dims.safeMarginOutside,
+        safeMarginSpine: dims.safeMarginSpine,
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
         lockedElements,

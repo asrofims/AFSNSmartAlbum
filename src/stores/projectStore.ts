@@ -14,7 +14,7 @@ interface ProjectState {
   setCurrentProject: (project: Project | null) => void;
   updateProjectName: (name: string) => Promise<void>;
   updateProjectSpacing: (spacingValue: number, spacingUnit?: Unit) => Promise<void>;
-  updateProjectMargin: (marginValue: number, marginUnit?: Unit) => Promise<void>;
+  updateProjectMargin: (marginValue: number, marginUnit?: Unit, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => Promise<void>;
   updateProjectBackgroundColor: (backgroundColor: string) => Promise<void>;
   closeProject: () => void;
   loadRecentProjects: () => Promise<void>;
@@ -129,16 +129,32 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  updateProjectMargin: async (marginValue: number, marginUnit?: Unit) => {
+  updateProjectMargin: async (marginValue: number, marginUnit?: Unit, side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all') => {
     const current = get().currentProject;
     if (!current) return;
     const unit = marginUnit || current.marginUnit || 'mm';
+    const num = Number(marginValue);
     const updatedProject: Project = {
       ...current,
-      marginValue: Number(marginValue),
       marginUnit: unit,
       updatedAt: new Date().toISOString(),
     };
+
+    if (side === 'all') {
+      updatedProject.marginValue = num;
+      updatedProject.marginTop = num;
+      updatedProject.marginBottom = num;
+      updatedProject.marginOutside = num;
+      updatedProject.marginSpine = num;
+    } else if (side === 'top') {
+      updatedProject.marginTop = num;
+    } else if (side === 'bottom') {
+      updatedProject.marginBottom = num;
+    } else if (side === 'outside') {
+      updatedProject.marginOutside = num;
+    } else if (side === 'spine') {
+      updatedProject.marginSpine = num;
+    }
 
     set((state) => ({
       currentProject: updatedProject,
@@ -220,6 +236,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       marginEnabled: Boolean(settings.margin.enabled),
       marginValue: Number(settings.margin.value),
       marginUnit: settings.margin.unit,
+      marginTop: settings.margin.top !== undefined ? Number(settings.margin.top) : Number(settings.margin.value),
+      marginBottom: settings.margin.bottom !== undefined ? Number(settings.margin.bottom) : Number(settings.margin.value),
+      marginOutside: settings.margin.outside !== undefined ? Number(settings.margin.outside) : Number(settings.margin.value),
+      marginSpine: settings.margin.spine !== undefined ? Number(settings.margin.spine) : Number(settings.margin.value),
       borderEnabled: Boolean(settings.border.enabled),
       borderWidth: Number(settings.border.width),
       borderUnit: settings.border.unit,

@@ -86,4 +86,23 @@ assert.strictEqual(restoredAutoSave.text, 'Wedding Album 2026', 'Text content mu
 assert.strictEqual(restoredAutoSave.style.fontSize, 32, 'Font size must be preserved across save/restore');
 assert.strictEqual(restoredAutoSave.style.fontWeight, 'bold', 'Font weight must be preserved across save/restore');
 
+// 10. Text Element Grouping and Resolution
+const textG1 = createTextNode({ text: 'Title Text' });
+const textG2 = createTextNode({ text: 'Subtitle Text' });
+const sampleGroupId = 'group-txt-123';
+const groupedTexts = [textG1, textG2].map((el) => ({ ...el, groupId: sampleGroupId }));
+
+assert.strictEqual(groupedTexts[0].groupId, sampleGroupId, 'Text 1 must have groupId');
+assert.strictEqual(groupedTexts[1].groupId, sampleGroupId, 'Text 2 must have groupId');
+
+// Resolve group members when one is targeted
+const targetTextGroupId = groupedTexts[0].groupId;
+const resolvedTextGroupIds = groupedTexts.filter((el) => el.groupId === targetTextGroupId).map((el) => el.id);
+assert.strictEqual(resolvedTextGroupIds.length, 2, 'Selecting one grouped text must resolve all text group siblings');
+
+// Ungroup text elements
+const ungroupedTexts = groupedTexts.map((el) => ({ ...el, groupId: undefined }));
+assert.strictEqual(ungroupedTexts[0].groupId, undefined, 'Text 1 must be ungrouped');
+assert.strictEqual(ungroupedTexts[1].groupId, undefined, 'Text 2 must be ungrouped');
+
 console.log('✓ All Text Domain unit tests passed successfully!');

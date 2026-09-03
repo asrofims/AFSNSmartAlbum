@@ -344,7 +344,14 @@ export function calculateSnapping(
   dragged: RectBounds,
   spreadWidth: number,
   spreadHeight: number,
-  safeArea: number,
+  safeArea:
+    | number
+    | {
+        top?: number;
+        bottom?: number;
+        outside?: number;
+        spine?: number;
+      },
   gutterWidth: number,
   otherFrames: RectBounds[],
   thresholdOrConfig: number | SnappingConfig = DEFAULT_SNAPPING_CONFIG,
@@ -364,6 +371,11 @@ export function calculateSnapping(
   let snappedY = dragged.y;
   const snapLines: SnapLine[] = [];
   const gapGuides: GapGuide[] = [];
+
+  const safeAreaTop = typeof safeArea === 'object' ? (safeArea.top ?? 0) : safeArea;
+  const safeAreaBottom = typeof safeArea === 'object' ? (safeArea.bottom ?? 0) : safeArea;
+  const safeAreaOutside = typeof safeArea === 'object' ? (safeArea.outside ?? 0) : safeArea;
+  const safeAreaSpine = typeof safeArea === 'object' ? (safeArea.spine ?? 0) : safeArea;
 
   const singlePageW = (spreadWidth - gutterWidth) / 2;
   const leftPageCenter = singlePageW / 2;
@@ -396,13 +408,19 @@ export function calculateSnapping(
     );
   }
 
-  if (config.snapToMargins && safeArea > 0) {
-    vTargets.push(
-      { pos: safeArea, label: 'Safe Margin Left', kind: 'margin' },
-      { pos: spineLeft - safeArea, label: 'Safe Margin Spine Left', kind: 'margin' },
-      { pos: spineRight + safeArea, label: 'Safe Margin Spine Right', kind: 'margin' },
-      { pos: spreadWidth - safeArea, label: 'Safe Margin Right', kind: 'margin' }
-    );
+  if (config.snapToMargins) {
+    if (safeAreaOutside > 0) {
+      vTargets.push(
+        { pos: safeAreaOutside, label: 'Safe Margin Outside (Left)', kind: 'margin' },
+        { pos: spreadWidth - safeAreaOutside, label: 'Safe Margin Outside (Right)', kind: 'margin' }
+      );
+    }
+    if (safeAreaSpine > 0) {
+      vTargets.push(
+        { pos: spineLeft - safeAreaSpine, label: 'Safe Margin Spine (Left)', kind: 'margin' },
+        { pos: spineRight + safeAreaSpine, label: 'Safe Margin Spine (Right)', kind: 'margin' }
+      );
+    }
   }
 
   // Key horizontal reference points on spread
@@ -419,11 +437,13 @@ export function calculateSnapping(
     hTargets.push({ pos: spreadHeight / 2, label: 'Spread Center Y', kind: 'center' });
   }
 
-  if (config.snapToMargins && safeArea > 0) {
-    hTargets.push(
-      { pos: safeArea, label: 'Safe Margin Top', kind: 'margin' },
-      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom', kind: 'margin' }
-    );
+  if (config.snapToMargins) {
+    if (safeAreaTop > 0) {
+      hTargets.push({ pos: safeAreaTop, label: 'Safe Margin Top', kind: 'margin' });
+    }
+    if (safeAreaBottom > 0) {
+      hTargets.push({ pos: spreadHeight - safeAreaBottom, label: 'Safe Margin Bottom', kind: 'margin' });
+    }
   }
 
   // Add points from other frames

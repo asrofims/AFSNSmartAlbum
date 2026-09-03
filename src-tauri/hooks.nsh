@@ -14,7 +14,7 @@
 
 !macro NSIS_HOOK_POSTINSTALL
   DetailPrint "Configuring desktop shortcuts and file associations..."
-  DetailPrint "Registering .afsn and .afsnz file types..."
+  DetailPrint "Registering .afsn file type..."
   DetailPrint "AFSNSmartAlbum installation completed successfully."
-  MessageBox MB_OK|MB_ICONINFORMATION "Installation Successful!$\r$\n$\r$\nAFSNSmartAlbum is now installed on your computer.$\r$\n$\r$\nDesktop shortcuts and project associations (.afsn, .afsnz) are ready to use."
+  MessageBox MB_OK|MB_ICONINFORMATION "Installation Successful!$\r$\n$\r$\nAFSNSmartAlbum is now installed on your computer.$\r$\n$\r$\nDesktop shortcuts and project associations (.afsn) are ready to use."
 !macroend
