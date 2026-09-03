@@ -252,19 +252,104 @@ export function WorkspaceLayout() {
     }
   }, [currentProject]);
 
-  // Global Keyboard Shortcuts for Undo (Ctrl+Z), Redo (Ctrl+Y), Save (Ctrl+S), Save As (Ctrl+Shift+S), Open (Ctrl+O), New (Ctrl+N)
+  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
+  const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
+
+  // Global Keyboard Shortcuts for App
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Ignore when typing inside input / textarea / select / contentEditable
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
-      if (!cmdOrCtrl) return;
-
-      // Ignore when typing inside input / textarea
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      // 0. F1 or ? -> Open Keyboard Shortcuts Dialog
+      if (e.key === 'F1' || (!cmdOrCtrl && !e.altKey && e.key === '?')) {
+        e.preventDefault();
+        openSettings('shortcuts');
         return;
       }
+
+      // 1. Single Key: P -> Open Properties Panel
+      if (!cmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setIsPropertiesOpen(true);
+        setInspectorTab('properties');
+        showToast('📋 Properties Panel');
+        return;
+      }
+
+      // 2. Single Key: L -> Open Lock Panel
+      if (!cmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        setIsPropertiesOpen(true);
+        setInspectorTab('locks');
+        showToast('🔒 Locked Photos & Elements Panel');
+        return;
+      }
+
+      // 3. Single Key: G -> Open Smart Layout Panel
+      if (!cmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        setIsPropertiesOpen(true);
+        setInspectorTab('smart_layout');
+        showToast('✨ Smart Layout Panel');
+        return;
+      }
+
+      // 3. Ctrl + L -> Lock selected images / texts
+      if (cmdOrCtrl && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        if (activeSpread) {
+          if (selectedFrameIds.length > 0) {
+            toggleLockSelectedFrames(activeSpread.id, true);
+            showToast(`🔒 Locked ${selectedFrameIds.length} selected element(s)`);
+          } else {
+            showToast('⚠️ Select photo(s) or text(s) to lock (Ctrl+L)');
+          }
+        }
+        return;
+      }
+
+      // 4. Alt + L (or Ctrl + Shift + L) -> Unlock selected images / texts
+      if ((e.altKey && (e.key === 'l' || e.key === 'L')) || (cmdOrCtrl && e.shiftKey && (e.key === 'l' || e.key === 'L'))) {
+        e.preventDefault();
+        if (activeSpread) {
+          if (selectedFrameIds.length > 0) {
+            toggleLockSelectedFrames(activeSpread.id, false);
+            showToast(`🔓 Unlocked ${selectedFrameIds.length} selected element(s)`);
+          } else {
+            const lockedCount = (activeSpread.elements || []).filter((el) => el.locked).length;
+            if (lockedCount > 0) {
+              useEditorStore.getState().unlockAllFramesOnSpread(activeSpread.id);
+              showToast(`🔓 Unlocked all ${lockedCount} element(s) on spread`);
+            } else {
+              showToast('⚠️ No locked elements found on spread');
+            }
+          }
+        }
+        return;
+      }
+
+      // 5. Single Key: T -> Add Text Box to Spread
+      if (!cmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        if (activeSpreadId) {
+          e.preventDefault();
+          const newId = addTextToSpread(activeSpreadId);
+          if (newId) {
+            setEditingTextElementId(newId);
+            showToast('✓ Added Text Box. Double-click or type to edit.');
+          }
+        }
+        return;
+      }
+
+      // Below shortcuts require cmdOrCtrl:
+      if (!cmdOrCtrl) return;
 
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
@@ -300,12 +385,8 @@ export function WorkspaceLayout() {
         if (currentProject) {
           setIsExportDialogOpen(true);
         }
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (tag === 'input' || tag === 'textarea') return;
-
+      } else if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();
-
         // If hovering over filmstrip, select all photos
         const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
         if (isHoveredOnFilmstrip) {
@@ -314,11 +395,11 @@ export function WorkspaceLayout() {
         } else {
           // Select all frames on active spread
           const album = useAlbumStore.getState().currentAlbum;
-          const activeSpreadId = useAlbumStore.getState().activeSpreadId;
+          const curSpreadId = useAlbumStore.getState().activeSpreadId;
           const spreads = album ? getAllAlbumSpreads(album) : [];
-          const activeSpread = spreads.find((s) => s.id === activeSpreadId) || spreads[0];
-          if (activeSpread && activeSpread.elements && activeSpread.elements.length > 0) {
-            useEditorStore.getState().selectFrames(activeSpread.elements.map((f) => f.id));
+          const curSpread = spreads.find((s) => s.id === curSpreadId) || spreads[0];
+          if (curSpread && curSpread.elements && curSpread.elements.length > 0) {
+            useEditorStore.getState().selectFrames(curSpread.elements.map((f) => f.id));
             usePhotoStore.getState().clearSelection();
           }
         }
@@ -330,20 +411,9 @@ export function WorkspaceLayout() {
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         confirmSafeAction(() => openNewProject());
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 't' || e.key === 'T')) {
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (tag === 'input' || tag === 'textarea') return;
-        if (activeSpreadId) {
-          e.preventDefault();
-          const newId = addTextToSpread(activeSpreadId);
-          if (newId) {
-            setEditingTextElementId(newId);
-            showToast('✓ Added Text Box. Double-click or type to edit.');
-          }
-        }
       }
     },
-    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast, activeSpreadId, addTextToSpread, setEditingTextElementId]
+    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast, activeSpreadId, activeSpread, selectedFrameIds, toggleLockSelectedFrames, addTextToSpread, setEditingTextElementId, currentProject]
   );
 
   useEffect(() => {
@@ -353,9 +423,6 @@ export function WorkspaceLayout() {
 
   const spreadW = currentProject ? currentProject.canvasWidth * 2 : 16;
   const spreadH = currentProject ? currentProject.canvasHeight : 8;
-
-  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
-  const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
   return (
     <div className={styles.workspace}>
@@ -463,6 +530,20 @@ export function WorkspaceLayout() {
                       }}
                     >
                       <span>📦 Export Packaged (.zip)...</span>
+                    </button>
+
+                    <div className={styles.menuDivider} />
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setIsFileMenuOpen(false);
+                        openSettings('shortcuts');
+                      }}
+                    >
+                      <span>⌨️ Keyboard Shortcuts...</span>
+                      <span className={styles.shortcutText}>F1</span>
                     </button>
                   </>
                 )}
@@ -808,7 +889,7 @@ export function WorkspaceLayout() {
                   justifyContent: 'center',
                   transition: 'all 0.15s ease',
                 }}
-                title="Smart Layout — Adaptive Templates & Dynamic Variations (L)"
+                title="Smart Layout — Adaptive Templates & Dynamic Variations (G)"
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
@@ -833,7 +914,7 @@ export function WorkspaceLayout() {
                   position: 'relative',
                   transition: 'all 0.15s ease',
                 }}
-                title="Locked Photos — Fixed Frames Management (Ctrl+L)"
+                title="Locked Photos & Elements — Fixed Frames Management (L)"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />

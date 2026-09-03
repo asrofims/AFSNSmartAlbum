@@ -72,6 +72,13 @@ Export album spreads at true **300 DPI** print resolution:
 | <kbd>Ctrl</kbd> + <kbd>0</kbd> | Fit Spread to Screen (100% View) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Previous / Next Spread |
 
+### Panel & Inspector Navigation
+| Shortcut | Action |
+| :--- | :--- |
+| <kbd>P</kbd> | Open Properties Panel (Frame, Spread, Margins & Background) |
+| <kbd>L</kbd> | Open Lock Panel (Locked Photos & Elements) |
+| <kbd>G</kbd> | Open Smart Layout Panel (Adaptive Templates & Variations) |
+
 ### Frame Selection & Manipulation
 | Shortcut | Action |
 | :--- | :--- |
@@ -82,10 +89,17 @@ Export album spreads at true **300 DPI** print resolution:
 | Arrow Keys (<kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd>) | Nudge Selected Frame(s) by 1 mm |
 | <kbd>Shift</kbd> + Arrow Keys | Nudge Selected Frame(s) by 10 mm |
 | <kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>Ctrl</kbd> + <kbd>V</kbd> | Copy & Paste Selected Frame(s) |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>V</kbd> | Paste in Place |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>V</kbd> | Paste to All Spreads |
 | <kbd>Ctrl</kbd> + <kbd>D</kbd> | Duplicate Selected Frame(s) |
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Delete Selected Frame(s) |
+| <kbd>Ctrl</kbd> + <kbd>L</kbd> | Lock Selected Frame(s) |
+| <kbd>Alt</kbd> + <kbd>L</kbd> | Unlock Selected Frame(s) |
 | <kbd>Ctrl</kbd> + <kbd>G</kbd> | Group Selected Frames |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> | Ungroup Selected Frames |
+| <kbd>S</kbd> | Swap 2 Selected Photos |
+| <kbd>R</kbd> / <kbd>Shift</kbd> + <kbd>R</kbd> | Rotate Selected Frame(s) 90° CW / CCW |
+| <kbd>T</kbd> | Add Text Box |
 
 ### Photo Placement & Crop
 | Action | Description |

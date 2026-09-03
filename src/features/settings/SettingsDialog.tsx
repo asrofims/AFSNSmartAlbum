@@ -318,6 +318,134 @@ export function SettingsDialog() {
                     </tr>
                   </thead>
                   <tbody>
+                    {/* 1. Panels & Navigation */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>1. Panels & Inspector Navigation</td>
+                    </tr>
+                    <tr>
+                      <td>Open Properties Panel</td>
+                      <td><kbd className={styles.kbd}>P</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Open Lock Panel</td>
+                      <td><kbd className={styles.kbd}>L</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Open Smart Layout Panel</td>
+                      <td><kbd className={styles.kbd}>G</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Next / Previous Spread</td>
+                      <td><kbd className={styles.kbd}>PageDown</kbd> / <kbd className={styles.kbd}>PageUp</kbd> (<kbd className={styles.kbd}>Alt</kbd>+<kbd className={styles.kbd}>→</kbd>/<kbd className={styles.kbd}>←</kbd>)</td>
+                    </tr>
+                    <tr>
+                      <td>Pan / Hand Tool</td>
+                      <td><kbd className={styles.kbd}>Spacebar</kbd> + Drag</td>
+                    </tr>
+                    <tr>
+                      <td>Reset Zoom (Fit to Screen)</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>0</kbd></td>
+                    </tr>
+
+                    {/* 2. Locking & Grouping */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>2. Locking & Grouping</td>
+                    </tr>
+                    <tr>
+                      <td>Lock Selected Frame(s)</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>L</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Unlock Selected Frame(s)</td>
+                      <td><kbd className={styles.kbd}>Alt</kbd> + <kbd className={styles.kbd}>L</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Group Selected Frames</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>G</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Ungroup Selected Frames</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Shift</kbd> + <kbd className={styles.kbd}>G</kbd></td>
+                    </tr>
+
+                    {/* 3. Canvas Selection & Manipulation */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>3. Canvas Selection & Manipulation</td>
+                    </tr>
+                    <tr>
+                      <td>Select Frame</td>
+                      <td><kbd className={styles.kbd}>Click</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Multi-Select Frames / Photos</td>
+                      <td><kbd className={styles.kbd}>Shift</kbd> + Click / Marquee Box Drag</td>
+                    </tr>
+                    <tr>
+                      <td>Select All Frames on Spread</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>A</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Duplicate Selected Frame(s)</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>D</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Delete Photo / Frame</td>
+                      <td><kbd className={styles.kbd}>Delete</kbd> / <kbd className={styles.kbd}>Backspace</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Crop Image Mode</td>
+                      <td><kbd className={styles.kbd}>Double Click</kbd> on frame</td>
+                    </tr>
+                    <tr>
+                      <td>Exit Crop Mode / Deselect</td>
+                      <td><kbd className={styles.kbd}>Esc</kbd> / <kbd className={styles.kbd}>Enter</kbd></td>
+                    </tr>
+
+                    {/* 4. Transform, Rotation & Nudge */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>4. Transform, Rotation & Layout</td>
+                    </tr>
+                    <tr>
+                      <td>Swap 2 Selected Photos</td>
+                      <td><kbd className={styles.kbd}>S</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Rotate 90° Clockwise</td>
+                      <td><kbd className={styles.kbd}>R</kbd> (<kbd className={styles.kbd}>Shift</kbd>+<kbd className={styles.kbd}>R</kbd> CCW)</td>
+                    </tr>
+                    <tr>
+                      <td>Cycle Smart Layout</td>
+                      <td><kbd className={styles.kbd}>Spacebar</kbd> / <kbd className={styles.kbd}>Shift</kbd>+<kbd className={styles.kbd}>Space</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Shuffle Photo Placements</td>
+                      <td><kbd className={styles.kbd}>S</kbd> (when Layout HUD is active)</td>
+                    </tr>
+                    <tr>
+                      <td>Orthogonal Axis-Lock Drag</td>
+                      <td>Hold <kbd className={styles.kbd}>Shift</kbd> while dragging frame</td>
+                    </tr>
+                    <tr>
+                      <td>Quick Drag-Duplicate</td>
+                      <td>Hold <kbd className={styles.kbd}>Alt</kbd> while dragging frame</td>
+                    </tr>
+                    <tr>
+                      <td>Bypass Magnetic Snapping</td>
+                      <td>Hold <kbd className={styles.kbd}>Alt</kbd> while dragging handle</td>
+                    </tr>
+                    <tr>
+                      <td>Fine Position Nudge (1.0mm)</td>
+                      <td><kbd className={styles.kbd}>Arrow Keys</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Fast Movement (5.0mm)</td>
+                      <td><kbd className={styles.kbd}>Shift</kbd> + <kbd className={styles.kbd}>Arrow Keys</kbd></td>
+                    </tr>
+
+                    {/* 5. Clipboard */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>5. Clipboard (Copy & Paste)</td>
+                    </tr>
                     <tr>
                       <td>Copy Selected Frames</td>
                       <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>C</kbd></td>
@@ -327,40 +455,66 @@ export function SettingsDialog() {
                       <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>V</kbd></td>
                     </tr>
                     <tr>
-                      <td>Duplicate Selected Frames</td>
-                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>D</kbd></td>
+                      <td>Paste in Place</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Shift</kbd> + <kbd className={styles.kbd}>V</kbd></td>
                     </tr>
                     <tr>
-                      <td>Delete Photo / Frame</td>
-                      <td><kbd className={styles.kbd}>Delete</kbd> / <kbd className={styles.kbd}>Backspace</kbd></td>
+                      <td>Paste to All Spreads</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Alt</kbd> + <kbd className={styles.kbd}>V</kbd></td>
+                    </tr>
+
+                    {/* 6. Text & Typography */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>6. Text & Typography</td>
                     </tr>
                     <tr>
-                      <td>Bypass Magnetic Snapping</td>
-                      <td>Hold <kbd className={styles.kbd}>Alt</kbd> while dragging</td>
+                      <td>Add Text Box</td>
+                      <td><kbd className={styles.kbd}>T</kbd></td>
                     </tr>
                     <tr>
-                      <td>Fine Position Nudge (0.5mm)</td>
-                      <td><kbd className={styles.kbd}>Arrow Keys</kbd></td>
+                      <td>Edit Text Inline</td>
+                      <td><kbd className={styles.kbd}>Double Click</kbd> on text box</td>
                     </tr>
                     <tr>
-                      <td>Ultra-Fine Nudge (0.1mm)</td>
-                      <td><kbd className={styles.kbd}>Alt</kbd> + <kbd className={styles.kbd}>Arrow Keys</kbd></td>
+                      <td>Bold / Italic / Underline</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>B</kbd> / <kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>I</kbd> / <kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>U</kbd></td>
                     </tr>
                     <tr>
-                      <td>Fast Movement (2.0mm)</td>
-                      <td><kbd className={styles.kbd}>Shift</kbd> + <kbd className={styles.kbd}>Arrow Keys</kbd></td>
+                      <td>Commit & Save Text Edit</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Enter</kbd></td>
+                    </tr>
+
+                    {/* 7. Project & File Operations */}
+                    <tr className={styles.categoryRow}>
+                      <td colSpan={2}>7. Project & File Operations</td>
                     </tr>
                     <tr>
-                      <td>Multi-Select Frames / Photos</td>
-                      <td><kbd className={styles.kbd}>Shift</kbd> + Click / Marquee Box</td>
+                      <td>Save Project</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>S</kbd></td>
                     </tr>
                     <tr>
-                      <td>Crop Image Mode</td>
-                      <td><kbd className={styles.kbd}>Double Click</kbd> on frame</td>
+                      <td>Save Project As (.afsn)</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Shift</kbd> + <kbd className={styles.kbd}>S</kbd></td>
                     </tr>
                     <tr>
-                      <td>Exit Crop Mode / Deselect</td>
-                      <td><kbd className={styles.kbd}>Esc</kbd> / <kbd className={styles.kbd}>Enter</kbd></td>
+                      <td>Open Project (.afsn)</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>O</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>New Project</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>N</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Export High-Resolution Album</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>E</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Undo / Redo</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>Z</kbd> / <kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>Y</kbd></td>
+                    </tr>
+                    <tr>
+                      <td>Open Keyboard Shortcuts</td>
+                      <td><kbd className={styles.kbd}>F1</kbd></td>
                     </tr>
                   </tbody>
                 </table>

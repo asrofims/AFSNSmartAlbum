@@ -1047,17 +1047,34 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         } else {
           groupSelectedFrames(activeSpread.id);
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        if (e.altKey) {
-          useEditorStore.getState().unlockAllFramesOnSpread(activeSpread.id);
-          if (onToast) onToast('🔓 Unlocked all photos on spread');
-        } else if (e.shiftKey) {
-          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
-          if (onToast) onToast('🔓 Unlocked selected photo(s)');
-        } else {
-          useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
-          if (onToast) onToast('🔒 Locked selected photo(s)');
+      } else if (e.key.toLowerCase() === 'l') {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (e.altKey || e.shiftKey) {
+            useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
+            if (onToast) onToast(`🔓 Unlocked ${selectedFrameIds.length} selected element(s)`);
+          } else {
+            if (selectedFrameIds.length > 0) {
+              useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
+              if (onToast) onToast(`🔒 Locked ${selectedFrameIds.length} selected element(s)`);
+            } else if (onToast) {
+              onToast('⚠️ Select photo(s) or text(s) to lock (Ctrl+L)');
+            }
+          }
+        } else if (e.altKey) {
+          e.preventDefault();
+          if (selectedFrameIds.length > 0) {
+            useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
+            if (onToast) onToast(`🔓 Unlocked ${selectedFrameIds.length} selected element(s)`);
+          } else {
+            const lockedCount = (activeSpread.elements || []).filter((el) => el.locked).length;
+            if (lockedCount > 0) {
+              useEditorStore.getState().unlockAllFramesOnSpread(activeSpread.id);
+              if (onToast) onToast(`🔓 Unlocked all ${lockedCount} element(s) on spread`);
+            } else if (onToast) {
+              onToast('⚠️ No locked elements found on spread');
+            }
+          }
         }
       } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (selectedFrameIds.length === 2 && selectedFrameIds[0] && selectedFrameIds[1]) {
@@ -1585,7 +1602,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         id: 'unlock-elements',
         label: count > 1 ? `Unlock ${count} ${itemNounPlural}` : `Unlock ${itemNounSingular}`,
         icon: '🔓',
-        shortcut: 'Ctrl+Shift+L',
+        shortcut: 'Alt+L',
         onClick: () => {
           useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);
           if (onToast) onToast(`🔓 Unlocked ${count} ${itemNoun.toLowerCase()}`);
