@@ -72,6 +72,36 @@ export function convertUnit(
 }
 
 /**
+ * Convert typographic point size (pt) to project's canvasUnit.
+ * 1 pt = 1/72 inch = 25.4/72 mm ≈ 0.352778 mm.
+ */
+export function convertPtToUnit(pt: number, to: Unit, dpi: number = 300): number {
+  if (to === 'inch') return pt / 72;
+  if (to === 'mm') return (pt * MM_PER_INCH) / 72;
+  if (to === 'cm') return (pt * MM_PER_INCH) / (72 * 10);
+  return (pt * dpi) / 72; // 'px'
+}
+
+/**
+ * Convert project canvas unit value to typographic points (pt).
+ */
+export function convertUnitToPt(val: number, from: Unit, dpi: number = 300): number {
+  if (from === 'inch') return val * 72;
+  if (from === 'mm') return (val * 72) / MM_PER_INCH;
+  if (from === 'cm') return (val * 10 * 72) / MM_PER_INCH;
+  return (val * 72) / dpi; // 'px'
+}
+
+/**
+ * Convert typographic point size (pt) directly to screen pixels.
+ * Uses exact scale factor between project canvas units and screen pixels.
+ */
+export function ptToScreenPx(pt: number, canvasUnit: Unit, dpi: number, scaleFactor: number): number {
+  const inUnit = convertPtToUnit(pt, canvasUnit, dpi);
+  return Math.max(6, Math.round(inUnit * scaleFactor));
+}
+
+/**
  * Convert a value from its unit to pixels at given DPI.
  */
 export function toPixels(value: number, unit: Unit, dpi: number = 300): number {

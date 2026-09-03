@@ -12,7 +12,14 @@ import {
   moveAlbumSpread,
   getAllAlbumSpreads,
   syncAlbumPhotoAssets,
+  AlbumElement,
 } from '../domain/album';
+import {
+  TextNodeElement,
+  serializeTextPayload,
+  deserializeTextPayload,
+  DEFAULT_TEXT_STYLE,
+} from '../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import {
   AdaptivePhoto,
@@ -128,13 +135,51 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   loadAlbumFromDb: async (projectId: string) => {
+    const hydrateElement = (el: any): AlbumElement => {
+      if (el.type === 'text') {
+        const { text, style, textRuns } = deserializeTextPayload(el.textPayload, el.fileName || el.text);
+        return {
+          id: el.id,
+          type: 'text',
+          text,
+          x: Number.isFinite(el.x) ? el.x : 0,
+          y: Number.isFinite(el.y) ? el.y : 0,
+          width: Number.isFinite(el.width) ? el.width : 120,
+          height: Number.isFinite(el.height) ? el.height : 35,
+          rotation: Number.isFinite(el.rotation) ? el.rotation : 0,
+          zIndex: Number.isFinite(el.zIndex) ? el.zIndex : 10,
+          locked: Boolean(el.locked),
+          groupId: el.groupId || null,
+          style,
+          textRuns,
+        };
+      }
+      return {
+        ...el,
+        type: 'photo',
+        locked: Boolean(el.locked),
+      };
+    };
+
     try {
       const payload = await invoke<any>('load_album_structure', { projectId });
       if (payload && payload.spreads && payload.spreads.length > 0) {
+        const hydratedAlbum: Album = {
+          ...payload,
+          coverSpread: {
+            ...payload.coverSpread,
+            elements: (payload.coverSpread?.elements || []).map(hydrateElement),
+          },
+          spreads: (payload.spreads || []).map((s: any) => ({
+            ...s,
+            elements: (s.elements || []).map(hydrateElement),
+          })),
+        };
+
         useHistoryStore.getState().clearHistory();
         set({
-          currentAlbum: payload as Album,
-          activeSpreadId: payload.spreads[0]?.id || payload.coverSpread?.id || '',
+          currentAlbum: hydratedAlbum,
+          activeSpreadId: hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '',
           activeSpreadIndex: 0,
           selectedPageId: null,
           saveStatus: 'saved',
@@ -158,10 +203,22 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.album && parsed.album.spreads && parsed.album.spreads.length > 0) {
+          const hydratedAlbum: Album = {
+            ...parsed.album,
+            coverSpread: {
+              ...parsed.album.coverSpread,
+              elements: (parsed.album.coverSpread?.elements || []).map(hydrateElement),
+            },
+            spreads: (parsed.album.spreads || []).map((s: any) => ({
+              ...s,
+              elements: (s.elements || []).map(hydrateElement),
+            })),
+          };
+
           useHistoryStore.getState().clearHistory();
           set({
-            currentAlbum: parsed.album as Album,
-            activeSpreadId: parsed.album.spreads[0]?.id || parsed.album.coverSpread?.id || '',
+            currentAlbum: hydratedAlbum,
+            activeSpreadId: hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '',
             activeSpreadIndex: 0,
             selectedPageId: null,
             saveStatus: 'saved',
@@ -192,29 +249,79 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     set({ saveStatus: 'saving' });
 
     // Clean up / sanitize album payload so all fields are defined
-    const sanitizeElement = (el: PhotoFrameElement): PhotoFrameElement => ({
-      ...el,
-      type: el.type || 'photo',
-      photoId: el.photoId || null,
-      filePath: el.filePath || '',
-      fileName: el.fileName || '',
-      previewPath: el.previewPath || '',
-      thumbnailPath: el.thumbnailPath || '',
-      x: Number.isFinite(el.x) ? el.x : 0,
-      y: Number.isFinite(el.y) ? el.y : 0,
-      width: Number.isFinite(el.width) ? el.width : 100,
-      height: Number.isFinite(el.height) ? el.height : 100,
-      rotation: Number.isFinite(el.rotation) ? el.rotation : 0,
-      zIndex: Number.isFinite(el.zIndex) ? el.zIndex : 1,
-      photoAspect: typeof el.photoAspect === 'number' && el.photoAspect > 0 ? el.photoAspect : 1.5,
-      cropX: Number.isFinite(el.cropX) ? el.cropX : 0,
-      cropY: Number.isFinite(el.cropY) ? el.cropY : 0,
-      cropScale: Number.isFinite(el.cropScale) && el.cropScale > 0 ? el.cropScale : 1.0,
-      borderEnabled: Boolean(el.borderEnabled),
-      borderWidth: Number.isFinite(el.borderWidth) ? el.borderWidth : 0,
-      borderColor: el.borderColor || '#FFFFFF',
-      opacity: Number.isFinite(el.opacity) ? el.opacity : 1.0,
-    });
+    const sanitizeElement = (el: AlbumElement): any => {
+      if (el.type === 'text') {
+        const textEl = el as TextNodeElement;
+        const textStr = typeof textEl.text === 'string' ? textEl.text : ((textEl as any).fileName || '');
+        const styleObj = { ...DEFAULT_TEXT_STYLE, ...(textEl.style || {}) };
+        return {
+          ...textEl,
+          id: textEl.id,
+          type: 'text',
+          text: textStr,
+          style: styleObj,
+          textRuns: textEl.textRuns || [],
+          photoId: null,
+          groupId: textEl.groupId || null,
+          filePath: '',
+          fileName: textStr,
+          previewPath: '',
+          thumbnailPath: '',
+          x: Number.isFinite(textEl.x) ? textEl.x : 0,
+          y: Number.isFinite(textEl.y) ? textEl.y : 0,
+          width: Number.isFinite(textEl.width) ? textEl.width : 120,
+          height: Number.isFinite(textEl.height) ? textEl.height : 35,
+          rotation: Number.isFinite(textEl.rotation) ? textEl.rotation : 0,
+          zIndex: Number.isFinite(textEl.zIndex) ? textEl.zIndex : 10,
+          photoAspect: 1.0,
+          originalWidth: textEl.width,
+          originalHeight: textEl.height,
+          cropX: 0,
+          cropY: 0,
+          cropScale: 1.0,
+          cropRotation: 0,
+          borderEnabled: false,
+          borderWidth: 0,
+          borderColor: '#FFFFFF',
+          opacity: 1.0,
+          locked: Boolean(textEl.locked),
+          textPayload: serializeTextPayload({
+            ...textEl,
+            text: textStr,
+            style: styleObj,
+          }),
+        };
+      }
+      return {
+        ...el,
+        type: el.type || 'photo',
+        photoId: el.photoId || null,
+        groupId: el.groupId || null,
+        filePath: el.filePath || '',
+        fileName: el.fileName || '',
+        previewPath: el.previewPath || '',
+        thumbnailPath: el.thumbnailPath || '',
+        x: Number.isFinite(el.x) ? el.x : 0,
+        y: Number.isFinite(el.y) ? el.y : 0,
+        width: Number.isFinite(el.width) ? el.width : 100,
+        height: Number.isFinite(el.height) ? el.height : 100,
+        rotation: Number.isFinite(el.rotation) ? el.rotation : 0,
+        zIndex: Number.isFinite(el.zIndex) ? el.zIndex : 1,
+        photoAspect: typeof el.photoAspect === 'number' && el.photoAspect > 0 ? el.photoAspect : 1.5,
+        originalWidth: el.originalWidth || el.width,
+        originalHeight: el.originalHeight || el.height,
+        cropX: Number.isFinite(el.cropX) ? el.cropX : 0,
+        cropY: Number.isFinite(el.cropY) ? el.cropY : 0,
+        cropScale: Number.isFinite(el.cropScale) && el.cropScale > 0 ? el.cropScale : 1.0,
+        cropRotation: Number.isFinite(el.cropRotation) ? el.cropRotation : 0,
+        borderEnabled: Boolean(el.borderEnabled),
+        borderWidth: Number.isFinite(el.borderWidth) ? el.borderWidth : 0,
+        borderColor: el.borderColor || '#FFFFFF',
+        opacity: Number.isFinite(el.opacity) ? el.opacity : 1.0,
+        locked: Boolean(el.locked),
+        textPayload: null,
+      };
+    };
 
     const sanitizedAlbum: Album = {
       ...currentAlbum,
@@ -714,10 +821,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     if (!targetSpread || targetSpread.elements.length === 0) return;
 
-    const lockedElements = targetSpread.elements.filter((el) => el.locked);
-    const unlockedElements = targetSpread.elements.filter((el) => !el.locked);
+    const lockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
+    const unlockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
+    const textElements = targetSpread.elements.filter((el) => el.type === 'text');
 
-    // If all elements are locked, no changes can be made
+    // If all photo elements are locked, no changes can be made
     if (unlockedElements.length === 0) return;
 
     const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
@@ -773,7 +881,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       project.borderColor
     );
 
-    const newElements = [...lockedElements, ...newUnlockedElements];
+    const newElements = [...lockedElements, ...newUnlockedElements, ...textElements];
 
     if (isCover) {
       set({
@@ -808,11 +916,15 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       ? currentAlbum.coverSpread
       : currentAlbum.spreads.find((s) => s.id === spreadId);
 
-    if (!targetSpread || targetSpread.elements.length <= 1) return;
+    if (!targetSpread) return;
+
+    const photoElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo');
+    const textElements = targetSpread.elements.filter((el) => el.type === 'text');
+    if (photoElements.length <= 1) return;
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const shuffledElements = shuffleElementsPhotos(targetSpread.elements);
+    const shuffledElements = [...shuffleElementsPhotos(photoElements), ...textElements];
 
     if (isCover) {
       set({
@@ -847,10 +959,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     if (!targetSpread || targetSpread.elements.length === 0) return;
 
-    const lockedElements = targetSpread.elements.filter((el) => el.locked);
-    const unlockedElements = targetSpread.elements.filter((el) => !el.locked);
+    const lockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
+    const unlockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
+    const textElements = targetSpread.elements.filter((el) => el.type === 'text');
 
-    // If all elements are locked, no changes can be made
+    // If all photo elements are locked, no changes can be made
     if (unlockedElements.length === 0) return;
 
     const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
@@ -900,7 +1013,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       project.borderColor
     );
 
-    const newElements = [...lockedElements, ...newUnlockedElements];
+    const newElements = [...lockedElements, ...newUnlockedElements, ...textElements];
 
     if (isCover) {
       set({

@@ -6,6 +6,7 @@ import {
   generateAdaptiveLayoutVariations,
   AdaptivePhoto,
 } from '../../domain/adaptiveLayout';
+import { PhotoFrameElement } from '../../domain/editor';
 import styles from './TemplatesPanel.module.css';
 
 interface TemplatesPanelProps {
@@ -31,12 +32,12 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
   const unlockedElements = useMemo(() => {
     if (!activeSpread) return [];
-    return activeSpread.elements.filter((el) => !el.locked);
+    return activeSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
   }, [activeSpread]);
 
   const lockedElements = useMemo(() => {
     if (!activeSpread) return [];
-    return activeSpread.elements.filter((el) => el.locked);
+    return activeSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
   }, [activeSpread]);
 
   const photos: AdaptivePhoto[] = useMemo(() => {

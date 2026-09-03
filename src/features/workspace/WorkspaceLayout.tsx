@@ -19,6 +19,8 @@ import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
+import { TypographyPanel } from '../editor/TypographyPanel';
+import { TextNodeElement } from '../../domain/text';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
 import { LockedPhotosPanel } from '../editor/LockedPhotosPanel';
@@ -95,6 +97,8 @@ export function WorkspaceLayout() {
   const applyFixedGapToSelected = useEditorStore((s) => s.applyFixedGapToSelected);
   const matchSelectedDimensions = useEditorStore((s) => s.matchSelectedDimensions);
   const toggleLockSelectedFrames = useEditorStore((s) => s.toggleLockSelectedFrames);
+  const addTextToSpread = useEditorStore((s) => s.addTextToSpread);
+  const setEditingTextElementId = useEditorStore((s) => s.setEditingTextElementId);
 
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
@@ -104,8 +108,28 @@ export function WorkspaceLayout() {
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
+  const propertyListRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+
+  // Auto-scroll Properties Panel smoothly to the very top whenever any frame (photo or text) or selection changes
+  useEffect(() => {
+    if (selectedFrameIds.length > 0) {
+      if (inspectorTab !== 'properties') {
+        setInspectorTab('properties');
+      }
+      if (!isPropertiesOpen) {
+        setIsPropertiesOpen(true);
+      }
+      // Smoothly scroll the entire property list to the top so the full card and all properties are completely visible
+      const timer = setTimeout(() => {
+        if (propertyListRef.current) {
+          propertyListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedFrameIds]);
 
   // Inline Project Rename State (Top Bar & Inspector)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
@@ -317,9 +341,20 @@ export function WorkspaceLayout() {
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         confirmSafeAction(() => openNewProject());
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 't' || e.key === 'T')) {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+        if (activeSpreadId) {
+          e.preventDefault();
+          const newId = addTextToSpread(activeSpreadId);
+          if (newId) {
+            setEditingTextElementId(newId);
+            showToast('✓ Added Text Box. Double-click or type to edit.');
+          }
+        }
       }
     },
-    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast]
+    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast, activeSpreadId, addTextToSpread, setEditingTextElementId]
   );
 
   useEffect(() => {
@@ -564,6 +599,43 @@ export function WorkspaceLayout() {
                   </svg>
                 </button>
               </div>
+
+              <div className={styles.toolbarSeparator} />
+
+              {/* Add Text Tool Button */}
+              <button
+                type="button"
+                className={styles.toolButton}
+                onClick={() => {
+                  if (!activeSpreadId) return;
+                  const newId = addTextToSpread(activeSpreadId);
+                  if (newId) {
+                    setEditingTextElementId(newId);
+                    showToast('✓ Added Text Box. Double-click or type to edit.');
+                  }
+                }}
+                title="Add Text Box (T)"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '3px 8px',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  color: 'var(--color-accent, #3b82f6)',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 7 4 4 20 4 20 7" />
+                  <line x1="9" y1="20" x2="15" y2="20" />
+                  <line x1="12" y1="4" x2="12" y2="20" />
+                </svg>
+                <span>Add Text</span>
+              </button>
 
               <div className={styles.toolbarSeparator} />
 
@@ -833,7 +905,7 @@ export function WorkspaceLayout() {
           ) : inspectorTab === 'locks' ? (
             <LockedPhotosPanel onToast={(msg) => showToast(msg)} />
           ) : (
-            <div className={styles.propertyList}>
+            <div ref={propertyListRef} className={styles.propertyList}>
               {/* Selected Photo Frame Properties / Multi-Selection Controls (Placed at TOP when active) */}
               {(() => {
                 const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
@@ -1057,11 +1129,57 @@ export function WorkspaceLayout() {
                   );
                 }
 
-                // SINGLE FRAME SELECTION MODE
+                // SINGLE FRAME OR TEXT ELEMENT SELECTION MODE
                 const selectedFrame = (activeSpread?.elements || []).find((f) => f.id === selectedFrameIds[0]);
                 if (!selectedFrame) return null;
+
+                if (selectedFrame.type === 'text') {
+                  return (
+                    <div
+                      className={styles.propSection}
+                      style={{
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '10px',
+                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                      }}
+                    >
+                      <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Selected Text Box</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleLockSelectedFrames(activeSpread.id);
+                            showToast(selectedFrame.locked ? '🔓 Text unlocked' : '🔒 Text locked');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            borderRadius: '4px',
+                            background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                            border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
+                            color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={selectedFrame.locked ? 'Unlock Text (Ctrl+Shift+L)' : 'Lock Text (Ctrl+L)'}
+                        >
+                          <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
+                          <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
+                        </button>
+                      </div>
+
+                      <TypographyPanel element={selectedFrame as TextNodeElement} onToast={showToast} />
+                    </div>
+                  );
+                }
+
                 const isEditingCrop = editingCropFrameId === selectedFrame.id;
-                const cropTransform = clampCropTransform(selectedFrame);
+                const cropTransform = clampCropTransform(selectedFrame as PhotoFrameElement);
 
                 return (
                   <div

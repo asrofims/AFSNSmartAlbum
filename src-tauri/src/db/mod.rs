@@ -123,6 +123,8 @@ pub struct ElementPayload {
     pub opacity: f64,
     #[serde(default)]
     pub locked: Option<bool>,
+    #[serde(default)]
+    pub text_payload: Option<String>,
 }
 
 /// Represents a single page in a spread.
@@ -295,6 +297,10 @@ impl Database {
 
         if current_version < 9 {
             Self::migrate_v9(conn)?;
+        }
+
+        if current_version < 10 {
+            Self::migrate_v10(conn)?;
         }
 
         Ok(())
@@ -586,6 +592,29 @@ impl Database {
         }
 
         log::info!("Applied database migration v9");
+        Ok(())
+    }
+
+    /// Schema version 10: Add text_payload to spread_elements table.
+    fn migrate_v10(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"text_payload".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE spread_elements ADD COLUMN text_payload TEXT;
+                INSERT INTO schema_version (version) VALUES (10);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (10)", [])?;
+        }
+
+        log::info!("Applied database migration v10");
         Ok(())
     }
 
@@ -1350,14 +1379,14 @@ impl Database {
                         preview_path, thumbnail_path, x, y, width, height,
                         rotation, z_index, photo_aspect, original_width, original_height,
                         crop_x, crop_y, crop_scale, crop_rotation,
-                        border_enabled, border_width, border_color, opacity, locked,
+                        border_enabled, border_width, border_color, opacity, locked, text_payload,
                         created_at, updated_at
                     ) VALUES (
                         ?1, ?2, ?3, ?4, ?5, ?6, ?7,
                         ?8, ?9, ?10, ?11, ?12, ?13,
                         ?14, ?15, ?16, ?17, ?18,
                         ?19, ?20, ?21, ?22,
-                        ?23, ?24, ?25, ?26, ?27,
+                        ?23, ?24, ?25, ?26, ?27, ?28,
                         datetime('now'), datetime('now')
                     )",
                     rusqlite::params![
@@ -1388,6 +1417,7 @@ impl Database {
                         elem.border_color,
                         elem.opacity,
                         elem.locked.unwrap_or(false) as i32,
+                        elem.text_payload.as_deref(),
                     ],
                 )?;
             }
@@ -1470,7 +1500,7 @@ impl Database {
                     rotation, z_index, photo_aspect, original_width, original_height,
                     crop_x, crop_y, crop_scale, crop_rotation,
                     border_enabled, border_width, border_color, opacity,
-                    group_id, locked, created_at, updated_at
+                    group_id, locked, text_payload, created_at, updated_at
              FROM spread_elements
              WHERE spread_id = ?1
              ORDER BY z_index ASC",
@@ -1539,6 +1569,7 @@ impl Database {
                     opacity: er.get(24).unwrap_or(1.0),
                     group_id: er.get(25).ok(),
                     locked: Some(locked_int != 0),
+                    text_payload: er.get(27).ok(),
                 })
             })?;
 
@@ -2186,6 +2217,7 @@ mod tests {
                     border_color: "#FFFFFF".to_string(),
                     opacity: 1.0,
                     locked: Some(false),
+                    text_payload: None,
                 }
             ],
         };

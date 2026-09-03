@@ -121,7 +121,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
     (currentAlbum.spreads || []).forEach((spread) => {
       (spread.elements || []).forEach((el) => {
-        if (el.photoId) set.add(el.photoId);
+        if (el.type === 'photo' && el.photoId) set.add(el.photoId);
       });
     });
 

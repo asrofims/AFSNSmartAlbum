@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
+import { PhotoFrameElement } from '../../domain/editor';
 import styles from './LockedPhotosPanel.module.css';
 
 interface LockedPhotosPanelProps {
@@ -28,10 +29,13 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
-  const elements = useMemo(() => activeSpread?.elements || [], [activeSpread]);
+  const photoElements = useMemo(
+    () => (activeSpread?.elements || []).filter((f): f is PhotoFrameElement => f.type === 'photo'),
+    [activeSpread]
+  );
 
-  const lockedElements = useMemo(() => elements.filter((f) => f.locked), [elements]);
-  const unlockedElements = useMemo(() => elements.filter((f) => !f.locked), [elements]);
+  const lockedElements = useMemo(() => photoElements.filter((f) => f.locked), [photoElements]);
+  const unlockedElements = useMemo(() => photoElements.filter((f) => !f.locked), [photoElements]);
 
   const dims = useMemo(() => {
     if (!currentProject) return null;
@@ -76,7 +80,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
   const handleLockAll = () => {
     if (!activeSpread) return;
     lockAllFramesOnSpread(activeSpread.id);
-    if (onToast) onToast(`🔒 Locked all ${elements.length} photos on spread`);
+    if (onToast) onToast(`🔒 Locked all ${photoElements.length} photos on spread`);
   };
 
   const handleToggleLock = (e: React.MouseEvent, frameId: string, isCurrentlyLocked: boolean) => {
@@ -88,7 +92,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     }
   };
 
-  if (!activeSpread || elements.length === 0) {
+  if (!activeSpread || photoElements.length === 0) {
     return (
       <div className={styles.container}>
         <div className={styles.emptyState}>

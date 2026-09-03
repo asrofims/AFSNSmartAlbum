@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "tsx tests/domain.test.ts && tsx tests/album.test.ts && tsx tests/editor.test.ts && tsx tests/history.test.ts && tsx tests/templates.test.ts && tsx tests/adaptiveLayout.test.ts",
+    "test": "tsx tests/domain.test.ts && tsx tests/album.test.ts && tsx tests/editor.test.ts && tsx tests/history.test.ts && tsx tests/templates.test.ts && tsx tests/adaptiveLayout.test.ts && tsx tests/text.test.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },

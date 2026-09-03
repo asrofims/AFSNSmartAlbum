@@ -1,7 +1,7 @@
 import { useEditorStore } from '../../stores/editorStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { zoomCropAtPoint } from '../../domain/editor';
+import { zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
 import styles from './FrameToolbar.module.css';
 
 export function FrameToolbar() {
@@ -30,8 +30,9 @@ export function FrameToolbar() {
   if (!activeSpread) return null;
 
   const primaryFrameId = selectedFrameIds[0];
-  const frame = (activeSpread.elements || []).find((f) => f.id === primaryFrameId);
-  if (!frame) return null;
+  const foundFrame = (activeSpread.elements || []).find((f) => f.id === primaryFrameId);
+  if (!foundFrame || foundFrame.type !== 'photo') return null;
+  const frame = foundFrame as PhotoFrameElement;
 
   const selectedElements = (activeSpread.elements || []).filter((f) =>
     selectedFrameIds.includes(f.id)

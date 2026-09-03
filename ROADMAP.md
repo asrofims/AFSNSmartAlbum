@@ -99,3 +99,23 @@
 - [x] Persistent Last Export Destination Directory
 - [x] 2-Way Upfront Pre-Flight Verification (Missing original photo check & Destination overwrite collision warning)
 - [x] Real-time Granular Progress Tracking Modal with Direct Destination Folder Launcher
+
+## Phase 9 — Text & Typography Engine
+- [x] Polymorphic Album Element Schema (`AlbumElement = PhotoFrameElement | TextNodeElement`)
+- [x] SQLite Migration v10 (`text_payload TEXT` column) & Atomic Album Persistence
+- [x] Konva Interactive Text Node (`TextNode.tsx` with physical point-to-pixel math, drag, resize, rotate)
+- [x] Double-Click WYSIWYG Inline Text Editor (`TextInlineEditor.tsx` overlay with live sync, multi-line support, and idempotent commit)
+- [x] Typography Inspector Panel (`TypographyPanel.tsx` with quick presets, font picker, live 60 FPS size slider & stepper, formatting, color swatches, line height, and letter spacing)
+- [x] Universal Unit-Aware Typographic Sizing Math (`ptToScreenPx` & `convertPtToUnit` supporting mm, cm, inch, and px)
+- [x] Professional Initial Text Placement & Bounding Box Sizing (non-overlapping spine fold, clean page alignment)
+- [x] Free Text Box Resize without Aspect Ratio Lock (`Transformer keepRatio={false}` for single text frames)
+- [x] Top Toolbar "Add Text" Tool & Global Shortcut <kbd>T</kbd>
+- [x] Proportional Font Size Scaling on Canvas Corner Resize (with granular 1pt minimum font size support)
+- [x] Content-Aware Auto-Fit Bounding Box (`calculateTextFitHeight` & "Fit Box" action)
+- [x] Vertical Middle Alignment (`verticalAlign: 'middle'` default with Top/Middle/Bottom segmented controls)
+- [x] Dynamic Style Preset Auto-Fitting (tight content wrapping without empty bottom space)
+- [x] Centralized Smooth Auto-Scroll to Top of Properties Panel for Selected Photos & Text
+- [x] WebView2 D3D11 Crash Guard & Idempotent Auto-Save SQLite Persistence
+- [ ] Advanced Per-Word Tokenized Rich Text Layout
+- [ ] High-Resolution Print Export Text Rasterization in Rust Backend
+

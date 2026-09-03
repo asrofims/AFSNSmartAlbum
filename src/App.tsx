@@ -4,11 +4,42 @@ import { AboutDialog } from './features/about/AboutDialog';
 import { SettingsDialog } from './features/settings/SettingsDialog';
 import { NewProjectDialog } from './features/project/NewProjectDialog';
 import { SupportDonationModal } from './features/support/SupportDonationModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './stores/projectStore';
 import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
 
 export default function App() {
+  // Catch any unhandled window errors and store them for diagnostics
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      console.error('[AFSN Window Error]', event.error || event.message);
+      try {
+        localStorage.setItem(
+          'afsn_last_window_error',
+          JSON.stringify({
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            time: new Date().toISOString(),
+          })
+        );
+      } catch {}
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.error('[AFSN Unhandled Rejection]', event.reason);
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
   // Disable default browser context menu globally for a native desktop application experience,
   // allowing only standard editable input/textarea fields or custom app context menus.
   useEffect(() => {
@@ -73,12 +104,12 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       <WorkspaceLayout />
       <AboutDialog />
       <SettingsDialog />
       <NewProjectDialog />
       <SupportDonationModal />
-    </>
+    </ErrorBoundary>
   );
 }

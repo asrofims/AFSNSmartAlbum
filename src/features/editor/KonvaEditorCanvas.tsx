@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { Stage, Layer, Rect, Line, Circle, Path as KonvaPath, Text as KonvaText, Group, Image as KonvaImage, Transformer, Label, Tag } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -23,6 +23,9 @@ import {
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
+import { TextNode } from './TextNode';
+import { TextInlineEditor } from './TextInlineEditor';
+import { TextNodeElement } from '../../domain/text';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -707,6 +710,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     setSnapLines,
     clearSnapLines,
     nudgeSelected,
+    editingTextElementId,
+    setEditingTextElementId,
+    updateTextElement,
   } = useEditorStore();
   const photos = usePhotoStore((s) => s.photos);
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
@@ -871,6 +877,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
+  const editingTextElement = useMemo(() => {
+    if (!editingTextElementId || !activeSpread) return null;
+    const found = (activeSpread.elements || []).find((el) => el.id === editingTextElementId);
+    return found && found.type === 'text' ? (found as TextNodeElement) : null;
+  }, [editingTextElementId, activeSpread]);
+
   const selectedFramesList = useMemo(() => {
     return (activeSpread?.elements || []).filter((el) => selectedFrameIds.includes(el.id));
   }, [activeSpread?.elements, selectedFrameIds]);
@@ -878,7 +890,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const selectionGroupRotation = useEditorStore((s) => s.selectionGroupRotation);
   const multiGroupInfo = useMemo(() => {
     if (selectedFramesList.length <= 1) return null;
-    return computeMultiFrameGroupInfo(selectedFramesList, selectionGroupRotation ?? undefined);
+    return computeMultiFrameGroupInfo(selectedFramesList as PhotoFrameElement[], selectionGroupRotation ?? undefined);
   }, [selectedFramesList, selectionGroupRotation]);
 
   const isSelectionFullyLocked = useMemo(() => {
@@ -891,7 +903,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   useEffect(() => {
     if (!trRef.current || !stageRef.current) return;
 
-    if (editingCropFrameId || isSelectionFullyLocked) {
+    if (editingCropFrameId || editingTextElementId || isSelectionFullyLocked) {
       trRef.current.nodes([]);
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
@@ -939,7 +951,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedFrameIds, editingCropFrameId, activeSpread?.elements, zoomLevel, containerSize, multiGroupInfo, selectionGroupRotation, isSelectionFullyLocked]);
+  }, [selectedFrameIds, editingCropFrameId, editingTextElementId, activeSpread?.elements, zoomLevel, containerSize, multiGroupInfo, selectionGroupRotation, isSelectionFullyLocked]);
+
+  // Immediately detach Transformer synchronously before paint when editing text or crop mode
+  useLayoutEffect(() => {
+    if ((editingTextElementId || editingCropFrameId) && trRef.current) {
+      trRef.current.nodes([]);
+      trRef.current.forceUpdate();
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [editingTextElementId, editingCropFrameId]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
@@ -1034,11 +1055,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (editingCropFrameId) {
           const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
-          if (cropFrame) {
+          if (cropFrame && cropFrame.type === 'photo') {
+            const photoEl = cropFrame as PhotoFrameElement;
             e.preventDefault();
             const step = e.shiftKey ? 0.05 : 0.01;
-            const currentX = cropFrame.cropX ?? 0;
-            const currentY = cropFrame.cropY ?? 0;
+            const currentX = photoEl.cropX ?? 0;
+            const currentY = photoEl.cropY ?? 0;
             let newX = currentX;
             let newY = currentY;
             if (e.key === 'ArrowLeft') newX = clamp(currentX - step, -1, 1);
@@ -2002,9 +2024,213 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             )}
           </Layer>
 
-          {/* Layer 2: Interactive Photo Frames */}
+          {/* Layer 2: Interactive Photo Frames & Text Nodes */}
           <Layer>
-            {(activeSpread.elements || []).map((frame) => {
+            {(activeSpread.elements || []).map((element) => {
+              if (element.type === 'text') {
+                const textEl = element as TextNodeElement;
+                const isSelected = selectedFrameIds.includes(textEl.id);
+                const isEditing = editingTextElementId === textEl.id;
+
+                return (
+                  <TextNode
+                    key={textEl.id}
+                    element={textEl}
+                    isSelected={isSelected}
+                    isEditing={isEditing}
+                    isMultiSelectActive={isMultiSelected}
+                    scaleFactor={scaleFactor}
+                    canvasUnit={dims.unit}
+                    dpi={dims.dpi}
+                    onSelect={(e) => {
+                      if (justDroppedRef.current) return;
+                      if (e) {
+                        e.cancelBubble = true;
+                        const isMulti = Boolean(e.evt?.shiftKey || e.evt?.ctrlKey || e.evt?.metaKey);
+                        selectFrame(textEl.id, isMulti);
+                      } else {
+                        selectFrame(textEl.id);
+                      }
+                    }}
+                    onDragStart={() => {
+                      const isThisSelected = selectedFrameIds.includes(textEl.id);
+                      let currentGroupIds = isThisSelected ? [...selectedFrameIds] : [textEl.id];
+                      if (!isThisSelected) {
+                        selectFrame(textEl.id);
+                        currentGroupIds = [textEl.id];
+                      }
+
+                      const initialPositions = new Map<string, { x: number; y: number }>();
+                      currentGroupIds.forEach((id) => {
+                        const f = (activeSpread.elements || []).find((el) => el.id === id);
+                        if (f) {
+                          initialPositions.set(id, { x: f.x, y: f.y });
+                        }
+                      });
+                      dragInitialPhysicalPositionsRef.current = initialPositions;
+                    }}
+                    onDragMove={(e) => {
+                      if (dragInitialPhysicalPositionsRef.current.size === 0) return;
+                      const draggedNode = (stageRef.current?.findOne(`#${textEl.id}`) || e.currentTarget || e.target) as Konva.Node;
+                      if (!draggedNode) return;
+
+                      let currentPhysX = draggedNode.x() / scaleFactor;
+                      let currentPhysY = draggedNode.y() / scaleFactor;
+                      let deltaPhysX = currentPhysX - textEl.x;
+                      let deltaPhysY = currentPhysY - textEl.y;
+
+                      if (e.evt?.shiftKey) {
+                        if (Math.abs(deltaPhysX) >= Math.abs(deltaPhysY)) {
+                          deltaPhysY = 0;
+                          currentPhysY = textEl.y;
+                          draggedNode.y(textEl.y * scaleFactor);
+                        } else {
+                          deltaPhysX = 0;
+                          currentPhysX = textEl.x;
+                          draggedNode.x(textEl.x * scaleFactor);
+                        }
+                      }
+
+                      if (!snapEnabled || e.evt?.ctrlKey) {
+                        clearSnapLines();
+                      } else {
+                        const otherRects = (activeSpread.elements || [])
+                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                        const thresholdUnits =
+                          typeof snappingConfig.threshold === 'number'
+                            ? snappingConfig.threshold
+                            : 0.1;
+
+                        const snapRes = calculateSnapping(
+                          { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height },
+                          totalSpreadPhysicalW,
+                          totalSpreadPhysicalH,
+                          activeSpread.safeArea,
+                          gutterPhysicalW,
+                          otherRects,
+                          { ...snappingConfig, threshold: thresholdUnits },
+                          unit
+                        );
+
+                        if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
+                          setSnapLines(snapRes.snapLines, snapRes.gapGuides);
+                          const snappedPhysX = snapRes.snappedX;
+                          const snappedPhysY = snapRes.snappedY;
+                          deltaPhysX = snappedPhysX - textEl.x;
+                          deltaPhysY = snappedPhysY - textEl.y;
+                          draggedNode.x(snappedPhysX * scaleFactor);
+                          draggedNode.y(snappedPhysY * scaleFactor);
+                        } else {
+                          clearSnapLines();
+                        }
+                      }
+
+                      if (dragInitialPhysicalPositionsRef.current.size > 1) {
+                        dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                          if (id !== textEl.id) {
+                            const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                            if (node) {
+                              node.x((initPhys.x + deltaPhysX) * scaleFactor);
+                              node.y((initPhys.y + deltaPhysY) * scaleFactor);
+                            }
+                          }
+                        });
+                        if (multiGroupRef.current && multiGroupInfo) {
+                          multiGroupRef.current.x((multiGroupInfo.groupX + deltaPhysX) * scaleFactor);
+                          multiGroupRef.current.y((multiGroupInfo.groupY + deltaPhysY) * scaleFactor);
+                        }
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      clearSnapLines();
+                      const draggedNode = (stageRef.current?.findOne(`#${textEl.id}`) || e.currentTarget || e.target) as Konva.Node;
+                      const isAltPressed = Boolean(e.evt?.altKey);
+
+                      if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
+                        let finalCurrentPhysX = draggedNode.x() / scaleFactor;
+                        let finalCurrentPhysY = draggedNode.y() / scaleFactor;
+                        const isShiftConstrained = Boolean(e.evt?.shiftKey);
+                        const initPos = dragInitialPhysicalPositionsRef.current.get(textEl.id) || { x: textEl.x, y: textEl.y };
+                        const rawDx = finalCurrentPhysX - initPos.x;
+                        const rawDy = finalCurrentPhysY - initPos.y;
+                        const isHorizontalConstraint = Math.abs(rawDx) >= Math.abs(rawDy);
+
+                        const otherRects = (activeSpread.elements || [])
+                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+                        const snapRes =
+                          !snapEnabled || e.evt?.ctrlKey
+                            ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
+                            : calculateSnapping(
+                                { x: finalCurrentPhysX, y: finalCurrentPhysY, width: textEl.width, height: textEl.height },
+                                totalSpreadPhysicalW,
+                                totalSpreadPhysicalH,
+                                activeSpread.safeArea,
+                                gutterPhysicalW,
+                                otherRects,
+                                snappingConfig,
+                                unit
+                              );
+
+                        let deltaPhysX = snapRes.snappedX - textEl.x;
+                        let deltaPhysY = snapRes.snappedY - textEl.y;
+
+                        if (isShiftConstrained) {
+                          if (isHorizontalConstraint) {
+                            deltaPhysY = 0;
+                          } else {
+                            deltaPhysX = 0;
+                          }
+                        }
+
+                        if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
+                          if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                            dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
+                              const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+                              if (node) {
+                                node.x(initPhys.x * scaleFactor);
+                                node.y(initPhys.y * scaleFactor);
+                              }
+                            });
+
+                            const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                              sourceId: id,
+                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                            }));
+
+                            duplicateFramesToPosition(activeSpread.id, duplicates);
+                            if (onToast) {
+                              onToast(`✓ Duplicated ${duplicates.length} item(s) via Alt+Drag`);
+                            }
+                          } else if (Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05) {
+                            const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
+                              id,
+                              geometry: {
+                                x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
+                                y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
+                              },
+                            }));
+
+                            batchUpdateFrames(activeSpread.id, updates);
+                          }
+                        }
+                      }
+                      dragInitialPhysicalPositionsRef.current.clear();
+                    }}
+                    onContextMenu={(e) => {
+                      openContextMenuAt(e.evt.clientX, e.evt.clientY);
+                    }}
+                    onElementChange={(updates) => updateTextElement(activeSpread.id, textEl.id, updates)}
+                    onDoubleClick={() => setEditingTextElementId(textEl.id)}
+                  />
+                );
+              }
+
+              const frame = element as PhotoFrameElement;
               const hydratedFrame = mergeFramePhotoAsset(frame, frame.photoId ? photoById.get(frame.photoId) : null);
               const isSelected = selectedFrameIds.includes(frame.id);
               const isCrop = editingCropFrameId === frame.id;
@@ -2296,9 +2522,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             {/* Dynamic Contextual Transformer */}
             <Transformer
             ref={trRef}
-            visible={!editingCropFrameId}
+            visible={!editingCropFrameId && !editingTextElementId}
             rotateEnabled
-            keepRatio={true}
+            keepRatio={selectedFramesList.length === 1 && selectedFramesList[0]?.type === 'text' ? false : true}
             rotateAnchorOffset={20}
             rotateAnchorCursor={ROTATE_CURSOR}
               onContextMenu={(e) => {
@@ -2347,9 +2573,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   !anchor ||
                   anchor === 'top-left' ||
                   anchor === 'top-right' ||
-                          anchor === 'bottom-left' ||
+                  anchor === 'bottom-left' ||
                   anchor === 'bottom-right';
-                tr.keepRatio(isCorner || selectedFrameIds.length > 1);
+
+                const isSingleText = selectedFramesList.length === 1 && selectedFramesList[0]?.type === 'text';
+                if (isSingleText) {
+                  tr.keepRatio(isCorner);
+                } else {
+                  tr.keepRatio(isCorner || selectedFrameIds.length > 1);
+                }
 
                 // Lock to high-contrast curved rotation cursor during active rotation
                 if (anchor === 'rotater' && stageRef.current) {
@@ -2361,7 +2593,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     .filter((f) => selectedFrameIds.includes(f.id))
                     .map((f) => ({ ...f }));
                   multiTransformInitialStateRef.current = {
-                    frames: selectedFrames,
+                    frames: selectedFrames as PhotoFrameElement[],
                     initialGroupRot: multiGroupInfo.groupRotation,
                     bounds: {
                       x: multiGroupInfo.groupX,
@@ -2735,6 +2967,26 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             })}
           </Layer>
         </Stage>
+
+        {/* Inline Text Editor Overlay */}
+        {editingTextElement && (
+          <TextInlineEditor
+            key={editingTextElement.id}
+            element={editingTextElement}
+            stageRef={stageRef}
+            scaleFactor={scaleFactor}
+            canvasUnit={dims.unit}
+            dpi={dims.dpi}
+            onCommit={(newText) => {
+              const currentId = editingTextElement?.id;
+              if (currentId && newText !== editingTextElement?.text) {
+                updateTextElement(activeSpread.id, currentId, { text: newText });
+              }
+              setEditingTextElementId(null);
+            }}
+            onCancel={() => setEditingTextElementId(null)}
+          />
+        )}
       </div>
 
 

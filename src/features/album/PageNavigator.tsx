@@ -4,6 +4,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
+import { PhotoFrameElement } from '../../domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -77,7 +78,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         }}
       />
 
-      {/* Spine / Gutter Line */}
+      {/* Spine / Gutter Guide */}
       <div
         style={{
           position: 'absolute',
@@ -90,14 +91,51 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         }}
       />
 
-      {/* Real-time Rendered Photo Elements */}
+      {/* Real-time Rendered Photo & Text Elements */}
       {(spread.elements || []).map((el) => {
-        const hydratedElement = mergeFramePhotoAsset(el, el.photoId ? photoById.get(el.photoId) : null);
         const x = el.x * scale;
         const y = el.y * scale;
         const w = el.width * scale;
         const h = el.height * scale;
         const rot = el.rotation || 0;
+
+        if (el.type === 'text') {
+          const fontPt = Number.isFinite(el.style?.fontSize) ? el.style.fontSize : 24;
+          const fontSizePx = Math.max(1, Math.round(((fontPt * 25.4) / 72) * scale));
+          const isBold = el.style?.fontWeight === 'bold' || Number(el.style?.fontWeight) >= 600;
+          const isItalic = el.style?.fontStyle === 'italic';
+
+          return (
+            <div
+              key={el.id}
+              style={{
+                position: 'absolute',
+                left: `${x}px`,
+                top: `${y}px`,
+                width: `${w}px`,
+                height: `${h}px`,
+                transform: rot ? `rotate(${rot}deg)` : undefined,
+                transformOrigin: '0 0',
+                overflow: 'hidden',
+                fontSize: `${fontSizePx}px`,
+                color: el.style?.fill || '#ffffff',
+                fontFamily: el.style?.fontFamily || 'sans-serif',
+                fontWeight: isBold ? 700 : 400,
+                fontStyle: isItalic ? 'italic' : 'normal',
+                lineHeight: 1.1,
+                pointerEvents: 'none',
+                userSelect: 'none',
+                whiteSpace: 'pre-wrap',
+                zIndex: el.zIndex || 2,
+              }}
+            >
+              {el.text || ''}
+            </div>
+          );
+        }
+
+        const photoEl = el as PhotoFrameElement;
+        const hydratedElement = mergeFramePhotoAsset(photoEl, photoEl.photoId ? photoById.get(photoEl.photoId) : null);
         const isCachePath = (p?: string | null) => {
           if (!p) return false;
           const norm = p.replace(/\\/g, '/').toLowerCase();
@@ -109,11 +147,11 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           ? (safeThumb || safePreview || null)
           : null;
 
-        const photoMeta = el.photoId ? photoById.get(el.photoId) : null;
+        const photoMeta = photoEl.photoId ? photoById.get(photoEl.photoId) : null;
 
         return (
           <div
-            key={el.id}
+            key={photoEl.id}
             style={{
               position: 'absolute',
               left: `${x}px`,
@@ -124,15 +162,15 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               transformOrigin: '0 0',
               overflow: 'hidden',
               background: 'linear-gradient(135deg, #334155, #1e293b)',
-              opacity: el.opacity ?? 1,
-              border: el.borderEnabled && el.borderWidth ? `1px solid ${el.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
+              opacity: photoEl.opacity ?? 1,
+              border: photoEl.borderEnabled && photoEl.borderWidth ? `1px solid ${photoEl.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
               borderRadius: '1px',
-              zIndex: 2,
+              zIndex: photoEl.zIndex || 2,
             }}
           >
             {imgSrc && (
               <img
-                key={`${el.id}_${imgSrc}_${photoMeta?.updatedAt || ''}`}
+                key={`${photoEl.id}_${imgSrc}_${photoMeta?.updatedAt || ''}`}
                 src={safeConvertFileSrc(imgSrc)}
                 alt=""
                 style={{
@@ -151,8 +189,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                 }}
                 onError={(e) => {
                   e.currentTarget.style.opacity = '0';
-                  if (el.photoId) {
-                    void usePhotoStore.getState().healThumbnail(el.photoId);
+                  if (photoEl.photoId) {
+                    void usePhotoStore.getState().healThumbnail(photoEl.photoId);
                   }
                 }}
               />
@@ -224,7 +262,7 @@ export function PageNavigator() {
 
   const handleDeleteRequest = (e: React.MouseEvent, spread: Spread) => {
     e.stopPropagation();
-    const photoCount = (spread.elements || []).filter((el) => Boolean(el.photoId || el.filePath)).length;
+    const photoCount = (spread.elements || []).filter((el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)).length;
 
     if (photoCount === 0) {
       // Empty spread without photos -> delete immediately without confirmation modal
@@ -476,7 +514,7 @@ export function PageNavigator() {
         message={`Are you sure you want to delete "${spreadToDelete?.name}"?`}
         detail={
           spreadToDelete
-            ? `This spread contains ${(spreadToDelete.elements || []).filter((el) => Boolean(el.photoId || el.filePath)).length} photo(s). Deleting it will remove this spread from your album.`
+            ? `This spread contains ${(spreadToDelete.elements || []).filter((el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)).length} photo(s). Deleting it will remove this spread from your album.`
             : 'The two facing pages and any layout elements on this spread will be removed from your album.'
         }
         confirmText="Delete Spread"
