@@ -128,15 +128,25 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setupListeners: async () => {
     try {
       const { listen } = await import('@tauri-apps/api/event');
+      const { useProjectStore } = await import('./projectStore');
+
+      const isCurrentProject = (projectId?: string) => {
+        const activeId = useProjectStore.getState().currentProject?.id;
+        if (!activeId) return false;
+        if (projectId && projectId !== activeId) return false;
+        return true;
+      };
 
       const unlistenProgress = await listen<ImportProgress>('photo-import-progress', (event) => {
-        if (event.payload && event.payload.total > 0) {
+        if (!isCurrentProject(event.payload?.projectId)) return;
+        if (event.payload && event.payload.total > 0 && !get().isCancelling) {
           set({ isImporting: true, importProgress: event.payload });
         }
       });
 
       const unlistenItem = await listen<Photo>('photo-imported', (event) => {
         const item = event.payload;
+        if (!isCurrentProject(item.projectId)) return;
         set((s) => {
           const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
           const nextFolderPhotoIds = { ...s.folderPhotoIds };
@@ -150,9 +160,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         });
       });
 
-      const unlistenPreview = await listen<{ id: string; thumbnailPath: string; previewPath: string }>(
+      const unlistenPreview = await listen<{ projectId?: string; id: string; thumbnailPath: string; previewPath: string }>(
         'photo-preview-ready',
         (event) => {
+          if (!isCurrentProject(event.payload?.projectId)) return;
           if (event.payload && event.payload.id) {
             const { id, thumbnailPath, previewPath } = event.payload;
             set((s) => {
@@ -170,12 +181,16 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         'photo-import-complete',
         (event) => {
           const payload = event.payload;
-          if (
-            payload &&
-            (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))
-          ) {
-            set({ importNotice: payload });
-          }
+          if (!isCurrentProject(payload?.projectId)) return;
+          set({
+            isImporting: false,
+            isCancelling: false,
+            importProgress: null,
+            currentImportTask: null,
+            ...(payload && (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))
+              ? { importNotice: payload }
+              : {}),
+          });
         }
       );
 
@@ -254,19 +269,46 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         folderId: task.folderId,
       });
 
-      if (Array.isArray(updatedPhotos) && updatedPhotos.length > 0) {
+      const { useProjectStore } = await import('./projectStore');
+      const currentProj = useProjectStore.getState().currentProject;
+      if (currentProj && currentProj.id === task.projectId && Array.isArray(updatedPhotos)) {
         set({ photos: updatedPhotos });
+        void get().loadFolders(task.projectId);
       }
-      void get().loadFolders(task.projectId);
     } catch (err) {
       console.error('[AFSN] executeImportTask error:', err);
       set({ error: String(err) });
     } finally {
-      void get().processNextQueueItem();
+      const { useProjectStore } = await import('./projectStore');
+      const currentProj = useProjectStore.getState().currentProject;
+      if (currentProj && currentProj.id === task.projectId && !get().isCancelling) {
+        void get().processNextQueueItem();
+      } else {
+        set({
+          isImporting: false,
+          isCancelling: false,
+          currentImportTask: null,
+          importProgress: null,
+          importQueue: [],
+        });
+      }
     }
   },
 
   processNextQueueItem: async () => {
+    const { useProjectStore } = await import('./projectStore');
+    const currentProj = useProjectStore.getState().currentProject;
+    if (!currentProj) {
+      set({
+        isImporting: false,
+        isCancelling: false,
+        currentImportTask: null,
+        importProgress: null,
+        importQueue: [],
+      });
+      return;
+    }
+
     const queue = get().importQueue;
     if (queue.length > 0) {
       const nextTask = queue[0];
@@ -276,7 +318,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
           currentImportTask: nextTask,
           isImporting: true,
           isCancelling: false,
-          importProgress: { current: 0, total: nextTask.paths.length, currentFile: '', percent: 0 },
+          importProgress: { projectId: nextTask.projectId, current: 0, total: nextTask.paths.length, currentFile: '', percent: 0 },
         });
         void get().executeImportTask(nextTask);
       }
@@ -361,16 +403,36 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } catch (err) {
       console.warn('[AFSN] cancel_photo_import error:', err);
     }
+    const remainingQueue = get().importQueue;
+    if (remainingQueue.length === 0) {
+      set({
+        isImporting: false,
+        isCancelling: false,
+        importProgress: null,
+        currentImportTask: null,
+      });
+    }
   },
 
   cancelAllImports: async () => {
-    set({ isCancelling: true, importQueue: [] });
+    set({
+      isCancelling: true,
+      importQueue: [],
+      currentImportTask: null,
+    });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('cancel_photo_import');
     } catch (err) {
       console.warn('[AFSN] cancelAllImports error:', err);
     }
+    set({
+      isImporting: false,
+      isCancelling: false,
+      importProgress: null,
+      currentImportTask: null,
+      importQueue: [],
+    });
   },
 
   toggleFavorite: async (photoId: string) => {

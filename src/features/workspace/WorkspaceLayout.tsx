@@ -181,11 +181,14 @@ export function WorkspaceLayout() {
     }
   };
 
-  // Unsaved Changes Protection Dialog State
+  // Active Import Cancellation & Unsaved Changes Protection Dialog State
   const [pendingSafeAction, setPendingSafeAction] = useState<(() => void | Promise<void>) | null>(null);
+  const [pendingImportCancelAction, setPendingImportCancelAction] = useState<(() => void | Promise<void>) | null>(null);
 
   const confirmSafeAction = useCallback((action: () => void | Promise<void>) => {
-    if (saveStatus === 'unsaved') {
+    if (usePhotoStore.getState().isImporting) {
+      setPendingImportCancelAction(() => action);
+    } else if (saveStatus === 'unsaved') {
       setPendingSafeAction(() => action);
     } else {
       action();
@@ -2479,6 +2482,30 @@ export function WorkspaceLayout() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Active Photo Import In Progress Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={pendingImportCancelAction !== null}
+        title="Cancel Photo Import?"
+        message={`Photos are currently being imported into "${currentProject?.name}". Closing or leaving now will cancel the remaining import process.`}
+        detail="Photos that have already finished importing will remain safely in your album library. Background canvas preview generation and remaining queued files will be stopped immediately."
+        confirmText="Cancel Import & Continue"
+        cancelText="Keep Importing"
+        variant="warning"
+        onConfirm={async () => {
+          await usePhotoStore.getState().cancelAllImports();
+          const act = pendingImportCancelAction;
+          setPendingImportCancelAction(null);
+          if (act) {
+            if (saveStatus === 'unsaved') {
+              setPendingSafeAction(() => act);
+            } else {
+              await act();
+            }
+          }
+        }}
+        onCancel={() => setPendingImportCancelAction(null)}
+      />
 
       {/* Unsaved Changes Confirmation Dialog */}
       <ConfirmDialog

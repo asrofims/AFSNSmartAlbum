@@ -28,6 +28,7 @@ export interface PhotoFolder {
 }
 
 export interface ImportProgress {
+  projectId?: string;
   current: number;
   total: number;
   currentFile: string;
@@ -35,6 +36,7 @@ export interface ImportProgress {
 }
 
 export interface ImportNotice {
+  projectId?: string;
   total: number;
   imported: number;
   existing: number;

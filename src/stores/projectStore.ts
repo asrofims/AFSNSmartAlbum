@@ -216,13 +216,35 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   closeProject: async () => {
+    // 1. Terminate any active or queued photo imports immediately
+    try {
+      const { usePhotoStore } = await import('./photoStore');
+      await usePhotoStore.getState().cancelAllImports();
+    } catch (err) {
+      console.warn('[AFSN] Error cancelling imports on closeProject:', err);
+    }
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cancel_photo_import');
+    } catch {}
+
     set({ currentProject: null });
     try {
       const { useAlbumStore } = await import('./albumStore');
       const { usePhotoStore } = await import('./photoStore');
       const { useEditorStore } = await import('./editorStore');
       useAlbumStore.setState({ currentAlbum: null, activeSpreadId: null, activeSpreadIndex: 0, saveStatus: 'saved' });
-      usePhotoStore.setState({ photos: [], folders: [], selectedPhotoIds: [] });
+      usePhotoStore.setState({
+        photos: [],
+        folders: [],
+        selectedPhotoIds: [],
+        importQueue: [],
+        currentImportTask: null,
+        isImporting: false,
+        isCancelling: false,
+        importProgress: null,
+        importNotice: null,
+      });
       useEditorStore.setState({ selectedFrameIds: [], editingCropFrameId: null });
     } catch {}
   },
@@ -250,6 +272,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createNewProject: async (settings: ProjectSettings): Promise<Project> => {
+    // Terminate any existing import tasks before creating a new project
+    try {
+      const { usePhotoStore } = await import('./photoStore');
+      await usePhotoStore.getState().cancelAllImports();
+    } catch {}
+
     set({ isLoading: true, error: null });
 
     const payload = {
@@ -334,6 +362,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   openProjectById: async (id: string) => {
+    // Terminate any existing import tasks before switching projects
+    try {
+      const { usePhotoStore } = await import('./photoStore');
+      await usePhotoStore.getState().cancelAllImports();
+    } catch {}
+
     set({ isLoading: true, error: null });
 
     let project: Project | null = null;

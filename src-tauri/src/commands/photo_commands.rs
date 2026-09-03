@@ -17,11 +17,13 @@ use crate::photo_engine::{
 pub struct ImportState {
     pub cancel_flag: Arc<AtomicBool>,
     pub is_busy: Arc<Mutex<()>>,
+    pub active_project_id: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportProgressPayload {
+    pub project_id: String,
     pub current: usize,
     pub total: usize,
     pub current_file: String,
@@ -31,6 +33,7 @@ pub struct ImportProgressPayload {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoPreviewReadyPayload {
+    pub project_id: String,
     pub id: String,
     pub thumbnail_path: String,
     pub preview_path: String,
@@ -143,7 +146,10 @@ pub async fn pick_photo_folder_dialog() -> Result<Option<Vec<String>>, String> {
 #[tauri::command]
 pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> {
     state.cancel_flag.store(true, Ordering::SeqCst);
-    log::info!("Photo import cancellation requested by user");
+    if let Ok(mut guard) = state.active_project_id.lock() {
+        *guard = None;
+    }
+    log::info!("Photo import cancellation requested by user or project close");
     Ok(())
 }
 
@@ -163,6 +169,9 @@ async fn import_paths_internal(
     let _busy_guard = import_state.is_busy.lock().await;
 
     import_state.cancel_flag.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = import_state.active_project_id.lock() {
+        *guard = Some(project_id.clone());
+    }
     let cancel_flag = import_state.cancel_flag.clone();
 
     let db = app.state::<Database>();
@@ -220,6 +229,11 @@ async fn import_paths_internal(
     let mut relink_ids: Vec<String> = Vec::new();
 
     for path in to_import {
+        if cancel_flag.load(Ordering::Relaxed) {
+            log::info!("Photo import cancelled during Phase 1 metadata extraction");
+            break;
+        }
+
         let file_name = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -283,6 +297,30 @@ async fn import_paths_internal(
         }
     }
 
+    // If cancelled during Phase 1, exit early without spawning background preview pool
+    if cancel_flag.load(Ordering::Relaxed) {
+        log::info!("Photo import was cancelled; skipping Phase 2 preview generation");
+        if let Ok(mut guard) = import_state.active_project_id.lock() {
+            if let Some(ref current_pid) = *guard {
+                if current_pid == &project_id {
+                    *guard = None;
+                }
+            }
+        }
+        let _ = app.emit(
+            "photo-import-complete",
+            serde_json::json!({
+                "projectId": project_id,
+                "total": total_selected,
+                "imported": new_rows_count,
+                "existing": already_existing_count,
+                "relinked": relink_count,
+                "cancelled": true
+            }),
+        );
+        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
+    }
+
     // -------------------------------------------------------------
     // PHASE 2: NON-BLOCKING BACKGROUND CANVAS PREVIEW GENERATION
     // Spawn background worker with bounded 2-thread Rayon pool.
@@ -292,10 +330,12 @@ async fn import_paths_internal(
     let cancel_bg = cancel_flag.clone();
     let total_bg = to_process.len();
     let counter_bg = Arc::new(AtomicUsize::new(0));
+    let project_id_bg = project_id.clone();
 
     let _ = app.emit(
         "photo-import-progress",
         ImportProgressPayload {
+            project_id: project_id.clone(),
             current: 0,
             total: total_bg,
             current_file: "Starting progressive canvas cache generation...".to_string(),
@@ -353,6 +393,7 @@ async fn import_paths_internal(
                         let _ = app_bg.emit(
                             "photo-preview-ready",
                             PhotoPreviewReadyPayload {
+                                project_id: project_id_bg.clone(),
                                 id: photo_id.clone(),
                                 thumbnail_path: thumb_path_str,
                                 preview_path: preview_path.clone(),
@@ -362,6 +403,7 @@ async fn import_paths_internal(
                         let _ = app_bg.emit(
                             "photo-import-progress",
                             ImportProgressPayload {
+                                project_id: project_id_bg.clone(),
                                 current: curr,
                                 total: total_bg,
                                 current_file: file_name,
@@ -376,6 +418,7 @@ async fn import_paths_internal(
                         let _ = app_bg.emit(
                             "photo-import-progress",
                             ImportProgressPayload {
+                                project_id: project_id_bg.clone(),
                                 current: curr,
                                 total: total_bg,
                                 current_file: format!("Skipped: {}", file_name),
@@ -391,9 +434,18 @@ async fn import_paths_internal(
         trim_process_memory();
 
         let is_cancelled = cancel_bg.load(Ordering::Relaxed);
+        if let Ok(mut guard) = app_bg.state::<ImportState>().active_project_id.lock() {
+            if let Some(ref current_pid) = *guard {
+                if current_pid == &project_id_bg {
+                    *guard = None;
+                }
+            }
+        }
+
         let _ = app_bg.emit(
             "photo-import-complete",
             serde_json::json!({
+                "projectId": project_id_bg,
                 "total": total_selected,
                 "imported": new_rows_count,
                 "existing": already_existing_count,
@@ -451,6 +503,7 @@ pub async fn generate_missing_previews(
                 let _ = app.emit(
                     "photo-preview-ready",
                     PhotoPreviewReadyPayload {
+                        project_id: photo.project_id.clone(),
                         id: photo.id.clone(),
                         thumbnail_path: instant_thumb,
                         preview_path: photo.preview_path.clone().unwrap_or_default(),
@@ -463,8 +516,16 @@ pub async fn generate_missing_previews(
     // PHASE 2: BACKGROUND RESIZING WORKER (Runs progressively without blocking)
     tauri::async_runtime::spawn_blocking(move || {
         let db_thread = app_clone.state::<Database>();
+        let cancel_flag = app_clone.state::<ImportState>().cancel_flag.clone();
         for photo in photos_needing_preview {
+            if cancel_flag.load(Ordering::Relaxed) {
+                log::info!("generate_missing_previews cancelled");
+                break;
+            }
             if let Ok(processed) = process_photo(Path::new(&photo.file_path), &cache_dir, &photo.id) {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    break;
+                }
                 let thumb_path_str = processed.thumbnail_path.clone().unwrap_or_default();
                 if let Some(thumbnail_path) = &processed.thumbnail_path {
                     let _ = db_thread.update_photo_thumbnail(&photo.id, thumbnail_path);
@@ -475,6 +536,7 @@ pub async fn generate_missing_previews(
                 let _ = app_clone.emit(
                     "photo-preview-ready",
                     PhotoPreviewReadyPayload {
+                        project_id: photo.project_id.clone(),
                         id: photo.id.clone(),
                         thumbnail_path: if thumb_path_str.is_empty() { processed.preview_path.clone().unwrap_or_default() } else { thumb_path_str },
                         preview_path: processed.preview_path.unwrap_or_default(),
