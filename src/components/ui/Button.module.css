@@ -43,7 +43,6 @@
 
 .secondary:hover:not(:disabled) {
   background-color: var(--color-surface-hover);
-  border-color: var(--color-border-subtle);
 }
 
 .ghost {
@@ -55,7 +54,6 @@
 .ghost:hover:not(:disabled) {
   background-color: var(--color-surface-hover);
   color: var(--color-text-primary);
-  border-color: var(--color-border-subtle);
 }
 
 .danger {

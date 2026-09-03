@@ -45,8 +45,7 @@
 }
 
 .nameInput:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: rgba(255, 255, 255, 0.12);
   background: #090d16;
 }
 
@@ -151,7 +150,7 @@
 }
 
 .presetActionBtn {
-  height: 32px;
+  height: 28px;
   padding: 0 10px;
   display: flex;
   align-items: center;
@@ -165,18 +164,16 @@
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
-  margin-bottom: 1px;
 }
 
 .presetActionBtn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .presetDeleteBtn {
-  height: 32px;
-  width: 32px;
+  height: 28px;
+  width: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,12 +183,10 @@
   color: #f87171;
   cursor: pointer;
   transition: all 0.15s ease;
-  margin-bottom: 1px;
 }
 
 .presetDeleteBtn:hover {
   background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
   color: #fca5a5;
 }
 

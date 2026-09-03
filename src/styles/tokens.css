@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   /* Canonical Colors */
   --color-bg-primary: #1a1a1e;
   --color-bg-secondary: #222226;
@@ -75,7 +76,7 @@
   --border-width: 1px;
 
   /* Focus */
-  --focus-ring: 0 0 0 2px var(--color-accent);
+  --focus-ring: 0 0 0 1px rgba(255, 255, 255, 0.08);
 
   /* Transitions */
   --transition-fast: 120ms ease;

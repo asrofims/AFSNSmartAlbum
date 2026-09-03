@@ -140,10 +140,8 @@
 .cancelBtn:hover {
   background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
-  border-color: var(--color-border-hover);
 }
 
 .cancelBtn:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+  outline: none;
 }

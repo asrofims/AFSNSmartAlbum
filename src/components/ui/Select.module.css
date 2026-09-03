@@ -28,16 +28,23 @@
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="%23808080"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>');
   background-repeat: no-repeat;
   background-position: right var(--space-2) center;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
   cursor: pointer;
+  color-scheme: dark;
 }
 
 .select:hover:not(:disabled) {
-  border-color: var(--color-surface-hover);
+  background-color: var(--color-surface-hover);
 }
 
 .select:focus {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
+  border-color: var(--color-border);
+  background-color: var(--color-surface-active);
+}
+
+.select option {
+  background-color: #222226;
+  color: #e8e8ec;
+  padding: 6px 10px;
 }

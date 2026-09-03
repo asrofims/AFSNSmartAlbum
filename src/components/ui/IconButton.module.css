@@ -15,7 +15,6 @@
 .iconButton:hover:not(:disabled) {
   background-color: var(--color-surface-hover);
   color: var(--color-text-primary);
-  border-color: var(--color-border-subtle);
 }
 
 .iconButton:focus-visible {
