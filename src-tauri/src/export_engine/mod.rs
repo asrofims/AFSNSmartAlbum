@@ -224,22 +224,63 @@ fn render_photo_element(
     offset_x_px: f64,
     offset_y_px: f64,
     scale_factor: f64,
+    include_bleed: bool,
+    total_spread_w: f64,
+    total_spread_h: f64,
 ) {
     if elem.file_path.is_empty() {
         return;
     }
 
-    let frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
-    let frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
-    let frame_px_w = (elem.width * scale_factor).round() as u32;
-    let frame_px_h = (elem.height * scale_factor).round() as u32;
+    let mut frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
+    let mut frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
+    let mut frame_px_w = (elem.width * scale_factor).round() as u32;
+    let mut frame_px_h = (elem.height * scale_factor).round() as u32;
+
+    let canvas_w = canvas.width() as i64;
+    let canvas_h = canvas.height() as i64;
+
+    // If include_bleed is active and this photo is aligned with spread boundaries (trim line),
+    // automatically extend the photo all the way into the bleed margin so it prints seamlessly
+    // without unwanted blank white borders around full-bleed photos.
+    if include_bleed && (offset_x_px > 0.0 || offset_y_px > 0.0) {
+        let tolerance = 2.0; // 2 physical pixels tolerance for edge snapping
+
+        let touches_left = (elem.x * scale_factor) <= tolerance;
+        let touches_top = (elem.y * scale_factor) <= tolerance;
+        let touches_right = ((elem.x + elem.width) * scale_factor) >= (total_spread_w * scale_factor - tolerance);
+        let touches_bottom = ((elem.y + elem.height) * scale_factor) >= (total_spread_h * scale_factor - tolerance);
+
+        if touches_left {
+            let extend_left = frame_px_x.max(0);
+            frame_px_x = 0;
+            frame_px_w += extend_left as u32;
+        }
+
+        if touches_top {
+            let extend_top = frame_px_y.max(0);
+            frame_px_y = 0;
+            frame_px_h += extend_top as u32;
+        }
+
+        if touches_right {
+            let right_edge = frame_px_x + frame_px_w as i64;
+            if right_edge < canvas_w {
+                frame_px_w += (canvas_w - right_edge) as u32;
+            }
+        }
+
+        if touches_bottom {
+            let bottom_edge = frame_px_y + frame_px_h as i64;
+            if bottom_edge < canvas_h {
+                frame_px_h += (canvas_h - bottom_edge) as u32;
+            }
+        }
+    }
 
     if frame_px_w == 0 || frame_px_h == 0 {
         return;
     }
-
-    let canvas_w = canvas.width() as i64;
-    let canvas_h = canvas.height() as i64;
 
     // Quick boundary check: if frame is completely off canvas, skip
     if frame_px_x + frame_px_w as i64 <= 0
@@ -282,7 +323,13 @@ fn render_photo_element(
     }
 
     let photo_aspect = img_w as f64 / img_h as f64;
-    let frame_aspect = if elem.height > 0.0 { elem.width / elem.height } else { 1.0 };
+    let frame_aspect = if frame_px_h > 0 {
+        frame_px_w as f64 / frame_px_h as f64
+    } else if elem.height > 0.0 {
+        elem.width / elem.height
+    } else {
+        1.0
+    };
     let crop_scale = elem.crop_scale.max(1.0);
 
     // Calculate visible crop rectangle in original image pixel coordinates
@@ -466,7 +513,16 @@ where
         if elem.r#type == "text" || elem.text_payload.is_some() {
             render_text_element(&mut canvas, elem, offset_x_px, offset_y_px, scale, dpi);
         } else {
-            render_photo_element(&mut canvas, elem, offset_x_px, offset_y_px, scale);
+            render_photo_element(
+                &mut canvas,
+                elem,
+                offset_x_px,
+                offset_y_px,
+                scale,
+                include_bleed,
+                total_spread_w,
+                total_spread_h,
+            );
         }
     }
 

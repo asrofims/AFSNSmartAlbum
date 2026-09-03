@@ -2338,28 +2338,36 @@ export function WorkspaceLayout() {
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-md)',
                     padding: '8px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
                     marginBottom: '10px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                      Bleed Cut
-                    </span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Bleed Cut
+                      </span>
+                    </div>
+                    <div style={{ width: '110px' }}>
+                      <NumberInput
+                        value={activeSpread?.bleed ?? (currentProject.canvasUnit === 'inch' ? 0.125 : currentProject.canvasUnit === 'cm' ? 0.3 : 3.0)}
+                        onChange={(val) => updateBleed(val)}
+                        min={0}
+                        max={999}
+                        step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
+                        suffix={currentProject.canvasUnit}
+                      />
+                    </div>
                   </div>
-                  <div style={{ width: '110px' }}>
-                    <NumberInput
-                      value={activeSpread?.bleed ?? 3}
-                      onChange={(val) => updateBleed(val)}
-                      min={0}
-                      max={999}
-                      step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      suffix={currentProject.canvasUnit}
-                    />
+                  <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    Standard print bleed: {currentProject.canvasUnit === 'inch' ? '0.125 in (3.2 mm)' : currentProject.canvasUnit === 'cm' ? '0.3 cm (3 mm)' : '3 mm'}
                   </div>
                 </div>
 

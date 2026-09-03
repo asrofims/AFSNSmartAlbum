@@ -87,7 +87,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [isCustomDpi, setIsCustomDpi] = useState<boolean>(false);
   const [customDpiText, setCustomDpiText] = useState<string>(String(currentProject?.canvasDpi || 300));
   const [jpegQuality, setJpegQuality] = useState<number>(95);
-  const [includeBleed, setIncludeBleed] = useState<boolean>(true);
+  const [includeBleed, setIncludeBleed] = useState<boolean>(false);
   const [splitPages, setSplitPages] = useState<boolean>(false);
   const [sharpenEnabled, setSharpenEnabled] = useState<boolean>(true);
   const [sharpenAmount, setSharpenAmount] = useState<'standard' | 'high'>('standard');
@@ -358,24 +358,29 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
           <div className={styles.optionField}>
             <label className={styles.label}>Bleed Allowance</label>
             <div className={styles.radioGroup}>
-              <label className={styles.radioItem}>
-                <input
-                  type="radio"
-                  name="bleedOption"
-                  checked={includeBleed}
-                  onChange={() => setIncludeBleed(true)}
-                />
-                Include Bleed ({activeSpread?.bleed || 0} {currentProject.canvasUnit})
-              </label>
-              <label className={styles.radioItem}>
+              <label className={styles.radioItem} title="Export image matching the exact canvas size without outer cut margins">
                 <input
                   type="radio"
                   name="bleedOption"
                   checked={!includeBleed}
                   onChange={() => setIncludeBleed(false)}
                 />
-                Trim to Page Boundary
+                Trim to Page Boundary (Exact Canvas Size)
               </label>
+              <label className={styles.radioItem} title="Includes extra cut margin for print lab trimming; edge-aligned photos will auto-extend into bleed">
+                <input
+                  type="radio"
+                  name="bleedOption"
+                  checked={includeBleed}
+                  onChange={() => setIncludeBleed(true)}
+                />
+                Include Bleed ({activeSpread?.bleed || 0} {currentProject.canvasUnit} for Print Lab)
+              </label>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
+              {includeBleed
+                ? `✂️ Adds +${activeSpread?.bleed || 0} ${currentProject.canvasUnit} cut margin on all sides; edge-aligned photos automatically extend into bleed.`
+                : '📐 Output dimensions match the canvas display 100% with no outer bleed margins.'}
             </div>
           </div>
         </div>
