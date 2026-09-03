@@ -727,6 +727,23 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     bounds: RectBounds;
   } | null>(null);
   const activeTransformAnchorRef = useRef<string | null>(null);
+  const [rotationHud, setRotationHud] = useState<{ angle: number; snapped: boolean; x: number; y: number } | null>(null);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
@@ -2524,8 +2541,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             ref={trRef}
             visible={!editingCropFrameId && !editingTextElementId}
             rotateEnabled
+            rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
+            rotationSnapTolerance={isShiftPressed ? 180 : 5}
             keepRatio={selectedFramesList.length === 1 && selectedFramesList[0]?.type === 'text' ? false : true}
-            rotateAnchorOffset={20}
+            rotateAnchorOffset={24}
             rotateAnchorCursor={ROTATE_CURSOR}
               onContextMenu={(e) => {
                 e.evt.preventDefault();
@@ -2584,8 +2603,37 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 }
 
                 // Lock to high-contrast curved rotation cursor during active rotation
-                if (anchor === 'rotater' && stageRef.current) {
-                  stageRef.current.container().style.cursor = ROTATE_CURSOR;
+                if (anchor === 'rotater') {
+                  if (stageRef.current) {
+                    stageRef.current.container().style.cursor = ROTATE_CURSOR;
+                  }
+                  const targetNode = selectedFrameIds.length > 1
+                    ? multiGroupRef.current
+                    : (tr.getNode() || (selectedFrameIds[0] ? (stageRef.current?.findOne(`#${selectedFrameIds[0]}`) as Konva.Node | undefined) : null));
+                  if (targetNode) {
+                    const rawRot = targetNode.rotation();
+                    const normalizedRot = Math.round((((rawRot % 360) + 360) % 360) * 10) / 10;
+                    const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+                    const isSnapped = SNAP_ANGLES.some((snap) => Math.abs(normalizedRot - (snap % 360)) < 0.8);
+                    const rotaterAnchor = tr.findOne('.rotater');
+                    let hudX = targetNode.x();
+                    let hudY = targetNode.y() - 32;
+                    if (rotaterAnchor) {
+                      const absPos = rotaterAnchor.getAbsolutePosition();
+                      const stageTransform = stageRef.current?.getAbsoluteTransform().copy().invert();
+                      if (stageTransform) {
+                        const local = stageTransform.point(absPos);
+                        hudX = local.x;
+                        hudY = local.y - 28;
+                      }
+                    }
+                    setRotationHud({
+                      angle: normalizedRot === 360 ? 0 : Math.round(normalizedRot),
+                      snapped: isSnapped,
+                      x: hudX,
+                      y: hudY,
+                    });
+                  }
                 }
 
                 if (selectedFrameIds.length > 1 && activeSpread && multiGroupInfo) {
@@ -2607,9 +2655,48 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 }
               }}
               onTransform={() => {
+                const activeAnchor = activeTransformAnchorRef.current || trRef.current?.getActiveAnchor();
+
+                // Live WYSIWYG Rotation Snapping HUD
+                if (activeAnchor === 'rotater') {
+                  if (stageRef.current) {
+                    stageRef.current.container().style.cursor = ROTATE_CURSOR;
+                  }
+                  const tr = trRef.current;
+                  const targetNode = selectedFrameIds.length > 1
+                    ? multiGroupRef.current
+                    : (tr?.getNode() || (selectedFrameIds[0] ? (stageRef.current?.findOne(`#${selectedFrameIds[0]}`) as Konva.Node | undefined) : null));
+
+                  if (targetNode && tr) {
+                    const rawRot = targetNode.rotation();
+                    const normalizedRot = Math.round((((rawRot % 360) + 360) % 360) * 10) / 10;
+                    const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+                    const isSnapped = SNAP_ANGLES.some((snap) => Math.abs(normalizedRot - (snap % 360)) < 0.8);
+
+                    const rotaterAnchor = tr.findOne('.rotater');
+                    let hudX = targetNode.x();
+                    let hudY = targetNode.y() - 32;
+                    if (rotaterAnchor) {
+                      const absPos = rotaterAnchor.getAbsolutePosition();
+                      const stageTransform = stageRef.current?.getAbsoluteTransform().copy().invert();
+                      if (stageTransform) {
+                        const local = stageTransform.point(absPos);
+                        hudX = local.x;
+                        hudY = local.y - 28;
+                      }
+                    }
+
+                    setRotationHud({
+                      angle: normalizedRot === 360 ? 0 : Math.round(normalizedRot),
+                      snapped: isSnapped,
+                      x: hudX,
+                      y: hudY,
+                    });
+                  }
+                }
+
                 // Live Real-Time WYSIWYG 60 FPS Multi-Frame Transform during mouse dragging
                 if (selectedFrameIds.length > 1 && multiGroupInfo && activeSpread) {
-                  const activeAnchor = activeTransformAnchorRef.current || trRef.current?.getActiveAnchor();
                   const proxyNode = multiGroupRef.current;
                   if (!proxyNode) return;
 
@@ -2792,8 +2879,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     }
                   }
                   multiTransformInitialStateRef.current = null;
-                  activeTransformAnchorRef.current = null;
                 }
+
+                activeTransformAnchorRef.current = null;
+                setRotationHud(null);
 
                 tr.keepRatio(true);
                 tr.update();
@@ -2965,6 +3054,36 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 </Group>
               );
             })}
+
+            {/* Live Interactive Rotation Snapping HUD Badge */}
+            {rotationHud && (
+              <Group
+                key="rotation-angle-hud"
+                x={rotationHud.x}
+                y={rotationHud.y}
+                listening={false}
+              >
+                <Label offsetX={rotationHud.angle >= 100 ? 20 : 16} offsetY={12}>
+                  <Tag
+                    fill="#090d16"
+                    stroke={rotationHud.snapped ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)'}
+                    strokeWidth={rotationHud.snapped ? 1.5 : 1}
+                    cornerRadius={4}
+                    shadowColor={rotationHud.snapped ? 'rgba(59, 130, 246, 0.5)' : 'rgba(0, 0, 0, 0.6)'}
+                    shadowBlur={rotationHud.snapped ? 10 : 6}
+                    shadowOffset={{ x: 0, y: 1 }}
+                  />
+                  <KonvaText
+                    text={`${rotationHud.angle}°`}
+                    fill={rotationHud.snapped ? '#60a5fa' : '#f8fafc'}
+                    fontSize={11}
+                    fontStyle="bold"
+                    padding={5}
+                    align="center"
+                  />
+                </Label>
+              </Group>
+            )}
           </Layer>
         </Stage>
 
