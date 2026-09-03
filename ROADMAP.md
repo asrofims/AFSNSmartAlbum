@@ -112,6 +112,9 @@
 - [x] Top Toolbar "Add Text" Tool & Global Shortcut <kbd>T</kbd>
 - [x] Proportional Font Size Scaling on Canvas Corner Resize (with granular 1pt minimum font size support)
 - [x] Content-Aware Auto-Fit Bounding Box (`calculateTextFitHeight` & "Fit Box" action)
+- [x] Dual InDesign-Style Text Frame Fitting: `↕ Fit Height to Text` (Preserve Column Width) & `⤢ Fit Frame to Content` (Hug Width & Height, <kbd>Ctrl+Alt+C</kbd>)
+- [x] Handle-Aware Text Transformations: Free vertical resizing via top/bottom center handles, column word-wrapping via side handles, and zero-jump proportional diagonal scaling
+- [x] Typographic Safety Breathing Buffer (`safetyBufferPt = 6` / ~2.1mm) & ceiling rounding preventing accidental sub-pixel line drops
 - [x] Vertical Middle Alignment (`verticalAlign: 'middle'` default with Top/Middle/Bottom segmented controls)
 - [x] Dynamic Style Preset Auto-Fitting (tight content wrapping without empty bottom space)
 - [x] Centralized Smooth Auto-Scroll to Top of Properties Panel for Selected Photos & Text

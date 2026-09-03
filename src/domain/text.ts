@@ -61,7 +61,7 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   verticalAlign: 'middle',
   lineHeight: 1.3,
   letterSpacing: 0,
-  padding: 6,
+  padding: 4,
   wordWrap: 'word',
   ellipsis: false,
 };
@@ -274,6 +274,155 @@ export function createTextNode(options: {
 }
 
 /**
+ * Calculates exact fitting width and height for text content with intelligent word wrapping.
+ * - For short text (titles, names, dates): snugly hugs font glyphs horizontally and vertically.
+ * - For long text (paragraphs, stories, quotes): automatically wraps words within boundaries
+ *   (either established box width or maxAllowedWidth) and expands height cleanly to fit all lines.
+ */
+export function calculateTextFitDimensions(
+  text: string,
+  style: Partial<TextStyle>,
+  unit: Unit = 'mm',
+  dpi: number = 300,
+  targetWidth?: number,
+  maxAllowedWidth?: number
+): { width: number; height: number } {
+  const plainText = stripRichTextMarkup(text || ' ');
+  const fontSize = style.fontSize || 24;
+  const lineHeight = style.lineHeight || 1.3;
+  const letterSpacing = style.letterSpacing || 0;
+  const paddingPt = Number.isFinite(style.padding) ? Math.min(style.padding as number, 4) : 4;
+
+  const fontFamily = style.fontFamily || 'Inter';
+  const fontWeight = style.fontWeight || 'normal';
+  const fontStyle = style.fontStyle || 'normal';
+
+  // Determine maximum width boundary in points
+  // Default boundary: 150mm (~425pt) if not specified
+  const defaultMaxMm = 150;
+  const maxBoundaryPt = maxAllowedWidth !== undefined && maxAllowedWidth > 0
+    ? convertUnitToPt(maxAllowedWidth, unit, dpi)
+    : convertUnitToPt(defaultMaxMm, 'mm', dpi);
+
+  const targetWidthPt = targetWidth !== undefined && targetWidth > 0
+    ? convertUnitToPt(targetWidth, unit, dpi)
+    : undefined;
+
+  // Measurement context
+  let measureFn = (str: string): number => str.length * fontSize * 0.55;
+
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+        measureFn = (str: string) => {
+          let w = ctx.measureText(str).width;
+          if (letterSpacing > 0 && str.length > 1) {
+            w += (str.length - 1) * letterSpacing;
+          }
+          return w;
+        };
+      }
+    } catch {}
+  }
+
+  // 1. First measure unconstrained single-line width of each explicit paragraph (\n)
+  const paragraphs = plainText.split('\n');
+  let maxParagraphWidthPt = 0;
+  for (const para of paragraphs) {
+    const w = measureFn(para);
+    if (w > maxParagraphWidthPt) {
+      maxParagraphWidthPt = w;
+    }
+  }
+
+  // 2. Decide effective wrapping width limit
+  // If targetWidth was explicitly specified (e.g. user-established box width):
+  //   Wrap within targetWidth (or maxBoundaryPt).
+  // If no targetWidth was specified:
+  //   If text is short (< maxBoundaryPt), width hugs the text!
+  //   If text is long (> maxBoundaryPt), wrap at maxBoundaryPt!
+  let wrapLimitPt: number;
+  if (targetWidthPt !== undefined && targetWidthPt > 0) {
+    wrapLimitPt = Math.min(targetWidthPt, maxBoundaryPt);
+  } else {
+    wrapLimitPt = maxBoundaryPt;
+  }
+
+  const safetyBufferPt = 6;
+  const usableWrapWidthPt = Math.max(30, wrapLimitPt - (paddingPt * 2) - safetyBufferPt);
+
+  // 3. Word-wrap paragraphs if any paragraph exceeds usableWrapWidthPt
+  let wrappedLineCount = 0;
+  let maxWrappedLineWidthPt = 0;
+
+  for (const para of paragraphs) {
+    if (!para || para.trim().length === 0) {
+      wrappedLineCount += 1;
+      continue;
+    }
+
+    const words = para.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      wrappedLineCount += 1;
+      continue;
+    }
+
+    let currentLine = '';
+    let currentLineWidth = 0;
+
+    for (const word of words) {
+      const wordWidth = measureFn(word);
+      const spaceWidth = measureFn(' ');
+
+      if (!currentLine) {
+        currentLine = word;
+        currentLineWidth = wordWidth;
+      } else {
+        const testWidth = currentLineWidth + spaceWidth + wordWidth;
+        if (testWidth <= usableWrapWidthPt) {
+          currentLine += ' ' + word;
+          currentLineWidth = testWidth;
+        } else {
+          // Break line!
+          wrappedLineCount += 1;
+          if (currentLineWidth > maxWrappedLineWidthPt) {
+            maxWrappedLineWidthPt = currentLineWidth;
+          }
+          currentLine = word;
+          currentLineWidth = wordWidth;
+        }
+      }
+    }
+
+    if (currentLine) {
+      wrappedLineCount += 1;
+      if (currentLineWidth > maxWrappedLineWidthPt) {
+        maxWrappedLineWidthPt = currentLineWidth;
+      }
+    }
+  }
+
+  // Final fitted width and height:
+  // Add 6pt (~2.1mm) safety buffer to guarantee browser sub-pixel antialiasing
+  // and DPI rounding NEVER drop the last word to a new line!
+  const tightestWidthPt = Math.max(30, maxWrappedLineWidthPt + (paddingPt * 2) + safetyBufferPt);
+  const finalWidthPt = Math.min(tightestWidthPt, wrapLimitPt);
+
+  const totalHeightPt = (Math.max(1, wrappedLineCount) * fontSize * lineHeight) + (paddingPt * 2);
+
+  const widthInUnit = convertPtToUnit(finalWidthPt, unit, dpi);
+  const heightInUnit = convertPtToUnit(totalHeightPt, unit, dpi);
+
+  return {
+    width: Math.max(convertPtToUnit(15, unit, dpi), Math.ceil(widthInUnit * 100) / 100),
+    height: Math.max(convertPtToUnit(8, unit, dpi), Math.ceil(heightInUnit * 100) / 100),
+  };
+}
+
+/**
  * Calculates accurate fitting height for text content so text frames wrap tightly
  * with balanced top and bottom padding without creating huge blank areas.
  */
@@ -284,30 +433,8 @@ export function calculateTextFitHeight(
   unit: Unit = 'mm',
   dpi: number = 300
 ): number {
-  const plainText = stripRichTextMarkup(text || ' ');
-  const fontSize = style.fontSize || 24;
-  const lineHeight = style.lineHeight || 1.3;
-  const paddingPt = Number.isFinite(style.padding) ? (style.padding as number) : 6;
-
-  const widthInPt = convertUnitToPt(boxWidth, unit, dpi);
-  const usableWidthPt = Math.max(30, widthInPt - (paddingPt * 2));
-  const avgCharWidthPt = Math.max(1, fontSize * 0.52);
-  const charsPerLine = Math.max(1, Math.floor(usableWidthPt / avgCharWidthPt));
-
-  const paragraphs = plainText.split('\n');
-  let lineCount = 0;
-  for (const para of paragraphs) {
-    const len = para.length;
-    if (len === 0) {
-      lineCount += 1;
-    } else {
-      lineCount += Math.max(1, Math.ceil(len / charsPerLine));
-    }
-  }
-
-  const contentHeightPt = (lineCount * fontSize * lineHeight) + (paddingPt * 2);
-  const fitHeightInUnit = convertPtToUnit(contentHeightPt, unit, dpi);
-  return Math.max(convertPtToUnit(10, unit, dpi), Math.round(fitHeightInUnit * 100) / 100);
+  const fitted = calculateTextFitDimensions(text, style, unit, dpi, boxWidth);
+  return fitted.height;
 }
 
 export function applyTextPreset(

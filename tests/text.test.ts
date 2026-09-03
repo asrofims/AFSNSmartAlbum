@@ -8,6 +8,7 @@ import {
   isTextElement,
   TEXT_PRESETS,
   DEFAULT_TEXT_STYLE,
+  calculateTextFitDimensions,
 } from '../src/domain/text';
 import { convertPtToUnit, ptToScreenPx } from '../src/domain/units';
 
@@ -104,5 +105,25 @@ assert.strictEqual(resolvedTextGroupIds.length, 2, 'Selecting one grouped text m
 const ungroupedTexts = groupedTexts.map((el) => ({ ...el, groupId: undefined }));
 assert.strictEqual(ungroupedTexts[0].groupId, undefined, 'Text 1 must be ungrouped');
 assert.strictEqual(ungroupedTexts[1].groupId, undefined, 'Text 2 must be ungrouped');
+
+// 11. calculateTextFitDimensions - snug bounding box verification
+const shortFit = calculateTextFitDimensions('Wedding', { fontSize: 24, padding: 4 }, 'mm', 300);
+assert.ok(shortFit.width > 0 && shortFit.width < 60, 'Short text "Wedding" must have a compact width (<60mm) instead of oversized default');
+assert.ok(shortFit.height > 0 && shortFit.height < 20, 'Single line text height must be compact (<20mm)');
+
+const longFit = calculateTextFitDimensions('Our Beautiful Wedding Day Memories in Bali', { fontSize: 24, padding: 4 }, 'mm', 300);
+assert.ok(longFit.width > shortFit.width, 'Longer text must calculate larger width than short text');
+
+// 12. calculateTextFitDimensions - long text word wrapping boundary verification
+const longStory = 'Kami mengundang bapak dan ibu sekalian untuk hadir dalam acara pernikahan kami yang akan diselenggarakan di Jakarta.';
+const wrappedFit = calculateTextFitDimensions(longStory, { fontSize: 24, padding: 4 }, 'mm', 300, undefined, 120);
+assert.ok(wrappedFit.width <= 120, 'Long text width must be bounded by maxAllowedWidth (120mm)');
+assert.ok(wrappedFit.height > shortFit.height * 2, 'Long text must wrap into multiple lines with taller height');
+
+// 13. calculateTextFitDimensions - fit frame tightly to content without unwrapping
+const multilineText = 'First Line Title\nSecond Line Date';
+const multilineFit = calculateTextFitDimensions(multilineText, { fontSize: 24, padding: 4 }, 'mm', 300, 100);
+assert.ok(multilineFit.width < 100, 'Fit box to text must shrink width to hug longest line (<100mm)');
+assert.ok(multilineFit.height > shortFit.height * 1.5, 'Multiline fit height must preserve multiple lines');
 
 console.log('✓ All Text Domain unit tests passed successfully!');

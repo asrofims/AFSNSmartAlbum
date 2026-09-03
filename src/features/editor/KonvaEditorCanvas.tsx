@@ -25,7 +25,7 @@ import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
-import { TextNodeElement } from '../../domain/text';
+import { TextNodeElement, calculateTextFitHeight, calculateTextFitDimensions } from '../../domain/text';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -1018,6 +1018,28 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           }
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (e.altKey && selectedFrameIds.length === 1) {
+          const selEl = (activeSpread?.elements || []).find((el) => el.id === selectedFrameIds[0]);
+          if (selEl && selEl.type === 'text') {
+            e.preventDefault();
+            const textEl = selEl as TextNodeElement;
+            const maxTextW = currentProject ? currentProject.canvasWidth * 0.85 : undefined;
+            const fitted = calculateTextFitDimensions(
+              textEl.text || ' ',
+              textEl.style || {},
+              dims.unit,
+              dims.dpi,
+              undefined,
+              maxTextW
+            );
+            updateTextElement(activeSpread.id, textEl.id, {
+              width: fitted.width,
+              height: fitted.height,
+            });
+            if (onToast) onToast('✓ Fitted frame tightly around text content');
+            return;
+          }
+        }
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           copySelectedFrames(activeSpread.id);
@@ -1481,16 +1503,57 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     const items: ContextMenuItem[] = [];
 
-    // If single text element selected, allow direct edit via context menu
+    // If single text element selected, allow direct edit and fit actions via context menu
     if (count === 1 && isAllText && selectedElements[0]) {
-      const textId = selectedElements[0].id;
-      items.push({
-        id: 'edit-text',
-        label: 'Edit Text',
-        icon: '✏️',
-        shortcut: 'Double-Click',
-        onClick: () => setEditingTextElementId(textId),
-      });
+      const textEl = selectedElements[0] as TextNodeElement;
+      items.push(
+        {
+          id: 'edit-text',
+          label: 'Edit Text',
+          icon: '✏️',
+          shortcut: 'Double-Click',
+          onClick: () => setEditingTextElementId(textEl.id),
+        },
+        {
+          id: 'fit-height-text',
+          label: 'Fit Height to Text (Preserve Width)',
+          icon: '↕',
+          onClick: () => {
+            const fittedH = calculateTextFitHeight(
+              textEl.text || ' ',
+              textEl.style || {},
+              textEl.width,
+              dims.unit,
+              dims.dpi
+            );
+            updateTextElement(activeSpread.id, textEl.id, { height: fittedH });
+            if (onToast) onToast('✓ Fitted frame height to text (width preserved)');
+          },
+        },
+        {
+          id: 'fit-both-text',
+          label: 'Fit Frame to Content (Hug Both)',
+          icon: '⤢',
+          shortcut: 'Ctrl+Alt+C',
+          onClick: () => {
+            const maxTextW = currentProject ? currentProject.canvasWidth * 0.85 : undefined;
+            const fitted = calculateTextFitDimensions(
+              textEl.text || ' ',
+              textEl.style || {},
+              dims.unit,
+              dims.dpi,
+              undefined,
+              maxTextW
+            );
+            updateTextElement(activeSpread.id, textEl.id, {
+              width: fitted.width,
+              height: fitted.height,
+            });
+            if (onToast) onToast('✓ Fitted frame tightly around text content');
+          },
+        },
+        { divider: true, id: 'div-text-fit', label: '' }
+      );
     }
 
     items.push(
@@ -2098,6 +2161,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     scaleFactor={scaleFactor}
                     canvasUnit={dims.unit}
                     dpi={dims.dpi}
+                    activeAnchor={activeTransformAnchorRef.current}
                     onSelect={(e) => {
                       if (justDroppedRef.current) return;
                       if (e) {
@@ -2589,7 +2653,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             rotateEnabled
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             rotationSnapTolerance={isShiftPressed ? 180 : 5}
-            keepRatio={selectedFramesList.length === 1 && selectedFramesList[0]?.type === 'text' ? false : true}
+            keepRatio={true}
             rotateAnchorOffset={24}
             rotateAnchorCursor={ROTATE_CURSOR}
               onContextMenu={(e) => {
@@ -2641,12 +2705,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   anchor === 'bottom-left' ||
                   anchor === 'bottom-right';
 
-                const isSingleText = selectedFramesList.length === 1 && selectedFramesList[0]?.type === 'text';
-                if (isSingleText) {
-                  tr.keepRatio(isCorner);
-                } else {
-                  tr.keepRatio(isCorner || selectedFrameIds.length > 1);
-                }
+                tr.keepRatio(isCorner || selectedFrameIds.length > 1);
 
                 // Lock to high-contrast curved rotation cursor during active rotation
                 if (anchor === 'rotater') {
@@ -3145,8 +3204,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             onCommit={(newText, newRanges) => {
               const currentId = editingTextElement?.id;
               if (currentId) {
+                const boxW = editingTextElement.width;
+                const fittedH = calculateTextFitHeight(
+                  newText,
+                  editingTextElement.style || {},
+                  boxW,
+                  dims.unit,
+                  dims.dpi
+                );
                 updateTextElement(activeSpread.id, currentId, {
                   text: newText,
+                  height: fittedH,
                   ...(newRanges !== undefined ? { styledRanges: newRanges } : {}),
                 });
               }

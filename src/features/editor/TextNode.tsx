@@ -10,6 +10,7 @@ import {
   rangesToTextRuns,
   layoutRichText,
   drawRichTextLayout,
+  calculateTextFitHeight,
 } from '../../domain/text';
 import { roundToHundredth } from '../../domain/editor';
 import { Unit, ptToScreenPx, convertPtToUnit, convertUnit } from '../../domain/units';
@@ -22,6 +23,7 @@ interface TextNodeProps {
   scaleFactor: number;
   canvasUnit?: Unit;
   dpi?: number;
+  activeAnchor?: string | null;
   onSelect: (e?: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -39,6 +41,7 @@ export function TextNode({
   scaleFactor,
   canvasUnit,
   dpi,
+  activeAnchor,
   onSelect,
   onDragStart,
   onDragMove,
@@ -56,8 +59,8 @@ export function TextNode({
 
   const pixelX = Number.isFinite(element.x * scaleFactor) ? element.x * scaleFactor : 0;
   const pixelY = Number.isFinite(element.y * scaleFactor) ? element.y * scaleFactor : 0;
-  const pixelW = Math.max(20, Number.isFinite(element.width * scaleFactor) ? element.width * scaleFactor : 60);
-  const pixelH = Math.max(14, Number.isFinite(element.height * scaleFactor) ? element.height * scaleFactor : 20);
+  const pixelW = Math.max(10, Number.isFinite(element.width * scaleFactor) ? element.width * scaleFactor : 20);
+  const pixelH = Math.max(8, Number.isFinite(element.height * scaleFactor) ? element.height * scaleFactor : 14);
 
   // Safe typographic point size conversion directly to screen pixels (supports down to 1pt)
   const fontPt = Number.isFinite(style.fontSize) && style.fontSize > 0 ? style.fontSize : 24;
@@ -69,7 +72,7 @@ export function TextNode({
   const isItalic = style.fontStyle === 'italic';
   const fontStyle = isBold ? (isItalic ? 'italic bold' : 'bold') : (isItalic ? 'italic' : 'normal');
 
-  const paddingPt = Number.isFinite(style.padding) ? style.padding : 6;
+  const paddingPt = Number.isFinite(style.padding) ? style.padding : 4;
   const rawPaddingPx = ptToScreenPx(paddingPt, unit, currentDpi, scaleFactor);
   const paddingPx = Math.max(0, Math.min(Math.floor(pixelW / 4), Number.isFinite(rawPaddingPx) ? rawPaddingPx : 0));
 
@@ -166,20 +169,69 @@ export function TextNode({
         rawW = Math.max(minW, rawW);
         rawH = Math.max(minH, rawH);
 
-        // Check if this was a corner scale (uniform proportional scaling)
-        // If corner scaling: update style.fontSize proportionally so canvas resize and panel slider are 100% consistent!
-        const isCornerScale = Math.abs(scaleX - scaleY) < 0.08 && (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01);
+        // Check if this was a corner/diagonal scale (uniform proportional scaling)
+        const anchor = activeAnchor;
+        const isKnownCornerAnchor =
+          anchor === 'top-left' ||
+          anchor === 'top-right' ||
+          anchor === 'bottom-left' ||
+          anchor === 'bottom-right';
+
+        const isVerticalAnchor =
+          anchor === 'top-center' ||
+          anchor === 'bottom-center' ||
+          (!isKnownCornerAnchor && Math.abs(scaleY - 1) > 0.005 && Math.abs(scaleX - 1) < 0.005);
+
+        const isHorizontalAnchor =
+          anchor === 'middle-left' ||
+          anchor === 'middle-right' ||
+          (!isKnownCornerAnchor && Math.abs(scaleX - 1) > 0.005 && Math.abs(scaleY - 1) < 0.005);
+
+        const isCornerScale = isKnownCornerAnchor || (
+          !isVerticalAnchor &&
+          !isHorizontalAnchor &&
+          Math.abs(scaleX - scaleY) < 0.12 &&
+          (Math.abs(scaleX - 1) > 0.005 || Math.abs(scaleY - 1) > 0.005)
+        );
+
         const currentFontSize = style.fontSize || 24;
+        const avgScale = (scaleX + scaleY) / 2;
         const newFontSize = isCornerScale
-          ? Math.max(1, Math.min(200, Math.round((currentFontSize * scaleX) * 10) / 10))
+          ? Math.max(1, Math.min(200, Math.round((currentFontSize * avgScale) * 10) / 10))
           : currentFontSize;
+
+        const finalX = node.x() / scaleFactor;
+        const finalY = node.y() / scaleFactor;
+
+        if (isHorizontalAnchor) {
+          // If user dragged a horizontal side handle (middle-left or middle-right):
+          // auto-fit height so text lines wrap/unwrap cleanly without blank gaps or clipping
+          rawH = calculateTextFitHeight(
+            element.text || ' ',
+            style,
+            rawW,
+            unit,
+            currentDpi
+          );
+        } else if (isVerticalAnchor) {
+          // If user dragged top-center or bottom-center handle:
+          // allow free vertical height resizing, ensuring it does not squish below min text height
+          const minTextH = calculateTextFitHeight(
+            element.text || ' ',
+            style,
+            rawW,
+            unit,
+            currentDpi
+          );
+          rawH = Math.max(minH, Math.max(minTextH, rawH));
+        }
 
         node.scaleX(1);
         node.scaleY(1);
 
         onElementChange({
-          x: roundToHundredth(node.x() / scaleFactor),
-          y: roundToHundredth(node.y() / scaleFactor),
+          x: roundToHundredth(finalX),
+          y: roundToHundredth(finalY),
           width: roundToHundredth(rawW),
           height: roundToHundredth(rawH),
           rotation: Math.round(node.rotation()),
@@ -191,7 +243,7 @@ export function TextNode({
             ...(element.styledRanges && element.styledRanges.length > 0 ? {
               styledRanges: element.styledRanges.map((r) => ({
                 ...r,
-                fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scaleX) * 10) / 10)) : undefined,
+                fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * avgScale) * 10) / 10)) : undefined,
               })),
             } : {}),
           } : {}),

@@ -18,12 +18,13 @@ import {
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
 import { Album, getAllAlbumSpreads, AlbumElement } from '../domain/album';
-import { convertUnit } from '../domain/units';
 import {
   createTextNode,
   TextNodeElement,
   TextStyle,
   TextPresetKey,
+  calculateTextFitDimensions,
+  DEFAULT_TEXT_STYLE,
 } from '../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import { useAlbumStore } from './albumStore';
@@ -459,16 +460,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const canvasUnit = currentProject.canvasUnit;
     const dpi = currentProject.canvasDpi || 300;
 
-    // Convert standard 60mm x 16mm text box to current project's canvas unit
-    const defaultBoxW = Math.round(convertUnit(60, 'mm', canvasUnit, dpi, 2) * 100) / 100;
-    const defaultBoxH = Math.round(convertUnit(16, 'mm', canvasUnit, dpi, 2) * 100) / 100;
+    // Calculate snug box dimensions fitting the font and text content tightly
+    const initialText = options?.text ?? 'Add a title or story here';
+    const mergedStyle = { ...DEFAULT_TEXT_STYLE, ...(options?.style || {}) };
+    const fittedDims = calculateTextFitDimensions(
+      initialText,
+      mergedStyle,
+      canvasUnit,
+      dpi,
+      pageW * 0.8
+    );
 
     const node = createTextNode({
-      text: options?.text ?? 'Add a title or story here',
+      text: initialText,
       preset: options?.preset,
       style: options?.style,
-      width: options?.width ?? defaultBoxW,
-      height: options?.height ?? defaultBoxH,
+      width: options?.width ?? fittedDims.width,
+      height: options?.height ?? fittedDims.height,
       unit: canvasUnit,
       dpi,
     });

@@ -10,6 +10,7 @@ import {
   TEXT_PRESETS,
   TextPresetKey,
   applyTextPreset,
+  calculateTextFitDimensions,
   calculateTextFitHeight,
   DEFAULT_TEXT_STYLE,
   StyledRange,
@@ -144,7 +145,8 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
     }
   };
 
-  const handleFitBoxToText = () => {
+  // 1. Fit Height Only (Preserve Column Width) — Ideal for Paragraphs & Captions
+  const handleFitHeightOnly = () => {
     const fittedH = calculateTextFitHeight(
       element.text || ' ',
       style,
@@ -156,7 +158,27 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
       height: fittedH,
     });
     if (onToast) {
-      onToast('✓ Fitted frame height tightly to text content');
+      onToast('✓ Fitted frame height to text (width preserved)');
+    }
+  };
+
+  // 2. Fit Frame to Content (Hug Width & Height) — Ideal for Titles, Dates, Badges
+  const handleFitBothWidthAndHeight = () => {
+    const maxTextW = currentProject ? currentProject.canvasWidth * 0.85 : undefined;
+    const fitted = calculateTextFitDimensions(
+      element.text || ' ',
+      style,
+      currentProject?.canvasUnit || 'mm',
+      currentProject?.canvasDpi || 300,
+      undefined,
+      maxTextW
+    );
+    updateTextElement(activeSpreadId, element.id, {
+      width: fitted.width,
+      height: fitted.height,
+    });
+    if (onToast) {
+      onToast('✓ Fitted frame tightly around text content');
     }
   };
 
@@ -175,7 +197,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button
             type="button"
-            onClick={handleFitBoxToText}
+            onClick={handleFitHeightOnly}
             style={{
               width: '30px',
               height: '30px',
@@ -189,7 +211,31 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               justifyContent: 'center',
               transition: 'all 0.15s ease',
             }}
-            title="Fit Box to Text"
+            title="Fit Height to Text (Preserve Column Width)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="7 6 12 1 17 6" />
+              <polyline points="7 18 12 23 17 18" />
+              <line x1="12" y1="1" x2="12" y2="23" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={handleFitBothWidthAndHeight}
+            style={{
+              width: '30px',
+              height: '30px',
+              borderRadius: '5px',
+              background: 'var(--color-surface-raised, rgba(255, 255, 255, 0.05))',
+              border: '1px solid var(--color-border, #334155)',
+              color: 'var(--color-text-secondary, #94a3b8)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+            }}
+            title="Fit Frame to Content (Hug Width & Height)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="4 14 10 14 10 20" />
@@ -306,7 +352,18 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             const nextRanges = shiftRangesOnTextEdit(element.styledRanges, changeStart, removedLen, insertedLen);
 
             setEditingTextElementId(null);
-            updateTextElement(activeSpreadId, element.id, { text: next, styledRanges: nextRanges }, true);
+            const fittedH = calculateTextFitHeight(
+              next,
+              element.style || {},
+              element.width,
+              currentProject?.canvasUnit || 'mm',
+              currentProject?.canvasDpi || 300
+            );
+            updateTextElement(activeSpreadId, element.id, {
+              text: next,
+              styledRanges: nextRanges,
+              height: fittedH,
+            }, true);
           }}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
