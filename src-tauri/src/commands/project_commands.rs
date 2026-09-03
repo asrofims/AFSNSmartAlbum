@@ -346,8 +346,8 @@ pub async fn import_afsn_with_dialog(
 ) -> Result<Option<ProjectPackagePayload>, String> {
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
-            .set_title("Open AFSNSmartAlbum Project or Package (.afsn, .zip)")
-            .add_filter("AFSNSmartAlbum Supported Files (*.afsn, *.zip, *.afsnz)", &["afsn", "zip", "afsnz"])
+            .set_title("Open AFSNSmartAlbum Project (.afsn)")
+            .add_filter("AFSNSmartAlbum Project (*.afsn)", &["afsn"])
             .pick_file()
     })
     .await

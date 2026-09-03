@@ -87,7 +87,7 @@ export function WelcomeScreen() {
               onClick={async () => {
                 await useProjectStore.getState().importProjectFromAfsn();
               }}
-              title="Open an exported .afsn or .zip project file"
+              title="Open an exported .afsn project file"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
@@ -181,7 +181,7 @@ export function WelcomeScreen() {
         isOpen={isClearAllDialogOpen}
         title="Clear Recent Projects"
         message="Are you sure you want to clear all projects from the recent list?"
-        detail="This will remove the projects from the internal database. Your original photo files and any exported .afsn / .zip files on your computer remain completely safe."
+        detail="This will remove the projects from the internal database. Your original photo files and any exported .afsn files on your computer remain completely safe."
         confirmText="Clear History"
         cancelText="Cancel"
         variant="danger"
