@@ -459,9 +459,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const canvasUnit = currentProject.canvasUnit;
     const dpi = currentProject.canvasDpi || 300;
 
-    // Convert standard 100mm x 24mm text box to current project's canvas unit
-    const defaultBoxW = Math.round(convertUnit(100, 'mm', canvasUnit, dpi, 2) * 100) / 100;
-    const defaultBoxH = Math.round(convertUnit(24, 'mm', canvasUnit, dpi, 2) * 100) / 100;
+    // Convert standard 60mm x 16mm text box to current project's canvas unit
+    const defaultBoxW = Math.round(convertUnit(60, 'mm', canvasUnit, dpi, 2) * 100) / 100;
+    const defaultBoxH = Math.round(convertUnit(16, 'mm', canvasUnit, dpi, 2) * 100) / 100;
 
     const node = createTextNode({
       text: options?.text ?? 'Add a title or story here',

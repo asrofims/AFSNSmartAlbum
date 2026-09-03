@@ -280,7 +280,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             borderRadius: '4px',
             background: 'var(--color-surface-raised, #1e293b)',
             border: '1px solid var(--color-border, #334155)',
-            color: style.fill || 'var(--color-text-primary, #f8fafc)',
+            color: '#f8fafc',
             fontWeight: (style.fontWeight === 'bold' || Number(style.fontWeight) >= 600) ? 'bold' : 'normal',
             fontStyle: style.fontStyle === 'italic' ? 'italic' : 'normal',
             resize: 'vertical',
