@@ -176,7 +176,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
             className={`${styles.headerActionBtn} ${styles.unlockAllBtn}`}
             onClick={handleUnlockAll}
             disabled={lockedElements.length === 0}
-            title="Unlock all items on this spread (Ctrl+Shift+L)"
+            title="Unlock all items on this spread (Ctrl+Alt+L)"
           >
             <span>🔓</span>
             <span>Unlock All</span>

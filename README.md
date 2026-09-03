@@ -95,6 +95,7 @@ Export album spreads at true **300 DPI** print resolution:
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Delete Selected Frame(s) |
 | <kbd>Ctrl</kbd> + <kbd>L</kbd> | Lock Selected Frame(s) |
 | <kbd>Alt</kbd> + <kbd>L</kbd> | Unlock Selected Frame(s) |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> | Unlock All Items on Spread |
 | <kbd>Ctrl</kbd> + <kbd>G</kbd> | Group Selected Frames |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> | Ungroup Selected Frames |
 | <kbd>S</kbd> | Swap 2 Selected Photos |

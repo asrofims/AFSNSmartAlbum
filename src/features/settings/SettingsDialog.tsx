@@ -360,6 +360,10 @@ export function SettingsDialog() {
                       <td><kbd className={styles.kbd}>Alt</kbd> + <kbd className={styles.kbd}>L</kbd></td>
                     </tr>
                     <tr>
+                      <td>Unlock All Frames on Spread</td>
+                      <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>Alt</kbd> + <kbd className={styles.kbd}>L</kbd></td>
+                    </tr>
+                    <tr>
                       <td>Group Selected Frames</td>
                       <td><kbd className={styles.kbd}>Ctrl</kbd> + <kbd className={styles.kbd}>G</kbd></td>
                     </tr>

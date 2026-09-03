@@ -247,8 +247,8 @@ export function FrameToolbar() {
                   ? `Lock ${selectedFrameIds.length} Frames (Ctrl+L)`
                   : 'Lock Photo Frame (Ctrl+L)'
                 : selectedFrameIds.length > 1
-                ? `Unlock ${selectedFrameIds.length} Frames (Ctrl+Shift+L)`
-                : 'Unlock Photo Frame (Ctrl+Shift+L)'
+                ? `Unlock ${selectedFrameIds.length} Frames (Alt+L)`
+                : 'Unlock Photo Frame (Alt+L)'
             }
           >
             {selectedElements.every((f) => f.locked) ? (

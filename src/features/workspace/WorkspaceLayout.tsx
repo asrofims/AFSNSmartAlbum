@@ -301,8 +301,23 @@ export function WorkspaceLayout() {
         return;
       }
 
-      // 3. Ctrl + L -> Lock selected images / texts
-      if (cmdOrCtrl && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+      // 3. Ctrl + Alt + L -> Unlock all items on spread
+      if (cmdOrCtrl && e.altKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        if (activeSpread) {
+          const lockedCount = (activeSpread.elements || []).filter((el) => el.locked).length;
+          if (lockedCount > 0) {
+            useEditorStore.getState().unlockAllFramesOnSpread(activeSpread.id);
+            showToast(`🔓 Unlocked all ${lockedCount} element(s) on spread`);
+          } else {
+            showToast('⚠️ No locked elements found on spread');
+          }
+        }
+        return;
+      }
+
+      // 4. Ctrl + L -> Lock selected images / texts
+      if (cmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         if (activeSpread) {
           if (selectedFrameIds.length > 0) {
@@ -315,7 +330,7 @@ export function WorkspaceLayout() {
         return;
       }
 
-      // 4. Alt + L (or Ctrl + Shift + L) -> Unlock selected images / texts
+      // 5. Alt + L (or Ctrl + Shift + L) -> Unlock selected images / texts
       if ((e.altKey && (e.key === 'l' || e.key === 'L')) || (cmdOrCtrl && e.shiftKey && (e.key === 'l' || e.key === 'L'))) {
         e.preventDefault();
         if (activeSpread) {
@@ -1020,7 +1035,7 @@ export function WorkspaceLayout() {
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease',
                               }}
-                              title={hasUnlocked ? 'Lock selected frames (Ctrl+L)' : 'Unlock selected frames (Ctrl+Shift+L)'}
+                              title={hasUnlocked ? 'Lock selected frames (Ctrl+L)' : 'Unlock selected frames (Alt+L)'}
                             >
                               <span>{isAllLocked ? '🔒' : '🔓'}</span>
                               <span>{isAllLocked ? 'Locked' : hasUnlocked ? 'Lock' : 'Unlock'}</span>
@@ -1235,7 +1250,7 @@ export function WorkspaceLayout() {
                             cursor: 'pointer',
                             transition: 'all 0.15s ease',
                           }}
-                          title={selectedFrame.locked ? 'Unlock Text (Ctrl+Shift+L)' : 'Lock Text (Ctrl+L)'}
+                          title={selectedFrame.locked ? 'Unlock Text (Alt+L)' : 'Lock Text (Ctrl+L)'}
                         >
                           <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
                           <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
@@ -1282,7 +1297,7 @@ export function WorkspaceLayout() {
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
                         }}
-                        title={selectedFrame.locked ? 'Unlock Photo (Ctrl+Shift+L)' : 'Lock Photo (Ctrl+L)'}
+                        title={selectedFrame.locked ? 'Unlock Photo (Alt+L)' : 'Lock Photo (Ctrl+L)'}
                       >
                         <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
                         <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
