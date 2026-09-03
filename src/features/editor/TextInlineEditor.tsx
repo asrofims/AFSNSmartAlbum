@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
-import { TextNodeElement, DEFAULT_TEXT_STYLE, wrapSelectionWithMarkup } from '../../domain/text';
+import {
+  TextNodeElement,
+  DEFAULT_TEXT_STYLE,
+  StyledRange,
+  applyStyleToRange,
+  shiftRangesOnTextEdit,
+} from '../../domain/text';
 import { Unit, ptToScreenPx, convertPtToUnit } from '../../domain/units';
 
 interface TextInlineEditorProps {
@@ -9,7 +15,7 @@ interface TextInlineEditorProps {
   scaleFactor: number;
   canvasUnit?: Unit;
   dpi?: number;
-  onCommit: (newText: string) => void;
+  onCommit: (newText: string, newRanges?: StyledRange[]) => void;
   onCancel: () => void;
 }
 
@@ -23,6 +29,7 @@ export function TextInlineEditor({
   onCancel,
 }: TextInlineEditorProps) {
   const [val, setVal] = useState(element.text || '');
+  const [ranges, setRanges] = useState<StyledRange[]>(element.styledRanges || []);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const committedRef = useRef(false);
 
@@ -33,13 +40,61 @@ export function TextInlineEditor({
   const safeCommit = (textToCommit: string) => {
     if (committedRef.current) return;
     committedRef.current = true;
-    onCommit(textToCommit);
+    onCommit(textToCommit, ranges);
   };
 
   const safeCancel = () => {
     if (committedRef.current) return;
     committedRef.current = true;
     onCancel();
+  };
+
+  const applyRangeStyle = (patch: Partial<Omit<StyledRange, 'id' | 'start' | 'end'>>) => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    if (start >= end) return;
+
+    const nextRanges = applyStyleToRange(ranges, start, end, patch);
+    setRanges(nextRanges);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(start, end);
+      }
+    }, 0);
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextVal = e.target.value;
+    const changeStart = e.target.selectionStart;
+    const removedLen = Math.max(0, val.length - nextVal.length);
+    const insertedLen = Math.max(0, nextVal.length - val.length);
+    const nextRanges = shiftRangesOnTextEdit(ranges, changeStart, removedLen, insertedLen);
+    setVal(nextVal);
+    setRanges(nextRanges);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      e.preventDefault();
+      safeCancel();
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      // Ctrl+Enter or Cmd+Enter commits
+      e.stopPropagation();
+      e.preventDefault();
+      safeCommit(val);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      applyRangeStyle({ fontWeight: 'bold' });
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      applyRangeStyle({ fontStyle: 'italic' });
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+      e.preventDefault();
+      applyRangeStyle({ textDecoration: 'underline' });
+    }
   };
 
   // Compute exact screen coordinate relative to stage container
@@ -93,43 +148,6 @@ export function TextInlineEditor({
     }
   }, []);
 
-  const applyFormat = (openTag: string, closeTag: string) => {
-    if (!textareaRef.current) return;
-    const start = textareaRef.current.selectionStart;
-    const end = textareaRef.current.selectionEnd;
-    const res = wrapSelectionWithMarkup(val, start, end, openTag, closeTag);
-    setVal(res.newText);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(res.newStart, res.newEnd);
-      }
-    }, 0);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      e.preventDefault();
-      safeCancel();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      // Ctrl+Enter or Cmd+Enter commits
-      e.stopPropagation();
-      e.preventDefault();
-      safeCommit(val);
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      applyFormat('**', '**');
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
-      e.preventDefault();
-      applyFormat('*', '*');
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-      e.preventDefault();
-      applyFormat('__', '__');
-    }
-    // Note: Plain Enter is intentionally allowed to insert newlines (\n) for multi-line text!
-  };
-
   return (
     <div
       style={{
@@ -152,8 +170,8 @@ export function TextInlineEditor({
         style={{
           position: 'absolute',
           left: `${posX}px`,
-          top: `${Math.max(10, posY - 36)}px`,
-          width: `${Math.max(pixelW, 240)}px`,
+          top: `${posY}px`,
+          width: `${pixelW}px`,
           transform: `rotate(${rot}deg)`,
           transformOrigin: 'top left',
           display: 'flex',
@@ -161,151 +179,10 @@ export function TextInlineEditor({
           zIndex: 51,
         }}
       >
-        {/* Sleek Floating Rich Text Format Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '3px',
-            marginBottom: '4px',
-            padding: '2px 6px',
-            background: 'rgba(24, 24, 27, 0.95)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(63, 63, 70, 0.8)',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-            alignSelf: 'flex-start',
-          }}
-        >
-          <button
-            type="button"
-            title="Bold (Ctrl+B)"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('**', '**');
-            }}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontWeight: 800,
-              color: '#ffffff',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-            }}
-          >
-            B
-          </button>
-          <button
-            type="button"
-            title="Italic (Ctrl+I)"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('*', '*');
-            }}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontStyle: 'italic',
-              fontWeight: 600,
-              color: '#ffffff',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-            }}
-          >
-            I
-          </button>
-          <button
-            type="button"
-            title="Underline (Ctrl+U)"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('__', '__');
-            }}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              textDecoration: 'underline',
-              color: '#ffffff',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-            }}
-          >
-            U
-          </button>
-          <button
-            type="button"
-            title="Strikethrough"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('~~', '~~');
-            }}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              textDecoration: 'line-through',
-              color: '#a1a1aa',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-            }}
-          >
-            S
-          </button>
-          <div style={{ width: '1px', height: '14px', background: '#3f3f46', margin: '0 2px' }} />
-          <button
-            type="button"
-            title="Golden Color Tag"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('{color:#f59e0b}', '{/color}');
-            }}
-            style={{
-              padding: '2px 5px',
-              fontSize: '10px',
-              fontWeight: 700,
-              color: '#fbbf24',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-            }}
-          >
-            🎨 Gold
-          </button>
-          <button
-            type="button"
-            title="Yellow Background Highlight"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('{highlight:#fef08a}', '{/highlight}');
-            }}
-            style={{
-              padding: '2px 5px',
-              fontSize: '10px',
-              fontWeight: 700,
-              color: '#000000',
-              background: '#fef08a',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              marginLeft: '2px',
-            }}
-          >
-            🖍 Marker
-          </button>
-        </div>
-
         <textarea
           ref={textareaRef}
           value={val}
-          onChange={(e) => setVal(e.target.value)}
+          onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           onBlur={() => safeCommit(val)}
           style={{
@@ -315,19 +192,20 @@ export function TextInlineEditor({
             fontSize: `${fontSizePx}px`,
             fontWeight: isBold ? 'bold' : 'normal',
             fontStyle: isItalic ? 'italic' : 'normal',
-            color: style.fill || '#1e293b',
+            color: style.fill || '#f8fafc',
             textAlign: style.align || 'center',
             lineHeight: style.lineHeight || 1.3,
             letterSpacing: `${letterSpacingPx}px`,
             padding: `${paddingPx}px`,
-            background: 'rgba(255, 255, 255, 0.98)',
+            background: 'rgba(15, 23, 42, 0.55)',
             border: '2px solid var(--color-accent, #3b82f6)',
             borderRadius: '4px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
             resize: 'vertical',
             outline: 'none',
             overflow: 'auto',
             boxSizing: 'border-box',
+            caretColor: '#60a5fa',
           }}
         />
         <div

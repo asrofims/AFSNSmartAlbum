@@ -11,7 +11,10 @@ import {
   applyTextPreset,
   calculateTextFitHeight,
   DEFAULT_TEXT_STYLE,
-  wrapSelectionWithMarkup,
+  StyledRange,
+  applyStyleToRange,
+  removeStyleRange,
+  shiftRangesOnTextEdit,
 } from '../../domain/text';
 import { ColorPicker } from '../../components/ui/ColorPicker';
 
@@ -42,18 +45,20 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
 
   if (!activeSpreadId) return null;
 
-  const handleApplyFormatToPanel = (openTag: string, closeTag: string) => {
+  const handleApplyRangeToPanel = (patch: Partial<Omit<StyledRange, 'id' | 'start' | 'end'>>) => {
     const el = panelTextareaRef.current;
     if (!el) return;
     const s = el.selectionStart;
     const e = el.selectionEnd;
-    const currentVal = element.text || '';
-    const res = wrapSelectionWithMarkup(currentVal, s, e, openTag, closeTag);
-    updateTextElement(activeSpreadId, element.id, { text: res.newText });
+    if (s >= e) return;
+
+    const currentRanges = element.styledRanges || [];
+    const nextRanges = applyStyleToRange(currentRanges, s, e, patch);
+    updateTextElement(activeSpreadId, element.id, { styledRanges: nextRanges });
     setTimeout(() => {
       if (panelTextareaRef.current) {
         panelTextareaRef.current.focus();
-        panelTextareaRef.current.setSelectionRange(res.newStart, res.newEnd);
+        panelTextareaRef.current.setSelectionRange(s, e);
       }
     }, 0);
   };
@@ -178,7 +183,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               title="Bold selection (Ctrl+B)"
               onMouseDown={(e) => {
                 e.preventDefault();
-                handleApplyFormatToPanel('**', '**');
+                handleApplyRangeToPanel({ fontWeight: 'bold' });
               }}
               style={{
                 padding: '1px 5px',
@@ -198,7 +203,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               title="Italic selection (Ctrl+I)"
               onMouseDown={(e) => {
                 e.preventDefault();
-                handleApplyFormatToPanel('*', '*');
+                handleApplyRangeToPanel({ fontStyle: 'italic' });
               }}
               style={{
                 padding: '1px 5px',
@@ -219,7 +224,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               title="Underline selection (Ctrl+U)"
               onMouseDown={(e) => {
                 e.preventDefault();
-                handleApplyFormatToPanel('__', '__');
+                handleApplyRangeToPanel({ textDecoration: 'underline' });
               }}
               style={{
                 padding: '1px 5px',
@@ -234,46 +239,6 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             >
               U
             </button>
-            <button
-              type="button"
-              title="Gold color tag"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleApplyFormatToPanel('{color:#f59e0b}', '{/color}');
-              }}
-              style={{
-                padding: '1px 4px',
-                fontSize: '9px',
-                fontWeight: 700,
-                color: '#fbbf24',
-                background: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                borderRadius: '3px',
-                cursor: 'pointer',
-              }}
-            >
-              Gold
-            </button>
-            <button
-              type="button"
-              title="Yellow highlight marker"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleApplyFormatToPanel('{highlight:#fef08a}', '{/highlight}');
-              }}
-              style={{
-                padding: '1px 4px',
-                fontSize: '9px',
-                fontWeight: 700,
-                color: '#000000',
-                background: '#fef08a',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: 'pointer',
-              }}
-            >
-              Mark
-            </button>
           </div>
         </div>
         <textarea
@@ -281,27 +246,32 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
           value={element.text || ''}
           onChange={(e) => {
             const next = e.target.value;
-            // Clear any active canvas inline editor so canvas TextNode renders cleanly and doesn't conflict
+            const changeStart = e.target.selectionStart;
+            const prev = element.text || '';
+            const removedLen = Math.max(0, prev.length - next.length);
+            const insertedLen = Math.max(0, next.length - prev.length);
+            const nextRanges = shiftRangesOnTextEdit(element.styledRanges, changeStart, removedLen, insertedLen);
+
             setEditingTextElementId(null);
-            updateTextElement(activeSpreadId, element.id, { text: next }, true);
+            updateTextElement(activeSpreadId, element.id, { text: next, styledRanges: nextRanges }, true);
           }}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
               e.preventDefault();
-              handleApplyFormatToPanel('**', '**');
+              handleApplyRangeToPanel({ fontWeight: 'bold' });
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
               e.preventDefault();
-              handleApplyFormatToPanel('*', '*');
+              handleApplyRangeToPanel({ fontStyle: 'italic' });
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
               e.preventDefault();
-              handleApplyFormatToPanel('__', '__');
+              handleApplyRangeToPanel({ textDecoration: 'underline' });
             }
           }}
           onBlur={() => {
             const currentAlbum = useAlbumStore.getState().currentAlbum;
             if (currentAlbum) useHistoryStore.getState().pushState(currentAlbum);
           }}
-          placeholder="Enter album text or **rich markup**..."
+          placeholder="Enter album text..."
           rows={3}
           style={{
             width: '100%',
@@ -310,13 +280,93 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             borderRadius: '4px',
             background: 'var(--color-surface-raised, #1e293b)',
             border: '1px solid var(--color-border, #334155)',
-            color: 'var(--color-text-primary, #f8fafc)',
+            color: style.fill || 'var(--color-text-primary, #f8fafc)',
+            fontWeight: (style.fontWeight === 'bold' || Number(style.fontWeight) >= 600) ? 'bold' : 'normal',
+            fontStyle: style.fontStyle === 'italic' ? 'italic' : 'normal',
             resize: 'vertical',
             outline: 'none',
             fontFamily: style.fontFamily || 'inherit',
             boxSizing: 'border-box',
           }}
         />
+
+        {/* Custom Styled Words List */}
+        {element.styledRanges && element.styledRanges.length > 0 && (
+          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                Styled Words ({element.styledRanges.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => updateTextElement(activeSpreadId, element.id, { styledRanges: [] })}
+                style={{
+                  fontSize: '9px',
+                  color: '#94a3b8',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '1px 4px',
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              {element.styledRanges.map((range) => {
+                const phrase = (element.text || '').slice(range.start, range.end);
+                return (
+                  <div
+                    key={range.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 6px',
+                      borderRadius: '3px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      fontSize: '11px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: range.fontWeight === 'bold' ? 700 : 400,
+                        fontStyle: range.fontStyle === 'italic' ? 'italic' : 'normal',
+                        textDecoration: range.textDecoration || 'none',
+                        color: range.fill || 'var(--color-text-primary)',
+                        backgroundColor: range.highlight || 'transparent',
+                        padding: range.highlight ? '0 2px' : '0',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      "{phrase || '...'}"
+                    </span>
+                    <button
+                      type="button"
+                      title="Reset formatting for this word"
+                      onClick={() => {
+                        const updated = removeStyleRange(element.styledRanges, range.id);
+                        updateTextElement(activeSpreadId, element.id, { styledRanges: updated });
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '0 2px',
+                        fontSize: '11px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. Quick Presets */}

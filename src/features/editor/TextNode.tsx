@@ -7,6 +7,7 @@ import {
   DEFAULT_TEXT_STYLE,
   hasRichTextMarkup,
   parseRichTextRuns,
+  rangesToTextRuns,
   layoutRichText,
   drawRichTextLayout,
 } from '../../domain/text';
@@ -76,12 +77,18 @@ export function TextNode({
     ? (convertPtToUnit(style.letterSpacing, unit, currentDpi) * scaleFactor) || 0
     : 0;
 
-  // Rich Text Layout (Fase 5: per-word styling, formatting, and highlights)
-  const isRich = hasRichTextMarkup(element.text);
+  // Rich Text Layout (Range selection or legacy markup)
+  const hasRanges = Boolean(element.styledRanges && element.styledRanges.length > 0);
+  const isMarkup = hasRichTextMarkup(element.text);
+  const isRich = hasRanges || isMarkup;
+
   const richRuns = useMemo(() => {
     if (!isRich) return null;
+    if (hasRanges) {
+      return rangesToTextRuns(element.text, element.styledRanges, style);
+    }
     return parseRichTextRuns(element.text, style);
-  }, [isRich, element.text, style]);
+  }, [isRich, hasRanges, element.text, element.styledRanges, style]);
 
   const richLayout = useMemo(() => {
     if (!isRich || !richRuns) return null;

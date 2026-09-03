@@ -2977,10 +2977,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             scaleFactor={scaleFactor}
             canvasUnit={dims.unit}
             dpi={dims.dpi}
-            onCommit={(newText) => {
+            onCommit={(newText, newRanges) => {
               const currentId = editingTextElement?.id;
-              if (currentId && newText !== editingTextElement?.text) {
-                updateTextElement(activeSpread.id, currentId, { text: newText });
+              if (currentId) {
+                updateTextElement(activeSpread.id, currentId, {
+                  text: newText,
+                  ...(newRanges !== undefined ? { styledRanges: newRanges } : {}),
+                });
               }
               setEditingTextElementId(null);
             }}

@@ -1,6 +1,7 @@
 import { Unit, convertUnit, convertPtToUnit, convertUnitToPt } from './units';
 import { stripRichTextMarkup } from './richTextParser';
 
+export * from './styledRanges';
 export * from './richTextParser';
 export * from './richTextRenderer';
 
@@ -45,6 +46,7 @@ export interface TextNodeElement {
   groupId?: string | null;
   groupRotation?: number;
   style: TextStyle;
+  styledRanges?: import('./styledRanges').StyledRange[];
   textRuns?: TextRun[];
 }
 
@@ -355,6 +357,7 @@ export function serializeTextPayload(element: TextNodeElement): string {
   return JSON.stringify({
     text: element.text,
     style: element.style,
+    styledRanges: element.styledRanges,
     textRuns: element.textRuns,
   });
 }
@@ -362,7 +365,7 @@ export function serializeTextPayload(element: TextNodeElement): string {
 export function deserializeTextPayload(
   rawPayload: string | null | undefined,
   fallbackText: string = ''
-): { text: string; style: TextStyle; textRuns?: TextRun[] } {
+): { text: string; style: TextStyle; styledRanges?: import('./styledRanges').StyledRange[]; textRuns?: TextRun[] } {
   if (!rawPayload) {
     return {
       text: fallbackText || 'Double click to edit text',
@@ -378,6 +381,7 @@ export function deserializeTextPayload(
         ...DEFAULT_TEXT_STYLE,
         ...(parsed.style || {}),
       },
+      styledRanges: Array.isArray(parsed.styledRanges) ? parsed.styledRanges : undefined,
       textRuns: Array.isArray(parsed.textRuns) ? parsed.textRuns : undefined,
     };
   } catch {
