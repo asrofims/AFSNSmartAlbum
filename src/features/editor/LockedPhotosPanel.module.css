@@ -1,4 +1,4 @@
-﻿.container {
+.container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -199,7 +199,9 @@
 
 .tagDimensions {
   color: var(--color-text-muted, #71717a);
-  font-size: 9px;
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 .toggleLockBtn {

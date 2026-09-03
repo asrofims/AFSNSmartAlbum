@@ -43,19 +43,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     return getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
   }, [currentProject, activeSpread]);
 
-  const singlePageW = dims?.pageWidth || 200;
   const unit = dims?.unit || 'mm';
-
-  const getElementPageLocation = (x: number) => {
-    return x < singlePageW ? 'Left Page' : 'Right Page';
-  };
-
-  const getElementOrientation = (w: number, h: number) => {
-    const ratio = w / Math.max(0.001, h);
-    if (ratio >= 1.15) return 'Landscape';
-    if (ratio <= 0.87) return 'Portrait';
-    return 'Square';
-  };
 
   const getPhotoPreviewSrc = (photoId?: string | null, fallbackThumbnail?: string | null) => {
     if (photoId) {
@@ -116,8 +104,6 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     const textEl = isText ? (frame as TextNodeElement) : null;
     const isSelected = selectedFrameIds.includes(frame.id);
     const thumbSrc = !isText ? getPhotoPreviewSrc(frame.photoId, frame.thumbnailPath || frame.previewPath) : '';
-    const pageLoc = getElementPageLocation(frame.x);
-    const orientation = getElementOrientation(frame.width, frame.height);
     const dimText = `${Math.round(frame.width)} × ${Math.round(frame.height)} ${unit}`;
 
     return (
@@ -156,15 +142,10 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
         <div className={styles.photoMeta}>
           <div className={styles.photoName} title={isText ? (textEl?.text || 'Text Box') : (frame.fileName || 'Photo Frame')}>
             {isText
-              ? (textEl?.text ? `"${textEl.text.slice(0, 26)}${textEl.text.length > 26 ? '...' : ''}"` : 'Text Box')
+              ? (textEl?.text ? `"${textEl.text.slice(0, 28)}${textEl.text.length > 28 ? '...' : ''}"` : 'Text Box')
               : (frame.fileName || 'Photo Frame')}
           </div>
-          <div className={styles.tagRow}>
-            <span className={`${styles.tagPill} ${styles.tagPage}`}>{pageLoc}</span>
-            <span className={styles.tagPill}>{isText ? (textEl?.style?.fontFamily || 'Inter') : orientation}</span>
-            {isText && <span className={styles.tagPill}>{textEl?.style?.fontSize || 24} pt</span>}
-            <span className={styles.tagDimensions}>{dimText}</span>
-          </div>
+          <div className={styles.tagDimensions}>{dimText}</div>
         </div>
 
         <button
