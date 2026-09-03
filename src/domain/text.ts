@@ -1,4 +1,8 @@
 import { Unit, convertUnit, convertPtToUnit, convertUnitToPt } from './units';
+import { stripRichTextMarkup } from './richTextParser';
+
+export * from './richTextParser';
+export * from './richTextRenderer';
 
 export interface TextRun {
   text: string;
@@ -278,6 +282,7 @@ export function calculateTextFitHeight(
   unit: Unit = 'mm',
   dpi: number = 300
 ): number {
+  const plainText = stripRichTextMarkup(text || ' ');
   const fontSize = style.fontSize || 24;
   const lineHeight = style.lineHeight || 1.3;
   const paddingPt = Number.isFinite(style.padding) ? (style.padding as number) : 6;
@@ -287,7 +292,7 @@ export function calculateTextFitHeight(
   const avgCharWidthPt = Math.max(1, fontSize * 0.52);
   const charsPerLine = Math.max(1, Math.floor(usableWidthPt / avgCharWidthPt));
 
-  const paragraphs = (text || ' ').split('\n');
+  const paragraphs = plainText.split('\n');
   let lineCount = 0;
   for (const para of paragraphs) {
     const len = para.length;

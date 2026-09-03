@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
-import { TextNodeElement, DEFAULT_TEXT_STYLE } from '../../domain/text';
+import { TextNodeElement, DEFAULT_TEXT_STYLE, wrapSelectionWithMarkup } from '../../domain/text';
 import { Unit, ptToScreenPx, convertPtToUnit } from '../../domain/units';
 
 interface TextInlineEditorProps {
@@ -93,6 +93,20 @@ export function TextInlineEditor({
     }
   }, []);
 
+  const applyFormat = (openTag: string, closeTag: string) => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const res = wrapSelectionWithMarkup(val, start, end, openTag, closeTag);
+    setVal(res.newText);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(res.newStart, res.newEnd);
+      }
+    }, 0);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
@@ -103,6 +117,15 @@ export function TextInlineEditor({
       e.stopPropagation();
       e.preventDefault();
       safeCommit(val);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      applyFormat('**', '**');
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      applyFormat('*', '*');
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+      e.preventDefault();
+      applyFormat('__', '__');
     }
     // Note: Plain Enter is intentionally allowed to insert newlines (\n) for multi-line text!
   };
@@ -129,8 +152,8 @@ export function TextInlineEditor({
         style={{
           position: 'absolute',
           left: `${posX}px`,
-          top: `${posY}px`,
-          width: `${pixelW}px`,
+          top: `${Math.max(10, posY - 36)}px`,
+          width: `${Math.max(pixelW, 240)}px`,
           transform: `rotate(${rot}deg)`,
           transformOrigin: 'top left',
           display: 'flex',
@@ -138,6 +161,147 @@ export function TextInlineEditor({
           zIndex: 51,
         }}
       >
+        {/* Sleek Floating Rich Text Format Toolbar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            marginBottom: '4px',
+            padding: '2px 6px',
+            background: 'rgba(24, 24, 27, 0.95)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(63, 63, 70, 0.8)',
+            borderRadius: '4px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+            alignSelf: 'flex-start',
+          }}
+        >
+          <button
+            type="button"
+            title="Bold (Ctrl+B)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('**', '**');
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontWeight: 800,
+              color: '#ffffff',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+          >
+            B
+          </button>
+          <button
+            type="button"
+            title="Italic (Ctrl+I)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('*', '*');
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontStyle: 'italic',
+              fontWeight: 600,
+              color: '#ffffff',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+          >
+            I
+          </button>
+          <button
+            type="button"
+            title="Underline (Ctrl+U)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('__', '__');
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '11px',
+              textDecoration: 'underline',
+              color: '#ffffff',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+          >
+            U
+          </button>
+          <button
+            type="button"
+            title="Strikethrough"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('~~', '~~');
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '11px',
+              textDecoration: 'line-through',
+              color: '#a1a1aa',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+          >
+            S
+          </button>
+          <div style={{ width: '1px', height: '14px', background: '#3f3f46', margin: '0 2px' }} />
+          <button
+            type="button"
+            title="Golden Color Tag"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('{color:#f59e0b}', '{/color}');
+            }}
+            style={{
+              padding: '2px 5px',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#fbbf24',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+          >
+            🎨 Gold
+          </button>
+          <button
+            type="button"
+            title="Yellow Background Highlight"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('{highlight:#fef08a}', '{/highlight}');
+            }}
+            style={{
+              padding: '2px 5px',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#000000',
+              background: '#fef08a',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              marginLeft: '2px',
+            }}
+          >
+            🖍 Marker
+          </button>
+        </div>
+
         <textarea
           ref={textareaRef}
           value={val}

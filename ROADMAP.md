@@ -116,6 +116,6 @@
 - [x] Dynamic Style Preset Auto-Fitting (tight content wrapping without empty bottom space)
 - [x] Centralized Smooth Auto-Scroll to Top of Properties Panel for Selected Photos & Text
 - [x] WebView2 D3D11 Crash Guard & Idempotent Auto-Save SQLite Persistence
-- [ ] Advanced Per-Word Tokenized Rich Text Layout
+- [x] Advanced Per-Word Tokenized Rich Text Layout & Styling (per-word bold, italic, underline, strike, custom colors, background highlights, multi-line wrapping, floating mini format bar, and keyboard shortcuts)
 - [ ] High-Resolution Print Export Text Rasterization in Rust Backend
 

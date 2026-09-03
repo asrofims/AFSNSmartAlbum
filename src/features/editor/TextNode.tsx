@@ -1,8 +1,15 @@
-import { useRef, useState } from 'react';
-import { Group, Rect, Text as KonvaText, Circle, Path as KonvaPath } from 'react-konva';
+import { useRef, useState, useMemo } from 'react';
+import { Group, Rect, Text as KonvaText, Circle, Path as KonvaPath, Shape as KonvaShape } from 'react-konva';
 import Konva from 'konva';
 import { useEditorStore } from '../../stores/editorStore';
-import { TextNodeElement, DEFAULT_TEXT_STYLE } from '../../domain/text';
+import {
+  TextNodeElement,
+  DEFAULT_TEXT_STYLE,
+  hasRichTextMarkup,
+  parseRichTextRuns,
+  layoutRichText,
+  drawRichTextLayout,
+} from '../../domain/text';
 import { roundToHundredth } from '../../domain/editor';
 import { Unit, ptToScreenPx, convertPtToUnit, convertUnit } from '../../domain/units';
 
@@ -68,6 +75,18 @@ export function TextNode({
   const letterSpacingPx = style.letterSpacing
     ? (convertPtToUnit(style.letterSpacing, unit, currentDpi) * scaleFactor) || 0
     : 0;
+
+  // Rich Text Layout (Fase 5: per-word styling, formatting, and highlights)
+  const isRich = hasRichTextMarkup(element.text);
+  const richRuns = useMemo(() => {
+    if (!isRich) return null;
+    return parseRichTextRuns(element.text, style);
+  }, [isRich, element.text, style]);
+
+  const richLayout = useMemo(() => {
+    if (!isRich || !richRuns) return null;
+    return layoutRichText(richRuns, style, pixelW, pixelH, scaleFactor, unit, currentDpi);
+  }, [isRich, richRuns, style, pixelW, pixelH, scaleFactor, unit, currentDpi]);
 
   return (
     <Group
@@ -147,25 +166,38 @@ export function TextNode({
       />
 
       {/* Rendered Text Element - Centered in middle of frame */}
-      <KonvaText
-        text={element.text || ' '}
-        width={pixelW}
-        height={pixelH}
-        fontFamily={style.fontFamily || 'Inter'}
-        fontSize={fontSizePx}
-        fontStyle={fontStyle}
-        textDecoration={style.textDecoration || 'none'}
-        fill={style.fill || '#1e293b'}
-        align={style.align || 'center'}
-        verticalAlign={style.verticalAlign || 'middle'}
-        lineHeight={style.lineHeight || 1.3}
-        letterSpacing={letterSpacingPx}
-        padding={paddingPx}
-        wrap={style.wordWrap === 'char' ? 'char' : style.wordWrap === 'none' ? 'none' : 'word'}
-        ellipsis={Boolean(style.ellipsis)}
-        opacity={isEditing ? 0 : 1}
-        listening={!isEditing}
-      />
+      {isRich && richLayout ? (
+        <KonvaShape
+          width={pixelW}
+          height={pixelH}
+          opacity={isEditing ? 0 : 1}
+          listening={!isEditing}
+          sceneFunc={(context) => {
+            const nativeCtx = (context as any)._context || context;
+            drawRichTextLayout(nativeCtx, richLayout);
+          }}
+        />
+      ) : (
+        <KonvaText
+          text={element.text || ' '}
+          width={pixelW}
+          height={pixelH}
+          fontFamily={style.fontFamily || 'Inter'}
+          fontSize={fontSizePx}
+          fontStyle={fontStyle}
+          textDecoration={style.textDecoration || 'none'}
+          fill={style.fill || '#1e293b'}
+          align={style.align || 'center'}
+          verticalAlign={style.verticalAlign || 'middle'}
+          lineHeight={style.lineHeight || 1.3}
+          letterSpacing={letterSpacingPx}
+          padding={paddingPx}
+          wrap={style.wordWrap === 'char' ? 'char' : style.wordWrap === 'none' ? 'none' : 'word'}
+          ellipsis={Boolean(style.ellipsis)}
+          opacity={isEditing ? 0 : 1}
+          listening={!isEditing}
+        />
+      )}
 
       {/* Subtle Hover Outline when not selected and not editing */}
       {isHovered && !isSelected && !isEditing && (

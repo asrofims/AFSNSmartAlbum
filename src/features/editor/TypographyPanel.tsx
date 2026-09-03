@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -10,6 +11,7 @@ import {
   applyTextPreset,
   calculateTextFitHeight,
   DEFAULT_TEXT_STYLE,
+  wrapSelectionWithMarkup,
 } from '../../domain/text';
 import { ColorPicker } from '../../components/ui/ColorPicker';
 
@@ -36,8 +38,25 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const updateTextElement = useEditorStore((s) => s.updateTextElement);
   const setEditingTextElementId = useEditorStore((s) => s.setEditingTextElementId);
+  const panelTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   if (!activeSpreadId) return null;
+
+  const handleApplyFormatToPanel = (openTag: string, closeTag: string) => {
+    const el = panelTextareaRef.current;
+    if (!el) return;
+    const s = el.selectionStart;
+    const e = el.selectionEnd;
+    const currentVal = element.text || '';
+    const res = wrapSelectionWithMarkup(currentVal, s, e, openTag, closeTag);
+    updateTextElement(activeSpreadId, element.id, { text: res.newText });
+    setTimeout(() => {
+      if (panelTextareaRef.current) {
+        panelTextareaRef.current.focus();
+        panelTextareaRef.current.setSelectionRange(res.newStart, res.newEnd);
+      }
+    }, 0);
+  };
 
   const style = { ...DEFAULT_TEXT_STYLE, ...(element.style || {}) };
 
@@ -146,12 +165,119 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         </div>
       </div>
 
-      {/* 2. Direct Content Input Field */}
+      {/* 2. Direct Content Input Field with Quick Rich Format Bar */}
       <div>
-        <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.5px' }}>
-          Text Content
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, letterSpacing: '0.5px' }}>
+            Text Content
+          </div>
+          {/* Quick Rich Format Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <button
+              type="button"
+              title="Bold selection (Ctrl+B)"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleApplyFormatToPanel('**', '**');
+              }}
+              style={{
+                padding: '1px 5px',
+                fontSize: '10px',
+                fontWeight: 800,
+                color: '#ffffff',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              B
+            </button>
+            <button
+              type="button"
+              title="Italic selection (Ctrl+I)"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleApplyFormatToPanel('*', '*');
+              }}
+              style={{
+                padding: '1px 5px',
+                fontSize: '10px',
+                fontStyle: 'italic',
+                fontWeight: 600,
+                color: '#ffffff',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              I
+            </button>
+            <button
+              type="button"
+              title="Underline selection (Ctrl+U)"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleApplyFormatToPanel('__', '__');
+              }}
+              style={{
+                padding: '1px 5px',
+                fontSize: '10px',
+                textDecoration: 'underline',
+                color: '#ffffff',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              U
+            </button>
+            <button
+              type="button"
+              title="Gold color tag"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleApplyFormatToPanel('{color:#f59e0b}', '{/color}');
+              }}
+              style={{
+                padding: '1px 4px',
+                fontSize: '9px',
+                fontWeight: 700,
+                color: '#fbbf24',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              Gold
+            </button>
+            <button
+              type="button"
+              title="Yellow highlight marker"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleApplyFormatToPanel('{highlight:#fef08a}', '{/highlight}');
+              }}
+              style={{
+                padding: '1px 4px',
+                fontSize: '9px',
+                fontWeight: 700,
+                color: '#000000',
+                background: '#fef08a',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              Mark
+            </button>
+          </div>
         </div>
         <textarea
+          ref={panelTextareaRef}
           value={element.text || ''}
           onChange={(e) => {
             const next = e.target.value;
@@ -159,11 +285,23 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             setEditingTextElementId(null);
             updateTextElement(activeSpreadId, element.id, { text: next }, true);
           }}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+              e.preventDefault();
+              handleApplyFormatToPanel('**', '**');
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+              e.preventDefault();
+              handleApplyFormatToPanel('*', '*');
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+              e.preventDefault();
+              handleApplyFormatToPanel('__', '__');
+            }
+          }}
           onBlur={() => {
             const currentAlbum = useAlbumStore.getState().currentAlbum;
             if (currentAlbum) useHistoryStore.getState().pushState(currentAlbum);
           }}
-          placeholder="Enter album text..."
+          placeholder="Enter album text or **rich markup**..."
           rows={3}
           style={{
             width: '100%',
