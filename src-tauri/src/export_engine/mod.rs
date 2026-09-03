@@ -217,6 +217,46 @@ pub fn parse_hex_color(hex: &str) -> Rgba<u8> {
     Rgba([255, 255, 255, 255]) // Default white
 }
 
+/// Reads EXIF orientation from an image file path (1..=8, default 1).
+pub fn get_image_exif_orientation(path: &Path) -> u32 {
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return 1,
+    };
+    let mut bufreader = std::io::BufReader::new(file);
+    let exifreader = exif::Reader::new();
+    let exif_data = match exifreader.read_from_container(&mut bufreader) {
+        Ok(exif) => exif,
+        Err(_) => return 1,
+    };
+    if let Some(field) = exif_data.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
+        if let Some(v) = field.value.get_uint(0) {
+            return v;
+        }
+    }
+    1
+}
+
+/// Applies EXIF orientation rotation/flip to a DynamicImage.
+pub fn apply_exif_orientation(mut img: image::DynamicImage, orientation: u32) -> image::DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => {
+            img = img.rotate90();
+            img.fliph()
+        }
+        6 => img.rotate90(),
+        7 => {
+            img = img.rotate270();
+            img.fliph()
+        }
+        8 => img.rotate270(),
+        _ => img,
+    }
+}
+
 /// Renders a single photo element onto the canvas at high resolution with maximum speed and memory efficiency
 fn render_photo_element(
     canvas: &mut RgbaImage,
@@ -293,13 +333,13 @@ fn render_photo_element(
 
     // Try loading original file, fallback to preview or thumbnail
     let img_path = Path::new(&elem.file_path);
-    let mut dynamic_img = match image::open(img_path) {
-        Ok(img) => img,
+    let (mut dynamic_img, is_original) = match image::open(img_path) {
+        Ok(img) => (img, true),
         Err(e) => {
             log::warn!("Could not open original image at {:?}: {}", img_path, e);
             if let Some(ref prev) = elem.preview_path {
                 match image::open(Path::new(prev)) {
-                    Ok(img) => img,
+                    Ok(img) => (img, false),
                     Err(_) => return,
                 }
             } else {
@@ -307,6 +347,14 @@ fn render_photo_element(
             }
         }
     };
+
+    // Auto-orient according to EXIF tags if loading original photo directly
+    if is_original {
+        let orientation = get_image_exif_orientation(img_path);
+        if orientation > 1 {
+            dynamic_img = apply_exif_orientation(dynamic_img, orientation);
+        }
+    }
 
     // Apply frame rotation if 90, 180, 270 degrees
     let rotation = ((elem.rotation % 360.0 + 360.0) % 360.0).round() as i64;
@@ -323,10 +371,11 @@ fn render_photo_element(
     }
 
     let photo_aspect = img_w as f64 / img_h as f64;
-    let frame_aspect = if frame_px_h > 0 {
-        frame_px_w as f64 / frame_px_h as f64
-    } else if elem.height > 0.0 {
+    // Prefer design frame aspect ratio from elem geometry to prevent bleed expansion from distorting framing
+    let frame_aspect = if elem.height > 0.0 {
         elem.width / elem.height
+    } else if frame_px_h > 0 {
+        frame_px_w as f64 / frame_px_h as f64
     } else {
         1.0
     };
@@ -349,9 +398,10 @@ fn render_photo_element(
     let norm_x = elem.crop_x.clamp(-1.0, 1.0);
     let norm_y = elem.crop_y.clamp(-1.0, 1.0);
 
-    // Center offset + pan offset
-    let src_x = ((excess_x / 2.0) + (norm_x * (excess_x / 2.0))).clamp(0.0, (img_w as f64 - visible_w).max(0.0));
-    let src_y = ((excess_y / 2.0) + (norm_y * (excess_y / 2.0))).clamp(0.0, (img_h as f64 - visible_h).max(0.0));
+    // Center offset - pan offset (matches Konva calculateImageOffset in editor.ts:
+    // positive norm_x / norm_y moves viewport toward the start of the image axis, showing left/top features)
+    let src_x = ((excess_x / 2.0) - (norm_x * (excess_x / 2.0))).clamp(0.0, (img_w as f64 - visible_w).max(0.0));
+    let src_y = ((excess_y / 2.0) - (norm_y * (excess_y / 2.0))).clamp(0.0, (img_h as f64 - visible_h).max(0.0));
 
     let crop_x_px = src_x.round() as u32;
     let crop_y_px = src_y.round() as u32;
@@ -1012,6 +1062,34 @@ mod tests {
 
         let high_sharp = apply_print_sharpening(&test_img, "high");
         assert_eq!(high_sharp.dimensions(), (100, 100));
+    }
+
+    #[test]
+    fn test_crop_pan_math_matches_konva() {
+        // Reproduce exact test case from Spread 2 (portrait photo 4000x6000 inside landscape frame 13.4cm x 8.4cm)
+        let img_w: f64 = 4000.0;
+        let img_h: f64 = 6000.0;
+        let frame_w: f64 = 13.4;
+        let frame_h: f64 = 8.4;
+        let frame_aspect: f64 = frame_w / frame_h;
+        let photo_aspect: f64 = img_w / img_h;
+        let crop_scale: f64 = 1.0;
+        let norm_y: f64 = 0.288; // User panned downward in viewport to frame face
+
+        // Konva calculation:
+        let konva_height: f64 = (frame_w / photo_aspect) * crop_scale;
+        let max_excess_y: f64 = konva_height - frame_h;
+        let konva_offset_y: f64 = -(max_excess_y / 2.0) + (norm_y * (max_excess_y / 2.0));
+        let konva_visible_start_fraction: f64 = (-konva_offset_y) / konva_height;
+        let konva_src_y: f64 = konva_visible_start_fraction * img_h;
+
+        // Rust export calculation:
+        let rust_vw: f64 = img_w / crop_scale;
+        let rust_vh: f64 = (rust_vw / frame_aspect).min(img_h);
+        let excess_y: f64 = (img_h - rust_vh).max(0.0);
+        let rust_src_y: f64 = ((excess_y / 2.0) - (norm_y * (excess_y / 2.0))).clamp(0.0, (img_h - rust_vh).max(0.0));
+
+        assert!((konva_src_y - rust_src_y).abs() < 0.01, "Rust crop Y ({}) must match Konva crop Y ({})", rust_src_y, konva_src_y);
     }
 }
 

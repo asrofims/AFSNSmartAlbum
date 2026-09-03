@@ -77,7 +77,7 @@ pub fn extract_photo_metadata(file_path: &Path) -> Result<PhotoMetadata, String>
         .to_lowercase();
 
     // Fast header-only dimension check
-    let (width, height) = match image::image_dimensions(file_path) {
+    let (mut width, mut height) = match image::image_dimensions(file_path) {
         Ok(dims) => dims,
         Err(_) => {
             if let Ok(reader) = image::ImageReader::open(file_path) {
@@ -91,6 +91,11 @@ pub fn extract_photo_metadata(file_path: &Path) -> Result<PhotoMetadata, String>
             }
         }
     };
+
+    let orientation = crate::export_engine::get_image_exif_orientation(file_path);
+    if matches!(orientation, 5..=8) {
+        std::mem::swap(&mut width, &mut height);
+    }
 
     Ok(PhotoMetadata {
         file_path: file_path.to_string_lossy().to_string(),
@@ -243,7 +248,11 @@ pub fn generate_photo_preview(
     let preview_file_path = previews_dir.join(format!("{}.{}", photo_id, ext));
     let tmp_file_path = previews_dir.join(format!("{}.tmp", photo_id));
 
-    let img = image::open(file_path).map_err(|e| format!("Failed to open image: {}", e))?;
+    let mut img = image::open(file_path).map_err(|e| format!("Failed to open image: {}", e))?;
+    let orientation = crate::export_engine::get_image_exif_orientation(file_path);
+    if orientation > 1 {
+        img = crate::export_engine::apply_exif_orientation(img, orientation);
+    }
 
     if is_cancelled.load(Ordering::Relaxed) {
         return Err("Cancelled".to_string());
