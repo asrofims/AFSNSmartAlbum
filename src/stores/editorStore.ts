@@ -85,7 +85,7 @@ export interface EditorState {
   ) => void;
   batchUpdateFrames: (
     spreadId: string,
-    updates: { id: string; geometry: Partial<PhotoFrameElement> }[]
+    updates: { id: string; geometry: Partial<AlbumElement> }[]
   ) => void;
   deleteSelectedFrames: (spreadId: string) => void;
   copySelectedFrames: (spreadId: string) => void;

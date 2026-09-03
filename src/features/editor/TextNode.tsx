@@ -160,6 +160,12 @@ export function TextNode({
               ...style,
               fontSize: newFontSize,
             },
+            ...(element.styledRanges && element.styledRanges.length > 0 ? {
+              styledRanges: element.styledRanges.map((r) => ({
+                ...r,
+                fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scaleX) * 10) / 10)) : undefined,
+              })),
+            } : {}),
           } : {}),
         });
       }}

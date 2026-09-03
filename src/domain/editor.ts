@@ -1496,6 +1496,9 @@ export interface FrameBounds {
   height: number;
   rotation?: number;
   groupRotation?: number;
+  type?: string;
+  style?: any;
+  styledRanges?: any[];
 }
 
 /**
@@ -1638,13 +1641,28 @@ export function doesMarqueeIntersectFrame(
  * the exact inter-frame gap spacing (both horizontally and vertically) across any layout topology,
  * fully supporting rotated frames with center pivot invariance.
  */
+export type ResizedFrameUpdate = {
+  id: string;
+  geometry: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    rotation?: number;
+    groupRotation?: number;
+    style?: any;
+    styledRanges?: any[];
+    [key: string]: any;
+  };
+};
+
 export function calculateMultiFrameResize(
   initialFrames: FrameBounds[],
   initialGroupBounds: RectBounds,
   newGroupBounds: RectBounds,
   anchor?: string,
   mode: 'proportional' | 'fixed_gap' = 'proportional'
-): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+): ResizedFrameUpdate[] {
   if (initialFrames.length === 0) return [];
 
   // Compute visual bounds for all initial frames
@@ -1665,6 +1683,27 @@ export function calculateMultiFrameResize(
     const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
     const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
+    const isText = (f as any)?.type === 'text';
+    const textStyle = isText ? (f as any)?.style : undefined;
+    let newStyle = undefined;
+    let newStyledRanges = undefined;
+
+    if (isText && textStyle) {
+      const currentFontSize = textStyle.fontSize || 24;
+      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * uniformScale) * 10) / 10));
+      newStyle = {
+        ...textStyle,
+        fontSize: newFontSize,
+      };
+      const origRanges = (f as any)?.styledRanges;
+      if (origRanges && Array.isArray(origRanges)) {
+        newStyledRanges = origRanges.map((r: any) => ({
+          ...r,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * uniformScale) * 10) / 10)) : undefined,
+        }));
+      }
+    }
+
     return [{
       id: f.id,
       geometry: {
@@ -1672,6 +1711,8 @@ export function calculateMultiFrameResize(
         y: roundToHundredth(finalY),
         width: newWidth,
         height: newHeight,
+        ...(isText && newStyle ? { style: newStyle } : {}),
+        ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
       },
     }];
   }
@@ -1729,6 +1770,27 @@ export function calculateMultiFrameResize(
       const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
       const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
+      const isText = (f as any)?.type === 'text';
+      const textStyle = isText ? (f as any)?.style : undefined;
+      let newStyle = undefined;
+      let newStyledRanges = undefined;
+
+      if (isText && textStyle) {
+        const currentFontSize = textStyle.fontSize || 24;
+        const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * scale) * 10) / 10));
+        newStyle = {
+          ...textStyle,
+          fontSize: newFontSize,
+        };
+        const origRanges = (f as any)?.styledRanges;
+        if (origRanges && Array.isArray(origRanges)) {
+          newStyledRanges = origRanges.map((r: any) => ({
+            ...r,
+            fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scale) * 10) / 10)) : undefined,
+          }));
+        }
+      }
+
       return {
         id: f.id,
         geometry: {
@@ -1736,6 +1798,8 @@ export function calculateMultiFrameResize(
           y: roundToHundredth(finalY),
           width: newWidth,
           height: newHeight,
+          ...(isText && newStyle ? { style: newStyle } : {}),
+          ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
         },
       };
     });
@@ -1914,6 +1978,27 @@ export function calculateMultiFrameResize(
     const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
     const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
+    const isText = (f as any)?.type === 'text';
+    const textStyle = isText ? (f as any)?.style : undefined;
+    let newStyle = undefined;
+    let newStyledRanges = undefined;
+
+    if (isText && textStyle) {
+      const currentFontSize = textStyle.fontSize || 24;
+      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * uniformScale) * 10) / 10));
+      newStyle = {
+        ...textStyle,
+        fontSize: newFontSize,
+      };
+      const origRanges = (f as any)?.styledRanges;
+      if (origRanges && Array.isArray(origRanges)) {
+        newStyledRanges = origRanges.map((r: any) => ({
+          ...r,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * uniformScale) * 10) / 10)) : undefined,
+        }));
+      }
+    }
+
     return {
       id: f.id,
       geometry: {
@@ -1921,6 +2006,8 @@ export function calculateMultiFrameResize(
         y: roundToHundredth(finalY),
         width: newWidth,
         height: newHeight,
+        ...(isText && newStyle ? { style: newStyle } : {}),
+        ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
       },
     };
   });
@@ -2273,7 +2360,7 @@ export function calculateRotatedMultiFrameResize(
   newGroupY: number,
   scaleX: number,
   scaleY: number
-): { id: string; geometry: Partial<PhotoFrameElement> }[] {
+): ResizedFrameUpdate[] {
   if (initialFrames.length === 0 || groupInfo.childLocalFrames.length === 0) return [];
 
   const initialMap = new Map(initialFrames.map((f) => [f.id, f]));
@@ -2298,6 +2385,27 @@ export function calculateRotatedMultiFrameResize(
       child.localRotation
     );
 
+    const isText = (orig as any)?.type === 'text';
+    const textStyle = isText ? (orig as any)?.style : undefined;
+    let newStyle = undefined;
+    let newStyledRanges = undefined;
+
+    if (isText && textStyle) {
+      const currentFontSize = textStyle.fontSize || 24;
+      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * scale) * 10) / 10));
+      newStyle = {
+        ...textStyle,
+        fontSize: newFontSize,
+      };
+      const origRanges = (orig as any)?.styledRanges;
+      if (origRanges && Array.isArray(origRanges)) {
+        newStyledRanges = origRanges.map((r: any) => ({
+          ...r,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scale) * 10) / 10)) : undefined,
+        }));
+      }
+    }
+
     return {
       id: child.id,
       geometry: {
@@ -2307,6 +2415,8 @@ export function calculateRotatedMultiFrameResize(
         height: newHeight,
         rotation: worldGeom.rotation,
         groupRotation: groupInfo.groupRotation,
+        ...(isText && newStyle ? { style: newStyle } : {}),
+        ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
       },
     };
   });

@@ -1049,8 +1049,49 @@ const groupInfoPreferred = computeMultiFrameGroupInfo(mixedFrames, 90);
 console.assert(groupInfoPreferred.groupRotation === 90, `Group rotation should honor preferredRotation 90°, got ${groupInfoPreferred.groupRotation}`);
 
 // 18n. Persistent Group Rotation Propagation
-const rotatedWithGroup = calculateMultiFrameRotation(mixedFrames, 45);
-console.assert(rotatedWithGroup[0].geometry.groupRotation === 45, `f1 should have groupRotation 45, got ${rotatedWithGroup[0].geometry.groupRotation}`);
-console.assert(rotatedWithGroup[1].geometry.groupRotation === 45, `f2 should have groupRotation 45, got ${rotatedWithGroup[1].geometry.groupRotation}`);
+// 18o. Proportional Text Font Size Scaling during Multi-Frame Resize
+const textAndPhotoFrames: FrameBounds[] = [
+  {
+    id: 'p1',
+    type: 'photo',
+    x: 10,
+    y: 10,
+    width: 100,
+    height: 80,
+    rotation: 0,
+  } as any,
+  {
+    id: 't1',
+    type: 'text',
+    x: 120,
+    y: 10,
+    width: 60,
+    height: 20,
+    rotation: 0,
+    style: {
+      fontSize: 20,
+      fontFamily: 'Inter',
+    },
+    styledRanges: [
+      { id: 'r1', start: 0, end: 4, fontSize: 30 },
+    ],
+  } as any,
+];
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, and Snapping Config Persistence tests passed successfully!');
+const multiTextGroupInfo = computeMultiFrameGroupInfo(textAndPhotoFrames);
+const resizedMultiText = calculateRotatedMultiFrameResize(
+  multiTextGroupInfo,
+  textAndPhotoFrames,
+  multiTextGroupInfo.groupX,
+  multiTextGroupInfo.groupY,
+  1.5,
+  1.5
+);
+
+console.assert(resizedMultiText.length === 2, 'Must return 2 resized elements');
+const textResult = resizedMultiText.find((r) => r.id === 't1')!;
+console.assert(textResult !== undefined, 'Text element must be present in resize result');
+console.assert(textResult.geometry.style?.fontSize === 30, `Text fontSize must scale from 20 to 30 (1.5x), got ${textResult.geometry.style?.fontSize}`);
+console.assert(textResult.geometry.styledRanges?.[0]?.fontSize === 45, `StyledRange fontSize must scale from 30 to 45 (1.5x), got ${textResult.geometry.styledRanges?.[0]?.fontSize}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, and Snapping Config Persistence tests passed successfully!');
