@@ -1528,7 +1528,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     const items: ContextMenuItem[] = [];
 
-    // If single text element selected, allow direct edit and fit actions via context menu
+    // If single text element selected, allow direct edit via context menu
     if (count === 1 && isAllText && selectedElements[0]) {
       const textEl = selectedElements[0] as TextNodeElement;
       items.push(
@@ -1539,45 +1539,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           shortcut: 'Double-Click',
           onClick: () => setEditingTextElementId(textEl.id),
         },
-        {
-          id: 'fit-height-text',
-          label: 'Fit Height to Text (Preserve Width)',
-          icon: '↕',
-          onClick: () => {
-            const fittedH = calculateTextFitHeight(
-              textEl.text || ' ',
-              textEl.style || {},
-              textEl.width,
-              dims.unit,
-              dims.dpi
-            );
-            updateTextElement(activeSpread.id, textEl.id, { height: fittedH });
-            if (onToast) onToast('✓ Fitted frame height to text (width preserved)');
-          },
-        },
-        {
-          id: 'fit-both-text',
-          label: 'Fit Frame to Content (Hug Both)',
-          icon: '⤢',
-          shortcut: 'Ctrl+Alt+C',
-          onClick: () => {
-            const maxTextW = currentProject ? currentProject.canvasWidth * 0.85 : undefined;
-            const fitted = calculateTextFitDimensions(
-              textEl.text || ' ',
-              textEl.style || {},
-              dims.unit,
-              dims.dpi,
-              undefined,
-              maxTextW
-            );
-            updateTextElement(activeSpread.id, textEl.id, {
-              width: fitted.width,
-              height: fitted.height,
-            });
-            if (onToast) onToast('✓ Fitted frame tightly around text content');
-          },
-        },
-        { divider: true, id: 'div-text-fit', label: '' }
+        { divider: true, id: 'div-text-edit', label: '' }
       );
     }
 

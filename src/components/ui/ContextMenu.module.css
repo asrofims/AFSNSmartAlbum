@@ -9,7 +9,7 @@
   position: fixed;
   min-width: 210px;
   max-width: 280px;
-  max-height: calc(100vh - 24px);
+  max-height: calc(100vh - 28px);
   overflow-y: auto;
   overflow-x: hidden;
   background: rgba(15, 23, 42, 0.96);
@@ -128,7 +128,7 @@
   position: fixed;
   min-width: 210px;
   max-width: 280px;
-  max-height: calc(100vh - 24px);
+  max-height: calc(100vh - 28px);
   overflow-y: auto;
   overflow-x: hidden;
   background: rgba(15, 23, 42, 0.98);

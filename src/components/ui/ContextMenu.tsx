@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import styles from './ContextMenu.module.css';
 
 export interface ContextMenuItem {
@@ -31,8 +31,12 @@ interface FloatingSubmenuState {
 
 export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const [floatingSubmenu, setFloatingSubmenu] = useState<FloatingSubmenuState | null>(null);
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x, y });
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number }>(() => ({
+    x: typeof window !== 'undefined' ? Math.max(14, Math.min(window.innerWidth - 240 - 14, x)) : x,
+    y: typeof window !== 'undefined' ? Math.max(14, Math.min(window.innerHeight - 300 - 14, y)) : y,
+  }));
   const closeSubmenuTimerRef = useRef<number | null>(null);
 
   const clearCloseTimer = () => {
@@ -41,6 +45,15 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
       closeSubmenuTimerRef.current = null;
     }
   };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setMenuPos({
+        x: Math.max(14, Math.min(window.innerWidth - 240 - 14, x)),
+        y: Math.max(14, Math.min(window.innerHeight - 300 - 14, y)),
+      });
+    }
+  }, [x, y]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -62,21 +75,40 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
     };
   }, [isOpen, onClose]);
 
-  // Viewport boundary adjustment after DOM mount
-  useEffect(() => {
+  // Smart primary menu viewport boundary detection before paint
+  useLayoutEffect(() => {
     if (!isOpen || !menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
-    const padding = 12;
+    const padding = 14;
 
     let targetX = x;
     let targetY = y;
 
+    // Horizontal boundary detection: flip left if near right edge, clamp to bounds
     if (x + rect.width > window.innerWidth - padding) {
-      targetX = Math.max(padding, window.innerWidth - rect.width - padding);
+      if (x - rect.width >= padding) {
+        targetX = x - rect.width;
+      } else {
+        targetX = Math.max(padding, window.innerWidth - rect.width - padding);
+      }
+    } else {
+      targetX = Math.max(padding, x);
     }
+    // Hard horizontal clamp: never allow left edge to be less than padding
+    targetX = Math.max(padding, Math.min(window.innerWidth - rect.width - padding, targetX));
+
+    // Vertical boundary detection: flip upward if near bottom edge
     if (y + rect.height > window.innerHeight - padding) {
-      targetY = Math.max(padding, window.innerHeight - rect.height - padding);
+      if (y - rect.height >= padding) {
+        targetY = y - rect.height;
+      } else {
+        targetY = Math.max(padding, window.innerHeight - rect.height - padding);
+      }
+    } else {
+      targetY = Math.max(padding, y);
     }
+    // Hard top/bottom vertical clamp: NEVER allow top edge to be less than padding (never overflow top boundary!)
+    targetY = Math.max(padding, Math.min(window.innerHeight - rect.height - padding, targetY));
 
     setMenuPos({ x: targetX, y: targetY });
   }, [isOpen, x, y, items]);
@@ -85,18 +117,24 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
     clearCloseTimer();
     if (item.children && item.children.length > 0) {
       const rect = element.getBoundingClientRect();
-      const submenuWidth = 220;
-      const submenuHeight = item.children.length * 32 + 16;
-      const isNearRight = rect.right + submenuWidth + 12 > window.innerWidth;
+      const padding = 14;
+      const estimatedSubWidth = 230;
+      const estimatedSubHeight = item.children.length * 32 + 16;
 
-      const left = isNearRight
-        ? Math.max(10, rect.left - submenuWidth - 4)
-        : rect.right + 4;
+      // Smart horizontal placement: prefer right side, flip to left if near right edge
+      let left = rect.right + 4;
+      if (left + estimatedSubWidth > window.innerWidth - padding) {
+        left = rect.left - estimatedSubWidth - 4;
+      }
+      left = Math.max(padding, Math.min(window.innerWidth - estimatedSubWidth - padding, left));
 
-      const top = Math.max(
-        10,
-        Math.min(rect.top - 4, window.innerHeight - submenuHeight - 12)
-      );
+      // Smart vertical placement: align with item top, clamp if near bottom edge
+      let top = rect.top - 4;
+      if (top + estimatedSubHeight > window.innerHeight - padding) {
+        top = Math.max(padding, window.innerHeight - estimatedSubHeight - padding);
+      }
+      // Hard top boundary protection
+      top = Math.max(padding, top);
 
       setFloatingSubmenu({
         id: item.id,
@@ -108,6 +146,33 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
       setFloatingSubmenu(null);
     }
   };
+
+  // Smart submenu viewport boundary detection before paint
+  useLayoutEffect(() => {
+    if (!floatingSubmenu || !submenuRef.current) return;
+    const rect = submenuRef.current.getBoundingClientRect();
+    const padding = 14;
+
+    let adjustedLeft = floatingSubmenu.left;
+    let adjustedTop = floatingSubmenu.top;
+
+    if (adjustedLeft + rect.width > window.innerWidth - padding) {
+      adjustedLeft = Math.max(padding, window.innerWidth - rect.width - padding);
+    }
+    adjustedLeft = Math.max(padding, adjustedLeft);
+
+    if (adjustedTop + rect.height > window.innerHeight - padding) {
+      adjustedTop = Math.max(padding, window.innerHeight - rect.height - padding);
+    }
+    // Hard top boundary protection: NEVER let submenu overflow top boundary!
+    adjustedTop = Math.max(padding, adjustedTop);
+
+    if (adjustedLeft !== floatingSubmenu.left || adjustedTop !== floatingSubmenu.top) {
+      setFloatingSubmenu((prev) =>
+        prev ? { ...prev, left: adjustedLeft, top: adjustedTop } : null
+      );
+    }
+  }, [floatingSubmenu?.id, floatingSubmenu?.items]);
 
   const handleMenuMouseLeave = () => {
     clearCloseTimer();
@@ -188,6 +253,7 @@ export function ContextMenu({ isOpen, x, y, items, onClose }: ContextMenuProps) 
       {/* Independent Floating Flyout Submenu Panel */}
       {floatingSubmenu && (
         <div
+          ref={submenuRef}
           className={styles.submenu}
           style={{ top: floatingSubmenu.top, left: floatingSubmenu.left }}
           onClick={(e) => e.stopPropagation()}
