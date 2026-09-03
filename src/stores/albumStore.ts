@@ -37,6 +37,7 @@ export interface AlbumState {
   currentAlbum: Album | null;
   activeSpreadId: string | null;
   activeSpreadIndex: number;
+  selectedSpreadIds: string[];
   selectedPageId: string | null;
 
   // Persistence State
@@ -65,6 +66,11 @@ export interface AlbumState {
   prevSpread: () => void;
   addSpread: (project: Project, afterIndex?: number) => void;
   deleteSpread: (spreadId: string) => void;
+  deleteSpreads: (spreadIds: string[]) => void;
+  setSelectedSpreadIds: (spreadIds: string[]) => void;
+  toggleSpreadSelection: (spreadId: string, isMulti: boolean, isRange: boolean) => void;
+  selectAllSpreads: () => void;
+  clearSpreadSelection: () => void;
   duplicateSpread: (spreadId: string, project: Project) => void;
   moveSpread: (spreadId: string, direction: 'left' | 'right') => void;
   reorderSpread: (fromIndex: number, toIndex: number) => void;
@@ -88,6 +94,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   currentAlbum: null,
   activeSpreadId: null,
   activeSpreadIndex: 0,
+  selectedSpreadIds: [],
   selectedPageId: null,
 
   saveStatus: 'saved',
@@ -129,6 +136,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       currentAlbum: album,
       activeSpreadId: album.spreads[0]?.id || '',
       activeSpreadIndex: 0, // Default to Spread 1 (Pages 1-2)
+      selectedSpreadIds: album.spreads[0]?.id ? [album.spreads[0].id] : [],
       selectedPageId: null,
       saveStatus: 'saved',
       lastSavedAt: new Date().toLocaleTimeString(),
@@ -178,10 +186,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         };
 
         useHistoryStore.getState().clearHistory();
+        const initialSpreadId = hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '';
         set({
           currentAlbum: hydratedAlbum,
-          activeSpreadId: hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '',
+          activeSpreadId: initialSpreadId,
           activeSpreadIndex: 0,
+          selectedSpreadIds: initialSpreadId ? [initialSpreadId] : [],
           selectedPageId: null,
           saveStatus: 'saved',
           lastSavedAt: new Date().toLocaleTimeString(),
@@ -217,10 +227,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           };
 
           useHistoryStore.getState().clearHistory();
+          const initialSpreadId = hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '';
           set({
             currentAlbum: hydratedAlbum,
-            activeSpreadId: hydratedAlbum.spreads[0]?.id || hydratedAlbum.coverSpread?.id || '',
+            activeSpreadId: initialSpreadId,
             activeSpreadIndex: 0,
+            selectedSpreadIds: initialSpreadId ? [initialSpreadId] : [],
             selectedPageId: null,
             saveStatus: 'saved',
             lastSavedAt: new Date().toLocaleTimeString(),
@@ -434,6 +446,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       set({
         activeSpreadId: spreadId,
         activeSpreadIndex: foundIndex,
+        selectedSpreadIds: [spreadId],
         selectedPageId: null,
       });
     }
@@ -450,6 +463,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         set({
           activeSpreadId: targetSpread.id,
           activeSpreadIndex: index,
+          selectedSpreadIds: [targetSpread.id],
           selectedPageId: null,
         });
       }
@@ -499,6 +513,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       currentAlbum: updatedAlbum,
       activeSpreadId: newSpread.id,
       activeSpreadIndex: Math.max(0, newIndex),
+      selectedSpreadIds: [newSpread.id],
       selectedPageId: null,
       saveStatus: 'unsaved',
     });
@@ -537,8 +552,126 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       currentAlbum: updatedAlbum,
       activeSpreadId: nextActiveId,
       activeSpreadIndex: Math.max(0, nextIndex),
+      selectedSpreadIds: nextActiveId ? [nextActiveId] : [],
       selectedPageId: null,
       saveStatus: 'unsaved',
+    });
+  },
+
+  deleteSpreads: (spreadIds: string[]) => {
+    const { currentAlbum, activeSpreadId } = get();
+    if (!currentAlbum || spreadIds.length === 0) return;
+
+    const toDeleteSet = new Set(spreadIds);
+    const remainingSpreads = currentAlbum.spreads.filter((s) => !toDeleteSet.has(s.id));
+
+    // Album must retain at least 1 spread!
+    if (remainingSpreads.length === 0) {
+      return;
+    }
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const updatedAlbum = recalculateAlbumPageNumbers({
+      ...currentAlbum,
+      spreads: remainingSpreads,
+    });
+
+    const all = getAllAlbumSpreads(updatedAlbum);
+    let nextActiveId = activeSpreadId;
+    let nextIndex = 0;
+
+    if (activeSpreadId && toDeleteSet.has(activeSpreadId)) {
+      const fallbackSpread = all[0];
+      if (fallbackSpread) {
+        nextActiveId = fallbackSpread.id;
+        nextIndex = 0;
+      }
+    } else if (activeSpreadId) {
+      nextIndex = Math.max(0, all.findIndex((s) => s.id === activeSpreadId));
+    }
+
+    set({
+      currentAlbum: updatedAlbum,
+      activeSpreadId: nextActiveId,
+      activeSpreadIndex: nextIndex,
+      selectedSpreadIds: nextActiveId ? [nextActiveId] : [],
+      selectedPageId: null,
+      saveStatus: 'unsaved',
+    });
+  },
+
+  setSelectedSpreadIds: (spreadIds: string[]) => set({ selectedSpreadIds: spreadIds }),
+
+  toggleSpreadSelection: (spreadId: string, isMulti: boolean, isRange: boolean) => {
+    const { currentAlbum, activeSpreadId, selectedSpreadIds } = get();
+    if (!currentAlbum) return;
+    const allSpreads = getAllAlbumSpreads(currentAlbum);
+
+    if (isRange) {
+      // Shift+Click: Range selection between activeSpreadId and clicked spreadId
+      const startIndex = allSpreads.findIndex((s) => s.id === activeSpreadId);
+      const endIndex = allSpreads.findIndex((s) => s.id === spreadId);
+      if (startIndex !== -1 && endIndex !== -1) {
+        const minIdx = Math.min(startIndex, endIndex);
+        const maxIdx = Math.max(startIndex, endIndex);
+        const rangeIds = allSpreads.slice(minIdx, maxIdx + 1).map((s) => s.id);
+        set({
+          selectedSpreadIds: rangeIds,
+          activeSpreadId: spreadId,
+          activeSpreadIndex: endIndex,
+        });
+        return;
+      }
+    }
+
+    if (isMulti) {
+      // Ctrl+Click / Cmd+Click: Toggle clicked spread
+      if (selectedSpreadIds.includes(spreadId)) {
+        if (selectedSpreadIds.length > 1) {
+          const newSelected = selectedSpreadIds.filter((id) => id !== spreadId);
+          const nextActiveId = activeSpreadId === spreadId ? newSelected[0] : activeSpreadId;
+          const nextIndex = allSpreads.findIndex((s) => s.id === nextActiveId);
+          set({
+            selectedSpreadIds: newSelected,
+            activeSpreadId: nextActiveId,
+            activeSpreadIndex: Math.max(0, nextIndex),
+          });
+        }
+      } else {
+        const newSelected = [...selectedSpreadIds, spreadId];
+        const nextIndex = allSpreads.findIndex((s) => s.id === spreadId);
+        set({
+          selectedSpreadIds: newSelected,
+          activeSpreadId: spreadId,
+          activeSpreadIndex: Math.max(0, nextIndex),
+        });
+      }
+      return;
+    }
+
+    // Normal Click: Single selection
+    const index = allSpreads.findIndex((s) => s.id === spreadId);
+    set({
+      selectedSpreadIds: [spreadId],
+      activeSpreadId: spreadId,
+      activeSpreadIndex: Math.max(0, index),
+    });
+  },
+
+  selectAllSpreads: () => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+    const allSpreads = getAllAlbumSpreads(currentAlbum);
+    set({
+      selectedSpreadIds: allSpreads.map((s) => s.id),
+    });
+  },
+
+  clearSpreadSelection: () => {
+    const { activeSpreadId } = get();
+    set({
+      selectedSpreadIds: activeSpreadId ? [activeSpreadId] : [],
     });
   },
 
@@ -555,6 +688,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       currentAlbum: result.updatedAlbum,
       activeSpreadId: result.newSpreadId,
       activeSpreadIndex: result.newSpreadIndex,
+      selectedSpreadIds: [result.newSpreadId],
       selectedPageId: null,
       saveStatus: 'unsaved',
     });

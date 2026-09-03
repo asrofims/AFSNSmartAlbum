@@ -8,6 +8,7 @@ import { PhotoFrameElement } from '../../domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './PageNavigator.module.css';
 
 function safeConvertFileSrc(filePath: string): string {
@@ -208,29 +209,46 @@ export function PageNavigator() {
     currentAlbum,
     activeSpreadId,
     activeSpreadIndex,
+    selectedSpreadIds,
     isSpreadDrawerOpen,
     setActiveSpread,
     nextSpread,
     prevSpread,
     addSpread,
     deleteSpread,
+    deleteSpreads,
     duplicateSpread,
     moveSpread,
     reorderSpread,
     setSpreadDrawerOpen,
     toggleSpreadDrawer,
+    setSelectedSpreadIds,
+    toggleSpreadSelection,
+    selectAllSpreads,
+    clearSpreadSelection,
   } = useAlbumStore();
 
-  const [spreadToDelete, setSpreadToDelete] = useState<Spread | null>(null);
+  const [spreadsToDelete, setSpreadsToDelete] = useState<Spread[] | null>(null);
   const [draggedSpreadIndex, setDraggedSpreadIndex] = useState<number | null>(null);
   const [dragOverSpreadIndex, setDragOverSpreadIndex] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    targetSpread: Spread | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    targetSpread: null,
+  });
 
-  // Keyboard navigation shortcuts
+  // Keyboard navigation & multi-selection shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if in input
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target as HTMLElement)?.isContentEditable) return;
 
       if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowRight')) {
         e.preventDefault();
@@ -238,12 +256,36 @@ export function PageNavigator() {
       } else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowLeft')) {
         e.preventDefault();
         prevSpread();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && isSpreadDrawerOpen) {
+        e.preventDefault();
+        selectAllSpreads();
+      } else if (e.key === 'Escape') {
+        if (contextMenu.isOpen) {
+          setContextMenu((prev) => ({ ...prev, isOpen: false }));
+        } else if (selectedSpreadIds.length > 1) {
+          clearSpreadSelection();
+        }
+      } else if (e.key === 'Delete' && isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
+        e.preventDefault();
+        const { currentAlbum: album } = useAlbumStore.getState();
+        if (!album) return;
+        const spreads = getAllAlbumSpreads(album);
+        const selected = spreads.filter((s) => selectedSpreadIds.includes(s.id));
+        // Must keep at least 1 spread
+        if (spreads.length - selected.length < 1) return;
+
+        const hasElements = selected.some((s) => (s.elements || []).length > 0);
+        if (selected.length === 1 && !hasElements) {
+          deleteSpread(selected[0]!.id);
+        } else {
+          setSpreadsToDelete(selected);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nextSpread, prevSpread]);
+  }, [nextSpread, prevSpread, isSpreadDrawerOpen, selectAllSpreads, contextMenu.isOpen, selectedSpreadIds, clearSpreadSelection, deleteSpread]);
 
   if (!currentProject || !currentAlbum) return null;
 
@@ -260,25 +302,140 @@ export function PageNavigator() {
     duplicateSpread(spread.id, currentProject);
   };
 
-  const handleDeleteRequest = (e: React.MouseEvent, spread: Spread) => {
+  const handleDeleteRequest = (e: React.MouseEvent, targetSpreads: Spread[]) => {
     e.stopPropagation();
-    const elements = spread.elements || [];
+    if (targetSpreads.length === 0) return;
 
-    if (elements.length === 0) {
-      // Completely empty spread -> delete immediately without modal
-      deleteSpread(spread.id);
+    // Check if any spread has elements
+    const hasElements = targetSpreads.some((s) => (s.elements || []).length > 0);
+
+    // If single spread and completely empty, delete immediately without modal
+    if (targetSpreads.length === 1 && !hasElements) {
+      deleteSpread(targetSpreads[0]!.id);
       return;
     }
 
-    // Spread has elements (photos, text, or frames) -> prompt confirmation dialog
-    setSpreadToDelete(spread);
+    // Spread has elements or multiple spreads selected -> prompt confirmation dialog
+    setSpreadsToDelete(targetSpreads);
   };
 
   const handleConfirmDelete = () => {
-    if (spreadToDelete) {
-      deleteSpread(spreadToDelete.id);
-      setSpreadToDelete(null);
+    if (spreadsToDelete && spreadsToDelete.length > 0) {
+      if (spreadsToDelete.length === 1) {
+        deleteSpread(spreadsToDelete[0]!.id);
+      } else {
+        deleteSpreads(spreadsToDelete.map((s) => s.id));
+      }
+      setSpreadsToDelete(null);
     }
+  };
+
+  const getContextMenuItems = (): ContextMenuItem[] => {
+    if (!contextMenu.targetSpread) return [];
+
+    const isMulti = selectedSpreadIds.length > 1 && selectedSpreadIds.includes(contextMenu.targetSpread.id);
+    const selectedSpreads = allSpreads.filter((s) => selectedSpreadIds.includes(s.id));
+
+    if (isMulti) {
+      return [
+        {
+          id: 'header-multi',
+          label: `${selectedSpreadIds.length} Spreads Selected`,
+          header: true,
+        },
+        {
+          id: 'delete-selected',
+          label: `Delete Selected Spreads (${selectedSpreadIds.length})`,
+          icon: '🗑️',
+          shortcut: 'Delete',
+          danger: true,
+          disabled: allSpreads.length - selectedSpreadIds.length < 1,
+          onClick: () => {
+            setSpreadsToDelete(selectedSpreads);
+          },
+        },
+        {
+          id: 'duplicate-selected',
+          label: `Duplicate Selected Spreads (${selectedSpreadIds.length})`,
+          icon: '📋',
+          onClick: () => {
+            selectedSpreads.forEach((s) => duplicateSpread(s.id, currentProject));
+          },
+        },
+        { divider: true, id: 'div-1', label: '' },
+        {
+          id: 'select-all',
+          label: 'Select All Spreads',
+          shortcut: 'Ctrl+A',
+          onClick: selectAllSpreads,
+        },
+        {
+          id: 'clear-selection',
+          label: 'Deselect Others',
+          onClick: () => {
+            if (contextMenu.targetSpread) {
+              setSelectedSpreadIds([contextMenu.targetSpread.id]);
+              setActiveSpread(contextMenu.targetSpread.id);
+            }
+          },
+        },
+      ];
+    }
+
+    const spread = contextMenu.targetSpread;
+    const index = allSpreads.findIndex((s) => s.id === spread.id);
+    const isFirst = index === 0;
+    const isLast = index === allSpreads.length - 1;
+
+    return [
+      {
+        id: 'header-single',
+        label: `Spread ${spread.spreadIndex} (${spread.name})`,
+        header: true,
+      },
+      {
+        id: 'duplicate-single',
+        label: 'Duplicate Spread',
+        icon: '📋',
+        onClick: () => duplicateSpread(spread.id, currentProject),
+      },
+      {
+        id: 'move-left',
+        label: 'Move Left (Earlier)',
+        icon: '◀',
+        disabled: isFirst,
+        onClick: () => moveSpread(spread.id, 'left'),
+      },
+      {
+        id: 'move-right',
+        label: 'Move Right (Later)',
+        icon: '▶',
+        disabled: isLast,
+        onClick: () => moveSpread(spread.id, 'right'),
+      },
+      { divider: true, id: 'div-1', label: '' },
+      {
+        id: 'select-all',
+        label: 'Select All Spreads',
+        shortcut: 'Ctrl+A',
+        onClick: selectAllSpreads,
+      },
+      { divider: true, id: 'div-2', label: '' },
+      {
+        id: 'delete-single',
+        label: 'Delete Spread',
+        icon: '🗑️',
+        danger: true,
+        disabled: allSpreads.length <= 1,
+        onClick: () => {
+          if (spread.elements && spread.elements.length > 0) {
+            setSpreadsToDelete([spread]);
+          } else {
+            deleteSpread(spread.id);
+          }
+        },
+      },
+    ];
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -336,6 +493,7 @@ export function PageNavigator() {
           <div className={styles.drawerList}>
             {allSpreads.map((spread, index) => {
               const isActive = activeSpreadId === spread.id;
+              const isSelected = selectedSpreadIds.includes(spread.id);
               const isDragging = draggedSpreadIndex === index;
               const isDragOver = dragOverSpreadIndex === index;
               const isFirst = index === 0;
@@ -355,11 +513,29 @@ export function PageNavigator() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`${styles.thumbnailCard} ${isActive ? styles.cardActive : ''} ${isDragging ? styles.draggingCard : ''} ${dragOverClass}`}
-                  onClick={() => {
-                    setActiveSpread(spread.id);
+                  className={`${styles.thumbnailCard} ${isActive ? styles.cardActive : ''} ${isSelected && !isActive ? styles.cardSelected : ''} ${isDragging ? styles.draggingCard : ''} ${dragOverClass}`}
+                  onClick={(e) => {
+                    const isMulti = Boolean(e.ctrlKey || e.metaKey);
+                    const isRange = Boolean(e.shiftKey);
+                    toggleSpreadSelection(spread.id, isMulti, isRange);
                   }}
-                  title={`${spread.name} (Drag or use ◀ ▶ to reorder)`}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // If right-clicked card is NOT already selected, select only this card
+                    if (!selectedSpreadIds.includes(spread.id)) {
+                      toggleSpreadSelection(spread.id, false, false);
+                    }
+
+                    setContextMenu({
+                      isOpen: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      targetSpread: spread,
+                    });
+                  }}
+                  title={`${spread.name} (Ctrl+Click multi-select, Right-click for options)`}
                 >
                   {/* Real-time Miniature Spread Preview */}
                   <MiniSpreadPreview spread={spread} project={currentProject} />
@@ -414,7 +590,7 @@ export function PageNavigator() {
                         <button
                           type="button"
                           className={`${styles.cardActionBtn} ${styles.cardActionBtnDanger}`}
-                          onClick={(e) => handleDeleteRequest(e, spread)}
+                          onClick={(e) => handleDeleteRequest(e, [spread])}
                           title="Delete this spread"
                         >
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -508,19 +684,37 @@ export function PageNavigator() {
         </button>
       </div>
 
-      {/* Confirm Delete Spread Dialog (shown whenever a spread with any elements is about to be deleted) */}
+      {/* Right-Click Context Menu for Spread Cards */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={getContextMenuItems()}
+        onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Confirm Delete Spread Dialog (single or multi-spread batch) */}
       <ConfirmDialog
-        isOpen={spreadToDelete !== null}
-        title="Delete Album Spread?"
-        message={`Are you sure you want to delete "${spreadToDelete?.name}"?`}
+        isOpen={spreadsToDelete !== null && spreadsToDelete.length > 0}
+        title={
+          spreadsToDelete && spreadsToDelete.length > 1
+            ? `Delete ${spreadsToDelete.length} Album Spreads?`
+            : 'Delete Album Spread?'
+        }
+        message={
+          spreadsToDelete && spreadsToDelete.length > 1
+            ? `Are you sure you want to delete ${spreadsToDelete.length} selected spreads?`
+            : `Are you sure you want to delete "${spreadsToDelete?.[0]?.name}"?`
+        }
         detail={(() => {
-          if (!spreadToDelete) return '';
-          const elements = spreadToDelete.elements || [];
-          const photoCount = elements.filter(
+          if (!spreadsToDelete || spreadsToDelete.length === 0) return '';
+
+          const allElements = spreadsToDelete.flatMap((s) => s.elements || []);
+          const photoCount = allElements.filter(
             (el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)
           ).length;
-          const textCount = elements.filter((el) => el.type === 'text').length;
-          const emptyFrameCount = elements.filter(
+          const textCount = allElements.filter((el) => el.type === 'text').length;
+          const emptyFrameCount = allElements.filter(
             (el) => el.type === 'photo' && !el.photoId && !el.filePath
           ).length;
 
@@ -529,14 +723,22 @@ export function PageNavigator() {
           if (textCount > 0) parts.push(`${textCount} text element(s)`);
           if (emptyFrameCount > 0) parts.push(`${emptyFrameCount} placeholder frame(s)`);
 
-          const summary = parts.length > 0 ? parts.join(', ') : `${elements.length} element(s)`;
+          const summary = parts.length > 0 ? parts.join(', ') : `${allElements.length} element(s)`;
+
+          if (spreadsToDelete.length > 1) {
+            return `These ${spreadsToDelete.length} spreads contain a total of ${summary}. Deleting them will permanently remove all their contents from your album.`;
+          }
           return `This spread still contains ${summary}. Deleting it will permanently remove this spread and all its contents from your album.`;
         })()}
-        confirmText="Delete Spread"
+        confirmText={
+          spreadsToDelete && spreadsToDelete.length > 1
+            ? `Delete ${spreadsToDelete.length} Spreads`
+            : 'Delete Spread'
+        }
         cancelText="Cancel"
         variant="danger"
         onConfirm={handleConfirmDelete}
-        onCancel={() => setSpreadToDelete(null)}
+        onCancel={() => setSpreadsToDelete(null)}
       />
     </div>
   );
