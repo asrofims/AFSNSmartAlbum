@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { Project } from '../domain/project';
+import { Project, Unit } from '../domain/project';
 import {
   Album,
   Spread,
@@ -68,6 +68,7 @@ export interface AlbumState {
   moveSpread: (spreadId: string, direction: 'left' | 'right') => void;
   reorderSpread: (fromIndex: number, toIndex: number) => void;
   updateBleed: (bleed: number) => void;
+  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit) => void;
   updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
@@ -604,7 +605,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, bleed },
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            bleed,
+            leftPage: currentAlbum.coverSpread.leftPage ? { ...currentAlbum.coverSpread.leftPage, bleed } : currentAlbum.coverSpread.leftPage,
+            rightPage: currentAlbum.coverSpread.rightPage ? { ...currentAlbum.coverSpread.rightPage, bleed } : currentAlbum.coverSpread.rightPage,
+          },
         },
         saveStatus: 'unsaved',
       });
@@ -612,7 +618,50 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, bleed } : s
+      s.id === activeSpreadId ? {
+        ...s,
+        bleed,
+        leftPage: s.leftPage ? { ...s.leftPage, bleed } : s.leftPage,
+        rightPage: s.rightPage ? { ...s.rightPage, bleed } : s.rightPage,
+      } : s
+    );
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit) => {
+    const { currentAlbum, activeSpreadId } = get();
+    if (!currentAlbum || !activeSpreadId) return;
+
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    if (currentAlbum.coverSpread.id === activeSpreadId) {
+      set({
+        currentAlbum: {
+          ...currentAlbum,
+          coverSpread: {
+            ...currentAlbum.coverSpread,
+            spacingValue,
+            spacingUnit: spacingUnit || currentAlbum.coverSpread.spacingUnit,
+          },
+        },
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
+
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === activeSpreadId ? {
+        ...s,
+        spacingValue,
+        spacingUnit: spacingUnit || s.spacingUnit,
+      } : s
     );
 
     set({

@@ -1,4 +1,5 @@
 import { Unit } from './units';
+export type { Unit };
 
 export interface ProjectSettings {
   name: string;
@@ -42,6 +43,7 @@ export interface Project {
   canvasDpi: number;
   spacingValue: number;
   spacingUnit: Unit;
+  bleed?: number;
   marginEnabled?: boolean;
   marginValue?: number;
   marginUnit?: Unit;

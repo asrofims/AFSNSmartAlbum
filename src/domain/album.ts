@@ -52,6 +52,8 @@ export interface Spread {
   photoInsetBottom?: number;
   photoInsetLeft?: number;
   photoInsetRight?: number;
+  spacingValue?: number;
+  spacingUnit?: Unit;
   backgroundColor: string;
   elements: AlbumElement[];
 }
@@ -154,7 +156,8 @@ export function createInitialAlbum(project: Project): Album {
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
   const marginVal = project.marginValue || 10;
-  const bleedVal = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0; // Standard 3mm bleed
+  const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0; // Standard 3mm bleed
+  const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
 
   // 1. Cover Spread (Back Cover on left, Front Cover on right)
   const coverBackPage: Page = {
@@ -194,6 +197,8 @@ export function createInitialAlbum(project: Project): Album {
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
+    spacingValue: project.spacingValue,
+    spacingUnit: project.spacingUnit,
     backgroundColor: project.backgroundColor || '#1e293b',
     elements: [],
   };
@@ -238,6 +243,8 @@ export function createInitialAlbum(project: Project): Album {
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
+    spacingValue: project.spacingValue,
+    spacingUnit: project.spacingUnit,
     backgroundColor: defaultBgColor,
     elements: [],
   };
@@ -267,7 +274,18 @@ export function createInteriorSpread(
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
   const marginVal = project.marginValue || 10;
-  const bleedVal = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
+  const safeAreaTop = project.marginTop ?? marginVal;
+  const safeAreaBottom = project.marginBottom ?? marginVal;
+  const safeAreaOutside = project.marginOutside ?? marginVal;
+  const safeAreaSpine = project.marginSpine ?? marginVal;
+
+  // New spread creation baseline: strictly follows the master project creation settings
+  const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
+  const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
+
+  const spacingVal = project.spacingValue ?? 2;
+  const spacingUnitVal = project.spacingUnit ?? unit;
+
   const defaultBgColor = project.backgroundColor || '#FFFFFF';
 
   const leftPageNum = (spreadNumber - 1) * 2 + 1;
@@ -311,6 +329,12 @@ export function createInteriorSpread(
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
+    safeAreaTop,
+    safeAreaBottom,
+    safeAreaOutside,
+    safeAreaSpine,
+    spacingValue: spacingVal,
+    spacingUnit: spacingUnitVal,
     backgroundColor: defaultBgColor,
     elements: [],
   };
@@ -376,6 +400,12 @@ export function duplicateAlbumSpread(
   duplicated.gutterUnit = original.gutterUnit;
   duplicated.bleed = original.bleed;
   duplicated.safeArea = original.safeArea;
+  duplicated.safeAreaTop = original.safeAreaTop;
+  duplicated.safeAreaBottom = original.safeAreaBottom;
+  duplicated.safeAreaOutside = original.safeAreaOutside;
+  duplicated.safeAreaSpine = original.safeAreaSpine;
+  duplicated.spacingValue = original.spacingValue;
+  duplicated.spacingUnit = original.spacingUnit;
 
   // Deep clone all layout elements with fresh unique IDs
   duplicated.elements = (original.elements || []).map((elem, idx) => ({

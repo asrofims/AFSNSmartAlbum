@@ -1792,15 +1792,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           children: [
             {
               id: 'gap-h',
-              label: `Set Horizontal Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
+              label: `Set Horizontal Gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit})`,
               icon: '⇿',
-              onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', currentProject.spacingValue),
+              onClick: () => applyFixedGapToSelected(activeSpread.id, 'horizontal', activeSpread.spacingValue ?? currentProject.spacingValue),
             },
             {
               id: 'gap-v',
-              label: `Set Vertical Gap (${currentProject.spacingValue} ${currentProject.spacingUnit})`,
+              label: `Set Vertical Gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit})`,
               icon: '⇳',
-              onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', currentProject.spacingValue),
+              onClick: () => applyFixedGapToSelected(activeSpread.id, 'vertical', activeSpread.spacingValue ?? currentProject.spacingValue),
             },
             ...(count >= 3
               ? [

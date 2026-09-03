@@ -40,8 +40,6 @@ export function WorkspaceLayout() {
   const openNewProject = useProjectStore((s) => s.openNewProject);
   const closeProject = useProjectStore((s) => s.closeProject);
   const updateProjectName = useProjectStore((s) => s.updateProjectName);
-  const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
-  const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
   const updateProjectBackgroundColor = useProjectStore((s) => s.updateProjectBackgroundColor);
   const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
@@ -55,6 +53,7 @@ export function WorkspaceLayout() {
   const showSafeAreaGuide = useAlbumStore((s) => s.showSafeAreaGuide);
   const toggleGuide = useAlbumStore((s) => s.toggleGuide);
   const updateBleed = useAlbumStore((s) => s.updateBleed);
+  const updateSpreadSpacing = useAlbumStore((s) => s.updateSpreadSpacing);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
   const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
   const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
@@ -2004,27 +2003,28 @@ export function WorkspaceLayout() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Default Gap</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Photo Gap</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
                       <NumberInput
-                        value={currentProject.spacingValue}
+                        value={activeSpread?.spacingValue ?? currentProject.spacingValue}
                         onChange={(val) => {
                           const num = Math.max(0, val);
-                          updateProjectSpacing(num, currentProject.spacingUnit);
+                          const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
+                          updateSpreadSpacing(num, unit);
                           setCustomGapValue(num);
                         }}
                         min={0}
                         max={100}
-                        step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : 0.5}
-                        precision={currentProject.spacingUnit === 'inch' || currentProject.spacingUnit === 'cm' ? 2 : 1}
+                        step={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' ? 0.05 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 0.1 : 0.5}
+                        precision={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' || (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 2 : 1}
                       />
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '24px' }}>
-                        {currentProject.spacingUnit}
+                        {activeSpread?.spacingUnit ?? currentProject.spacingUnit}
                       </span>
                     </div>
                   </div>
 
-                  {/* Quick Action to apply project spacing to currently selected frames */}
+                  {/* Quick Action to apply spread spacing to currently selected frames */}
                   {selectedFrameIds.length >= 2 && activeSpread && (
                     <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                       <button
@@ -2032,10 +2032,12 @@ export function WorkspaceLayout() {
                         className={styles.toolBtn}
                         style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
                         onClick={() => {
-                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          const spreadGap = activeSpread.spacingValue ?? currentProject.spacingValue;
+                          const spreadUnit = activeSpread.spacingUnit ?? currentProject.spacingUnit;
+                          const gapInMm = convertUnit(spreadGap, spreadUnit, 'mm');
                           applyFixedGapToSelected(activeSpread.id, 'horizontal', gapInMm);
                         }}
-                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) horizontally`}
+                        title={`Apply gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit}) horizontally`}
                       >
                         ⇿ Apply Gap H
                       </button>
@@ -2044,10 +2046,12 @@ export function WorkspaceLayout() {
                         className={styles.toolBtn}
                         style={{ flex: 1, fontSize: '10px', padding: '4px 6px', justifyContent: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}
                         onClick={() => {
-                          const gapInMm = convertUnit(currentProject.spacingValue, currentProject.spacingUnit, 'mm');
+                          const spreadGap = activeSpread.spacingValue ?? currentProject.spacingValue;
+                          const spreadUnit = activeSpread.spacingUnit ?? currentProject.spacingUnit;
+                          const gapInMm = convertUnit(spreadGap, spreadUnit, 'mm');
                           applyFixedGapToSelected(activeSpread.id, 'vertical', gapInMm);
                         }}
-                        title={`Apply default gap (${currentProject.spacingValue} ${currentProject.spacingUnit}) vertically`}
+                        title={`Apply gap (${activeSpread.spacingValue ?? currentProject.spacingValue} ${activeSpread.spacingUnit ?? currentProject.spacingUnit}) vertically`}
                       >
                         ⇳ Apply Gap V
                       </button>
@@ -2237,10 +2241,7 @@ export function WorkspaceLayout() {
                       <div style={{ width: '110px' }}>
                         <NumberInput
                           value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'all');
-                            updateProjectMargin(val, undefined, 'all');
-                          }}
+                          onChange={(val) => updateSafeArea(val, 'all')}
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
@@ -2257,10 +2258,7 @@ export function WorkspaceLayout() {
                         </div>
                         <NumberInput
                           value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'top');
-                            updateProjectMargin(val, undefined, 'top');
-                          }}
+                          onChange={(val) => updateSafeArea(val, 'top')}
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
@@ -2275,10 +2273,7 @@ export function WorkspaceLayout() {
                         </div>
                         <NumberInput
                           value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'bottom');
-                            updateProjectMargin(val, undefined, 'bottom');
-                          }}
+                          onChange={(val) => updateSafeArea(val, 'bottom')}
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
@@ -2293,10 +2288,7 @@ export function WorkspaceLayout() {
                         </div>
                         <NumberInput
                           value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'outside');
-                            updateProjectMargin(val, undefined, 'outside');
-                          }}
+                          onChange={(val) => updateSafeArea(val, 'outside')}
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
@@ -2311,10 +2303,7 @@ export function WorkspaceLayout() {
                         </div>
                         <NumberInput
                           value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine || 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'spine');
-                            updateProjectMargin(val, undefined, 'spine');
-                          }}
+                          onChange={(val) => updateSafeArea(val, 'spine')}
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
@@ -2357,7 +2346,7 @@ export function WorkspaceLayout() {
                     </div>
                     <div style={{ width: '110px' }}>
                       <NumberInput
-                        value={activeSpread?.bleed ?? (currentProject.canvasUnit === 'inch' ? 0.125 : currentProject.canvasUnit === 'cm' ? 0.3 : 3.0)}
+                        value={activeSpread?.bleed ?? currentProject.bleed ?? (currentProject.canvasUnit === 'inch' ? 0.125 : currentProject.canvasUnit === 'cm' ? 0.3 : 3.0)}
                         onChange={(val) => updateBleed(val)}
                         min={0}
                         max={999}

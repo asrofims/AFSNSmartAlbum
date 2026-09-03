@@ -252,4 +252,26 @@ if (dupResult) {
   console.assert(clonedSpread?.rightPage?.backgroundColor === '#000000', 'Duplicated spread should preserve right page background color');
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation)!');
+// Test that new spreads follow project creation settings by default, while remaining dynamic per-spread
+const spreadToCustomize = darkAlbum.spreads[darkAlbum.spreads.length - 1];
+spreadToCustomize.bleed = 5.0; // Customize spread 2
+spreadToCustomize.spacingValue = 6.0;
+spreadToCustomize.safeArea = 15.0;
+
+// Creating new spread 3: must follow project creation defaults (spacingValue: 2, safeArea: 10, bleed: 3.0)
+const darkSpread3 = createInteriorSpread(darkAlbum, darkProject, 3);
+console.assert(darkSpread3.bleed === 3.0, `New spread should follow project default bleed (3.0), got ${darkSpread3.bleed}`);
+console.assert(darkSpread3.spacingValue === 2, `New spread should follow project default spacing (2), got ${darkSpread3.spacingValue}`);
+console.assert(darkSpread3.safeArea === 10, `New spread should follow project default safeArea (10), got ${darkSpread3.safeArea}`);
+
+// Verify previous spread retains its customized dynamic values
+console.assert(spreadToCustomize.bleed === 5.0, `Customized spread bleed must remain 5.0, got ${spreadToCustomize.bleed}`);
+console.assert(spreadToCustomize.spacingValue === 6.0, `Customized spread spacing must remain 6.0, got ${spreadToCustomize.spacingValue}`);
+console.assert(spreadToCustomize.safeArea === 15.0, `Customized spread safeArea must remain 15.0, got ${spreadToCustomize.safeArea}`);
+
+// Verify new spread can be dynamically edited independently
+darkSpread3.spacingValue = 0.0; // e.g. seamless collage
+console.assert(spreadToCustomize.spacingValue === 6.0, `Customized spread spacing must NOT be affected by new spread, got ${spreadToCustomize.spacingValue}`);
+console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be independently editable to 0.0, got ${darkSpread3.spacingValue}`);
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence)!');

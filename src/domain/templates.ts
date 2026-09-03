@@ -79,9 +79,9 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const safeMarginOutside = round4(convertUnit(rawMarginOutside, marginUnit, unit, dpi, 4));
   const safeMarginSpine = round4(convertUnit(rawMarginSpine, marginUnit, unit, dpi, 4));
 
-  // Spacing: convert from project.spacingUnit (or 'mm') to project.canvasUnit
-  const rawSpacing = project.spacingValue ?? 4;
-  const spacingUnit = project.spacingUnit || 'mm';
+  // Spacing: convert from spread.spacingUnit or project.spacingUnit (or 'mm') to project.canvasUnit
+  const rawSpacing = spread?.spacingValue ?? project.spacingValue ?? 4;
+  const spacingUnit = spread?.spacingUnit ?? project.spacingUnit ?? 'mm';
   const spacing = round4(convertUnit(rawSpacing, spacingUnit, unit, dpi, 4));
 
   // Gutter: In layflat photobooks, physical spread width is strictly 2 * pageWidth without spine expansion

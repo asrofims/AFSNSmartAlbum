@@ -60,6 +60,8 @@ export function NewProjectDialog() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<'page' | 'margins' | 'appearance'>('page');
+
   // Helper to round values cleanly based on unit
   const roundUnit = (val: number, unit: Unit): number => {
     if (unit === 'inch') return Math.round(val * 100) / 100;
@@ -99,6 +101,7 @@ export function NewProjectDialog() {
       setIsSavePresetOpen(false);
       setCustomPresetName('');
       setPresetSaveSuccess(null);
+      setActiveTab('page');
     }
   }, [isOpen]);
 
@@ -301,9 +304,13 @@ export function NewProjectDialog() {
   const previewRatio = spreadWidth / spreadHeight;
   let previewBoxW = 200;
   let previewBoxH = Math.round(200 / previewRatio);
-  if (previewBoxH > 130) {
-    previewBoxH = 130;
-    previewBoxW = Math.round(130 * previewRatio);
+  if (previewBoxH > 115) {
+    previewBoxH = 115;
+    previewBoxW = Math.round(115 * previewRatio);
+  }
+  if (previewBoxW > 220) {
+    previewBoxW = 220;
+    previewBoxH = Math.round(220 / previewRatio);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -365,500 +372,584 @@ export function NewProjectDialog() {
       isOpen={isOpen}
       onClose={closeNewProject}
       title="New Album Project"
-      width={720}
+      width={840}
       closeOnOverlayClick={false}
       closeOnEscape={false}
     >
       <form onSubmit={handleSubmit}>
-        {errorMessage && <div className={styles.errorMessage}>{errorMessage}</div>}
+        {errorMessage && (
+          <div className={styles.errorBanner}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
-        <div className={styles.container}>
-          {/* Left Column: Configuration Form */}
+        <div className={styles.dialogContainer}>
+          {/* Left Column: Form Configuration */}
           <div className={styles.leftColumn}>
-            {/* Project Name */}
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Project Name</label>
+            {/* Compact Project Name Input */}
+            <div className={styles.nameRow}>
+              <span className={styles.nameIcon}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+                  <path d="M6 6h10" />
+                  <path d="M6 10h10" />
+                </svg>
+              </span>
               <input
                 type="text"
-                className={styles.input}
+                className={styles.nameInput}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Wedding Album 2026"
+                placeholder="Album Project Name (e.g. Wedding Album 2026)"
                 autoFocus
               />
             </div>
 
-            {/* Album Page Settings */}
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>Page Dimensions</div>
+            {/* Category Navigation Tabs */}
+            <div className={styles.tabsNav}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'page' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('page')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 3H3v18h18V3z" />
+                  <path d="M3 9h18" />
+                  <path d="M9 21V9" />
+                </svg>
+                <span>Page & Canvas</span>
+              </button>
 
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <Select
-                    label="Album Preset"
-                    value={presetId}
-                    options={[
-                      ...allPresets.map((p) => ({
-                        value: p.id,
-                        label: p.isCustom ? `★ ${p.name}` : p.name,
-                      })),
-                      { value: CUSTOM_PRESET_ID, label: 'Custom Dimensions' },
-                    ]}
-                    onChange={handlePresetSelect}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomPresetName(`${canvasWidth}×${canvasHeight} ${canvasUnit} Custom`);
-                    setIsSavePresetOpen(!isSavePresetOpen);
-                  }}
-                  title="Save current dimensions and settings as a reusable preset"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '0 10px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    borderRadius: '4px',
-                    border: '1px solid var(--color-border)',
-                    background: isSavePresetOpen ? 'var(--color-surface-hover)' : 'var(--color-surface)',
-                    color: 'var(--color-text)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    height: '32px',
-                    marginBottom: '1px',
-                  }}
-                >
-                  ★ Save as Preset
-                </button>
-                {Boolean(allPresets.find((p) => p.id === presetId)?.isCustom) && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCustomPreset(presetId)}
-                    title="Delete this custom preset"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0 8px',
-                      fontSize: '11px',
-                      borderRadius: '4px',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      color: 'var(--color-danger, #ef4444)',
-                      cursor: 'pointer',
-                      height: '32px',
-                      marginBottom: '1px',
-                    }}
-                  >
-                    🗑️
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'margins' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('margins')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M7 7h10v10H7z" strokeDasharray="2 2" />
+                </svg>
+                <span>Margins & Gap</span>
+              </button>
 
-              {isSavePresetOpen && (
-                <div
-                  style={{
-                    background: 'var(--color-surface-hover, rgba(255,255,255,0.05))',
-                    border: '1px solid var(--color-accent)',
-                    borderRadius: '6px',
-                    padding: '10px',
-                    marginBottom: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)' }}>
-                    Save Current Configuration as Preset
-                  </div>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={customPresetName}
-                    onChange={(e) => setCustomPresetName(e.target.value)}
-                    placeholder="Enter preset name (e.g. 10x10 Wedding Standard)"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSaveCustomPreset();
-                      } else if (e.key === 'Escape') {
-                        setIsSavePresetOpen(false);
-                      }
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsSavePresetOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={handleSaveCustomPreset}
-                      disabled={!customPresetName.trim()}
-                    >
-                      Save Preset
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {presetSaveSuccess && (
-                <div
-                  style={{
-                    fontSize: '11px',
-                    color: 'var(--color-success, #10b981)',
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                    borderRadius: '4px',
-                    padding: '4px 8px',
-                    marginBottom: '8px',
-                  }}
-                >
-                  {presetSaveSuccess}
-                </div>
-              )}
-
-              {/* Orientation Switcher & Swap */}
-              <div className={styles.formGroup}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className={styles.label}>Orientation</label>
-                  <button
-                    type="button"
-                    onClick={handleSwapDimensions}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--color-accent)',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: 0,
-                    }}
-                    title="Swap width and height values"
-                  >
-                    ⇄ Swap W ↔ H
-                  </button>
-                </div>
-                <div className={styles.orientationGroup}>
-                  <button
-                    type="button"
-                    className={`${styles.orientBtn} ${currentOrientation === 'square' ? styles.orientBtnActive : ''}`}
-                    onClick={() => handleOrientation('square')}
-                  >
-                    ◫ Square
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.orientBtn} ${currentOrientation === 'portrait' ? styles.orientBtnActive : ''}`}
-                    onClick={() => handleOrientation('portrait')}
-                  >
-                    ▯ Portrait
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.orientBtn} ${currentOrientation === 'landscape' ? styles.orientBtnActive : ''}`}
-                    onClick={() => handleOrientation('landscape')}
-                  >
-                    ▭ Landscape
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.row}>
-                <div className={styles.flex1}>
-                  <NumberInput
-                    label="Page Width"
-                    value={canvasWidth}
-                    onChange={handleWidthChange}
-                    min={1}
-                    max={2000}
-                    step={canvasUnit === 'inch' ? 0.5 : 1}
-                  />
-                </div>
-
-                <div className={styles.flex1}>
-                  <NumberInput
-                    label="Page Height"
-                    value={canvasHeight}
-                    onChange={handleHeightChange}
-                    min={1}
-                    max={2000}
-                    step={canvasUnit === 'inch' ? 0.5 : 1}
-                  />
-                </div>
-
-                <div style={{ width: '90px' }}>
-                  <Select
-                    label="Unit"
-                    value={canvasUnit}
-                    options={UNIT_OPTIONS}
-                    onChange={handleUnitChange}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.row}>
-                <div className={styles.flex1}>
-                  <NumberInput
-                    label="Resolution (DPI)"
-                    value={canvasDpi}
-                    onChange={setCanvasDpi}
-                    min={72}
-                    max={1200}
-                    step={50}
-                    suffix="DPI"
-                  />
-                </div>
-              </div>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'appearance' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('appearance')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 2a7 7 0 1 0 7 7" />
+                </svg>
+                <span>Appearance</span>
+              </button>
             </div>
 
-            {/* Safe Margin */}
-            <div className={styles.section}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <div className={styles.sectionTitle} style={{ margin: 0 }}>Safe Zone Margins</div>
-                {marginEnabled && (
-                  <div style={{ display: 'flex', gap: '2px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', padding: '2px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setIsMargin4S(false)}
-                      style={{
-                        padding: '2px 8px',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        borderRadius: '3px',
-                        border: 'none',
-                        background: !isMargin4S ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                        color: !isMargin4S ? '#60a5fa' : 'var(--color-text-muted)',
-                        cursor: 'pointer',
-                      }}
-                      title="Equal safe margin on all sides"
-                    >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsMargin4S(true)}
-                      style={{
-                        padding: '2px 8px',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        borderRadius: '3px',
-                        border: 'none',
-                        background: isMargin4S ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                        color: isMargin4S ? '#60a5fa' : 'var(--color-text-muted)',
-                        cursor: 'pointer',
-                      }}
-                      title="Configure Top, Bottom, Outside, and Spine independently"
-                    >
-                      4S
-                    </button>
+            {/* TAB 1: Page Dimensions & Canvas Settings */}
+            {activeTab === 'page' && (
+              <div className={styles.tabContent}>
+                {/* Album Preset Selection Card */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                      </svg>
+                      Album Presets
+                    </span>
+                    <span className={styles.cardSubtitle}>Standard & Custom Sizes</span>
                   </div>
-                )}
-              </div>
-              <div style={{ padding: '2px 0 6px 0' }}>
-                <Switch
-                  checked={marginEnabled}
-                  onChange={setMarginEnabled}
-                  label="Enable safe margin guides"
-                  size="sm"
-                />
-              </div>
 
-              {marginEnabled && !isMargin4S && (
-                <div className={styles.row}>
-                  <div className={styles.flex1}>
-                    <NumberInput
-                      label="Safe Margin"
-                      value={marginValue}
-                      onChange={setMarginValue}
-                      min={0.1}
-                      max={1000}
-                      step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
-                    />
-                  </div>
-                  <div style={{ width: '90px' }}>
-                    <Select
-                      label="Unit"
-                      value={marginUnit}
-                      options={UNIT_OPTIONS}
-                      onChange={handleUnitChange}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {marginEnabled && isMargin4S && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className={styles.row}>
-                    <div className={styles.flex1}>
-                      <NumberInput
-                        label="Top (⤒)"
-                        value={marginTop}
-                        onChange={setMarginTop}
-                        min={0}
-                        max={1000}
-                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
-                      />
-                    </div>
-                    <div className={styles.flex1}>
-                      <NumberInput
-                        label="Bottom (⤓)"
-                        value={marginBottom}
-                        onChange={setMarginBottom}
-                        min={0}
-                        max={1000}
-                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
-                      />
-                    </div>
-                  </div>
-                  <div className={styles.row}>
-                    <div className={styles.flex1} title="Outer trim margin protected from paper cutting">
-                      <NumberInput
-                        label="Outside (⇤)"
-                        value={marginOutside}
-                        onChange={setMarginOutside}
-                        min={0}
-                        max={1000}
-                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
-                      />
-                    </div>
-                    <div className={styles.flex1} title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
-                      <NumberInput
-                        label="Spine (⇥)"
-                        value={marginSpine}
-                        onChange={setMarginSpine}
-                        min={0}
-                        max={1000}
-                        step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
-                      />
-                    </div>
-                    <div style={{ width: '90px' }}>
+                  <div className={styles.presetRow}>
+                    <div className={styles.presetSelectWrapper}>
                       <Select
-                        label="Unit"
-                        value={marginUnit}
-                        options={UNIT_OPTIONS}
-                        onChange={handleUnitChange}
+                        label="Preset Template"
+                        value={presetId}
+                        options={[
+                          ...allPresets.map((p) => ({
+                            value: p.id,
+                            label: p.isCustom ? `★ ${p.name}` : p.name,
+                          })),
+                          { value: CUSTOM_PRESET_ID, label: 'Custom Dimensions' },
+                        ]}
+                        onChange={handlePresetSelect}
                       />
                     </div>
+
+                    <button
+                      type="button"
+                      className={styles.presetActionBtn}
+                      onClick={() => {
+                        setCustomPresetName(`${canvasWidth}×${canvasHeight} ${canvasUnit} Custom`);
+                        setIsSavePresetOpen(!isSavePresetOpen);
+                      }}
+                      title="Save current dimensions as reusable preset"
+                    >
+                      <span>★</span>
+                      <span>Save Preset</span>
+                    </button>
+
+                    {Boolean(allPresets.find((p) => p.id === presetId)?.isCustom) && (
+                      <button
+                        type="button"
+                        className={styles.presetDeleteBtn}
+                        onClick={() => handleDeleteCustomPreset(presetId)}
+                        title="Delete this custom preset"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                  {marginSpine === 0 && (
-                    <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      ✓ Seamless Spread: Pages 1 & 2 connect continuously across spine
+
+                  {isSavePresetOpen && (
+                    <div className={styles.savePresetDrawer}>
+                      <div className={styles.savePresetTitle}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        Save Configuration as Custom Preset
+                      </div>
+                      <input
+                        type="text"
+                        className={styles.nameInput}
+                        value={customPresetName}
+                        onChange={(e) => setCustomPresetName(e.target.value)}
+                        placeholder="Preset Name (e.g. 10x10 Wedding Standard)"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveCustomPreset();
+                          } else if (e.key === 'Escape') {
+                            setIsSavePresetOpen(false);
+                          }
+                        }}
+                      />
+                      <div className={styles.savePresetActions}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsSavePresetOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveCustomPreset}
+                          disabled={!customPresetName.trim()}
+                        >
+                          Save Preset
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {presetSaveSuccess && (
+                    <div className={styles.seamlessSpineBadge}>
+                      ✓ {presetSaveSuccess}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Photo Spacing */}
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>Photo Spacing & Gap</div>
-              <div className={styles.row}>
-                <div className={styles.flex1}>
-                  <NumberInput
-                    label="Spacing"
-                    value={spacingValue}
-                    onChange={setSpacingValue}
-                    min={0}
-                    max={500}
-                    step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 2 : 0.5}
-                  />
-                </div>
-                <div style={{ width: '90px' }}>
-                  <Select
-                    label="Unit"
-                    value={spacingUnit}
-                    options={UNIT_OPTIONS}
-                    onChange={() => {}}
-                    disabled
-                  />
-                </div>
-              </div>
-            </div>
+                {/* Dimensions & Orientation Card */}
+                <div className={styles.card}>
+                  <div className={styles.orientationHeader}>
+                    <span className={styles.cardTitle}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+                        <path d="M2 12h20" />
+                      </svg>
+                      Page Geometry & Orientation
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.swapBtn}
+                      onClick={handleSwapDimensions}
+                      title="Swap Width and Height"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m16 3 4 4-4 4" />
+                        <path d="M20 7H4" />
+                        <path d="m8 21-4-4 4-4" />
+                        <path d="M4 17h16" />
+                      </svg>
+                      <span>Swap W ↔ H</span>
+                    </button>
+                  </div>
 
-            {/* Photo Border (Request 4: Default Nonaktif) */}
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>Photo Border</div>
-              <div style={{ padding: '2px 0 6px 0' }}>
-                <Switch
-                  checked={borderEnabled}
-                  onChange={setBorderEnabled}
-                  label="Enable photo border"
-                  size="sm"
-                />
-              </div>
+                  {/* Visual Orientation Tiles */}
+                  <div className={styles.orientationGrid}>
+                    <button
+                      type="button"
+                      className={`${styles.orientTile} ${currentOrientation === 'square' ? styles.orientTileActive : ''}`}
+                      onClick={() => handleOrientation('square')}
+                    >
+                      <div className={styles.orientIconBox}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="4" y="4" width="16" height="16" rx="2" />
+                        </svg>
+                      </div>
+                      <span className={styles.orientLabel}>Square</span>
+                    </button>
 
-              {borderEnabled && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                  <div className={styles.row}>
+                    <button
+                      type="button"
+                      className={`${styles.orientTile} ${currentOrientation === 'portrait' ? styles.orientTileActive : ''}`}
+                      onClick={() => handleOrientation('portrait')}
+                    >
+                      <div className={styles.orientIconBox}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="6" y="3" width="12" height="18" rx="2" />
+                        </svg>
+                      </div>
+                      <span className={styles.orientLabel}>Portrait</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`${styles.orientTile} ${currentOrientation === 'landscape' ? styles.orientTileActive : ''}`}
+                      onClick={() => handleOrientation('landscape')}
+                    >
+                      <div className={styles.orientIconBox}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="6" width="18" height="12" rx="2" />
+                        </svg>
+                      </div>
+                      <span className={styles.orientLabel}>Landscape</span>
+                    </button>
+                  </div>
+
+                  {/* Physical Dimensions & Resolution */}
+                  <div className={styles.inputRow}>
                     <div className={styles.flex1}>
                       <NumberInput
-                        label="Border Width"
-                        value={borderWidth}
-                        onChange={setBorderWidth}
-                        min={0.01}
-                        max={500}
-                        step={canvasUnit === 'inch' ? 0.01 : canvasUnit === 'cm' ? 0.02 : canvasUnit === 'px' ? 1 : 0.2}
+                        label="Width"
+                        value={canvasWidth}
+                        onChange={handleWidthChange}
+                        min={1}
+                        max={2000}
+                        step={canvasUnit === 'inch' ? 0.5 : 1}
                       />
                     </div>
-                    <div style={{ width: '90px' }}>
+
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Height"
+                        value={canvasHeight}
+                        onChange={handleHeightChange}
+                        min={1}
+                        max={2000}
+                        step={canvasUnit === 'inch' ? 0.5 : 1}
+                      />
+                    </div>
+
+                    <div style={{ width: '85px' }}>
                       <Select
                         label="Unit"
-                        value={borderUnit}
+                        value={canvasUnit}
                         options={UNIT_OPTIONS}
                         onChange={handleUnitChange}
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <ColorPicker
-                      label="Border Color"
-                      value={borderColor}
-                      onChange={setBorderColor}
-                    />
+                    <div style={{ width: '100px' }}>
+                      <NumberInput
+                        label="Resolution"
+                        value={canvasDpi}
+                        onChange={setCanvasDpi}
+                        min={72}
+                        max={1200}
+                        step={50}
+                        suffix="DPI"
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Canvas Background */}
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>Spread Background</div>
-              <ColorPicker
-                label="Background Color"
-                value={backgroundColor}
-                onChange={setBackgroundColor}
-              />
-            </div>
+            {/* TAB 2: Margins & Spacing Settings */}
+            {activeTab === 'margins' && (
+              <div className={styles.tabContent}>
+                {/* Safe Zone Margins Card */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className={styles.cardTitle}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="18" height="18" x="3" y="3" rx="2" />
+                          <path d="M7 7h10v10H7z" strokeDasharray="2 2" />
+                        </svg>
+                        Safe Zone Margins
+                      </span>
+                    </div>
+
+                    {marginEnabled && (
+                      <div className={styles.segmentedGroup}>
+                        <button
+                          type="button"
+                          className={`${styles.segmentBtn} ${!isMargin4S ? styles.segmentBtnActive : ''}`}
+                          onClick={() => setIsMargin4S(false)}
+                          title="Uniform margin on all sides"
+                        >
+                          Uniform
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.segmentBtn} ${isMargin4S ? styles.segmentBtnActive : ''}`}
+                          onClick={() => setIsMargin4S(true)}
+                          title="Independent 4-sided margins"
+                        >
+                          4-Sided
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding: '2px 0 4px 0' }}>
+                    <Switch
+                      checked={marginEnabled}
+                      onChange={setMarginEnabled}
+                      label="Enable safe margin guide lines"
+                      size="sm"
+                    />
+                  </div>
+
+                  {marginEnabled && !isMargin4S && (
+                    <div className={styles.inputRow}>
+                      <div className={styles.flex1}>
+                        <NumberInput
+                          label="Safe Margin (All Sides)"
+                          value={marginValue}
+                          onChange={setMarginValue}
+                          min={0.1}
+                          max={1000}
+                          step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                        />
+                      </div>
+                      <div className={styles.unitSelectBox}>
+                        <Select
+                          label="Unit"
+                          value={marginUnit}
+                          options={UNIT_OPTIONS}
+                          onChange={handleUnitChange}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {marginEnabled && isMargin4S && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className={styles.margin4sGrid}>
+                        <div>
+                          <NumberInput
+                            label="Top (⤒)"
+                            value={marginTop}
+                            onChange={setMarginTop}
+                            min={0}
+                            max={1000}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                          />
+                        </div>
+                        <div>
+                          <NumberInput
+                            label="Bottom (⤓)"
+                            value={marginBottom}
+                            onChange={setMarginBottom}
+                            min={0}
+                            max={1000}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                          />
+                        </div>
+                        <div title="Outer trim margin protected from paper cutting">
+                          <NumberInput
+                            label="Outside Trim (⇤)"
+                            value={marginOutside}
+                            onChange={setMarginOutside}
+                            min={0}
+                            max={1000}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                          />
+                        </div>
+                        <div title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
+                          <NumberInput
+                            label="Spine Fold (⇥)"
+                            value={marginSpine}
+                            onChange={setMarginSpine}
+                            min={0}
+                            max={1000}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                          />
+                        </div>
+                      </div>
+
+                      {marginSpine === 0 && (
+                        <div className={styles.seamlessSpineBadge}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>Seamless Spread: Pages 1 & 2 connect continuously across spine crease</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Photo Spacing Card */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="7" height="18" x="3" y="3" rx="1" />
+                        <rect width="7" height="18" x="14" y="3" rx="1" />
+                      </svg>
+                      Photo Spacing & Gap
+                    </span>
+                    <span className={styles.cardSubtitle}>Inter-frame distance</span>
+                  </div>
+
+                  <div className={styles.inputRow}>
+                    <div className={styles.flex1}>
+                      <NumberInput
+                        label="Default Frame Spacing"
+                        value={spacingValue}
+                        onChange={setSpacingValue}
+                        min={0}
+                        max={500}
+                        step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 2 : 0.5}
+                      />
+                    </div>
+                    <div className={styles.unitSelectBox}>
+                      <Select
+                        label="Unit"
+                        value={spacingUnit}
+                        options={UNIT_OPTIONS}
+                        onChange={() => {}}
+                        disabled
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Appearance & Styling Settings */}
+            {activeTab === 'appearance' && (
+              <div className={styles.tabContent}>
+                {/* Spread Background Card */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M3 9h18" />
+                      </svg>
+                      Spread Background Color
+                    </span>
+                    <span className={styles.cardSubtitle}>Canvas solid fill</span>
+                  </div>
+
+                  <ColorPicker
+                    label="Background Color"
+                    value={backgroundColor}
+                    onChange={setBackgroundColor}
+                  />
+                </div>
+
+                {/* Photo Border Card */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                      </svg>
+                      Photo Frame Border
+                    </span>
+                  </div>
+
+                  <div style={{ padding: '2px 0 4px 0' }}>
+                    <Switch
+                      checked={borderEnabled}
+                      onChange={setBorderEnabled}
+                      label="Add border stroke to photo frames"
+                      size="sm"
+                    />
+                  </div>
+
+                  {borderEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                      <div className={styles.inputRow}>
+                        <div className={styles.flex1}>
+                          <NumberInput
+                            label="Border Stroke Width"
+                            value={borderWidth}
+                            onChange={setBorderWidth}
+                            min={0.01}
+                            max={500}
+                            step={canvasUnit === 'inch' ? 0.01 : canvasUnit === 'cm' ? 0.02 : canvasUnit === 'px' ? 1 : 0.2}
+                          />
+                        </div>
+                        <div className={styles.unitSelectBox}>
+                          <Select
+                            label="Unit"
+                            value={borderUnit}
+                            options={UNIT_OPTIONS}
+                            onChange={handleUnitChange}
+                          />
+                        </div>
+                      </div>
+
+                      <ColorPicker
+                        label="Border Stroke Color"
+                        value={borderColor}
+                        onChange={setBorderColor}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Live Spread Preview */}
+          {/* Right Column: Studio Live Spread Preview & Print Specs */}
           <div className={styles.rightColumn}>
-            <div className={styles.previewTitle}>Live Spread Preview</div>
+            <div className={styles.previewHeader}>
+              <span className={styles.previewHeading}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Live Spread Preview
+              </span>
+              <span className={styles.aspectBadge}>
+                {currentOrientation.toUpperCase()} · {(canvasWidth / canvasHeight).toFixed(2)}:1
+              </span>
+            </div>
 
-            <div className={styles.previewCanvas}>
+            {/* Realistic 3D Mockup Stage */}
+            <div className={styles.mockupStage}>
               <div
-                className={styles.spreadContainer}
+                className={styles.albumSpread}
                 style={{
                   width: `${previewBoxW}px`,
                   height: `${previewBoxH}px`,
                   backgroundColor: backgroundColor,
                 }}
               >
-                {/* Left Page */}
-                <div className={styles.leftPage}>
+                {/* Left Album Page */}
+                <div className={styles.albumPageLeft}>
                   {marginEnabled && (
                     <div
                       style={{
@@ -867,27 +958,28 @@ export function NewProjectDialog() {
                         bottom: '8px',
                         left: '12px',
                         right: isMargin4S && marginSpine === 0 ? '0px' : '8px',
-                        border: '1px dashed rgba(59, 130, 246, 0.45)',
-                        borderRight: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(59, 130, 246, 0.45)',
+                        border: '1px dashed rgba(56, 189, 248, 0.55)',
+                        borderRight: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(56, 189, 248, 0.55)',
                         pointerEvents: 'none',
                       }}
                       title="Safe Margin Guide"
                     />
                   )}
                   <div
-                    className={styles.samplePhotoBox}
+                    className={styles.photoPlaceholder}
                     style={{
                       borderWidth: borderEnabled ? '1.5px' : '0',
                       borderColor: borderColor,
                     }}
                   />
+                  <span className={styles.pageNumberBadge}>1</span>
                 </div>
 
-                {/* Center Spine / Gutter */}
-                <div className={styles.centerGutter} />
+                {/* 3D Center Spine Crease */}
+                <div className={styles.albumSpine} />
 
-                {/* Right Page */}
-                <div className={styles.rightPage}>
+                {/* Right Album Page */}
+                <div className={styles.albumPageRight}>
                   {marginEnabled && (
                     <div
                       style={{
@@ -896,49 +988,53 @@ export function NewProjectDialog() {
                         bottom: '8px',
                         left: isMargin4S && marginSpine === 0 ? '0px' : '8px',
                         right: '12px',
-                        border: '1px dashed rgba(59, 130, 246, 0.45)',
-                        borderLeft: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(59, 130, 246, 0.45)',
+                        border: '1px dashed rgba(56, 189, 248, 0.55)',
+                        borderLeft: isMargin4S && marginSpine === 0 ? 'none' : '1px dashed rgba(56, 189, 248, 0.55)',
                         pointerEvents: 'none',
                       }}
                       title="Safe Margin Guide"
                     />
                   )}
                   <div
-                    className={styles.samplePhotoBox}
+                    className={styles.photoPlaceholder}
                     style={{
                       borderWidth: borderEnabled ? '1.5px' : '0',
                       borderColor: borderColor,
                     }}
                   />
+                  <span className={styles.pageNumberBadge}>2</span>
                 </div>
               </div>
             </div>
 
-            <div className={styles.previewSpecs}>
+            {/* Studio Print Specifications */}
+            <div className={styles.specsCard}>
               <div className={styles.specRow}>
-                <span>Single Page:</span>
+                <span className={styles.specLabel}>Single Page:</span>
                 <span className={styles.specValue}>
                   {formatDimensions(canvasWidth, canvasHeight, canvasUnit)}
                 </span>
               </div>
               <div className={styles.specRow}>
-                <span>Open Spread:</span>
+                <span className={styles.specLabel}>Open Spread:</span>
                 <span className={styles.specValue}>
                   {formatDimensions(spreadWidth, spreadHeight, canvasUnit)}
                 </span>
               </div>
+              <div className={styles.specDivider} />
               <div className={styles.specRow}>
-                <span>Print Canvas:</span>
-                <span className={styles.specValue}>
+                <span className={styles.specLabel}>Print Canvas:</span>
+                <span className={styles.specValueHighlight}>
                   {spreadPxW} × {spreadPxH} px
                 </span>
               </div>
               <div className={styles.specRow}>
-                <span>Resolution:</span>
+                <span className={styles.specLabel}>Resolution:</span>
                 <span className={styles.specValue}>{canvasDpi} DPI ({megapixels} MP)</span>
               </div>
+              <div className={styles.specDivider} />
               <div className={styles.specRow}>
-                <span>Safe Margin:</span>
+                <span className={styles.specLabel}>Safe Margins:</span>
                 <span className={styles.specValue}>
                   {marginEnabled
                     ? isMargin4S
@@ -948,11 +1044,11 @@ export function NewProjectDialog() {
                 </span>
               </div>
               <div className={styles.specRow}>
-                <span>Photo Gap:</span>
+                <span className={styles.specLabel}>Photo Gap:</span>
                 <span className={styles.specValue}>{spacingValue} {spacingUnit}</span>
               </div>
               <div className={styles.specRow}>
-                <span>Photo Border:</span>
+                <span className={styles.specLabel}>Photo Border:</span>
                 <span className={styles.specValue}>
                   {borderEnabled ? `${borderWidth} ${borderUnit}` : 'Disabled'}
                 </span>
@@ -961,8 +1057,8 @@ export function NewProjectDialog() {
           </div>
         </div>
 
-        {/* Footer actions */}
-        <div className={styles.footer}>
+        {/* Dialog Footer Actions */}
+        <div className={styles.dialogFooter}>
           <Button
             type="button"
             variant="ghost"
