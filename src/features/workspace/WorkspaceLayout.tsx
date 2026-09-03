@@ -3,6 +3,7 @@ import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { NumberInput } from '../../components/ui/NumberInput';
 import { Switch } from '../../components/ui/Switch';
+import { ColorPicker } from '../../components/ui/ColorPicker';
 import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
@@ -28,16 +29,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
 import styles from './WorkspaceLayout.module.css';
-
-const BG_PRESET_PALETTE = [
-  { name: 'Pure White', color: '#FFFFFF' },
-  { name: 'Off-White', color: '#F8FAFC' },
-  { name: 'Warm Cream', color: '#FDFBF7' },
-  { name: 'Neutral Gray', color: '#E2E8F0' },
-  { name: 'Slate Neutral', color: '#64748B' },
-  { name: 'Dark Charcoal', color: '#1E293B' },
-  { name: 'Rich Black', color: '#000000' },
-];
 
 export function WorkspaceLayout() {
   useAutoSave();
@@ -908,7 +899,6 @@ export function WorkspaceLayout() {
             <div ref={propertyListRef} className={styles.propertyList}>
               {/* Selected Photo Frame Properties / Multi-Selection Controls (Placed at TOP when active) */}
               {(() => {
-                const paletteColors = ['#FFFFFF', '#000000', '#F8FAFC', '#94A3B8', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
                 if (!activeSpread || selectedFrameIds.length === 0) return null;
 
                 // MULTI-SELECTION MODE (>= 2 frames selected)
@@ -1473,42 +1463,12 @@ export function WorkspaceLayout() {
                         </div>
 
                         {/* Border Color */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Border Color</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <input
-                                type="color"
-                                value={selectedFrame.borderColor || '#FFFFFF'}
-                                onChange={(e) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderColor: e.target.value })}
-                                style={{ width: '22px', height: '22px', padding: 0, border: 'none', borderRadius: '3px', cursor: 'pointer', backgroundColor: 'transparent' }}
-                              />
-                              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-text-primary)' }}>
-                                {selectedFrame.borderColor || '#FFFFFF'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Quick Palette */}
-                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                            {paletteColors.map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={() => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderColor: color })}
-                                style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  borderRadius: '3px',
-                                  backgroundColor: color,
-                                  border: (selectedFrame.borderColor || '#FFFFFF').toUpperCase() === color.toUpperCase() ? '2px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.2)',
-                                  cursor: 'pointer',
-                                  padding: 0,
-                                }}
-                                title={color}
-                              />
-                            ))}
-                          </div>
+                        <div style={{ marginTop: '8px' }}>
+                          <ColorPicker
+                            value={selectedFrame.borderColor || '#FFFFFF'}
+                            onChange={(newColor) => updateFrameGeometry(activeSpread.id, selectedFrame.id, { borderColor: newColor })}
+                            label="Border Color"
+                          />
                         </div>
                       </div>
                     )}
@@ -1885,95 +1845,20 @@ export function WorkspaceLayout() {
                       </button>
                     </div>
 
-                    {/* Color Swatch & Hex Input (Fixed layout, zero jitter) */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            position: 'relative',
-                            width: '26px',
-                            height: '26px',
-                            flexShrink: 0,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: currentScopeColor,
-                            border: '1px solid var(--color-border)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                          }}
-                          title="Click to choose custom color"
-                        >
-                          <input
-                            type="color"
-                            value={currentScopeColor.startsWith('#') && currentScopeColor.length === 7 ? currentScopeColor : '#FFFFFF'}
-                            onChange={(e) => {
-                              if (activeSpread) {
-                                updateSpreadBackgroundColor(activeSpread.id, e.target.value, bgScope);
-                              }
-                            }}
-                            style={{
-                              position: 'absolute',
-                              inset: '-4px',
-                              width: '36px',
-                              height: '36px',
-                              opacity: 0,
-                              cursor: 'pointer',
-                            }}
-                          />
-                        </div>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
-                          Color Code
-                        </span>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={currentScopeColor.toUpperCase()}
-                        onChange={(e) => {
-                          const val = e.target.value;
+                    {/* Color Swatch, Hex, Eyedropper & Palette */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <ColorPicker
+                        value={currentScopeColor}
+                        onChange={(newColor) => {
                           if (activeSpread) {
-                            updateSpreadBackgroundColor(activeSpread.id, val, bgScope);
+                            updateSpreadBackgroundColor(activeSpread.id, newColor, bgScope);
                           }
                         }}
-                        style={{
-                          width: '78px',
-                          padding: '4px 6px',
-                          fontSize: '11px',
-                          fontFamily: 'monospace',
-                          textAlign: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.2)',
-                          border: '1px solid var(--color-border)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--color-text-primary)',
-                        }}
+                        presetColors={[
+                          '#FFFFFF', '#F8FAFC', '#FDFBF7', '#E2E8F0', '#CBD5E1', '#94A3B8',
+                          '#64748B', '#475569', '#334155', '#1E293B', '#0F172A', '#000000'
+                        ]}
                       />
-                    </div>
-
-                    {/* Preset Palette Swatches */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                      {BG_PRESET_PALETTE.map((item) => (
-                        <button
-                          key={item.color}
-                          type="button"
-                          onClick={() => {
-                            if (activeSpread) {
-                              updateSpreadBackgroundColor(activeSpread.id, item.color, bgScope);
-                            }
-                          }}
-                          title={`${item.name} (${item.color})`}
-                          style={{
-                            flex: 1,
-                            height: '22px',
-                            backgroundColor: item.color,
-                            border: currentScopeColor.toLowerCase() === item.color.toLowerCase()
-                              ? '2px solid var(--color-accent)'
-                              : '1px solid var(--color-border)',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            transition: 'transform 0.1s ease',
-                          }}
-                        />
-                      ))}
                     </div>
 
                     {/* Quick Propagation Actions */}
