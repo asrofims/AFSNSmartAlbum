@@ -929,7 +929,7 @@ export function WorkspaceLayout() {
                         const isAllLocked = selectedElements.length > 0 && selectedElements.every((f) => f.locked);
 
                         return (
-                          <div className={styles.propTitle} style={{ color: isAllLocked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div className={styles.propTitle} style={{ color: isAllLocked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', marginBottom: '12px' }}>
                             <span>Multi-Selection ({selectedFrameIds.length} Frames)</span>
                             <button
                               type="button"
@@ -1144,7 +1144,7 @@ export function WorkspaceLayout() {
                         backgroundColor: 'rgba(59, 130, 246, 0.04)',
                       }}
                     >
-                      <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', marginBottom: '12px' }}>
                         <span>Selected Text Box</span>
                         <button
                           type="button"
@@ -1191,7 +1191,7 @@ export function WorkspaceLayout() {
                       backgroundColor: 'rgba(59, 130, 246, 0.04)',
                     }}
                   >
-                    <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div className={styles.propTitle} style={{ color: selectedFrame.locked ? '#f59e0b' : 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', marginBottom: '12px' }}>
                       <span>Selected Photo Frame</span>
                       <button
                         type="button"
@@ -1722,7 +1722,7 @@ export function WorkspaceLayout() {
 
               {/* Project Overview */}
               <div className={styles.propSection}>
-                <div className={styles.propTitle}>Album Project</div>
+                <div className={styles.propTitle}>Project Details</div>
                 <div className={styles.propRow}>
                   <span>Name</span>
                   {isEditingInspectorName ? (
@@ -2081,64 +2081,234 @@ export function WorkspaceLayout() {
               <div className={styles.propSection}>
                 <div className={styles.propTitle}>Margins & Guides</div>
 
-                {/* Guide Toggles */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showSafeAreaGuide}
-                      onChange={() => toggleGuide('safeArea')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Safe Zone Margin (Blue)</span>
-                  </label>
+                {/* Modern Guide Overlay Visibility Toggles */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
+                    gap: '4px',
+                    background: 'rgba(0, 0, 0, 0.25)',
+                    padding: '3px',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: '12px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('safeArea')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showSafeAreaGuide ? 600 : 400,
+                      color: showSafeAreaGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showSafeAreaGuide ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                      border: showSafeAreaGuide ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Blue Safe Zone Margin guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Safe Zone</span>
+                  </button>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showBleedGuide}
-                      onChange={() => toggleGuide('bleed')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Bleed Cut Line (Red)</span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('bleed')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showBleedGuide ? 600 : 400,
+                      color: showBleedGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showBleedGuide ? 'rgba(239, 68, 68, 0.25)' : 'transparent',
+                      border: showBleedGuide ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Red Bleed Line guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Bleed Cut</span>
+                  </button>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showGutterGuide}
-                      onChange={() => toggleGuide('gutter')}
-                      style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-                    />
-                    <span>Center Spine Crease Line</span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('gutter')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showGutterGuide ? 600 : 400,
+                      color: showGutterGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showGutterGuide ? 'rgba(129, 140, 248, 0.25)' : 'transparent',
+                      border: showGutterGuide ? '1px solid rgba(129, 140, 248, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Center Spine Crease Guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#818cf8', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Spine Line</span>
+                  </button>
                 </div>
 
-                {/* Safe Margins & Spine Inputs */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Safe Zone Margin</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                        onChange={(val) => {
-                          updateSafeArea(val);
-                          updateProjectMargin(val);
+                {/* Side-by-Side Cards: Safe Zone Margin & Bleed Allowance */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                  {/* Safe Zone Margin Card */}
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', flexShrink: 0 }} />
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Safe Margin
+                      </span>
+                    </div>
+                    <NumberInput
+                      value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
+                      onChange={(val) => {
+                        updateSafeArea(val);
+                        updateProjectMargin(val);
+                      }}
+                      min={0}
+                      max={999}
+                      step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                      suffix={currentProject.canvasUnit}
+                    />
+                  </div>
+
+                  {/* Bleed Allowance Card */}
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Bleed Cut
+                      </span>
+                    </div>
+                    <NumberInput
+                      value={activeSpread?.bleed ?? 3}
+                      onChange={(val) => updateBleed(val)}
+                      min={0}
+                      max={999}
+                      step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
+                      suffix={currentProject.canvasUnit}
+                    />
+                  </div>
+                </div>
+
+                {/* Inner Safe Inset Card with Sleek 4S Multi-Directional Switcher */}
+                <div
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  {/* Inset Header with Mode Switcher */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <rect x="7" y="7" width="10" height="10" />
+                      </svg>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }} title="Additional breathing room distance of photos inside the blue safe margin box">
+                        Inner Safe Inset
+                      </span>
+                    </div>
+
+                    {/* Segmented Pill Switcher: All Sides vs 4 Sides */}
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '2px',
+                        gap: '2px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsInsetExpanded(false)}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontWeight: !isInsetExpanded ? 600 : 400,
+                          color: !isInsetExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          backgroundColor: !isInsetExpanded ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
                         }}
-                        min={0}
-                        max={999}
-                        step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                        title="Uniform inset for all sides (Linked)"
+                      >
+                        All Sides
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsInsetExpanded(true)}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontWeight: isInsetExpanded ? 600 : 400,
+                          color: isInsetExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          backgroundColor: isInsetExpanded ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="Individual 4-sided insets (Top, Bottom, Left, Right)"
+                      >
+                        4 Sides
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {/* Inset Body */}
+                  {!isInsetExpanded ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }} title="Additional breathing room distance of photos inside the blue safe area margin">
-                        Inner Safe Inset
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        Uniform Inset
                       </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
+                      <div style={{ width: '110px' }}>
                         <NumberInput
                           value={activeSpread?.photoInset ?? (currentProject.photoInset || 0)}
                           onChange={(val) => {
@@ -2148,95 +2318,73 @@ export function WorkspaceLayout() {
                           min={0}
                           max={999}
                           step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setIsInsetExpanded(!isInsetExpanded)}
-                          title="Toggle 4-side individual edge insets (Top, Bottom, Left, Right)"
-                          style={{
-                            background: isInsetExpanded ? 'var(--color-accent)' : 'transparent',
-                            color: isInsetExpanded ? '#fff' : 'var(--color-text-muted)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '3px',
-                            padding: '2px 4px',
-                            fontSize: '9px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          4S
-                        </button>
                       </div>
                     </div>
-
-                    {isInsetExpanded && (
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '6px',
-                          background: 'rgba(0,0,0,0.15)',
-                          padding: '6px',
-                          borderRadius: '4px',
-                          marginTop: '2px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Top</span>
-                          <NumberInput
-                            value={activeSpread?.photoInsetTop ?? activeSpread?.photoInset ?? 0}
-                            onChange={(val) => updatePhotoInset(val, 'top')}
-                            min={0}
-                            max={999}
-                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          />
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '2px' }}>
+                      {/* Top Inset */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Bottom</span>
-                          <NumberInput
-                            value={activeSpread?.photoInsetBottom ?? activeSpread?.photoInset ?? 0}
-                            onChange={(val) => updatePhotoInset(val, 'bottom')}
-                            min={0}
-                            max={999}
-                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Left</span>
-                          <NumberInput
-                            value={activeSpread?.photoInsetLeft ?? activeSpread?.photoInset ?? 0}
-                            onChange={(val) => updatePhotoInset(val, 'left')}
-                            min={0}
-                            max={999}
-                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Right</span>
-                          <NumberInput
-                            value={activeSpread?.photoInsetRight ?? activeSpread?.photoInset ?? 0}
-                            onChange={(val) => updatePhotoInset(val, 'right')}
-                            min={0}
-                            max={999}
-                            step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
-                          />
-                        </div>
+                        <NumberInput
+                          value={activeSpread?.photoInsetTop ?? activeSpread?.photoInset ?? 0}
+                          onChange={(val) => updatePhotoInset(val, 'top')}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
                       </div>
-                    )}
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Bleed Allowance</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '110px' }}>
-                      <NumberInput
-                        value={activeSpread?.bleed ?? 3}
-                        onChange={(val) => updateBleed(val)}
-                        min={0}
-                        max={999}
-                        step={currentProject.canvasUnit === 'inch' ? 0.025 : currentProject.canvasUnit === 'cm' ? 0.05 : 0.5}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                      {/* Bottom Inset */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.photoInsetBottom ?? activeSpread?.photoInset ?? 0}
+                          onChange={(val) => updatePhotoInset(val, 'bottom')}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+
+                      {/* Left Inset */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Left</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.photoInsetLeft ?? activeSpread?.photoInset ?? 0}
+                          onChange={(val) => updatePhotoInset(val, 'left')}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
+
+                      {/* Right Inset */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Right</span>
+                        </div>
+                        <NumberInput
+                          value={activeSpread?.photoInsetRight ?? activeSpread?.photoInset ?? 0}
+                          onChange={(val) => updatePhotoInset(val, 'right')}
+                          min={0}
+                          max={999}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          suffix={currentProject.canvasUnit}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Smart Snapping Card & Granular Config Button */}
@@ -2283,31 +2431,6 @@ export function WorkspaceLayout() {
                     </svg>
                   </button>
                 </div>
-              </div>
-
-              {/* Project Default Border */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Project Default Border</div>
-                <div className={styles.propRow}>
-                  <span>Default Border</span>
-                  <span className={styles.propValue}>
-                    {currentProject.borderEnabled
-                      ? `${currentProject.borderWidth} ${currentProject.borderUnit}`
-                      : 'Disabled'}
-                  </span>
-                </div>
-                {currentProject.borderEnabled && (
-                  <div className={styles.propRow}>
-                    <span>Border Color</span>
-                    <span className={styles.propValue}>
-                      {currentProject.borderColor}
-                      <span
-                        className={styles.colorSwatchSmall}
-                        style={{ backgroundColor: currentProject.borderColor }}
-                      />
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           )}

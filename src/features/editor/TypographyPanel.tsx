@@ -247,14 +247,11 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         </select>
       </div>
 
-      {/* 4. Font Size Slider & Number Input (Supports down to 1 pt) */}
+      {/* 4. Font Size Slider & Direct Input Field */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+        <div style={{ marginBottom: '4px' }}>
           <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, letterSpacing: '0.5px' }}>
             Size
-          </span>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            {style.fontSize || 24} pt
           </span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -271,69 +268,34 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
             }}
             style={{ flex: 1, cursor: 'pointer' }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <button
-              type="button"
-              onClick={() => handleUpdateStyle({ fontSize: Math.max(1, (style.fontSize || 24) - 1) })}
-              style={{
-                width: '20px',
-                height: '24px',
-                borderRadius: '3px',
-                background: 'var(--color-surface-raised, #1e293b)',
-                border: '1px solid var(--color-border, #334155)',
-                color: 'var(--color-text-secondary, #94a3b8)',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              title="Decrease size (1 pt)"
-            >
-              -
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <input
-              type="number"
-              min={1}
-              max={200}
+              type="text"
+              inputMode="numeric"
               value={style.fontSize || 24}
               onChange={(e) => {
-                const val = Number(e.target.value);
-                if (Number.isFinite(val) && val > 0) {
+                const raw = e.target.value;
+                if (raw === '') return;
+                const val = parseInt(raw, 10);
+                if (Number.isFinite(val)) {
                   handleUpdateStyle({ fontSize: Math.max(1, Math.min(200, val)) });
                 }
               }}
               style={{
-                width: '42px',
-                padding: '3px 2px',
+                width: '44px',
+                padding: '4px 6px',
                 fontSize: '11px',
-                borderRadius: '3px',
+                fontWeight: 600,
+                borderRadius: '4px',
                 background: 'var(--color-surface-raised, #1e293b)',
                 border: '1px solid var(--color-border, #334155)',
                 color: 'var(--color-text-primary, #f8fafc)',
                 textAlign: 'center',
+                outline: 'none',
               }}
+              title="Type font size (1 - 200 pt)"
             />
-            <button
-              type="button"
-              onClick={() => handleUpdateStyle({ fontSize: Math.min(200, (style.fontSize || 24) + 1) })}
-              style={{
-                width: '20px',
-                height: '24px',
-                borderRadius: '3px',
-                background: 'var(--color-surface-raised, #1e293b)',
-                border: '1px solid var(--color-border, #334155)',
-                color: 'var(--color-text-secondary, #94a3b8)',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              title="Increase size (1 pt)"
-            >
-              +
-            </button>
+            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 500 }}>pt</span>
           </div>
         </div>
       </div>

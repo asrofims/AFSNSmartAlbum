@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Group, Rect, Text as KonvaText } from 'react-konva';
+import { Group, Rect, Text as KonvaText, Circle, Path as KonvaPath } from 'react-konva';
 import Konva from 'konva';
+import { useEditorStore } from '../../stores/editorStore';
 import { TextNodeElement, DEFAULT_TEXT_STYLE } from '../../domain/text';
 import { roundToHundredth } from '../../domain/editor';
 import { Unit, ptToScreenPx, convertPtToUnit, convertUnit } from '../../domain/units';
@@ -179,17 +180,55 @@ export function TextNode({
         />
       )}
 
-      {/* Lock Badge if locked */}
+      {/* Locked Text Box Selection / Status Outline (Yellow dashed bounding box) */}
       {element.locked && (
         <Rect
-          x={pixelW - 16}
-          y={2}
-          width={14}
-          height={14}
-          fill="rgba(245, 158, 11, 0.9)"
-          cornerRadius={3}
+          width={pixelW}
+          height={pixelH}
+          stroke="#f59e0b"
+          strokeWidth={isSelected ? 1.5 : 1}
+          dash={[4, 4]}
+          opacity={isSelected ? 1 : 0.8}
           listening={false}
+          strokeScaleEnabled={false}
         />
+      )}
+
+      {/* Locked Vector Padlock Badge (top-right corner) - Identical to Photo Frame */}
+      {element.locked && (
+        <Group
+          x={Math.max(14, pixelW - 16)}
+          y={16}
+          listening={true}
+          onClick={(e) => {
+            e.cancelBubble = true;
+            useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true;
+            useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
+          }}
+        >
+          <Circle
+            radius={11}
+            fill="rgba(15, 23, 42, 0.92)"
+            stroke="#f59e0b"
+            strokeWidth={1.5}
+            shadowColor="rgba(0, 0, 0, 0.6)"
+            shadowBlur={4}
+            shadowOffset={{ x: 0, y: 1 }}
+          />
+          <KonvaPath
+            data="M7 11V7a5 5 0 0 1 10 0v4M4 11h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
+            stroke="#fbbf24"
+            strokeWidth={2}
+            fill="#f59e0b"
+            scale={{ x: 0.5, y: 0.5 }}
+            x={-6}
+            y={-6}
+            listening={false}
+          />
+        </Group>
       )}
     </Group>
   );

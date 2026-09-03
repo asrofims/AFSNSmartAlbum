@@ -5,7 +5,8 @@ import { useProjectStore } from '../../stores/projectStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
-import { PhotoFrameElement } from '../../domain/editor';
+import { AlbumElement } from '../../domain/album';
+import { TextNodeElement } from '../../domain/text';
 import styles from './LockedPhotosPanel.module.css';
 
 interface LockedPhotosPanelProps {
@@ -29,13 +30,13 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
-  const photoElements = useMemo(
-    () => (activeSpread?.elements || []).filter((f): f is PhotoFrameElement => f.type === 'photo'),
+  const allElements = useMemo(
+    () => (activeSpread?.elements || []),
     [activeSpread]
   );
 
-  const lockedElements = useMemo(() => photoElements.filter((f) => f.locked), [photoElements]);
-  const unlockedElements = useMemo(() => photoElements.filter((f) => !f.locked), [photoElements]);
+  const lockedElements = useMemo(() => allElements.filter((f) => f.locked), [allElements]);
+  const unlockedElements = useMemo(() => allElements.filter((f) => !f.locked), [allElements]);
 
   const dims = useMemo(() => {
     if (!currentProject) return null;
@@ -74,37 +75,109 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
   const handleUnlockAll = () => {
     if (!activeSpread) return;
     unlockAllFramesOnSpread(activeSpread.id);
-    if (onToast) onToast(`🔓 Unlocked all ${lockedElements.length} photos on spread`);
+    if (onToast) onToast(`🔓 Unlocked all ${lockedElements.length} items on spread`);
   };
 
   const handleLockAll = () => {
     if (!activeSpread) return;
     lockAllFramesOnSpread(activeSpread.id);
-    if (onToast) onToast(`🔒 Locked all ${photoElements.length} photos on spread`);
+    if (onToast) onToast(`🔒 Locked all ${allElements.length} items on spread`);
   };
 
-  const handleToggleLock = (e: React.MouseEvent, frameId: string, isCurrentlyLocked: boolean) => {
+  const handleToggleLock = (e: React.MouseEvent, frameId: string, isCurrentlyLocked: boolean, isText: boolean = false) => {
     e.stopPropagation();
     if (!activeSpread) return;
     toggleLockSingleFrame(activeSpread.id, frameId, !isCurrentlyLocked);
     if (onToast) {
-      onToast(isCurrentlyLocked ? '🔓 Photo unlocked' : '🔒 Photo locked (fixed position & crop)');
+      if (isCurrentlyLocked) {
+        onToast(isText ? '🔓 Text unlocked' : '🔓 Photo unlocked');
+      } else {
+        onToast(isText ? '🔒 Text locked (fixed position)' : '🔒 Photo locked (fixed position & crop)');
+      }
     }
   };
 
-  if (!activeSpread || photoElements.length === 0) {
+  if (!activeSpread || allElements.length === 0) {
     return (
       <div className={styles.container}>
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>🔒</div>
           <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
-            No photos on active spread
+            No elements on active spread
           </p>
-          <p>Drag photos from the tray onto the spread canvas to start designing.</p>
+          <p>Add photos or text to the spread canvas to view and manage locks.</p>
         </div>
       </div>
     );
   }
+
+  const renderElementCard = (frame: AlbumElement, isLocked: boolean) => {
+    const isText = frame.type === 'text';
+    const textEl = isText ? (frame as TextNodeElement) : null;
+    const isSelected = selectedFrameIds.includes(frame.id);
+    const thumbSrc = !isText ? getPhotoPreviewSrc(frame.photoId, frame.thumbnailPath || frame.previewPath) : '';
+    const pageLoc = getElementPageLocation(frame.x);
+    const orientation = getElementOrientation(frame.width, frame.height);
+    const dimText = `${Math.round(frame.width)} × ${Math.round(frame.height)} ${unit}`;
+
+    return (
+      <div
+        key={frame.id}
+        className={`${styles.photoCard} ${isLocked ? styles.photoCardLocked : ''} ${isSelected ? styles.photoCardActive : ''}`}
+        onClick={() => handleSelect(frame.id)}
+        title={`Click to select ${isText ? 'text box' : 'photo frame'} on canvas`}
+      >
+        <div className={styles.thumbWrapper}>
+          {isText ? (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(59, 130, 246, 0.12)',
+              borderRadius: '4px',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              color: '#60a5fa',
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, lineHeight: 1 }}>T</span>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', opacity: 0.85, marginTop: '2px' }}>TEXT</span>
+            </div>
+          ) : thumbSrc ? (
+            <img src={thumbSrc} alt="" className={styles.thumbImg} loading="lazy" />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', fontSize: '10px' }}>
+              🖼
+            </div>
+          )}
+        </div>
+
+        <div className={styles.photoMeta}>
+          <div className={styles.photoName} title={isText ? (textEl?.text || 'Text Box') : (frame.fileName || 'Photo Frame')}>
+            {isText
+              ? (textEl?.text ? `"${textEl.text.slice(0, 26)}${textEl.text.length > 26 ? '...' : ''}"` : 'Text Box')
+              : (frame.fileName || 'Photo Frame')}
+          </div>
+          <div className={styles.tagRow}>
+            <span className={`${styles.tagPill} ${styles.tagPage}`}>{pageLoc}</span>
+            <span className={styles.tagPill}>{isText ? (textEl?.style?.fontFamily || 'Inter') : orientation}</span>
+            {isText && <span className={styles.tagPill}>{textEl?.style?.fontSize || 24} pt</span>}
+            <span className={styles.tagDimensions}>{dimText}</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={`${styles.toggleLockBtn} ${isLocked ? styles.toggleLockBtnActive : ''}`}
+          onClick={(e) => handleToggleLock(e, frame.id, isLocked, isText)}
+          title={isLocked ? `Unlock this ${isText ? 'text box' : 'photo frame'}` : `Lock this ${isText ? 'text box' : 'photo frame'}`}
+        >
+          {isLocked ? '🔒' : '🔓'}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className={styles.container}>
@@ -122,7 +195,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
             className={`${styles.headerActionBtn} ${styles.unlockAllBtn}`}
             onClick={handleUnlockAll}
             disabled={lockedElements.length === 0}
-            title="Unlock all photos on this spread (Ctrl+Shift+L)"
+            title="Unlock all items on this spread (Ctrl+Shift+L)"
           >
             <span>🔓</span>
             <span>Unlock All</span>
@@ -132,7 +205,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
             className={`${styles.headerActionBtn} ${styles.lockAllBtn}`}
             onClick={handleLockAll}
             disabled={unlockedElements.length === 0}
-            title="Lock all photos on this spread (Ctrl+L)"
+            title="Lock all items on this spread (Ctrl+L)"
           >
             <span>🔒</span>
             <span>Lock All</span>
@@ -141,114 +214,28 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
       </div>
 
       <div className={styles.scrollContent}>
-        {/* Section 1: Locked Photos */}
+        {/* Section 1: Locked Items */}
         {lockedElements.length > 0 && (
           <>
             <div className={styles.sectionTitle}>
-              <span>🔒 Locked Photos ({lockedElements.length})</span>
+              <span>🔒 Locked Items ({lockedElements.length})</span>
             </div>
 
             <div className={styles.cardList}>
-              {lockedElements.map((frame) => {
-                const isSelected = selectedFrameIds.includes(frame.id);
-                const thumbSrc = getPhotoPreviewSrc(frame.photoId, frame.thumbnailPath || frame.previewPath);
-                const pageLoc = getElementPageLocation(frame.x);
-                const orientation = getElementOrientation(frame.width, frame.height);
-                const dimText = `${Math.round(frame.width)} × ${Math.round(frame.height)} ${unit}`;
-
-                return (
-                  <div
-                    key={frame.id}
-                    className={`${styles.photoCard} ${styles.photoCardLocked} ${isSelected ? styles.photoCardActive : ''}`}
-                    onClick={() => handleSelect(frame.id)}
-                    title="Click to select frame on canvas"
-                  >
-                    <div className={styles.thumbWrapper}>
-                      {thumbSrc ? (
-                        <img src={thumbSrc} alt="" className={styles.thumbImg} loading="lazy" />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', fontSize: '10px' }}>
-                          🖼
-                        </div>
-                      )}
-                    </div>
-
-                    <div className={styles.photoMeta}>
-                      <div className={styles.photoName}>{frame.fileName || 'Photo Frame'}</div>
-                      <div className={styles.tagRow}>
-                        <span className={`${styles.tagPill} ${styles.tagPage}`}>{pageLoc}</span>
-                        <span className={styles.tagPill}>{orientation}</span>
-                        <span className={styles.tagDimensions}>{dimText}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className={`${styles.toggleLockBtn} ${styles.toggleLockBtnActive}`}
-                      onClick={(e) => handleToggleLock(e, frame.id, true)}
-                      title="Unlock this photo frame"
-                    >
-                      🔒
-                    </button>
-                  </div>
-                );
-              })}
+              {lockedElements.map((frame) => renderElementCard(frame, true))}
             </div>
           </>
         )}
 
-        {/* Section 2: Unlocked Photos */}
+        {/* Section 2: Unlocked Items */}
         {unlockedElements.length > 0 && (
           <>
             <div className={styles.sectionTitle}>
-              <span>🔓 Unlocked Photos ({unlockedElements.length})</span>
+              <span>🔓 Unlocked Items ({unlockedElements.length})</span>
             </div>
 
             <div className={styles.cardList}>
-              {unlockedElements.map((frame) => {
-                const isSelected = selectedFrameIds.includes(frame.id);
-                const thumbSrc = getPhotoPreviewSrc(frame.photoId, frame.thumbnailPath || frame.previewPath);
-                const pageLoc = getElementPageLocation(frame.x);
-                const orientation = getElementOrientation(frame.width, frame.height);
-                const dimText = `${Math.round(frame.width)} × ${Math.round(frame.height)} ${unit}`;
-
-                return (
-                  <div
-                    key={frame.id}
-                    className={`${styles.photoCard} ${isSelected ? styles.photoCardActive : ''}`}
-                    onClick={() => handleSelect(frame.id)}
-                    title="Click to select frame on canvas"
-                  >
-                    <div className={styles.thumbWrapper}>
-                      {thumbSrc ? (
-                        <img src={thumbSrc} alt="" className={styles.thumbImg} loading="lazy" />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', fontSize: '10px' }}>
-                          🖼
-                        </div>
-                      )}
-                    </div>
-
-                    <div className={styles.photoMeta}>
-                      <div className={styles.photoName}>{frame.fileName || 'Photo Frame'}</div>
-                      <div className={styles.tagRow}>
-                        <span className={`${styles.tagPill} ${styles.tagPage}`}>{pageLoc}</span>
-                        <span className={styles.tagPill}>{orientation}</span>
-                        <span className={styles.tagDimensions}>{dimText}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className={styles.toggleLockBtn}
-                      onClick={(e) => handleToggleLock(e, frame.id, false)}
-                      title="Lock this photo frame (Keep position & crop fixed during smart layouts)"
-                    >
-                      🔓
-                    </button>
-                  </div>
-                );
-              })}
+              {unlockedElements.map((frame) => renderElementCard(frame, false))}
             </div>
           </>
         )}
