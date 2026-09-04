@@ -36,7 +36,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     isImporting,
     isCancelling,
     importProgress,
-    importNotice,
     importQueue,
     currentImportTask,
     loadPhotos,
@@ -46,7 +45,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     importPaths,
     cancelImport,
     cancelAllImports,
-    dismissImportNotice,
     toggleFavorite,
     removePhoto,
     checkMissing,
@@ -114,16 +112,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       checkMissing(currentProject.id);
     }
   }, [currentProject?.id, loadPhotos, loadFolders, checkMissing]);
-
-  // Auto-dismiss import notice after 6 seconds
-  useEffect(() => {
-    if (importNotice) {
-      const timer = setTimeout(() => {
-        dismissImportNotice();
-      }, 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [importNotice, dismissImportNotice]);
 
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
 
@@ -352,72 +340,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     >
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
       <BatchActionBar />
-
-      {/* Import Notice Banner (Duplicates / Overwrite / Relink info) */}
-      {importNotice && (
-        <div className={styles.importNoticeBanner}>
-          <div className={styles.importNoticeLeft}>
-            <span className={styles.importNoticeIcon}>
-              {importNotice.cancelled ? '⊘' : importNotice.existing > 0 && importNotice.imported === 0 ? 'ℹ️' : '✓'}
-            </span>
-            <span className={styles.importNoticeText}>
-              {importNotice.cancelled && (
-                <>
-                  <strong className={styles.importNoticeHighlight}>Import Cancelled:</strong>{' '}
-                  {importNotice.imported > 0 ? (
-                    <>
-                      Kept {importNotice.imported} completed photo{importNotice.imported > 1 ? 's' : ''}.{' '}
-                      Removed {importNotice.purged || 0} cancelled photo{(importNotice.purged || 0) > 1 ? 's' : ''} from library.
-                    </>
-                  ) : (
-                    <>
-                      Import was cancelled. Removed {importNotice.purged || importNotice.total} photo{((importNotice.purged || importNotice.total) > 1) ? 's' : ''} from library.
-                    </>
-                  )}
-                </>
-              )}
-              {!importNotice.cancelled && importNotice.existing > 0 && importNotice.imported === 0 && importNotice.relinked === 0 && (
-                <>
-                  <strong className={styles.importNoticeHighlight}>Already in Library:</strong>{' '}
-                  All {importNotice.existing} selected photo{importNotice.existing > 1 ? 's already exist' : ' already exists'} in your project library.
-                </>
-              )}
-              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing > 0 && (
-                <>
-                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
-                  Registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}. ({importNotice.existing} duplicate file{importNotice.existing > 1 ? 's were' : ' was'} already in library).
-                </>
-              )}
-              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing === 0 && (
-                <>
-                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
-                  Successfully registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}.
-                </>
-              )}
-              {!importNotice.cancelled && importNotice.imported === 0 && importNotice.relinked > 0 && importNotice.existing === 0 && (
-                <>
-                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
-                  Relinked {importNotice.relinked} existing photo{importNotice.relinked > 1 ? 's' : ''}.
-                </>
-              )}
-              {!importNotice.cancelled && importNotice.relinked > 0 && (importNotice.imported > 0 || importNotice.existing > 0) && (
-                <>
-                  {' '}• Relinked/overwrote {importNotice.relinked} existing missing photo{importNotice.relinked > 1 ? 's' : ''}.
-                </>
-              )}
-            </span>
-          </div>
-          <button
-            type="button"
-            className={styles.importNoticeCloseBtn}
-            onClick={dismissImportNotice}
-            title="Dismiss notice"
-            aria-label="Dismiss notice"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* Top Header Bar */}
       <div className={styles.header}>

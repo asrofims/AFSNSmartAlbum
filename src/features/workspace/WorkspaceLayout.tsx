@@ -16,6 +16,7 @@ import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions, convertUnit } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
+import { formatImportNoticeToast } from '../../domain/photo';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
@@ -196,13 +197,27 @@ export function WorkspaceLayout() {
     }
   }, [saveStatus]);
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, durationMs: number = 4000) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
     toastTimeoutRef.current = window.setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+    }, durationMs);
   }, []);
+
+  // Surface photo import notices (success, duplicate, cancel, relink) as floating toasts
+  const importNotice = usePhotoStore((s) => s.importNotice);
+  const dismissImportNotice = usePhotoStore((s) => s.dismissImportNotice);
+
+  useEffect(() => {
+    if (importNotice) {
+      const msg = formatImportNoticeToast(importNotice);
+      if (msg) {
+        showToast(msg, 5000);
+      }
+      dismissImportNotice();
+    }
+  }, [importNotice, dismissImportNotice, showToast]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -2490,7 +2505,16 @@ export function WorkspaceLayout() {
 
       {/* Floating Notification Toast */}
       {toastMessage && (
-        <div className={styles.toastBanner}>
+        <div
+          className={styles.toastBanner}
+          onClick={() => {
+            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+            setToastMessage(null);
+          }}
+          title="Click to dismiss"
+          role="status"
+          style={{ cursor: 'pointer' }}
+        >
           <span>{toastMessage}</span>
         </div>
       )}

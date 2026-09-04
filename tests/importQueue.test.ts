@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { ImportTask } from '../src/stores/photoStore';
+import { formatImportNoticeToast } from '../src/domain/photo';
 
 console.log('Testing Photo Import Queue Lifecycle & Orchestration...');
 
@@ -237,5 +238,134 @@ const uniquePaths = rawPaths.filter((p) => {
 assert.strictEqual(uniquePaths.length, 2);
 assert.deepStrictEqual(uniquePaths, ['C:\\photo1.jpg', 'C:\\photo2.jpg']);
 console.log('✓ Path deduplication verified.');
+
+// 12. formatImportNoticeToast unit tests
+// 12.1. Cancellation with partially completed photos
+const cancelPartialMsg = formatImportNoticeToast({
+  total: 5,
+  imported: 2,
+  existing: 0,
+  relinked: 0,
+  cancelled: true,
+  purged: 3,
+});
+assert.strictEqual(
+  cancelPartialMsg,
+  '⊘ Import Cancelled: Kept 2 completed photos. Removed 3 cancelled photos from library.'
+);
+
+// 12.2. Cancellation with 1 photo completed, 1 purged
+const cancelSingleMsg = formatImportNoticeToast({
+  total: 2,
+  imported: 1,
+  existing: 0,
+  relinked: 0,
+  cancelled: true,
+  purged: 1,
+});
+assert.strictEqual(
+  cancelSingleMsg,
+  '⊘ Import Cancelled: Kept 1 completed photo. Removed 1 cancelled photo from library.'
+);
+
+// 12.3. Cancellation with 0 completed photos
+const cancelNoneMsg = formatImportNoticeToast({
+  total: 4,
+  imported: 0,
+  existing: 0,
+  relinked: 0,
+  cancelled: true,
+  purged: 4,
+});
+assert.strictEqual(cancelNoneMsg, '⊘ Import Cancelled: Removed 4 photos from library.');
+
+// 12.4. All duplicates
+const allDuplicatesMsg = formatImportNoticeToast({
+  total: 3,
+  imported: 0,
+  existing: 3,
+  relinked: 0,
+});
+assert.strictEqual(
+  allDuplicatesMsg,
+  'ℹ️ Already in Library: All 3 selected photos already exist in your project library.'
+);
+
+// 12.5. All duplicates (single photo)
+const singleDuplicateMsg = formatImportNoticeToast({
+  total: 1,
+  imported: 0,
+  existing: 1,
+  relinked: 0,
+});
+assert.strictEqual(
+  singleDuplicateMsg,
+  'ℹ️ Already in Library: All 1 selected photo already exists in your project library.'
+);
+
+// 12.6. Success with duplicates
+const successWithDupMsg = formatImportNoticeToast({
+  total: 5,
+  imported: 3,
+  existing: 2,
+  relinked: 0,
+});
+assert.strictEqual(
+  successWithDupMsg,
+  '✓ Imported 3 photos (2 duplicate files were already in library).'
+);
+
+// 12.7. Success with 1 duplicate
+const successWithSingleDupMsg = formatImportNoticeToast({
+  total: 2,
+  imported: 1,
+  existing: 1,
+  relinked: 0,
+});
+assert.strictEqual(
+  successWithSingleDupMsg,
+  '✓ Imported 1 photo (1 duplicate file was already in library).'
+);
+
+// 12.8. Pure success
+const pureSuccessMsg = formatImportNoticeToast({
+  total: 4,
+  imported: 4,
+  existing: 0,
+  relinked: 0,
+});
+assert.strictEqual(pureSuccessMsg, '✓ Successfully imported 4 photos.');
+
+// 12.9. Pure success (single photo)
+const singleSuccessMsg = formatImportNoticeToast({
+  total: 1,
+  imported: 1,
+  existing: 0,
+  relinked: 0,
+});
+assert.strictEqual(singleSuccessMsg, '✓ Successfully imported 1 photo.');
+
+// 12.10. Relink only
+const relinkOnlyMsg = formatImportNoticeToast({
+  total: 2,
+  imported: 0,
+  existing: 0,
+  relinked: 2,
+});
+assert.strictEqual(relinkOnlyMsg, '✓ Relinked 2 existing photos.');
+
+// 12.11. Relink and imported
+const relinkAndImportedMsg = formatImportNoticeToast({
+  total: 3,
+  imported: 2,
+  existing: 0,
+  relinked: 1,
+});
+assert.strictEqual(
+  relinkAndImportedMsg,
+  '✓ Successfully imported 2 photos. Relinked 1 missing photo.'
+);
+
+console.log('✓ Import notice toast message formatting verified.');
 
 console.log('ALL PHOTO IMPORT QUEUE TESTS PASSED! 🎉');

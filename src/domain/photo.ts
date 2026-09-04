@@ -129,3 +129,55 @@ export function getRangeSelection(
 
   return Array.from(new Set([...currentSelectedIds, ...rangeIds]));
 }
+
+/**
+ * Formats an ImportNotice into a concise, professional desktop toast notification message.
+ */
+export function formatImportNoticeToast(notice: ImportNotice): string {
+  if (notice.cancelled) {
+    if (notice.imported > 0) {
+      const keptPlural = notice.imported === 1 ? 'photo' : 'photos';
+      const purgedCount = notice.purged || 0;
+      const purgedPlural = purgedCount === 1 ? 'photo' : 'photos';
+      return `⊘ Import Cancelled: Kept ${notice.imported} completed ${keptPlural}. Removed ${purgedCount} cancelled ${purgedPlural} from library.`;
+    }
+    const purgedCount = notice.purged || notice.total || 0;
+    const purgedPlural = purgedCount === 1 ? 'photo' : 'photos';
+    return `⊘ Import Cancelled: Removed ${purgedCount} ${purgedPlural} from library.`;
+  }
+
+  if (notice.existing > 0 && notice.imported === 0 && notice.relinked === 0) {
+    const photoPlural = notice.existing === 1 ? 'photo already exists' : 'photos already exist';
+    return `ℹ️ Already in Library: All ${notice.existing} selected ${photoPlural} in your project library.`;
+  }
+
+  const parts: string[] = [];
+
+  if (notice.imported > 0) {
+    const photoPlural = notice.imported === 1 ? 'photo' : 'photos';
+    if (notice.existing > 0) {
+      const dupPlural = notice.existing === 1 ? 'duplicate file was' : 'duplicate files were';
+      parts.push(`✓ Imported ${notice.imported} ${photoPlural} (${notice.existing} ${dupPlural} already in library).`);
+    } else {
+      parts.push(`✓ Successfully imported ${notice.imported} ${photoPlural}.`);
+    }
+  }
+
+  if (notice.relinked > 0) {
+    const relinkPlural = notice.relinked === 1 ? 'photo' : 'photos';
+    if (parts.length === 0) {
+      const dupNote = notice.existing > 0
+        ? ` (${notice.existing} ${notice.existing === 1 ? 'duplicate file was' : 'duplicate files were'} already in library)`
+        : '';
+      parts.push(`✓ Relinked ${notice.relinked} existing ${relinkPlural}${dupNote}.`);
+    } else {
+      parts.push(`Relinked ${notice.relinked} missing ${relinkPlural}.`);
+    }
+  }
+
+  if (parts.length > 0) {
+    return parts.join(' ');
+  }
+
+  return '✓ Photo import complete.';
+}

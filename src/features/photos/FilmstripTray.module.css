@@ -31,61 +31,6 @@
   animation: slideDown 0.2s ease-out;
 }
 
-.importNoticeBanner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 14px;
-  background: linear-gradient(90deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  animation: slideDown 0.2s ease-out;
-  gap: var(--space-2);
-  z-index: 60;
-  position: relative;
-}
-
-.importNoticeLeft {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--color-text-primary);
-}
-
-.importNoticeIcon {
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-.importNoticeText {
-  line-height: 1.3;
-}
-
-.importNoticeHighlight {
-  color: #38bdf8;
-  font-weight: var(--font-weight-semibold);
-}
-
-.importNoticeCloseBtn {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.importNoticeCloseBtn:hover {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
