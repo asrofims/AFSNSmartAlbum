@@ -99,6 +99,10 @@ interface PhotoState {
   closeFolderDialog: () => void;
 }
 
+let activeListenersCount = 0;
+let unlistenFn: (() => void) | null = null;
+let setupPromise: Promise<() => void> | null = null;
+
 export const usePhotoStore = create<PhotoState>((set, get) => ({
   photos: [],
   folders: [],
@@ -128,98 +132,147 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   dismissImportNotice: () => set({ importNotice: null }),
 
   setupListeners: async () => {
-    try {
-      const { listen } = await import('@tauri-apps/api/event');
-      const { useProjectStore } = await import('./projectStore');
+    activeListenersCount += 1;
 
-      const isCurrentProject = (projectId?: string) => {
-        const activeId = useProjectStore.getState().currentProject?.id;
-        if (!activeId) return false;
-        if (projectId && projectId !== activeId) return false;
-        return true;
+    if (unlistenFn) {
+      return () => {
+        activeListenersCount = Math.max(0, activeListenersCount - 1);
+        if (activeListenersCount === 0 && unlistenFn) {
+          unlistenFn();
+          unlistenFn = null;
+          setupPromise = null;
+        }
       };
+    }
 
-      const unlistenProgress = await listen<ImportProgress>('photo-import-progress', (event) => {
-        if (!isCurrentProject(event.payload?.projectId)) return;
-        if (event.payload && event.payload.total > 0 && !get().isCancelling) {
-          set({ isImporting: true, importProgress: event.payload });
+    if (setupPromise) {
+      await setupPromise;
+      return () => {
+        activeListenersCount = Math.max(0, activeListenersCount - 1);
+        if (activeListenersCount === 0 && unlistenFn) {
+          unlistenFn();
+          unlistenFn = null;
+          setupPromise = null;
         }
-      });
+      };
+    }
 
-      const unlistenItem = await listen<Photo>('photo-imported', (event) => {
-        const item = event.payload;
-        if (!isCurrentProject(item.projectId)) return;
-        set((s) => {
-          const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
-          const nextFolderPhotoIds = { ...s.folderPhotoIds };
-          const targetFolderId = s.currentImportTask?.folderId || s.activeFolderId;
-          if (targetFolderId) {
-            const currentFolderIds = nextFolderPhotoIds[targetFolderId] || [];
-            if (!currentFolderIds.includes(item.id)) {
-              nextFolderPhotoIds[targetFolderId] = [...currentFolderIds, item.id];
-            }
-          }
-          return { photos: nextPhotos, folderPhotoIds: nextFolderPhotoIds };
-        });
-      });
+    setupPromise = (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const { useProjectStore } = await import('./projectStore');
 
-      const unlistenPreview = await listen<{ projectId?: string; id: string; thumbnailPath: string; previewPath: string }>(
-        'photo-preview-ready',
-        (event) => {
+        const isCurrentProject = (projectId?: string) => {
+          const activeId = useProjectStore.getState().currentProject?.id;
+          if (!activeId) return false;
+          if (projectId && projectId !== activeId) return false;
+          return true;
+        };
+
+        const unlistenProgress = await listen<ImportProgress>('photo-import-progress', (event) => {
           if (!isCurrentProject(event.payload?.projectId)) return;
-          if (event.payload && event.payload.id) {
-            const { id, thumbnailPath, previewPath } = event.payload;
-            set((s) => {
-              const nextPhotos = s.photos.map((p) =>
-                p.id === id ? { ...p, thumbnailPath, previewPath } : p
-              );
-              void syncAlbumFramePhotoAssets(nextPhotos, false);
-              return { photos: nextPhotos };
-            });
+          if (event.payload && event.payload.total > 0 && !get().isCancelling) {
+            set({ isImporting: true, importProgress: event.payload });
           }
-        }
-      );
+        });
 
-      const unlistenComplete = await listen<ImportNotice>(
-        'photo-import-complete',
-        (event) => {
-          const payload = event.payload;
-          if (!isCurrentProject(payload?.projectId)) return;
-          if (payload) {
-            if (payload.cancelled) {
-              set({ importNotice: payload });
-            } else if (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0)) {
+        const unlistenItem = await listen<Photo>('photo-imported', (event) => {
+          const item = event.payload;
+          if (!isCurrentProject(item.projectId)) return;
+          set((s) => {
+            const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
+            const nextFolderPhotoIds = { ...s.folderPhotoIds };
+            const targetFolderId = s.currentImportTask?.folderId || s.activeFolderId;
+            if (targetFolderId) {
+              const currentFolderIds = nextFolderPhotoIds[targetFolderId] || [];
+              if (!currentFolderIds.includes(item.id)) {
+                nextFolderPhotoIds[targetFolderId] = [...currentFolderIds, item.id];
+              }
+            }
+            return { photos: nextPhotos, folderPhotoIds: nextFolderPhotoIds };
+          });
+        });
+
+        const unlistenPreview = await listen<{ projectId?: string; id: string; thumbnailPath: string; previewPath: string }>(
+          'photo-preview-ready',
+          (event) => {
+            if (!isCurrentProject(event.payload?.projectId)) return;
+            if (event.payload && event.payload.id) {
+              const { id, thumbnailPath, previewPath } = event.payload;
               set((s) => {
-                const currentNotice = s.importNotice && !s.importNotice.cancelled ? s.importNotice : null;
-                if (!currentNotice) {
-                  return { importNotice: payload };
-                }
-                return {
-                  importNotice: {
-                    ...currentNotice,
-                    total: currentNotice.total + payload.total,
-                    imported: currentNotice.imported + payload.imported,
-                    existing: currentNotice.existing + payload.existing,
-                    relinked: currentNotice.relinked + payload.relinked,
-                    cancelled: false,
-                  },
-                };
+                const nextPhotos = s.photos.map((p) =>
+                  p.id === id ? { ...p, thumbnailPath, previewPath } : p
+                );
+                void syncAlbumFramePhotoAssets(nextPhotos, false);
+                return { photos: nextPhotos };
               });
             }
           }
-        }
-      );
+        );
 
-      return () => {
-        unlistenProgress();
-        unlistenItem();
-        unlistenPreview();
-        unlistenComplete();
-      };
-    } catch (e) {
-      console.warn('[AFSN] Error setting up event listeners:', e);
-      return () => {};
-    }
+        const unlistenComplete = await listen<ImportNotice>(
+          'photo-import-complete',
+          (event) => {
+            const payload = event.payload;
+            if (!isCurrentProject(payload?.projectId)) return;
+            if (payload) {
+              if (payload.cancelled) {
+                set({ importNotice: payload });
+              } else if (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0)) {
+                set((s) => {
+                  // Only accumulate if part of an ongoing multi-batch import queue session
+                  const isOngoingQueueSession = s.isImporting || s.importQueue.length > 0;
+                  const currentNotice = isOngoingQueueSession && s.importNotice && !s.importNotice.cancelled
+                    ? s.importNotice
+                    : null;
+
+                  if (!currentNotice) {
+                    return { importNotice: payload };
+                  }
+                  return {
+                    importNotice: {
+                      ...currentNotice,
+                      total: currentNotice.total + payload.total,
+                      imported: currentNotice.imported + payload.imported,
+                      existing: currentNotice.existing + payload.existing,
+                      relinked: currentNotice.relinked + payload.relinked,
+                      cancelled: false,
+                    },
+                  };
+                });
+              }
+            }
+          }
+        );
+
+        const unlistenAll = () => {
+          unlistenProgress();
+          unlistenItem();
+          unlistenPreview();
+          unlistenComplete();
+        };
+
+        if (activeListenersCount === 0) {
+          unlistenAll();
+          return () => {};
+        }
+
+        unlistenFn = unlistenAll;
+        return () => {
+          activeListenersCount = Math.max(0, activeListenersCount - 1);
+          if (activeListenersCount === 0 && unlistenFn) {
+            unlistenFn();
+            unlistenFn = null;
+            setupPromise = null;
+          }
+        };
+      } catch (e) {
+        console.warn('[AFSN] Error setting up event listeners:', e);
+        return () => {};
+      }
+    })();
+
+    return setupPromise;
   },
 
   loadPhotos: async (projectId: string) => {
@@ -265,6 +318,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       set({
         isImporting: true,
         isCancelling: false,
+        importNotice: null,
         currentImportTask: task,
         importProgress: { projectId, current: 0, total: paths.length, currentFile: '', percent: 0 },
       });
@@ -289,7 +343,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const currentProj = useProjectStore.getState().currentProject;
       if (currentProj && currentProj.id === task.projectId && Array.isArray(updatedPhotos)) {
         set({ photos: updatedPhotos });
-        void get().loadFolders(task.projectId);
+        await get().loadFolders(task.projectId);
       }
     } catch (err) {
       console.error('[AFSN] executeImportTask error:', err);

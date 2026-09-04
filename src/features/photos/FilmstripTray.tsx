@@ -91,11 +91,17 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
+    let isMounted = true;
     let cleanupFn: (() => void) | undefined;
     setupListeners().then((cleanup) => {
-      cleanupFn = cleanup;
+      if (!isMounted) {
+        if (cleanup) cleanup();
+      } else {
+        cleanupFn = cleanup;
+      }
     });
     return () => {
+      isMounted = false;
       if (cleanupFn) cleanupFn();
     };
   }, [setupListeners]);
@@ -370,7 +376,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   )}
                 </>
               )}
-              {!importNotice.cancelled && importNotice.existing > 0 && importNotice.imported === 0 && (
+              {!importNotice.cancelled && importNotice.existing > 0 && importNotice.imported === 0 && importNotice.relinked === 0 && (
                 <>
                   <strong className={styles.importNoticeHighlight}>Already in Library:</strong>{' '}
                   All {importNotice.existing} selected photo{importNotice.existing > 1 ? 's already exist' : ' already exists'} in your project library.
@@ -382,13 +388,19 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                   Registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}. ({importNotice.existing} duplicate file{importNotice.existing > 1 ? 's were' : ' was'} already in library).
                 </>
               )}
-              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing === 0 && importNotice.relinked === 0 && (
+              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing === 0 && (
                 <>
                   <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
                   Successfully registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}.
                 </>
               )}
-              {!importNotice.cancelled && importNotice.relinked > 0 && (
+              {!importNotice.cancelled && importNotice.imported === 0 && importNotice.relinked > 0 && importNotice.existing === 0 && (
+                <>
+                  <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
+                  Relinked {importNotice.relinked} existing photo{importNotice.relinked > 1 ? 's' : ''}.
+                </>
+              )}
+              {!importNotice.cancelled && importNotice.relinked > 0 && (importNotice.imported > 0 || importNotice.existing > 0) && (
                 <>
                   {' '}• Relinked/overwrote {importNotice.relinked} existing missing photo{importNotice.relinked > 1 ? 's' : ''}.
                 </>

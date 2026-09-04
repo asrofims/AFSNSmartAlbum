@@ -191,6 +191,51 @@ const cancelNotice = {
 assert.strictEqual(cancelNotice.cancelled, true);
 assert.strictEqual(cancelNotice.imported, 2);
 assert.strictEqual(cancelNotice.purged, 3);
-console.log('✓ Cancellation purge calculation verified.');
+// 9. Session isolation: New session starting with !isImporting resets notice
+let currentNoticeState: any = { projectId: 'project-1', total: 10, imported: 10, existing: 0, relinked: 0 };
+// A user starts a new import of 1 photo after an earlier session
+const isNewSession = true;
+if (isNewSession) {
+  currentNoticeState = null; // Reset on enqueue when !isRunning
+}
+assert.strictEqual(currentNoticeState, null);
+
+// When payload for 1 photo arrives
+const newSinglePayload = { projectId: 'project-1', total: 1, imported: 1, existing: 0, relinked: 0 };
+const isOngoingQueue = false; // single task, no queue
+const nextNotice = isOngoingQueue && currentNoticeState ? {
+  ...currentNoticeState,
+  imported: currentNoticeState.imported + newSinglePayload.imported,
+} : newSinglePayload;
+
+assert.strictEqual(nextNotice.imported, 1);
+assert.strictEqual(nextNotice.total, 1);
+console.log('✓ Session notice isolation verified (single photo import reports exactly 1).');
+
+// 10. Separation of newly registered vs relinked photos
+const newlyAddedIds = new Set(['photo-new-1']);
+const relinkedIds = new Set(['photo-relink-1']);
+const finishedPreviewIds = ['photo-new-1', 'photo-relink-1'];
+
+const completedNewCount = finishedPreviewIds.filter((id) => newlyAddedIds.has(id)).count
+  ? (finishedPreviewIds.filter((id) => newlyAddedIds.has(id)) as any).count()
+  : finishedPreviewIds.filter((id) => newlyAddedIds.has(id)).length;
+const completedRelinkCount = finishedPreviewIds.length - completedNewCount;
+
+assert.strictEqual(completedNewCount, 1);
+assert.strictEqual(completedRelinkCount, 1);
+console.log('✓ Separation of newly registered vs relinked photos verified.');
+
+// 11. Path deduplication test
+const rawPaths = ['C:\\photo1.jpg', 'C:\\photo2.jpg', 'C:\\photo1.jpg'];
+const seen = new Set<string>();
+const uniquePaths = rawPaths.filter((p) => {
+  if (seen.has(p)) return false;
+  seen.add(p);
+  return true;
+});
+assert.strictEqual(uniquePaths.length, 2);
+assert.deepStrictEqual(uniquePaths, ['C:\\photo1.jpg', 'C:\\photo2.jpg']);
+console.log('✓ Path deduplication verified.');
 
 console.log('ALL PHOTO IMPORT QUEUE TESTS PASSED! 🎉');

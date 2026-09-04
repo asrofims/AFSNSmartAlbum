@@ -35,6 +35,7 @@
 - [x] Right-Click Context Menu for Photo Cards
 - [x] Missing Photo Detection & Automatic Relinking Wizard with spread-frame asset recovery
 - [x] Automatic Orphaned Thumbnail & Preview Cache Cleanup
+- [x] Sequential Photo Import Queue, Cancel Rollback Purge, Modal Picker Protection, Ref-Counted Singleton Event Listeners, and Accurate Count Tracking
 
 ## Phase 3 — Album Structure
 - [x] Spread Model (Left Page, Center Gutter/Crease, Spine Width, Right Page)

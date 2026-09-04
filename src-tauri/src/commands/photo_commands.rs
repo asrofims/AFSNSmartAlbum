@@ -202,11 +202,18 @@ async fn import_paths_internal(
 
     let existing_photos = db.get_photos_for_project(&project_id).unwrap_or_default();
 
-    let total_selected = paths.len();
+    // Deduplicate input paths while preserving order
+    let mut seen_paths = std::collections::HashSet::new();
+    let unique_paths: Vec<PathBuf> = paths
+        .into_iter()
+        .filter(|p| seen_paths.insert(p.clone()))
+        .collect();
+
+    let total_selected = unique_paths.len();
     let mut to_import: Vec<PathBuf> = Vec::new();
     let mut already_existing_count = 0;
 
-    for p in paths {
+    for p in unique_paths {
         let path_str = p.to_string_lossy().to_string();
         let file_name = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
 
@@ -478,8 +485,9 @@ async fn import_paths_internal(
 
         if is_cancelled {
             let uncompleted_ids: Vec<String> = newly_added_ids
-                .into_iter()
-                .filter(|id| !finished_ids.contains(id))
+                .iter()
+                .filter(|id| !finished_ids.contains(*id))
+                .cloned()
                 .collect();
 
             if !uncompleted_ids.is_empty() {
@@ -503,15 +511,20 @@ async fn import_paths_internal(
             }
         }
 
-        let completed_count = finished_ids.len();
+        let completed_new_count = finished_ids
+            .iter()
+            .filter(|id| newly_added_ids.contains(*id))
+            .count();
+        let completed_relink_count = finished_ids.len().saturating_sub(completed_new_count);
+
         let _ = app_bg.emit(
             "photo-import-complete",
             serde_json::json!({
                 "projectId": project_id_bg,
                 "total": total_selected,
-                "imported": completed_count,
+                "imported": completed_new_count,
                 "existing": already_existing_count,
-                "relinked": relink_count,
+                "relinked": completed_relink_count,
                 "cancelled": is_cancelled,
                 "purged": purged_count
             }),
