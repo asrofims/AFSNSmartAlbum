@@ -150,10 +150,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         set((s) => {
           const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
           const nextFolderPhotoIds = { ...s.folderPhotoIds };
-          if (s.activeFolderId) {
-            const currentFolderIds = nextFolderPhotoIds[s.activeFolderId] || [];
+          const targetFolderId = s.currentImportTask?.folderId || s.activeFolderId;
+          if (targetFolderId) {
+            const currentFolderIds = nextFolderPhotoIds[targetFolderId] || [];
             if (!currentFolderIds.includes(item.id)) {
-              nextFolderPhotoIds[s.activeFolderId] = [...currentFolderIds, item.id];
+              nextFolderPhotoIds[targetFolderId] = [...currentFolderIds, item.id];
             }
           }
           return { photos: nextPhotos, folderPhotoIds: nextFolderPhotoIds };
@@ -182,15 +183,24 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         (event) => {
           const payload = event.payload;
           if (!isCurrentProject(payload?.projectId)) return;
-          set({
-            isImporting: false,
-            isCancelling: false,
-            importProgress: null,
-            currentImportTask: null,
-            ...(payload && (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))
-              ? { importNotice: payload }
-              : {}),
-          });
+          if (payload && !payload.cancelled && (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))) {
+            set((s) => {
+              const currentNotice = s.importNotice;
+              if (!currentNotice) {
+                return { importNotice: payload };
+              }
+              return {
+                importNotice: {
+                  ...currentNotice,
+                  total: currentNotice.total + payload.total,
+                  imported: currentNotice.imported + payload.imported,
+                  existing: currentNotice.existing + payload.existing,
+                  relinked: currentNotice.relinked + payload.relinked,
+                  cancelled: currentNotice.cancelled || payload.cancelled,
+                },
+              };
+            });
+          }
         }
       );
 
@@ -250,7 +260,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         isImporting: true,
         isCancelling: false,
         currentImportTask: task,
-        importProgress: { current: 0, total: paths.length, currentFile: '', percent: 0 },
+        importProgress: { projectId, current: 0, total: paths.length, currentFile: '', percent: 0 },
       });
       void get().executeImportTask(task);
     } else {
@@ -281,7 +291,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } finally {
       const { useProjectStore } = await import('./projectStore');
       const currentProj = useProjectStore.getState().currentProject;
-      if (currentProj && currentProj.id === task.projectId && !get().isCancelling) {
+      if (currentProj && currentProj.id === task.projectId) {
+        set({ isCancelling: false });
         void get().processNextQueueItem();
       } else {
         set({
@@ -403,22 +414,13 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } catch (err) {
       console.warn('[AFSN] cancel_photo_import error:', err);
     }
-    const remainingQueue = get().importQueue;
-    if (remainingQueue.length === 0) {
-      set({
-        isImporting: false,
-        isCancelling: false,
-        importProgress: null,
-        currentImportTask: null,
-      });
-    }
   },
 
   cancelAllImports: async () => {
+    const wasImporting = get().isImporting;
     set({
-      isCancelling: true,
+      isCancelling: wasImporting,
       importQueue: [],
-      currentImportTask: null,
     });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
@@ -426,13 +428,15 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } catch (err) {
       console.warn('[AFSN] cancelAllImports error:', err);
     }
-    set({
-      isImporting: false,
-      isCancelling: false,
-      importProgress: null,
-      currentImportTask: null,
-      importQueue: [],
-    });
+    if (!wasImporting) {
+      set({
+        isImporting: false,
+        isCancelling: false,
+        currentImportTask: null,
+        importProgress: null,
+        importQueue: [],
+      });
+    }
   },
 
   toggleFavorite: async (photoId: string) => {

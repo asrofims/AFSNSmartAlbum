@@ -208,6 +208,7 @@ async fn import_paths_internal(
         let _ = app.emit(
             "photo-import-complete",
             serde_json::json!({
+                "projectId": project_id,
                 "total": total_selected,
                 "imported": 0,
                 "existing": already_existing_count,
@@ -345,7 +346,7 @@ async fn import_paths_internal(
 
     let num_threads = std::cmp::min(2, std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2));
 
-    tauri::async_runtime::spawn_blocking(move || {
+    let bg_result = tauri::async_runtime::spawn_blocking(move || {
         let pool = match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
             Ok(p) => p,
             Err(e) => {
@@ -453,9 +454,14 @@ async fn import_paths_internal(
                 "cancelled": is_cancelled
             }),
         );
-    });
+    })
+    .await;
 
-    // Return immediately to frontend with all current project photos!
+    if let Err(e) = bg_result {
+        log::error!("Preview generation spawn_blocking failed: {}", e);
+    }
+
+    // Return to frontend with all current project photos!
     db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
 }
 
