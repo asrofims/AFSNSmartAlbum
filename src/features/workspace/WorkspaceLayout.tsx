@@ -56,6 +56,7 @@ export function WorkspaceLayout() {
   const updateBleed = useAlbumStore((s) => s.updateBleed);
   const updateSpreadSpacing = useAlbumStore((s) => s.updateSpreadSpacing);
   const applySpacingToAllSpreads = useAlbumStore((s) => s.applySpacingToAllSpreads);
+  const cycleSpreadLayout = useAlbumStore((s) => s.cycleSpreadLayout);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
   const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
   const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
@@ -258,6 +259,30 @@ export function WorkspaceLayout() {
 
   const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
+
+  const gapChangedRef = useRef(false);
+
+  const handleCommitGapChange = useCallback(() => {
+    if (!gapChangedRef.current) return;
+    gapChangedRef.current = false;
+
+    const album = useAlbumStore.getState().currentAlbum;
+    const curSpreadId = useAlbumStore.getState().activeSpreadId;
+    const project = useProjectStore.getState().currentProject;
+    if (!album || !curSpreadId || !project) return;
+
+    const allSpreads = getAllAlbumSpreads(album);
+    const targetSpread = allSpreads.find((s) => s.id === curSpreadId) || allSpreads[0];
+    if (!targetSpread) return;
+
+    // Rule: Jika spread belum diisi apapun, abaikan dan jangan memicu smart layout
+    const hasPhotos = targetSpread.elements && targetSpread.elements.some((el) => el.type === 'photo');
+    if (!hasPhotos) {
+      return;
+    }
+
+    cycleSpreadLayout(curSpreadId, 'next', project);
+  }, [cycleSpreadLayout]);
 
   // Global Keyboard Shortcuts for App
   const handleKeyDown = useCallback(
@@ -2017,22 +2042,9 @@ export function WorkspaceLayout() {
                           const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
                           updateSpreadSpacing(num, unit, currentProject);
                           setCustomGapValue(num);
-
-                          // Also real-time adjust specifically selected frames if a subset is selected
-                          if (selectedFrameIds.length >= 2 && activeSpread) {
-                            const gapInMm = convertUnit(num, unit, 'mm');
-                            const frames = (activeSpread.elements || []).filter((f) => selectedFrameIds.includes(f.id));
-                            if (frames.length >= 2) {
-                              const minX = Math.min(...frames.map((f) => f.x));
-                              const maxX = Math.max(...frames.map((f) => f.x + f.width));
-                              const minY = Math.min(...frames.map((f) => f.y));
-                              const maxY = Math.max(...frames.map((f) => f.y + f.height));
-                              const spanX = maxX - minX;
-                              const spanY = maxY - minY;
-                              applyFixedGapToSelected(activeSpread.id, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
-                            }
-                          }
+                          gapChangedRef.current = true;
                         }}
+                        onBlur={handleCommitGapChange}
                         min={0}
                         max={100}
                         step={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' ? 0.05 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 0.1 : 0.5}

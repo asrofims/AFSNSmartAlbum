@@ -12,6 +12,7 @@ interface NumberInputProps {
   disabled?: boolean;
   suffix?: string;
   className?: string;
+  onBlur?: () => void;
 }
 
 function formatNumber(val: number, precision?: number): string {
@@ -34,6 +35,7 @@ export function NumberInput({
   disabled,
   suffix,
   className = '',
+  onBlur,
 }: NumberInputProps) {
   const [localValue, setLocalValue] = useState<string>(() => formatNumber(value, precision));
   const isFocusedRef = useRef(false);
@@ -70,6 +72,7 @@ export function NumberInput({
       const formatted = formatNumber(0, precision);
       setLocalValue(formatted);
       onChange(0);
+      onBlur?.();
       return;
     }
 
@@ -89,6 +92,7 @@ export function NumberInput({
     if (finalNum !== value) {
       onChange(finalNum);
     }
+    onBlur?.();
   };
 
   const handleFocus = () => {
@@ -98,6 +102,7 @@ export function NumberInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleBlur();
+      e.currentTarget.blur();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const current = parseFloat(localValue) || 0;

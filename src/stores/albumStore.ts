@@ -27,10 +27,9 @@ import {
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
 } from '../domain/adaptiveLayout';
-import { convertUnit } from '../domain/units';
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
-import { applyFixedGap, type PhotoFrameElement } from '../domain/editor';
+import type { PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
 export interface AlbumState {
@@ -807,40 +806,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       spacingUnit: unit,
     };
 
-    let newElements = targetSpread.elements;
-
-    // Real-time canvas frame spacing update:
-    // If project is available and there are 2 or more unlocked photos on the spread,
-    // adjust the inter-frame gaps in-place along their primary axis without regenerating or shuffling the layout!
-    if (project && targetSpread.elements.length >= 2) {
-      const lockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
-      const unlockedElements = targetSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
-      const textElements = targetSpread.elements.filter((el) => el.type === 'text');
-
-      if (unlockedElements.length >= 2) {
-        const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
-        const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
-        const gapInMm = convertUnit(spacingValue, unit, 'mm');
-        const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
-        if (gapUpdates.length > 0) {
-          const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
-          const updatedUnlocked = unlockedElements.map((f) => {
-            const geom = updateMap.get(f.id);
-            return geom ? { ...f, ...geom } : f;
-          });
-          newElements = [...lockedElements, ...updatedUnlocked, ...textElements];
-        }
-      }
-    }
-
     if (isCover) {
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: {
-            ...updatedTargetSpread,
-            elements: newElements,
-          },
+          coverSpread: updatedTargetSpread,
         },
         saveStatus: 'unsaved',
       });
@@ -848,12 +818,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }
 
     const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId
-        ? {
-            ...updatedTargetSpread,
-            elements: newElements,
-          }
-        : s
+      s.id === activeSpreadId ? updatedTargetSpread : s
     );
 
     set({
@@ -872,35 +837,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     useHistoryStore.getState().pushState(currentAlbum);
 
     const unit = spacingUnit || currentAlbum.coverSpread.spacingUnit || (project ? project.spacingUnit : 'mm');
-    const gapInMm = convertUnit(spacingValue, unit, 'mm');
 
-    const updateSpreadGap = (spread: Spread): Spread => {
-      let elements = spread.elements;
-      const lockedElements = elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
-      const unlockedElements = elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && !el.locked);
-      const textElements = elements.filter((el) => el.type === 'text');
-
-      if (unlockedElements.length >= 2) {
-        const spanX = Math.max(...unlockedElements.map((f) => f.x + f.width)) - Math.min(...unlockedElements.map((f) => f.x));
-        const spanY = Math.max(...unlockedElements.map((f) => f.y + f.height)) - Math.min(...unlockedElements.map((f) => f.y));
-        const gapUpdates = applyFixedGap(unlockedElements, spanX >= spanY ? 'horizontal' : 'vertical', gapInMm);
-        if (gapUpdates.length > 0) {
-          const updateMap = new Map(gapUpdates.map((u) => [u.id, u.geometry]));
-          const updatedUnlocked = unlockedElements.map((f) => {
-            const geom = updateMap.get(f.id);
-            return geom ? { ...f, ...geom } : f;
-          });
-          elements = [...lockedElements, ...updatedUnlocked, ...textElements];
-        }
-      }
-
-      return {
-        ...spread,
-        spacingValue,
-        spacingUnit: unit,
-        elements,
-      };
-    };
+    const updateSpreadGap = (spread: Spread): Spread => ({
+      ...spread,
+      spacingValue,
+      spacingUnit: unit,
+    });
 
     const updatedCover = updateSpreadGap(currentAlbum.coverSpread);
     const updatedSpreads = currentAlbum.spreads.map(updateSpreadGap);
