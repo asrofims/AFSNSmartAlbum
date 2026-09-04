@@ -211,6 +211,26 @@
   gap: 4px;
 }
 
+.savePresetInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.savePresetInput:focus {
+  border-color: rgba(56, 189, 248, 0.6);
+  background: #090d16;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
 .savePresetActions {
   display: flex;
   justify-content: flex-end;

@@ -376,7 +376,7 @@ export function NewProjectDialog() {
       closeOnOverlayClick={false}
       closeOnEscape={false}
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onContextMenu={(e) => e.preventDefault()}>
         {errorMessage && (
           <div className={styles.errorBanner}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -519,7 +519,7 @@ export function NewProjectDialog() {
                       </div>
                       <input
                         type="text"
-                        className={styles.nameInput}
+                        className={styles.savePresetInput}
                         value={customPresetName}
                         onChange={(e) => setCustomPresetName(e.target.value)}
                         placeholder="Preset Name (e.g. 10x10 Wedding Standard)"

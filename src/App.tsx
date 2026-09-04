@@ -40,18 +40,10 @@ export default function App() {
     };
   }, []);
 
-  // Disable default browser context menu globally for a native desktop application experience,
-  // allowing only standard editable input/textarea fields or custom app context menus.
+  // Disable default browser context menu globally for a native desktop application experience.
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable;
-      if (!isInput) {
-        e.preventDefault();
-      }
+      e.preventDefault();
     };
     window.addEventListener('contextmenu', handleContextMenu);
     return () => window.removeEventListener('contextmenu', handleContextMenu);
