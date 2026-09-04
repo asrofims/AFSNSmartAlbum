@@ -42,6 +42,7 @@ export interface ImportNotice {
   existing: number;
   relinked: number;
   cancelled?: boolean;
+  purged?: number;
 }
 
 export type PhotoFilter = 'all' | 'unused' | 'used' | 'favorites';

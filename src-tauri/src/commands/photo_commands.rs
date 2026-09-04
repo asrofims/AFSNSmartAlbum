@@ -108,10 +108,26 @@ pub async fn import_file_paths(
     import_paths_internal(app, project_id, path_bufs, folder_id).await
 }
 
+static IS_FILE_PICKER_OPEN: AtomicBool = AtomicBool::new(false);
+
+struct PickerGuard;
+impl Drop for PickerGuard {
+    fn drop(&mut self) {
+        IS_FILE_PICKER_OPEN.store(false, Ordering::SeqCst);
+    }
+}
+
 #[tauri::command]
-pub async fn pick_photo_files_dialog() -> Result<Option<Vec<String>>, String> {
-    let files: Option<Vec<PathBuf>> = tauri::async_runtime::spawn_blocking(|| {
+pub async fn pick_photo_files_dialog(window: tauri::Window) -> Result<Option<Vec<String>>, String> {
+    if IS_FILE_PICKER_OPEN.swap(true, Ordering::SeqCst) {
+        log::warn!("File picker is already open; ignoring duplicate request");
+        return Ok(None);
+    }
+    let _guard = PickerGuard;
+
+    let files: Option<Vec<PathBuf>> = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
+            .set_parent(&window)
             .set_title("Select Photos to Import")
             .add_filter("Images", SUPPORTED_EXTENSIONS)
             .pick_files()
@@ -123,9 +139,16 @@ pub async fn pick_photo_files_dialog() -> Result<Option<Vec<String>>, String> {
 }
 
 #[tauri::command]
-pub async fn pick_photo_folder_dialog() -> Result<Option<Vec<String>>, String> {
-    let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(|| {
+pub async fn pick_photo_folder_dialog(window: tauri::Window) -> Result<Option<Vec<String>>, String> {
+    if IS_FILE_PICKER_OPEN.swap(true, Ordering::SeqCst) {
+        log::warn!("Folder picker is already open; ignoring duplicate request");
+        return Ok(None);
+    }
+    let _guard = PickerGuard;
+
+    let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
+            .set_parent(&window)
             .set_title("Select Folder to Import Photos")
             .pick_folder()
     })
@@ -285,7 +308,7 @@ async fn import_paths_internal(
         }
     }
 
-    let new_rows_count = new_rows.len();
+    let _new_rows_count = new_rows.len();
     let relink_count = relink_ids.len();
 
     if !new_rows.is_empty() {
@@ -300,7 +323,15 @@ async fn import_paths_internal(
 
     // If cancelled during Phase 1, exit early without spawning background preview pool
     if cancel_flag.load(Ordering::Relaxed) {
-        log::info!("Photo import was cancelled; skipping Phase 2 preview generation");
+        log::info!("Photo import was cancelled during Phase 1; purging newly inserted records");
+        let new_ids: Vec<String> = new_rows.iter().map(|r| r.id.clone()).collect();
+        if !new_ids.is_empty() {
+            let _ = db.batch_delete_photos(&new_ids);
+            let thumbs_dir = cache_dir.join("thumbnails");
+            for id in &new_ids {
+                let _ = std::fs::remove_file(thumbs_dir.join(format!("{}.jpg", id)));
+            }
+        }
         if let Ok(mut guard) = import_state.active_project_id.lock() {
             if let Some(ref current_pid) = *guard {
                 if current_pid == &project_id {
@@ -308,15 +339,17 @@ async fn import_paths_internal(
                 }
             }
         }
+        let purged_count = new_ids.len();
         let _ = app.emit(
             "photo-import-complete",
             serde_json::json!({
                 "projectId": project_id,
                 "total": total_selected,
-                "imported": new_rows_count,
+                "imported": 0,
                 "existing": already_existing_count,
                 "relinked": relink_count,
-                "cancelled": true
+                "cancelled": true,
+                "purged": purged_count
             }),
         );
         return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
@@ -332,6 +365,9 @@ async fn import_paths_internal(
     let total_bg = to_process.len();
     let counter_bg = Arc::new(AtomicUsize::new(0));
     let project_id_bg = project_id.clone();
+    let newly_added_ids: std::collections::HashSet<String> = new_rows.iter().map(|r| r.id.clone()).collect();
+    let completed_ids = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let completed_ids_bg = completed_ids.clone();
 
     let _ = app.emit(
         "photo-import-progress",
@@ -384,6 +420,8 @@ async fn import_paths_internal(
                         let _ = db_bg.update_photo_thumbnail(&photo_id, &thumb_path_str);
                         let _ = db_bg.update_photo_preview(&photo_id, &preview_path);
 
+                        completed_ids_bg.lock().unwrap().push(photo_id.clone());
+
                         let curr = counter_bg.fetch_add(1, Ordering::SeqCst) + 1;
                         let percent = ((curr as f64 / total_bg as f64) * 100.0).min(100.0) as u8;
 
@@ -435,6 +473,28 @@ async fn import_paths_internal(
         trim_process_memory();
 
         let is_cancelled = cancel_bg.load(Ordering::Relaxed);
+        let finished_ids: std::collections::HashSet<String> = completed_ids.lock().unwrap().iter().cloned().collect();
+        let mut purged_count = 0;
+
+        if is_cancelled {
+            let uncompleted_ids: Vec<String> = newly_added_ids
+                .into_iter()
+                .filter(|id| !finished_ids.contains(id))
+                .collect();
+
+            if !uncompleted_ids.is_empty() {
+                log::info!("Import cancelled. Purging {} uncompleted photo rows from SQLite and cache...", uncompleted_ids.len());
+                let db_bg = app_bg.state::<Database>();
+                let _ = db_bg.batch_delete_photos(&uncompleted_ids);
+
+                let thumbs_dir = cache_dir.join("thumbnails");
+                for id in &uncompleted_ids {
+                    let _ = std::fs::remove_file(thumbs_dir.join(format!("{}.jpg", id)));
+                }
+                purged_count = uncompleted_ids.len();
+            }
+        }
+
         if let Ok(mut guard) = app_bg.state::<ImportState>().active_project_id.lock() {
             if let Some(ref current_pid) = *guard {
                 if current_pid == &project_id_bg {
@@ -443,15 +503,17 @@ async fn import_paths_internal(
             }
         }
 
+        let completed_count = finished_ids.len();
         let _ = app_bg.emit(
             "photo-import-complete",
             serde_json::json!({
                 "projectId": project_id_bg,
                 "total": total_selected,
-                "imported": new_rows_count,
+                "imported": completed_count,
                 "existing": already_existing_count,
                 "relinked": relink_count,
-                "cancelled": is_cancelled
+                "cancelled": is_cancelled,
+                "purged": purged_count
             }),
         );
     })

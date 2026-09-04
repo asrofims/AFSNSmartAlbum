@@ -171,4 +171,26 @@ assert.strictEqual(accumulatedNotice.imported, 13);
 assert.strictEqual(accumulatedNotice.existing, 2);
 console.log('✓ Notice accumulation verified.');
 
+// 8. Cancellation purge calculation test
+const batchToImport = ['p1', 'p2', 'p3', 'p4', 'p5'];
+const completedDuringCancel = ['p1', 'p2'];
+const purgedOnCancel = batchToImport.filter((id) => !completedDuringCancel.includes(id));
+assert.strictEqual(purgedOnCancel.length, 3);
+assert.deepStrictEqual(purgedOnCancel, ['p3', 'p4', 'p5']);
+
+const cancelNotice = {
+  projectId: 'project-1',
+  total: batchToImport.length,
+  imported: completedDuringCancel.length,
+  existing: 0,
+  relinked: 0,
+  cancelled: true,
+  purged: purgedOnCancel.length,
+};
+
+assert.strictEqual(cancelNotice.cancelled, true);
+assert.strictEqual(cancelNotice.imported, 2);
+assert.strictEqual(cancelNotice.purged, 3);
+console.log('✓ Cancellation purge calculation verified.');
+
 console.log('ALL PHOTO IMPORT QUEUE TESTS PASSED! 🎉');

@@ -32,6 +32,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     filter,
     sortBy,
     searchQuery,
+    isBrowsing,
     isImporting,
     isCancelling,
     importProgress,
@@ -351,28 +352,43 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
         <div className={styles.importNoticeBanner}>
           <div className={styles.importNoticeLeft}>
             <span className={styles.importNoticeIcon}>
-              {importNotice.existing > 0 && importNotice.imported === 0 ? 'ℹ️' : '✓'}
+              {importNotice.cancelled ? '⊘' : importNotice.existing > 0 && importNotice.imported === 0 ? 'ℹ️' : '✓'}
             </span>
             <span className={styles.importNoticeText}>
-              {importNotice.existing > 0 && importNotice.imported === 0 && (
+              {importNotice.cancelled && (
+                <>
+                  <strong className={styles.importNoticeHighlight}>Import Cancelled:</strong>{' '}
+                  {importNotice.imported > 0 ? (
+                    <>
+                      Kept {importNotice.imported} completed photo{importNotice.imported > 1 ? 's' : ''}.{' '}
+                      Removed {importNotice.purged || 0} cancelled photo{(importNotice.purged || 0) > 1 ? 's' : ''} from library.
+                    </>
+                  ) : (
+                    <>
+                      Import was cancelled. Removed {importNotice.purged || importNotice.total} photo{((importNotice.purged || importNotice.total) > 1) ? 's' : ''} from library.
+                    </>
+                  )}
+                </>
+              )}
+              {!importNotice.cancelled && importNotice.existing > 0 && importNotice.imported === 0 && (
                 <>
                   <strong className={styles.importNoticeHighlight}>Already in Library:</strong>{' '}
                   All {importNotice.existing} selected photo{importNotice.existing > 1 ? 's already exist' : ' already exists'} in your project library.
                 </>
               )}
-              {importNotice.imported > 0 && importNotice.existing > 0 && (
+              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing > 0 && (
                 <>
                   <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
                   Registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}. ({importNotice.existing} duplicate file{importNotice.existing > 1 ? 's were' : ' was'} already in library).
                 </>
               )}
-              {importNotice.imported > 0 && importNotice.existing === 0 && importNotice.relinked === 0 && (
+              {!importNotice.cancelled && importNotice.imported > 0 && importNotice.existing === 0 && importNotice.relinked === 0 && (
                 <>
                   <strong className={styles.importNoticeHighlight}>Import Complete:</strong>{' '}
                   Successfully registered {importNotice.imported} photo{importNotice.imported > 1 ? 's' : ''}.
                 </>
               )}
-              {importNotice.relinked > 0 && (
+              {!importNotice.cancelled && importNotice.relinked > 0 && (
                 <>
                   {' '}• Relinked/overwrote {importNotice.relinked} existing missing photo{importNotice.relinked > 1 ? 's' : ''}.
                 </>
@@ -460,6 +476,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 type="button"
                 className={`${styles.importDropdownBtn} ${isImportMenuOpen ? styles.importDropdownBtnActive : ''}`}
                 onClick={handleToggleImportMenu}
+                disabled={isBrowsing}
                 title={activeFolderName ? `Import photos into ${activeFolderName}` : 'Import photos into project library'}
                 aria-label="Import options"
               >
@@ -831,6 +848,24 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           </div>
         </>,
         document.body
+      )}
+
+      {/* Modal File Browser Screen Blocker */}
+      {isBrowsing && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            backgroundColor: 'rgba(0, 0, 0, 0.25)',
+            cursor: 'wait',
+            pointerEvents: 'all',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        />
       )}
     </section>
   );

@@ -34,6 +34,7 @@ interface PhotoState {
   filter: PhotoFilter;
   sortBy: PhotoSortBy;
   searchQuery: string;
+  isBrowsing: boolean;
   isImporting: boolean;
   isCancelling: boolean;
   importProgress: ImportProgress | null;
@@ -111,6 +112,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   filter: 'all',
   sortBy: 'name',
   searchQuery: '',
+  isBrowsing: false,
   isImporting: false,
   isCancelling: false,
   importProgress: null,
@@ -183,23 +185,27 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         (event) => {
           const payload = event.payload;
           if (!isCurrentProject(payload?.projectId)) return;
-          if (payload && !payload.cancelled && (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0))) {
-            set((s) => {
-              const currentNotice = s.importNotice;
-              if (!currentNotice) {
-                return { importNotice: payload };
-              }
-              return {
-                importNotice: {
-                  ...currentNotice,
-                  total: currentNotice.total + payload.total,
-                  imported: currentNotice.imported + payload.imported,
-                  existing: currentNotice.existing + payload.existing,
-                  relinked: currentNotice.relinked + payload.relinked,
-                  cancelled: currentNotice.cancelled || payload.cancelled,
-                },
-              };
-            });
+          if (payload) {
+            if (payload.cancelled) {
+              set({ importNotice: payload });
+            } else if (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0)) {
+              set((s) => {
+                const currentNotice = s.importNotice && !s.importNotice.cancelled ? s.importNotice : null;
+                if (!currentNotice) {
+                  return { importNotice: payload };
+                }
+                return {
+                  importNotice: {
+                    ...currentNotice,
+                    total: currentNotice.total + payload.total,
+                    imported: currentNotice.imported + payload.imported,
+                    existing: currentNotice.existing + payload.existing,
+                    relinked: currentNotice.relinked + payload.relinked,
+                    cancelled: false,
+                  },
+                };
+              });
+            }
           }
         }
       );
@@ -344,7 +350,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   importFiles: async (projectId: string) => {
-    set({ error: null });
+    if (get().isBrowsing) return;
+    set({ error: null, isBrowsing: true });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const paths = await invoke<string[] | null>('pick_photo_files_dialog');
@@ -363,11 +370,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } catch (err) {
       console.error('[AFSN] importFiles error:', err);
       set({ error: String(err) });
+    } finally {
+      set({ isBrowsing: false });
     }
   },
 
   importFolder: async (projectId: string) => {
-    set({ error: null });
+    if (get().isBrowsing) return;
+    set({ error: null, isBrowsing: true });
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const paths = await invoke<string[] | null>('pick_photo_folder_dialog');
@@ -388,6 +398,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     } catch (err) {
       console.error('[AFSN] importFolder error:', err);
       set({ error: String(err) });
+    } finally {
+      set({ isBrowsing: false });
     }
   },
 
