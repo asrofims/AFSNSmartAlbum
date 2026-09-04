@@ -133,5 +133,8 @@
 - [x] Asynchronous FIFO Photo Import Queue with Thread-Safe Rayon Worker
 - [x] Coordinated Photo Import Cancellation & Safe Project Close Cleanup
 - [x] Project ID Event Isolation & Cross-Project Contamination Discard
+- [x] Visual Cancel Rollback Purge and Modal File Picker Protection
+- [x] Ref-Counted Singleton Tauri Listeners & Accurate Registration Counting
+- [x] Custom Preset Name Input Ergonomics & Global Browser Context Menu Suppression
 
 
