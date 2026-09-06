@@ -28,7 +28,7 @@ pub fn get_app_info(db: State<'_, Database>) -> Result<AppInfo, String> {
     let schema_version = db.get_schema_version().map_err(|e| e.to_string())?;
 
     Ok(AppInfo {
-        version: "v1.0.21".to_string(),
+        version: "v1.0.22".to_string(),
         build_number: "1".to_string(),
         platform: std::env::consts::OS.to_string(),
         db_schema_version: schema_version,
@@ -45,6 +45,12 @@ pub fn get_db_status(db: State<'_, Database>) -> Result<DbStatus, String> {
         schema_version,
         expected_version: Database::expected_version(),
     })
+}
+
+/// Gracefully restart the application (used after installing an update).
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) {
+    app.restart();
 }
 
 #[cfg(target_os = "windows")]

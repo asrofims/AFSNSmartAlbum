@@ -1,28 +1,49 @@
 import { useEffect, useState } from 'react';
-import { checkForAppUpdates, UpdateCheckResult } from '../../services/updateService';
+import {
+  checkForAppUpdates,
+  downloadAndInstallAutoUpdate,
+  restartApp,
+  UpdateCheckResult,
+} from '../../services/updateService';
 import { useAppStore } from '../../stores/appStore';
 import { isTauri } from '../../utils/platform';
 import styles from './UpdateModal.module.css';
 
+type UpdateStatus = 'checking' | 'available' | 'downloading' | 'ready' | 'uptodate' | 'error';
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 MB';
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(1)} MB`;
+}
+
 export function UpdateModal() {
-  const { isUpdateModalOpen: isOpen, closeUpdateModal, appInfo } = useAppStore();
-  const [status, setStatus] = useState<'checking' | 'available' | 'uptodate' | 'error'>('checking');
+  const { isUpdateModalOpen: isOpen, closeUpdateModal, appInfo, setUpdateAvailableVersion } = useAppStore();
+  const [status, setStatus] = useState<UpdateStatus>('checking');
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
+  const [downloadedBytes, setDownloadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const runCheck = async () => {
     setStatus('checking');
+    setErrorDetails(null);
     try {
       const res = await checkForAppUpdates(appInfo.version);
       setResult(res);
       if (res.isError) {
         setStatus('error');
+        setErrorDetails(res.errorMessage || 'Unable to contact update server.');
       } else if (res.hasUpdate) {
         setStatus('available');
+        setUpdateAvailableVersion(res.latestVersion);
       } else {
         setStatus('uptodate');
+        setUpdateAvailableVersion(null);
       }
-    } catch {
+    } catch (err: any) {
       setStatus('error');
+      setErrorDetails(err?.message || 'Unexpected error while checking for updates.');
     }
   };
 
@@ -43,8 +64,43 @@ export function UpdateModal() {
     }
   };
 
+  const handleStartAutoUpdate = async () => {
+    setStatus('downloading');
+    setDownloadedBytes(0);
+    setTotalBytes(0);
+    setErrorDetails(null);
+
+    try {
+      await downloadAndInstallAutoUpdate((downloaded, total) => {
+        setDownloadedBytes(downloaded);
+        if (total > 0) {
+          setTotalBytes(total);
+        }
+      });
+      setStatus('ready');
+    } catch (err: any) {
+      console.error('[Updater] Download & install failed:', err);
+      setStatus('error');
+      setErrorDetails(
+        err?.message ||
+          'Failed to download or verify the update signature. You can download the installer manually.'
+      );
+    }
+  };
+
+  const handleRestart = async () => {
+    try {
+      await restartApp();
+    } catch (err: any) {
+      console.error('[Updater] Failed to restart application:', err);
+    }
+  };
+
+  const percent =
+    totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+
   return (
-    <div className={styles.overlay} onClick={closeUpdateModal}>
+    <div className={styles.overlay} onClick={status === 'downloading' ? undefined : closeUpdateModal}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className={styles.header}>
@@ -53,15 +109,17 @@ export function UpdateModal() {
               className={`${styles.iconCircle} ${
                 status === 'checking'
                   ? styles.iconChecking
-                  : status === 'available'
+                  : status === 'available' || status === 'downloading'
                   ? styles.iconUpdate
-                  : status === 'uptodate'
+                  : status === 'uptodate' || status === 'ready'
                   ? styles.iconUpToDate
                   : styles.iconError
               }`}
             >
               {status === 'checking' && '🔄'}
               {status === 'available' && '🚀'}
+              {status === 'downloading' && '⏳'}
+              {status === 'ready' && '🎉'}
               {status === 'uptodate' && '✓'}
               {status === 'error' && '⚠️'}
             </div>
@@ -69,20 +127,35 @@ export function UpdateModal() {
               <h3 className={styles.titleText}>
                 {status === 'checking' && 'Checking for Updates'}
                 {status === 'available' && 'Software Update Available'}
+                {status === 'downloading' && 'Downloading Update'}
+                {status === 'ready' && 'Update Ready to Install'}
                 {status === 'uptodate' && 'Your Software is Up to Date'}
-                {status === 'error' && 'Could Not Check for Updates'}
+                {status === 'error' && 'Update Failed or Unavailable'}
               </h3>
               <p className={styles.subtitleText}>
                 {status === 'checking' && 'Looking for the latest software version...'}
-                {status === 'available' && `A new version of AFSNSmartAlbum is ready to download and install.`}
-                {status === 'uptodate' && `AFSNSmartAlbum ${appInfo.version} is currently the newest version.`}
-                {status === 'error' && 'The update service is temporarily unreachable.'}
+                {status === 'available' &&
+                  `A new version of AFSNSmartAlbum is ready to install.`}
+                {status === 'downloading' &&
+                  'Downloading and verifying signed update package...'}
+                {status === 'ready' &&
+                  'The update is installed. Restart AFSNSmartAlbum to apply changes.'}
+                {status === 'uptodate' &&
+                  `AFSNSmartAlbum ${appInfo.version} is currently the newest version.`}
+                {status === 'error' && 'Unable to complete the update automatically.'}
               </p>
             </div>
           </div>
-          <button type="button" className={styles.closeBtn} onClick={closeUpdateModal} title="Close">
-            ✕
-          </button>
+          {status !== 'downloading' && (
+            <button
+              type="button"
+              className={styles.closeBtn}
+              onClick={closeUpdateModal}
+              title="Close"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Body */}
@@ -106,14 +179,56 @@ export function UpdateModal() {
             </div>
           )}
 
+          {status === 'downloading' && (
+            <div className={styles.statusCard}>
+              <div className={styles.statusTitle}>
+                {totalBytes > 0 ? `Downloading... ${percent}%` : 'Downloading update...'}
+              </div>
+              <div className={styles.statusDesc}>
+                Please keep AFSNSmartAlbum open while the update downloads.
+              </div>
+
+              <div className={styles.progressContainer}>
+                <div className={styles.progressInfoRow}>
+                  <span>Progress</span>
+                  <span>
+                    {totalBytes > 0
+                      ? `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)} (${percent}%)`
+                      : formatBytes(downloadedBytes)}
+                  </span>
+                </div>
+                <div className={styles.progressTrack}>
+                  <div
+                    className={`${styles.progressBar} ${
+                      totalBytes === 0 ? styles.progressIndeterminate : ''
+                    }`}
+                    style={{ width: totalBytes > 0 ? `${percent}%` : '100%' }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {status === 'ready' && (
+            <div className={styles.statusCard}>
+              <div className={styles.statusTitle} style={{ color: '#34d399' }}>
+                ✓ Update Installed Successfully
+              </div>
+              <div className={styles.statusDesc}>
+                AFSNSmartAlbum has downloaded and verified the update. Click <strong>Restart Now</strong> to launch the new version.
+              </div>
+            </div>
+          )}
+
           {status === 'error' && (
             <div className={styles.statusCard}>
               <div className={styles.statusTitle} style={{ color: '#f87171' }}>
-                Connection Error
+                Update Error
               </div>
               <div className={styles.statusDesc}>
-                {result?.errorMessage ||
-                  'Could not connect to update service. Please check your internet connection and try again.'}
+                {errorDetails ||
+                  result?.errorMessage ||
+                  'Could not complete the auto-update. You can download the latest installer manually.'}
               </div>
             </div>
           )}
@@ -161,14 +276,50 @@ export function UpdateModal() {
             </button>
           )}
 
+          {status === 'downloading' && (
+            <button
+              type="button"
+              className={styles.btnSecondary}
+              onClick={closeUpdateModal}
+              title="Continue download in background"
+            >
+              Background
+            </button>
+          )}
+
+          {status === 'ready' && (
+            <>
+              <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
+                Later
+              </button>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={handleRestart}
+              >
+                🔄 Restart Now
+              </button>
+            </>
+          )}
+
           {status === 'error' && (
             <>
               <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
                 Close
               </button>
-              <button type="button" className={styles.btnPrimary} onClick={runCheck}>
+              <button type="button" className={styles.btnSecondary} onClick={runCheck}>
                 🔄 Retry
               </button>
+              {result?.downloadUrl && (
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={() => handleOpenUrl(result.downloadUrl)}
+                  title="Download the .exe installer manually from GitHub"
+                >
+                  📥 Manual Download
+                </button>
+              )}
             </>
           )}
 
@@ -183,15 +334,31 @@ export function UpdateModal() {
                   className={styles.btnSecondary}
                   onClick={() => handleOpenUrl(result.releaseUrl)}
                 >
-                  🌐 What's New
+                  🌐 Release Notes
                 </button>
               )}
+              {/* Permanent Fallback: Manual Download Button */}
+              {result.downloadUrl && (
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => handleOpenUrl(result.downloadUrl)}
+                  title="Download installer directly in browser"
+                >
+                  📥 Manual Download
+                </button>
+              )}
+              {/* Primary: Auto-Update Button */}
               <button
                 type="button"
                 className={styles.btnPrimary}
-                onClick={() => handleOpenUrl(result.downloadUrl)}
+                onClick={
+                  result.isAutoUpdateSupported
+                    ? handleStartAutoUpdate
+                    : () => handleOpenUrl(result.downloadUrl)
+                }
               >
-                📥 Install Update
+                {result.isAutoUpdateSupported ? '⚡ Update Now' : '📥 Install Update'}
               </button>
             </>
           )}

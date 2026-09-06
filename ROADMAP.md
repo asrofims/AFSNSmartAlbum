@@ -124,7 +124,7 @@
 - [x] Advanced Per-Word Tokenized Rich Text Layout & Styling (per-word bold, italic, underline, strike, custom colors, background highlights, multi-line wrapping, floating mini format bar, and keyboard shortcuts)
 - [x] High-Resolution Print Export Text Rasterization in Rust Backend (SIMD-accelerated fontdue glyph rasterization, system font fallback mapping, styled ranges, word-wrapping, baseline alignment, and alpha compositing)
 
-## Phase 10 — Studio Polish & System Lifecycle (v1.0.21)
+## Phase 10 — Studio Polish & System Lifecycle (v1.0.22)
 - [x] Live Scaled Canvas Preview for Export Studio (Spread & Single Page views with guides)
 - [x] True-to-Canvas Export Preview (Elimination of artificial border and shadows)
 - [x] Fixed Action Footer & Scrollable Middle Content in Export Dialog
@@ -142,5 +142,10 @@
 - [x] High-Fidelity Font Rendering Pipeline (Proportional unit-aware font scaling and flex vertical alignment in Export Preview; Windows 8.3 filename mapping, bold/italic registry variant lookup, and .ttc font support in Rust exporter)
 - [x] Expanded Guaranteed Windows Album Typography in Curated Font Library (`Century Gothic`, `Palatino Linotype`, `Gabriola`, `Segoe Script`, `Constantia`, `Garamond`, `Lucida Calligraphy`, `Monotype Corsiva`)
 - [x] Miniature Spread Navigator Font Preview Fidelity (Virtual supersampling scaling in PageNavigator and ExportSpreadPreview bypassing browser min-font-size clamping with full font family fallback support)
+- [x] Official Tauri v2 Signed Auto Updater with Ed25519 Cryptographic Signature Verification
+- [x] Resilient Dual-Flow Update Engine (Tauri `check()` with graceful fallback to GitHub Releases REST API)
+- [x] Real-Time Streaming Download Progress Tracking (% and MB / Total MB) with Non-Blocking Background Download
+- [x] Native In-App Restart Action (`app.restart()`) & Zero-Disruption Offline Launch Resilience
+- [x] Permanent Fallback Manual `.exe` Download Option Preserved Across All Update States
 
 

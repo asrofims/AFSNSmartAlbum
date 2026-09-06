@@ -36,6 +36,8 @@ export function WorkspaceLayout() {
 
   const openAbout = useAppStore((s) => s.openAbout);
   const openSettings = useAppStore((s) => s.openSettings);
+  const openUpdateModal = useAppStore((s) => s.openUpdateModal);
+  const updateAvailableVersion = useAppStore((s) => s.updateAvailableVersion);
 
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
@@ -869,6 +871,29 @@ export function WorkspaceLayout() {
             </svg>
             About
           </Button>
+
+          {updateAvailableVersion && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={openUpdateModal}
+              title={`Update to ${updateAvailableVersion} is available`}
+              style={{
+                backgroundColor: '#10b981',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 8px',
+                boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>⚡</span>
+              <span>Update ({updateAvailableVersion})</span>
+            </Button>
+          )}
         </div>
       </header>
 

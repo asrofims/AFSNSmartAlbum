@@ -1,6 +1,6 @@
 [package]
 name = "afsn-smart-album"
-version = "1.0.21"
+version = "1.0.22"
 description = "Professional Photo Album Layout Software"
 authors = ["Afsunmedia - Asrofims"]
 license = "Proprietary"
@@ -23,6 +23,7 @@ tauri-plugin-log = "2"
 tauri-plugin-os = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 rusqlite = { version = "0.34", features = ["bundled"] }
 uuid = { version = "1.0", features = ["v4"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp", "tiff"] }

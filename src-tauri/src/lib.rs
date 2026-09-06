@@ -51,6 +51,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Initialize logging in debug mode
             if cfg!(debug_assertions) {
@@ -96,6 +97,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_commands::get_app_info,
             commands::app_commands::get_db_status,
+            commands::app_commands::restart_app,
             commands::app_commands::sample_screen_color,
             commands::app_commands::get_system_fonts,
             commands::project_commands::get_initial_open_path,

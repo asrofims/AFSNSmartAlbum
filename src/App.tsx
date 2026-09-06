@@ -4,10 +4,12 @@ import { AboutDialog } from './features/about/AboutDialog';
 import { SettingsDialog } from './features/settings/SettingsDialog';
 import { NewProjectDialog } from './features/project/NewProjectDialog';
 import { SupportDonationModal } from './features/support/SupportDonationModal';
+import { UpdateModal } from './features/updates/UpdateModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './stores/projectStore';
 import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
+import { checkForAppUpdates } from './services/updateService';
 
 export default function App() {
   // Catch any unhandled window errors and store them for diagnostics
@@ -60,6 +62,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Silent non-blocking background update check (after 4s startup delay)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const { appInfo, setUpdateAvailableVersion } = useAppStore.getState();
+        const res = await checkForAppUpdates(appInfo.version);
+        if (res && res.hasUpdate && res.latestVersion) {
+          console.log('[Updater] Background check detected new version:', res.latestVersion);
+          setUpdateAvailableVersion(res.latestVersion);
+        }
+      } catch (err) {
+        // Silently swallow errors during background check so offline/network issues never interrupt app
+        console.warn('[Updater] Background check skipped gracefully:', err);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (!isTauri()) return;
 
@@ -102,6 +122,7 @@ export default function App() {
       <SettingsDialog />
       <NewProjectDialog />
       <SupportDonationModal />
+      <UpdateModal />
     </ErrorBoundary>
   );
 }
