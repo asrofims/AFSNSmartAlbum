@@ -143,6 +143,15 @@
 - [x] Expanded Guaranteed Windows Album Typography in Curated Font Library (`Century Gothic`, `Palatino Linotype`, `Gabriola`, `Segoe Script`, `Constantia`, `Garamond`, `Lucida Calligraphy`, `Monotype Corsiva`)
 - [x] Miniature Spread Navigator Font Preview Fidelity (Virtual supersampling scaling in PageNavigator and ExportSpreadPreview bypassing browser min-font-size clamping with full font family fallback support)
 - [x] Official Tauri v2 Signed Auto Updater with Ed25519 Cryptographic Signature Verification
+
+## Phase 11 — Modern Creative Desktop Preferences & Studio Ergonomics (v1.0.25)
+- [x] Complete Preferences / Settings Dialog Modernization (220px desktop sidebar with glowing accent capsules, responsive card layouts, inline vector SVGs)
+- [x] Granular Snapping Configuration & Sensitivity Presets (0.1mm Subtle to 2.0mm Strong with precision number input and 5 target switches)
+- [x] Interactive Multi-Frame Resize Gap Mode Selection (Proportional Visual Gap vs Strict Fixed Physical Gap with generous card layout)
+- [x] Real-Time Searchable Keyboard Shortcuts Engine (Action/key/category search, filter chips, and tactile desktop `<kbd>` keycaps)
+- [x] Modern About AFSNSmartAlbum Dialog (76px squircle app logo with ambient glow, system technical specs, QRIS support, and interactive open source chips)
+- [x] Workspace Properties Panel Lifecycle Optimization (Closed by default on initial launch / Welcome Screen, automatically opens when entering or creating a project)
+
 - [x] Resilient Dual-Flow Update Engine (Tauri `check()` with graceful fallback to GitHub Releases REST API)
 - [x] Real-Time Streaming Download Progress Tracking (% and MB / Total MB) with Non-Blocking Background Download
 - [x] Native In-App Restart Action (`app.restart()`) & Zero-Disruption Offline Launch Resilience

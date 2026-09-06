@@ -246,9 +246,23 @@ export function WorkspaceLayout() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveStatus]);
 
-  // Collapsible Right Properties & Bottom Filmstrip
-  const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
+  // Collapsible Right Properties (closed by default on first launch / Welcome Screen, open when in project)
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isFilmstripOpen, setIsFilmstripOpen] = useState(true);
+
+  // Automatically open Properties Panel when entering or creating a project, close when exiting to Welcome Screen
+  const prevProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentProject) {
+      if (prevProjectIdRef.current !== currentProject.id) {
+        setIsPropertiesOpen(true);
+        prevProjectIdRef.current = currentProject.id;
+      }
+    } else {
+      setIsPropertiesOpen(false);
+      prevProjectIdRef.current = null;
+    }
+  }, [currentProject]);
 
   useTauriInfo();
 
@@ -919,7 +933,7 @@ export function WorkspaceLayout() {
       </div>
 
       {/* Right Panel: Collapsible Properties & Smart Layout */}
-      {isPropertiesOpen && (
+      {currentProject && isPropertiesOpen && (
         <aside className={styles.rightPanel}>
           <div style={{
             display: 'flex',
