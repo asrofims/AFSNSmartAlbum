@@ -25,6 +25,7 @@ pub struct ExportOptions {
     pub sharpen_amount: String, // "standard", "high"
     pub output_dir: String,
     pub selected_spread_ids: Option<Vec<String>>,
+    pub selected_page_numbers: Option<Vec<i32>>,
     #[serde(default)]
     pub file_prefix: Option<String>,
 }

@@ -19,6 +19,7 @@ export interface ExportOptions {
   sharpenAmount?: 'standard' | 'high';
   outputDir: string;
   selectedSpreadIds?: string[];
+  selectedPageNumbers?: number[];
   filePrefix?: string;
 }
 
@@ -179,10 +180,23 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     return allSpreads;
   }, [scope, customRange, rangeMode, allSpreads, activeSpread]);
 
+  // Selected page numbers when custom range by pages is active
+  const selectedPageNumbers = useMemo(() => {
+    if (scope === 'custom' && rangeMode === 'pages') {
+      const maxPages = allSpreads.length * 2;
+      return parseRange(customRange, maxPages);
+    }
+    return undefined;
+  }, [scope, rangeMode, customRange, allSpreads.length]);
+
   if (!isOpen || !currentProject) return null;
 
   const targetSpreadCount = targetSpreads.length;
-  const targetPageCount = splitPages ? targetSpreadCount * 2 : targetSpreadCount;
+  const targetPageCount = selectedPageNumbers
+    ? selectedPageNumbers.length
+    : splitPages
+    ? targetSpreadCount * 2
+    : targetSpreadCount;
 
   const handleSelectFolder = async () => {
     try {
@@ -216,16 +230,18 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
     } catch {}
 
     const selectedSpreadIds = targetSpreads.map((s) => s.id);
+    const effectiveSplitPages = selectedPageNumbers && selectedPageNumbers.length > 0 ? true : splitPages;
     const exportOpts: ExportOptions = {
       format,
       dpi,
       jpegQuality,
       includeBleed,
-      splitPages,
+      splitPages: effectiveSplitPages,
       sharpenEnabled,
       sharpenAmount,
       outputDir: trimmedDir,
       selectedSpreadIds,
+      selectedPageNumbers,
       filePrefix: filePrefix.trim() || undefined,
     };
 
@@ -730,6 +746,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                         className={`${styles.rangeModeBtn} ${rangeMode === 'pages' ? styles.rangeModeBtnActive : ''}`}
                         onClick={() => {
                           setRangeMode('pages');
+                          setSplitPages(true);
                           setPreflightReport(null);
                         }}
                         title="Specify range by individual Page numbers"
@@ -743,7 +760,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                     <input
                       type="text"
                       className={styles.customRangeInput}
-                      placeholder={rangeMode === 'spreads' ? "e.g. 1-3, 5, 8" : "e.g. 1-6, 9-10"}
+                      placeholder={rangeMode === 'spreads' ? "e.g. 1-3, 5, 8" : "e.g. 1, 3, 5-8"}
                       value={customRange}
                       onChange={(e) => {
                         setCustomRange(e.target.value);
@@ -754,7 +771,18 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                   </div>
 
                   <div className={styles.customScopeResult}>
-                    {targetSpreads.length > 0 ? (
+                    {rangeMode === 'pages' ? (
+                      selectedPageNumbers && selectedPageNumbers.length > 0 ? (
+                        <span className={styles.customScopeSuccess}>
+                          ✓ Will export {selectedPageNumbers.length} {selectedPageNumbers.length === 1 ? 'Single Page' : 'Single Pages'}:{' '}
+                          {selectedPageNumbers.map((p) => `Page ${p}`).join(', ')}
+                        </span>
+                      ) : (
+                        <span className={styles.customScopeWarning}>
+                          ⚠️ No pages selected. Enter comma-separated page numbers or ranges (e.g. 1, 3, 5-8).
+                        </span>
+                      )
+                    ) : targetSpreads.length > 0 ? (
                       <span className={styles.customScopeSuccess}>
                         ✓ Will export {targetSpreads.length} {targetSpreads.length === 1 ? 'Spread' : 'Spreads'}:{' '}
                         {targetSpreads.map((s) => s.type === 'cover' ? 'Cover' : `Spread ${s.spreadIndex}`).join(', ')}

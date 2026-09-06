@@ -199,10 +199,18 @@ pub async fn preflight_check_export(
                 let right_num = left_num + 1;
                 let left_filename = resolve_export_filename(prefix, &spread.r#type, spread.spread_index, Some(left_num), ext);
                 let right_filename = resolve_export_filename(prefix, &spread.r#type, spread.spread_index, Some(right_num), ext);
-                if out_dir.join(&left_filename).exists() {
+
+                let should_check_left = options.selected_page_numbers.as_ref()
+                    .map(|nums| nums.contains(&left_num))
+                    .unwrap_or(true);
+                let should_check_right = options.selected_page_numbers.as_ref()
+                    .map(|nums| nums.contains(&right_num))
+                    .unwrap_or(true);
+
+                if should_check_left && out_dir.join(&left_filename).exists() {
                     existing_files.push(left_filename);
                 }
-                if out_dir.join(&right_filename).exists() {
+                if should_check_right && out_dir.join(&right_filename).exists() {
                     existing_files.push(right_filename);
                 }
             }
@@ -514,6 +522,13 @@ fn export_album_high_res_worker(
                     let left_num = (spread.spread_index - 1) * 2 + 1;
                     let right_num = left_num + 1;
 
+                    let should_export_left = options.selected_page_numbers.as_ref()
+                        .map(|nums| nums.contains(&left_num))
+                        .unwrap_or(true);
+                    let should_export_right = options.selected_page_numbers.as_ref()
+                        .map(|nums| nums.contains(&right_num))
+                        .unwrap_or(true);
+
                     let ext = if options.format == "png" { "png" } else { "jpg" };
                     let left_filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, Some(left_num), ext);
                     let right_filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, Some(right_num), ext);
@@ -522,40 +537,52 @@ fn export_album_high_res_worker(
                     let right_path = output_path.join(&right_filename);
 
                     if options.format == "png" {
-                        safe_write_image(&left_path, |tmp| {
-                            let png_bytes = encode_png_with_dpi(&left_page, options.dpi)?;
-                            fs::write(tmp, &png_bytes)
-                                .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
-                        })?;
-                        safe_write_image(&right_path, |tmp| {
-                            let png_bytes = encode_png_with_dpi(&right_page, options.dpi)?;
-                            fs::write(tmp, &png_bytes)
-                                .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
-                        })?;
+                        if should_export_left {
+                            safe_write_image(&left_path, |tmp| {
+                                let png_bytes = encode_png_with_dpi(&left_page, options.dpi)?;
+                                fs::write(tmp, &png_bytes)
+                                    .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
+                            })?;
+                            local_output_files.push(left_path.to_string_lossy().to_string());
+                        }
+                        if should_export_right {
+                            safe_write_image(&right_path, |tmp| {
+                                let png_bytes = encode_png_with_dpi(&right_page, options.dpi)?;
+                                fs::write(tmp, &png_bytes)
+                                    .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
+                            })?;
+                            local_output_files.push(right_path.to_string_lossy().to_string());
+                        }
                     } else {
                         // JPEG with atomic safe write and explicit JFIF DPI metadata
-                        let left_rgb = image::DynamicImage::ImageRgba8(left_page).to_rgb8();
-                        safe_write_image(&left_path, |tmp| {
-                            let jpg_bytes = encode_jpeg_with_dpi(&left_rgb, options.jpeg_quality, options.dpi)?;
-                            fs::write(tmp, &jpg_bytes)
-                                .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
-                        })?;
+                        if should_export_left {
+                            let left_rgb = image::DynamicImage::ImageRgba8(left_page).to_rgb8();
+                            safe_write_image(&left_path, |tmp| {
+                                let jpg_bytes = encode_jpeg_with_dpi(&left_rgb, options.jpeg_quality, options.dpi)?;
+                                fs::write(tmp, &jpg_bytes)
+                                    .map_err(|e| format!("Failed to save {}: {}", left_path.display(), e))
+                            })?;
 
-                        let right_rgb = image::DynamicImage::ImageRgba8(right_page).to_rgb8();
-                        safe_write_image(&right_path, |tmp| {
-                            let jpg_bytes = encode_jpeg_with_dpi(&right_rgb, options.jpeg_quality, options.dpi)?;
-                            fs::write(tmp, &jpg_bytes)
-                                .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
-                        })?;
+                            if options.format == "pdf" {
+                                local_temp_jpegs.push((left_path.clone(), left_rgb.width(), left_rgb.height()));
+                            }
+                            local_output_files.push(left_path.to_string_lossy().to_string());
+                        }
 
-                        if options.format == "pdf" {
-                            local_temp_jpegs.push((left_path.clone(), left_rgb.width(), left_rgb.height()));
-                            local_temp_jpegs.push((right_path.clone(), right_rgb.width(), right_rgb.height()));
+                        if should_export_right {
+                            let right_rgb = image::DynamicImage::ImageRgba8(right_page).to_rgb8();
+                            safe_write_image(&right_path, |tmp| {
+                                let jpg_bytes = encode_jpeg_with_dpi(&right_rgb, options.jpeg_quality, options.dpi)?;
+                                fs::write(tmp, &jpg_bytes)
+                                    .map_err(|e| format!("Failed to save {}: {}", right_path.display(), e))
+                            })?;
+
+                            if options.format == "pdf" {
+                                local_temp_jpegs.push((right_path.clone(), right_rgb.width(), right_rgb.height()));
+                            }
+                            local_output_files.push(right_path.to_string_lossy().to_string());
                         }
                     }
-
-                    local_output_files.push(left_path.to_string_lossy().to_string());
-                    local_output_files.push(right_path.to_string_lossy().to_string());
                 } else {
                     // Full Spread
                     let ext = if options.format == "png" { "png" } else { "jpg" };

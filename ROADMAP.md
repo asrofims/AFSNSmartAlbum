@@ -158,4 +158,11 @@
 - [x] Permanent Fallback Manual `.exe` Download Option Preserved Across All Update States
 - [x] Smart GitHub Actions Release Workflow (Asset completeness existence check, redundant run skipping, dynamic version tag resolution, and automated commit-based changelog generation)
 
+## Phase 12 — Single-Page Precision Print Export & Selective Spread Splitting (v1.0.26)
+- [x] Dedicated Single-Page Export Selection (Seamlessly export specific single page numbers from any spread without forced opposite page emission)
+- [x] Auto-Splitting Mode Synchronization (Switching custom range to `Pages` mode automatically enables and locks page-level splitting)
+- [x] Granular Preflight Collision Detection (Export disk check selectively evaluates only explicitly targeted page files)
+- [x] Rust High-Res Splitting Gate (`selected_page_numbers` filter for left and right page worker emission across JPEG, PNG, and PDF)
+- [x] Descriptive Feedback Indicator in Export Dialog (Real-time single vs multi-page export target summary with active page number badges)
+
 
