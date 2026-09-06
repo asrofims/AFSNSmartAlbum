@@ -5,6 +5,8 @@ import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
 import { PhotoFrameElement } from '../../domain/editor';
+import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
+import { convertPtToUnit } from '../../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -101,14 +103,43 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         const rot = el.rotation || 0;
 
         if (el.type === 'text') {
-          const fontPt = Number.isFinite(el.style?.fontSize) ? el.style.fontSize : 24;
-          const fontSizePx = Math.max(1, Math.round(((fontPt * 25.4) / 72) * scale));
-          const isBold = el.style?.fontWeight === 'bold' || Number(el.style?.fontWeight) >= 600;
-          const isItalic = el.style?.fontStyle === 'italic';
+          const textEl = el as TextNodeElement;
+          const fontPt = Number.isFinite(textEl.style?.fontSize) ? textEl.style.fontSize : 24;
+          const fontInUnit = convertPtToUnit(fontPt, dims.unit, dims.dpi);
+          const rawFontSizePx = fontInUnit * scale;
+
+          // Virtual supersampling factor k: ensures font is rendered at >= 16px
+          // inside a scaled virtual container. This completely bypasses Chromium's
+          // minimum font-size clamp (which ruins text below 9px) and enables
+          // crisp, anti-aliased subpixel rendering with perfect letterforms and proportions.
+          const targetVirtualPx = 16;
+          const k = Math.max(1, targetVirtualPx / Math.max(0.5, rawFontSizePx));
+
+          const virtualFontSize = Math.round(rawFontSizePx * k * 10) / 10;
+          const virtualW = Math.round(w * k * 10) / 10;
+          const virtualH = Math.round(h * k * 10) / 10;
+
+          const isBold = textEl.style?.fontWeight === 'bold' || Number(textEl.style?.fontWeight) >= 600;
+          const isItalic = textEl.style?.fontStyle === 'italic';
+          const vAlign = textEl.style?.verticalAlign || 'middle';
+          const hAlign = textEl.style?.align || 'center';
+          const paddingPt = Number.isFinite(textEl.style?.padding) ? textEl.style.padding : 2;
+          const paddingPx = convertPtToUnit(paddingPt, dims.unit, dims.dpi) * scale;
+          const virtualPadding = Math.max(0, Math.round(paddingPx * k * 10) / 10);
+          const letterSpacingPt = Number.isFinite(textEl.style?.letterSpacing) ? textEl.style.letterSpacing : 0;
+          const letterSpacingPx = letterSpacingPt ? convertPtToUnit(letterSpacingPt, dims.unit, dims.dpi) * scale : 0;
+          const virtualLetterSpacing = letterSpacingPx ? `${Math.round(letterSpacingPx * k * 10) / 10}px` : undefined;
+
+          const displayText = stripRichTextMarkup(textEl.text || '');
+
+          const justifyContent =
+            vAlign === 'bottom' ? 'flex-end' : vAlign === 'middle' ? 'center' : 'flex-start';
+          const alignItems =
+            hAlign === 'center' ? 'center' : hAlign === 'right' ? 'flex-end' : 'flex-start';
 
           return (
             <div
-              key={el.id}
+              key={textEl.id}
               style={{
                 position: 'absolute',
                 left: `${x}px`,
@@ -118,19 +149,39 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                 transform: rot ? `rotate(${rot}deg)` : undefined,
                 transformOrigin: '0 0',
                 overflow: 'hidden',
-                fontSize: `${fontSizePx}px`,
-                color: el.style?.fill || '#ffffff',
-                fontFamily: el.style?.fontFamily || 'sans-serif',
-                fontWeight: isBold ? 700 : 400,
-                fontStyle: isItalic ? 'italic' : 'normal',
-                lineHeight: 1.1,
                 pointerEvents: 'none',
                 userSelect: 'none',
-                whiteSpace: 'pre-wrap',
-                zIndex: el.zIndex || 2,
+                zIndex: textEl.zIndex || 2,
               }}
             >
-              {el.text || ''}
+              <div
+                style={{
+                  width: `${virtualW}px`,
+                  height: `${virtualH}px`,
+                  transform: `scale(${1 / k})`,
+                  transformOrigin: '0 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent,
+                  alignItems,
+                  fontSize: `${virtualFontSize}px`,
+                  color: textEl.style?.fill || '#1e293b',
+                  fontFamily: resolveCssFontFamily(textEl.style?.fontFamily),
+                  fontWeight: isBold ? 700 : 400,
+                  fontStyle: isItalic ? 'italic' : 'normal',
+                  textAlign: (hAlign as any) || 'center',
+                  lineHeight: textEl.style?.lineHeight || 1.2,
+                  letterSpacing: virtualLetterSpacing,
+                  padding: `${virtualPadding}px`,
+                  boxSizing: 'border-box',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                <div style={{ width: '100%', textAlign: (hAlign as any) || 'center' }}>
+                  {displayText}
+                </div>
+              </div>
             </div>
           );
         }

@@ -3,9 +3,9 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { Spread, mergeFramePhotoAsset } from '../../domain/album';
 import { Project } from '../../domain/project';
 import { PhotoFrameElement, calculateImageOffset } from '../../domain/editor';
-import { TextNodeElement } from '../../domain/text';
+import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
-import { calculateExportPixels } from '../../domain/units';
+import { calculateExportPixels, convertPtToUnit } from '../../domain/units';
 import { usePhotoStore } from '../../stores/photoStore';
 import styles from './ExportSpreadPreview.module.css';
 
@@ -256,10 +256,33 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             if (el.type === 'text') {
               const textEl = el as TextNodeElement;
               const fontPt = Number.isFinite(textEl.style?.fontSize) ? textEl.style.fontSize : 24;
-              // Screen size scaling (72 pt = 25.4 mm)
-              const fontSizePx = Math.max(6, Math.round(((fontPt * 25.4) / 72) * scale));
+              const fontInUnit = convertPtToUnit(fontPt, dims.unit, dims.dpi);
+              const rawFontSizePx = fontInUnit * scale;
+
+              // Apply virtual supersampling for small captions (< 14px) to prevent
+              // browser minimum font-size clamping and ensure crisp typography.
+              const targetVirtualPx = 14;
+              const k = rawFontSizePx < targetVirtualPx ? targetVirtualPx / Math.max(0.5, rawFontSizePx) : 1;
+              const virtualFontSize = Math.round(rawFontSizePx * k * 10) / 10;
+              const virtualW = Math.round(renderW * k * 10) / 10;
+              const virtualH = Math.round(renderH * k * 10) / 10;
+
               const isBold = textEl.style?.fontWeight === 'bold' || Number(textEl.style?.fontWeight) >= 600;
               const isItalic = textEl.style?.fontStyle === 'italic';
+              const vAlign = textEl.style?.verticalAlign || 'middle';
+              const hAlign = textEl.style?.align || 'center';
+              const paddingPt = Number.isFinite(textEl.style?.padding) ? textEl.style.padding : 4;
+              const paddingPx = convertPtToUnit(paddingPt, dims.unit, dims.dpi) * scale;
+              const virtualPadding = Math.max(0, Math.round(paddingPx * k * 10) / 10);
+              const letterSpacingPt = Number.isFinite(textEl.style?.letterSpacing) ? textEl.style.letterSpacing : 0;
+              const letterSpacingPx = letterSpacingPt ? convertPtToUnit(letterSpacingPt, dims.unit, dims.dpi) * scale : 0;
+              const virtualLetterSpacing = letterSpacingPx ? `${Math.round(letterSpacingPx * k * 10) / 10}px` : undefined;
+              const displayText = stripRichTextMarkup(textEl.text || '');
+
+              const justifyContent =
+                vAlign === 'bottom' ? 'flex-end' : vAlign === 'middle' ? 'center' : 'flex-start';
+              const alignItems =
+                hAlign === 'center' ? 'center' : hAlign === 'right' ? 'flex-end' : 'flex-start';
 
               return (
                 <div
@@ -273,21 +296,39 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     transform: rot ? `rotate(${rot}deg)` : undefined,
                     transformOrigin: '0 0',
                     overflow: 'hidden',
-                    fontSize: `${fontSizePx}px`,
-                    color: textEl.style?.fill || '#000000',
-                    fontFamily: textEl.style?.fontFamily || 'Inter, sans-serif',
-                    fontWeight: isBold ? 700 : 400,
-                    fontStyle: isItalic ? 'italic' : 'normal',
-                    textAlign: (textEl.style?.align as any) || 'left',
-                    lineHeight: 1.2,
                     pointerEvents: 'none',
                     userSelect: 'none',
-                    whiteSpace: 'pre-wrap',
                     zIndex: textEl.zIndex || 2,
-                    padding: '2px',
                   }}
                 >
-                  {textEl.text || ''}
+                  <div
+                    style={{
+                      width: `${virtualW}px`,
+                      height: `${virtualH}px`,
+                      transform: k !== 1 ? `scale(${1 / k})` : undefined,
+                      transformOrigin: '0 0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent,
+                      alignItems,
+                      fontSize: `${virtualFontSize}px`,
+                      color: textEl.style?.fill || '#1e293b',
+                      fontFamily: resolveCssFontFamily(textEl.style?.fontFamily),
+                      fontWeight: isBold ? 700 : 400,
+                      fontStyle: isItalic ? 'italic' : 'normal',
+                      textAlign: (hAlign as any) || 'center',
+                      lineHeight: textEl.style?.lineHeight || 1.3,
+                      letterSpacing: virtualLetterSpacing,
+                      padding: `${virtualPadding}px`,
+                      boxSizing: 'border-box',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    <div style={{ width: '100%', textAlign: (hAlign as any) || 'center' }}>
+                      {displayText}
+                    </div>
+                  </div>
                 </div>
               );
             }

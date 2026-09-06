@@ -215,16 +215,44 @@ export const TEXT_PRESETS: Record<TextPresetKey, TextPreset> = {
 
 /** Popular fonts available for album typography with clean fallbacks */
 export const ALBUM_FONT_FAMILIES = [
+  { value: 'Century Gothic', label: 'Century Gothic (Modern Geometric)', fallback: '"Century Gothic", "Segoe UI", sans-serif' },
+  { value: 'Palatino Linotype', label: 'Palatino Linotype (Classic Serif)', fallback: '"Palatino Linotype", "Book Antiqua", Palatino, serif' },
+  { value: 'Gabriola', label: 'Gabriola (Flourished Script)', fallback: 'Gabriola, "Segoe Script", cursive, serif' },
+  { value: 'Segoe Script', label: 'Segoe Script (Romantic Cursive)', fallback: '"Segoe Script", "Brush Script MT", cursive' },
+  { value: 'Georgia', label: 'Georgia (Warm Editorial Serif)', fallback: 'Georgia, serif' },
+  { value: 'Times New Roman', label: 'Times New Roman (Classic Formal)', fallback: '"Times New Roman", Times, serif' },
+  { value: 'Constantia', label: 'Constantia (Sophisticated Book Serif)', fallback: 'Constantia, Georgia, serif' },
+  { value: 'Garamond', label: 'Garamond (Renaissance Serif)', fallback: 'Garamond, "Times New Roman", serif' },
+  { value: 'Lucida Calligraphy', label: 'Lucida Calligraphy (Formal Script)', fallback: '"Lucida Calligraphy", "Monotype Corsiva", cursive' },
+  { value: 'Monotype Corsiva', label: 'Monotype Corsiva (Swash Italic)', fallback: '"Monotype Corsiva", "Lucida Calligraphy", cursive' },
+  { value: 'Segoe UI', label: 'Segoe UI (Clean Neutral Sans)', fallback: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' },
+  { value: 'Arial', label: 'Arial (Universal Sans)', fallback: 'Arial, Helvetica, sans-serif' },
+  { value: 'Calibri', label: 'Calibri (Contemporary Sans)', fallback: 'Calibri, "Segoe UI", sans-serif' },
+  { value: 'Bahnschrift', label: 'Bahnschrift (Geometric DIN Sans)', fallback: 'Bahnschrift, "Arial Narrow", sans-serif' },
   { value: 'Playfair Display', label: 'Playfair Display (Serif Elegant)', fallback: 'Georgia, serif' },
   { value: 'Cinzel', label: 'Cinzel (Classical Roman)', fallback: '"Times New Roman", serif' },
   { value: 'Cormorant Garamond', label: 'Cormorant Garamond (Editorial)', fallback: 'Garamond, serif' },
-  { value: 'Great Vibes', label: 'Great Vibes (Romantic Script)', fallback: '"Brush Script MT", cursive' },
-  { value: 'Montserrat', label: 'Montserrat (Modern Geometric)', fallback: 'Arial, sans-serif' },
-  { value: 'Inter', label: 'Inter (Clean Neutral)', fallback: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-  { value: 'Georgia', label: 'Georgia (System Serif)', fallback: 'serif' },
-  { value: 'Arial', label: 'Arial (System Sans)', fallback: 'sans-serif' },
-  { value: 'Times New Roman', label: 'Times New Roman (Classic)', fallback: 'serif' },
+  { value: 'Great Vibes', label: 'Great Vibes (Romantic Script)', fallback: '"Segoe Script", "Brush Script MT", cursive' },
+  { value: 'Montserrat', label: 'Montserrat (Modern Geometric)', fallback: '"Century Gothic", Arial, sans-serif' },
+  { value: 'Inter', label: 'Inter (Clean Neutral)', fallback: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' },
 ];
+
+/**
+ * Resolves a font family name into a robust CSS font-family string with appropriate system fallbacks.
+ */
+export function resolveCssFontFamily(fontFamily?: string | null): string {
+  if (!fontFamily || !fontFamily.trim()) {
+    return 'var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)';
+  }
+  const cleanFamily = fontFamily.trim();
+  const matched = ALBUM_FONT_FAMILIES.find(
+    (f) => f.value.toLowerCase() === cleanFamily.toLowerCase()
+  );
+  if (matched && matched.fallback) {
+    return `"${matched.value}", ${matched.fallback}`;
+  }
+  return `"${cleanFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+}
 
 export function isTextElement(elem: any): elem is TextNodeElement {
   return Boolean(elem && elem.type === 'text');

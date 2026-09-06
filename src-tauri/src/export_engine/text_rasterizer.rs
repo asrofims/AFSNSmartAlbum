@@ -205,89 +205,59 @@ fn get_system_font_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+static SYSTEM_FONTS_CACHE: OnceLock<Vec<crate::commands::app_commands::SystemFontInfo>> = OnceLock::new();
+
+fn get_cached_system_fonts() -> &'static [crate::commands::app_commands::SystemFontInfo] {
+    SYSTEM_FONTS_CACHE.get_or_init(|| {
+        crate::commands::app_commands::get_system_fonts().unwrap_or_default()
+    })
+}
+
 /// Resolve font file path on system with smart font family fallback
 fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<PathBuf> {
     let family_lower = family.to_lowercase();
     let dirs = get_system_font_dirs();
 
-    // Map common album families to actual system filenames
-    let candidate_names: Vec<String> = if family_lower.contains("georgia")
-        || family_lower.contains("playfair")
-        || family_lower.contains("garamond")
-        || family_lower.contains("cormorant")
-    {
-        match (is_bold, is_italic) {
-            (true, true) => vec!["georgiaz.ttf".into(), "georgiab.ttf".into(), "georgia.ttf".into()],
-            (true, false) => vec!["georgiab.ttf".into(), "georgia.ttf".into()],
-            (false, true) => vec!["georgiai.ttf".into(), "georgia.ttf".into()],
-            (false, false) => vec!["georgia.ttf".into()],
-        }
-    } else if family_lower.contains("times")
-        || family_lower.contains("cinzel")
-        || family_lower.contains("roman")
-    {
-        match (is_bold, is_italic) {
-            (true, true) => vec!["timesbi.ttf".into(), "timesbd.ttf".into(), "times.ttf".into()],
-            (true, false) => vec!["timesbd.ttf".into(), "times.ttf".into()],
-            (false, true) => vec!["timesi.ttf".into(), "times.ttf".into()],
-            (false, false) => vec!["times.ttf".into()],
-        }
-    } else if family_lower.contains("script")
-        || family_lower.contains("great vibes")
-        || family_lower.contains("cursive")
-    {
-        match (is_bold, is_italic) {
-            (true, _) => vec!["segoescb.ttf".into(), "segoesc.ttf".into()],
-            _ => vec!["segoesc.ttf".into(), "segoescb.ttf".into()],
-        }
-    } else if family_lower.contains("arial") {
-        match (is_bold, is_italic) {
-            (true, true) => vec!["arialbi.ttf".into(), "arialbd.ttf".into(), "arial.ttf".into()],
-            (true, false) => vec!["arialbd.ttf".into(), "arial.ttf".into()],
-            (false, true) => vec!["ariali.ttf".into(), "arial.ttf".into()],
-            (false, false) => vec!["arial.ttf".into()],
-        }
-    } else {
-        // Default sans-serif: Inter, Montserrat, Segoe UI, Roboto, etc.
-        match (is_bold, is_italic) {
-            (true, true) => vec![
-                "segoeuiz.ttf".into(),
-                "segoeuib.ttf".into(),
-                "arialbi.ttf".into(),
-                "arialbd.ttf".into(),
-                "segoeui.ttf".into(),
-                "arial.ttf".into(),
-            ],
-            (true, false) => vec![
-                "segoeuib.ttf".into(),
-                "arialbd.ttf".into(),
-                "segoeui.ttf".into(),
-                "arial.ttf".into(),
-            ],
-            (false, true) => vec![
-                "segoeuii.ttf".into(),
-                "ariali.ttf".into(),
-                "segoeui.ttf".into(),
-                "arial.ttf".into(),
-            ],
-            (false, false) => vec![
-                "segoeui.ttf".into(),
-                "arial.ttf".into(),
-            ],
-        }
+    // 1. FIRST PRIORITY: Look up in Windows System Font Registry with bold/italic variant resolution.
+    // This correctly matches ANY font installed on the user's OS (e.g. Arial, Verdana, Georgia,
+    // Palatino Linotype, Century Gothic, Gabriola, Constantia, Segoe Script, Comic Sans, Impact, etc.)
+    let sys_fonts = get_cached_system_fonts();
+    let variant_queries: Vec<String> = match (is_bold, is_italic) {
+        (true, true) => vec![
+            format!("{} Bold Italic", family),
+            format!("{} Italic Bold", family),
+            format!("{} Bold", family),
+            format!("{} Italic", family),
+            family.to_string(),
+        ],
+        (true, false) => vec![
+            format!("{} Bold", family),
+            format!("{} Black", family),
+            format!("{} SemiBold", family),
+            family.to_string(),
+        ],
+        (false, true) => vec![
+            format!("{} Italic", family),
+            format!("{} Oblique", family),
+            family.to_string(),
+        ],
+        (false, false) => vec![
+            family.to_string(),
+            format!("{} Regular", family),
+        ],
     };
 
-    // 0. First check if exact font filename is registered in Windows system fonts
-    if let Ok(sys_fonts) = crate::commands::app_commands::get_system_fonts() {
-        if let Some(font_info) = sys_fonts.iter().find(|f| f.family.eq_ignore_ascii_case(family)) {
-            if !font_info.file_name.is_empty() {
+    for query in &variant_queries {
+        if let Some(font_info) = sys_fonts.iter().find(|f| f.family.eq_ignore_ascii_case(query)) {
+            let file_name = font_info.file_name.split(',').next().unwrap_or(&font_info.file_name).trim();
+            if !file_name.is_empty() {
                 for dir in &dirs {
-                    let p = dir.join(&font_info.file_name);
+                    let p = dir.join(file_name);
                     if p.exists() {
                         return Some(p);
                     }
                 }
-                let direct_p = PathBuf::from(&font_info.file_name);
+                let direct_p = PathBuf::from(file_name);
                 if direct_p.exists() {
                     return Some(direct_p);
                 }
@@ -295,9 +265,122 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
         }
     }
 
-    // 1. First search explicit candidate names
-    for dir in &dirs {
-        for name in &candidate_names {
+    // Prefix / substring match in registry (e.g. "Lucida Calligraphy" matching "Lucida Calligraphy Italic")
+    if let Some(font_info) = sys_fonts.iter().find(|f| {
+        let fl = f.family.to_lowercase();
+        fl == family_lower || fl.starts_with(&family_lower) || family_lower.starts_with(&fl)
+    }) {
+        let file_name = font_info.file_name.split(',').next().unwrap_or(&font_info.file_name).trim();
+        if !file_name.is_empty() {
+            for dir in &dirs {
+                let p = dir.join(file_name);
+                if p.exists() {
+                    return Some(p);
+                }
+            }
+            let direct_p = PathBuf::from(file_name);
+            if direct_p.exists() {
+                return Some(direct_p);
+            }
+        }
+    }
+
+    // 2. SECOND PRIORITY: Known curated album typography fallbacks & Windows DOS 8.3 filenames
+    // for curated fonts that are not installed as separate files (Playfair, Cinzel, Great Vibes, etc.)
+    let curated_fallbacks: Vec<&str> = if family_lower.contains("century gothic") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["gothicbi.ttf", "gothicb.ttf", "gothic.ttf"],
+            (true, false) => vec!["gothicb.ttf", "gothic.ttf"],
+            (false, true) => vec!["gothici.ttf", "gothic.ttf"],
+            (false, false) => vec!["gothic.ttf"],
+        }
+    } else if family_lower.contains("palatino") || family_lower.contains("book antiqua") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["palabi.ttf", "antquabi.ttf", "palab.ttf", "pala.ttf"],
+            (true, false) => vec!["palab.ttf", "antquab.ttf", "pala.ttf"],
+            (false, true) => vec!["palai.ttf", "antquai.ttf", "pala.ttf"],
+            (false, false) => vec!["pala.ttf", "bkant.ttf"],
+        }
+    } else if family_lower.contains("gabriola") {
+        vec!["gabriola.ttf", "Gabriola.ttf"]
+    } else if family_lower.contains("constantia") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["constanz.ttf", "constanb.ttf", "constan.ttf"],
+            (true, false) => vec!["constanb.ttf", "constan.ttf"],
+            (false, true) => vec!["constani.ttf", "constan.ttf"],
+            (false, false) => vec!["constan.ttf"],
+        }
+    } else if family_lower.contains("corsiva") {
+        vec!["mtcorsva.ttf", "MTCORSVA.TTF"]
+    } else if family_lower.contains("lucida calligraphy") {
+        vec!["lcallig.ttf", "LCALLIG.TTF"]
+    } else if family_lower.contains("lucida handwriting") {
+        vec!["lhandw.ttf", "LHANDW.TTF"]
+    } else if family_lower.contains("garamond") || family_lower.contains("cormorant") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["garabd.ttf", "garait.ttf", "gara.ttf", "georgiaz.ttf"],
+            (true, false) => vec!["garabd.ttf", "gara.ttf", "georgiab.ttf"],
+            (false, true) => vec!["garait.ttf", "gara.ttf", "georgiai.ttf"],
+            (false, false) => vec!["gara.ttf", "georgia.ttf"],
+        }
+    } else if family_lower.contains("georgia") || family_lower.contains("playfair") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["georgiaz.ttf", "georgiab.ttf", "georgia.ttf"],
+            (true, false) => vec!["georgiab.ttf", "georgia.ttf"],
+            (false, true) => vec!["georgiai.ttf", "georgia.ttf"],
+            (false, false) => vec!["georgia.ttf"],
+        }
+    } else if family_lower.contains("times") || family_lower.contains("cinzel") || family_lower.contains("roman") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["timesbi.ttf", "timesbd.ttf", "times.ttf"],
+            (true, false) => vec!["timesbd.ttf", "times.ttf"],
+            (false, true) => vec!["timesi.ttf", "times.ttf"],
+            (false, false) => vec!["times.ttf"],
+        }
+    } else if family_lower.contains("script") || family_lower.contains("great vibes") || family_lower.contains("cursive") {
+        match (is_bold, is_italic) {
+            (true, _) => vec!["segoescb.ttf", "segoesc.ttf"],
+            _ => vec!["segoesc.ttf", "segoescb.ttf"],
+        }
+    } else if family_lower.contains("trebuchet") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["trebucbi.ttf", "trebucbd.ttf", "trebuc.ttf"],
+            (true, false) => vec!["trebucbd.ttf", "trebuc.ttf"],
+            (false, true) => vec!["trebucit.ttf", "trebuc.ttf"],
+            (false, false) => vec!["trebuc.ttf"],
+        }
+    } else if family_lower.contains("calibri") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["calibriz.ttf", "calibrib.ttf", "calibri.ttf"],
+            (true, false) => vec!["calibrib.ttf", "calibri.ttf"],
+            (false, true) => vec!["calibrii.ttf", "calibri.ttf"],
+            (false, false) => vec!["calibri.ttf"],
+        }
+    } else if family_lower.contains("cambria") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["cambriaz.ttf", "cambriab.ttf", "cambria.ttc"],
+            (true, false) => vec!["cambriab.ttf", "cambria.ttc"],
+            (false, true) => vec!["cambriai.ttf", "cambria.ttc"],
+            (false, false) => vec!["cambria.ttc", "cambria.ttf"],
+        }
+    } else if family_lower.contains("bahnschrift") {
+        vec!["bahnschrift.ttf"]
+    } else if family_lower.contains("arial") {
+        match (is_bold, is_italic) {
+            (true, true) => vec!["arialbi.ttf", "arialbd.ttf", "arial.ttf"],
+            (true, false) => vec!["arialbd.ttf", "arial.ttf"],
+            (false, true) => vec!["ariali.ttf", "arial.ttf"],
+            (false, false) => vec!["arial.ttf"],
+        }
+    } else if family_lower.contains("montserrat") {
+        vec!["gothic.ttf", "segoeui.ttf", "arial.ttf"]
+    } else {
+        // Empty by default: DO NOT hijack other system fonts!
+        Vec::new()
+    };
+
+    for name in &curated_fallbacks {
+        for dir in &dirs {
             let p = dir.join(name);
             if p.exists() {
                 return Some(p);
@@ -305,17 +388,17 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
         }
     }
 
-    // 2. Search directory for files matching family name
+    // 3. THIRD PRIORITY: Scan font directories for files matching the family name
     for dir in &dirs {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
                     let ext_lower = ext.to_lowercase();
-                    if ext_lower == "ttf" || ext_lower == "otf" {
+                    if ext_lower == "ttf" || ext_lower == "otf" || ext_lower == "ttc" {
                         if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
                             let stem_lower = stem.to_lowercase();
-                            if stem_lower.contains(&family_lower) {
+                            if stem_lower == family_lower || stem_lower.starts_with(&family_lower) {
                                 return Some(p);
                             }
                         }
@@ -325,8 +408,8 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
         }
     }
 
-    // 3. Fallback to any guaranteed standard font on system
-    let universal_fallbacks = ["arial.ttf", "segoeui.ttf", "times.ttf", "georgia.ttf", "DejaVuSans.ttf"];
+    // 4. LAST RESORT: Universal system fallbacks
+    let universal_fallbacks = ["segoeui.ttf", "arial.ttf", "times.ttf", "georgia.ttf", "DejaVuSans.ttf"];
     for dir in &dirs {
         for fb in &universal_fallbacks {
             let p = dir.join(fb);

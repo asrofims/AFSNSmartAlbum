@@ -729,13 +729,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const activeTransformAnchorRef = useRef<string | null>(null);
   const [rotationHud, setRotationHud] = useState<{ angle: number; snapped: boolean; x: number; y: number } | null>(null);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const isAltPressedRef = useRef(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setIsShiftPressed(true);
+      if (e.key === 'Alt') isAltPressedRef.current = true;
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setIsShiftPressed(false);
+      if (e.key === 'Alt') isAltPressedRef.current = false;
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -755,6 +758,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     const handleResetDragState = () => {
       setIsHoveredDropAlt(false);
       setHoveredDropFrameId(null);
+      isAltPressedRef.current = false;
     };
 
     window.addEventListener('blur', handleResetDragState);
@@ -1450,21 +1454,46 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const getContextMenuItems = (): ContextMenuItem[] => {
     if (!activeSpread) return [];
     const count = selectedFrameIds.length;
-    const hasClipboard =
-      useEditorStore.getState().clipboardFrames.length > 0 ||
-      usePhotoStore.getState().clipboardPhotoIds.length > 0;
+    const clipboardFrames = useEditorStore.getState().clipboardFrames || [];
+    const clipboardPhotoIds = usePhotoStore.getState().clipboardPhotoIds || [];
+    const hasClipboard = clipboardFrames.length > 0 || clipboardPhotoIds.length > 0;
+
+    let dynamicPasteLabel = 'Paste';
+    let pasteToastNoun = 'Element';
+    if (clipboardFrames.length > 0) {
+      const clipTextCount = clipboardFrames.filter((f) => f.type === 'text').length;
+      const clipPhotoCount = clipboardFrames.filter((f) => f.type === 'photo').length;
+      if (clipTextCount > 0 && clipPhotoCount === 0) {
+        dynamicPasteLabel = clipTextCount > 1 ? `Paste ${clipTextCount} Texts` : 'Paste Text';
+        pasteToastNoun = clipTextCount > 1 ? `${clipTextCount} Texts` : 'Text';
+      } else if (clipPhotoCount > 0 && clipTextCount === 0) {
+        dynamicPasteLabel = clipPhotoCount > 1 ? `Paste ${clipPhotoCount} Photos` : 'Paste Photo';
+        pasteToastNoun = clipPhotoCount > 1 ? `${clipPhotoCount} Photos` : 'Photo';
+      } else {
+        dynamicPasteLabel = `Paste ${clipboardFrames.length} Elements`;
+        pasteToastNoun = `${clipboardFrames.length} Elements`;
+      }
+    } else if (clipboardPhotoIds.length > 0) {
+      dynamicPasteLabel = clipboardPhotoIds.length > 1 ? `Paste ${clipboardPhotoIds.length} Photos` : 'Paste Photo';
+      pasteToastNoun = clipboardPhotoIds.length > 1 ? `${clipboardPhotoIds.length} Photos` : 'Photo';
+    }
 
     const targetPos = contextMenuPhysicalPosRef.current;
+
+    const handleExecutePaste = () => {
+      pasteFrames(activeSpread.id, targetPos || undefined);
+      if (onToast) onToast(`✓ Pasted ${pasteToastNoun}`);
+    };
 
     if (count === 0) {
       return [
         {
           id: 'paste',
-          label: 'Paste Photo',
+          label: dynamicPasteLabel,
           icon: '📥',
           shortcut: 'Ctrl+V',
           disabled: !hasClipboard,
-          onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
+          onClick: handleExecutePaste,
         },
         {
           id: 'paste-in-place',
@@ -1557,15 +1586,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         label: count > 1 ? `Copy ${count} ${itemNounPlural}` : `Copy ${itemNounSingular}`,
         icon: '📋',
         shortcut: 'Ctrl+C',
-        onClick: () => copySelectedFrames(activeSpread.id),
+        onClick: () => {
+          copySelectedFrames(activeSpread.id);
+          if (onToast) onToast(`✓ Copied ${count > 1 ? `${count} ${itemNounPlural}` : itemNounSingular}`);
+        },
       },
       {
         id: 'paste',
-        label: isAllText ? 'Paste' : 'Paste Photo',
+        label: dynamicPasteLabel,
         icon: '📥',
         shortcut: 'Ctrl+V',
         disabled: !hasClipboard,
-        onClick: () => pasteFrames(activeSpread.id, targetPos || undefined),
+        onClick: handleExecutePaste,
       },
       {
         id: 'paste-in-place',
@@ -2255,7 +2287,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     onDragEnd={(e) => {
                       clearSnapLines();
                       const draggedNode = (stageRef.current?.findOne(`#${textEl.id}`) || e.currentTarget || e.target) as Konva.Node;
-                      const isAltPressed = Boolean(e.evt?.altKey);
+                      const isAltPressed = Boolean(e.evt?.altKey || isAltPressedRef.current);
 
                       if (draggedNode && dragInitialPhysicalPositionsRef.current.size > 0) {
                         let finalCurrentPhysX = draggedNode.x() / scaleFactor;
@@ -2296,7 +2328,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         }
 
                         if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
-                          if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                          const pixelDist = Math.hypot(deltaPhysX, deltaPhysY) * scaleFactor;
+                          if (isAltPressed && (pixelDist >= 3 || Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05)) {
                             dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
                               const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
                               if (node) {
@@ -2445,23 +2478,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
                     }
 
-                    const isAlt = Boolean(e.evt?.altKey);
-                    setIsHoveredDropAlt(isAlt);
-                    if (dragInitialPhysicalPositionsRef.current.size === 1) {
-                      const draggedCenterPhysX = currentPhysX + frame.width / 2;
-                      const draggedCenterPhysY = currentPhysY + frame.height / 2;
-                      const hoverTarget = (activeSpread.elements || []).find((f) =>
-                        f.id !== frame.id &&
-                        draggedCenterPhysX >= f.x &&
-                        draggedCenterPhysX <= f.x + f.width &&
-                        draggedCenterPhysY >= f.y &&
-                        draggedCenterPhysY <= f.y + f.height
-                      );
-                      setHoveredDropFrameId(hoverTarget ? hoverTarget.id : null);
-                    } else {
-                      setHoveredDropFrameId(null);
-                    }
-
                     dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
                       if (id !== frame.id) {
                         const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
@@ -2505,31 +2521,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         }
                       }
 
-                      const isAltPressed = Boolean(e.evt?.altKey);
-                      if (isAltPressed && dragInitialPhysicalPositionsRef.current.size === 1) {
-                        const draggedCenterPhysX = finalCurrentPhysX + frame.width / 2;
-                        const draggedCenterPhysY = finalCurrentPhysY + frame.height / 2;
-                        const dropTarget = (activeSpread.elements || []).find((f) =>
-                          f.id !== frame.id &&
-                          draggedCenterPhysX >= f.x &&
-                          draggedCenterPhysX <= f.x + f.width &&
-                          draggedCenterPhysY >= f.y &&
-                          draggedCenterPhysY <= f.y + f.height
-                        );
-
-                        if (dropTarget) {
-                          draggedNode.x(frame.x * scaleFactor);
-                          draggedNode.y(frame.y * scaleFactor);
-                          swapFrames(activeSpread.id, frame.id, dropTarget.id);
-                          clearSelection();
-                          justDroppedRef.current = true;
-                          setTimeout(() => {
-                            justDroppedRef.current = false;
-                          }, 250);
-                          dragInitialPhysicalPositionsRef.current.clear();
-                          return;
-                        }
-                      }
+                      const isAltPressed = Boolean(e.evt?.altKey || isAltPressedRef.current);
 
                       const otherRects = (activeSpread.elements || [])
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
@@ -2560,7 +2552,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
 
                       if (Number.isFinite(deltaPhysX) && Number.isFinite(deltaPhysY)) {
-                        if (isAltPressed && (Math.abs(deltaPhysX) > 0.1 || Math.abs(deltaPhysY) > 0.1)) {
+                        const pixelDist = Math.hypot(deltaPhysX, deltaPhysY) * scaleFactor;
+                        if (isAltPressed && (pixelDist >= 3 || Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05)) {
                           dragInitialPhysicalPositionsRef.current.forEach((initPhys, id) => {
                             const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
                             if (node) {
