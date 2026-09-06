@@ -45,8 +45,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
 
   const dims = useMemo(() => getProjectDimensionsInCanvasUnit(project, spread), [project, spread]);
 
-  const singlePageW = spread.leftPage?.width || dims.pageWidth;
-  const singlePageH = spread.leftPage?.height || dims.pageHeight;
+  const singlePageW = dims.pageWidth;
+  const singlePageH = dims.pageHeight;
   const gutterW = spread.gutterWidth ?? dims.gutterWidth ?? 0;
   const bleed = includeBleed ? (spread.bleed ?? dims.bleed ?? 0) : 0;
 
@@ -260,24 +260,26 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             let finalRenderH = renderH;
 
             if (!rot) {
-              const isNearTop = Math.abs(el.y) < 0.2;
-              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 0.2;
-              const isNearLeft = Math.abs(el.x - viewOffsetX) < 0.2;
-              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 0.2;
+              const isNearTop = Math.abs(el.y) < 1.0;
+              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 1.5;
+              const isNearLeft = Math.abs(el.x - viewOffsetX) < 1.0;
+              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 1.5;
 
               if (isNearTop) {
                 finalRenderY = bleedPx;
               }
               if (isNearBottom) {
                 const targetBottomPx = containerH - bleedPx;
-                finalRenderH = Math.max(1, targetBottomPx - finalRenderY);
+                // Extend by +2px into bottom boundary (clipped by overflow:hidden) to guarantee zero white gap
+                finalRenderH = Math.max(1, targetBottomPx - finalRenderY + 2);
               }
               if (isNearLeft) {
                 finalRenderX = bleedPx;
               }
               if (isNearRight) {
                 const targetRightPx = containerW - bleedPx;
-                finalRenderW = Math.max(1, targetRightPx - finalRenderX);
+                // Extend by +2px into right boundary (clipped by overflow:hidden) to guarantee zero white gap
+                finalRenderW = Math.max(1, targetRightPx - finalRenderX + 2);
               }
             }
 
@@ -402,7 +404,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   transform: rot ? `rotate(${rot}deg)` : undefined,
                   transformOrigin: '0 0',
                   overflow: 'hidden',
-                  background: imgSrc ? 'transparent' : '#1e293b',
+                  background: imgSrc ? '#0f172a' : '#1e293b',
                   opacity: photoEl.opacity ?? 1,
                   boxSizing: 'border-box',
                   border: photoEl.borderEnabled && photoEl.borderWidth
