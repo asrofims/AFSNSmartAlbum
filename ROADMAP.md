@@ -165,7 +165,7 @@
 - [x] Rust High-Res Splitting Gate (`selected_page_numbers` filter for left and right page worker emission across JPEG, PNG, and PDF)
 - [x] Descriptive Feedback Indicator in Export Dialog (Real-time single vs multi-page export target summary with active page number badges)
 
-## Phase 13 — Responsive Typography Engine, Real-Time Dynamic Text Fitting, Viewport Invariance & Subpixel Edge-Clamping (v1.0.28)
+## Phase 13 — Responsive Typography Engine, Real-Time Dynamic Text Fitting, Viewport Invariance & Subpixel Edge-Clamping (v1.0.29)
 - [x] Zoom-Independent Canvas Typography (Precise unquantized subpixel font scaling and linear padding eliminate paragraph re-wrapping and position shifting on zoom in/out)
 - [x] Real-Time Auto-Expanding Text Box Geometry (Dynamic text height calculation without canvas clipping or downward jumping on Fit operations)
 - [x] Streamlined InDesign-Style Typography Toolbar (Clean 'Fit Height to Text' and 'Fit Frame to Content' controls with removed redundant actions)
