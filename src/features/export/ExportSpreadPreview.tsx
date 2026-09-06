@@ -80,8 +80,11 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
   const boxH = 330;
   const scale = Math.min(boxW / finalExportW, boxH / finalExportH);
 
-  const containerW = Math.round(finalExportW * scale);
-  const containerH = Math.round(finalExportH * scale);
+  let containerW = Math.round(finalExportW * scale);
+  let containerH = Math.round(finalExportH * scale);
+  // Guarantee even pixel dimensions so vertical and horizontal flex centering never produces fractional .5px offsets
+  if (containerW % 2 !== 0) containerW += 1;
+  if (containerH % 2 !== 0) containerH += 1;
 
   const bleedPx = Math.round(bleed * scale);
   const spinePx = Math.round((singlePageW + (bleed > 0 ? bleed : 0)) * scale);
@@ -156,10 +159,22 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             width: `${containerW}px`,
             height: `${containerH}px`,
             position: 'relative',
-            backgroundColor: spreadBgColor,
+            backgroundColor: 'transparent',
             overflow: 'hidden',
           }}
         >
+          {/* Base Spread Background Fill */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${bleedPx}px`,
+              top: `${bleedPx}px`,
+              width: `${Math.max(1, containerW - bleedPx * 2)}px`,
+              height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+              backgroundColor: spreadBgColor,
+            }}
+          />
+
           {/* Bleed Cut Margin Trim Guides */}
           {includeBleed && showBleedGuide && (
             <div
@@ -260,26 +275,26 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             let finalRenderH = renderH;
 
             if (!rot) {
-              const isNearTop = Math.abs(el.y) < 1.0;
-              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 1.5;
-              const isNearLeft = Math.abs(el.x - viewOffsetX) < 1.0;
-              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 1.5;
+              const isNearTop = Math.abs(el.y) < 2.0;
+              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 2.5;
+              const isNearLeft = Math.abs(el.x - viewOffsetX) < 2.0;
+              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 2.5;
 
               if (isNearTop) {
                 finalRenderY = bleedPx;
               }
               if (isNearBottom) {
                 const targetBottomPx = containerH - bleedPx;
-                // Extend by +2px into bottom boundary (clipped by overflow:hidden) to guarantee zero white gap
-                finalRenderH = Math.max(1, targetBottomPx - finalRenderY + 2);
+                // Extend by +4px into bottom boundary (clipped by overflow:hidden) to guarantee zero white gap
+                finalRenderH = Math.max(1, targetBottomPx - finalRenderY + 4);
               }
               if (isNearLeft) {
                 finalRenderX = bleedPx;
               }
               if (isNearRight) {
                 const targetRightPx = containerW - bleedPx;
-                // Extend by +2px into right boundary (clipped by overflow:hidden) to guarantee zero white gap
-                finalRenderW = Math.max(1, targetRightPx - finalRenderX + 2);
+                // Extend by +4px into right boundary (clipped by overflow:hidden) to guarantee zero white gap
+                finalRenderW = Math.max(1, targetRightPx - finalRenderX + 4);
               }
             }
 
