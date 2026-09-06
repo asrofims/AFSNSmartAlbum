@@ -313,21 +313,27 @@ export function calculateTextFitDimensions(
   unit: Unit = 'mm',
   dpi: number = 300,
   targetWidth?: number,
-  maxAllowedWidth?: number
-): { width: number; height: number } {
+  maxAllowedWidth?: number,
+  styledRanges?: import('./styledRanges').StyledRange[]
+): { width: number; height: number; lineCount: number } {
   const plainText = stripRichTextMarkup(text || ' ');
-  const fontSize = style.fontSize || 24;
+  const baseFontSize = style.fontSize || 24;
+  const maxRangeFontSize = styledRanges && styledRanges.length > 0
+    ? Math.max(baseFontSize, ...styledRanges.map((r) => r.fontSize || 0))
+    : baseFontSize;
+  const effectiveFontSize = maxRangeFontSize;
+
   const lineHeight = style.lineHeight || 1.3;
   const letterSpacing = style.letterSpacing || 0;
-  const paddingPt = Number.isFinite(style.padding) ? Math.min(style.padding as number, 4) : 4;
+  const paddingPt = Number.isFinite(style.padding) ? (style.padding as number) : 4;
 
   const fontFamily = style.fontFamily || 'Inter';
   const fontWeight = style.fontWeight || 'normal';
   const fontStyle = style.fontStyle || 'normal';
 
   // Determine maximum width boundary in points
-  // Default boundary: 150mm (~425pt) if not specified
-  const defaultMaxMm = 150;
+  // Default boundary: 800mm (covers double-spread width) to prevent prematurely breaking long single-line titles
+  const defaultMaxMm = 800;
   const maxBoundaryPt = maxAllowedWidth !== undefined && maxAllowedWidth > 0
     ? convertUnitToPt(maxAllowedWidth, unit, dpi)
     : convertUnitToPt(defaultMaxMm, 'mm', dpi);
@@ -336,21 +342,25 @@ export function calculateTextFitDimensions(
     ? convertUnitToPt(targetWidth, unit, dpi)
     : undefined;
 
-  // Measurement context
-  let measureFn = (str: string): number => str.length * fontSize * 0.55;
+  // True typographic point to CSS screen pixel ratio (1 pt = 96/72 CSS px = 1.333px)
+  const fontSizeCssPx = (effectiveFontSize * 96) / 72;
+
+  // Measurement context returning exact width in typographic points (pt)
+  let measureFn = (str: string): number => str.length * effectiveFontSize * 0.55;
 
   if (typeof document !== 'undefined') {
     try {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+        ctx.font = `${fontStyle} ${fontWeight} ${fontSizeCssPx}px ${resolveCssFontFamily(fontFamily)}`;
         measureFn = (str: string) => {
           let w = ctx.measureText(str).width;
           if (letterSpacing > 0 && str.length > 1) {
             w += (str.length - 1) * letterSpacing;
           }
-          return w;
+          // Convert measured CSS pixels at 96 DPI back to physical points (72 DPI)
+          return (w * 72) / 96;
         };
       }
     } catch {}
@@ -368,19 +378,21 @@ export function calculateTextFitDimensions(
 
   // 2. Decide effective wrapping width limit
   // If targetWidth was explicitly specified (e.g. user-established box width):
-  //   Wrap within targetWidth (or maxBoundaryPt).
+  //   Respect targetWidth (only bounded if explicit maxAllowedWidth was passed).
   // If no targetWidth was specified:
   //   If text is short (< maxBoundaryPt), width hugs the text!
   //   If text is long (> maxBoundaryPt), wrap at maxBoundaryPt!
   let wrapLimitPt: number;
   if (targetWidthPt !== undefined && targetWidthPt > 0) {
-    wrapLimitPt = Math.min(targetWidthPt, maxBoundaryPt);
+    wrapLimitPt = maxAllowedWidth !== undefined && maxAllowedWidth > 0
+      ? Math.min(targetWidthPt, maxBoundaryPt)
+      : targetWidthPt;
   } else {
     wrapLimitPt = maxBoundaryPt;
   }
 
-  const safetyBufferPt = 6;
-  const usableWrapWidthPt = Math.max(30, wrapLimitPt - (paddingPt * 2) - safetyBufferPt);
+  // Usable wrap width inside box boundary (padding deducted)
+  const usableWrapWidthPt = Math.max(30, wrapLimitPt - (paddingPt * 2));
 
   // 3. Word-wrap paragraphs if any paragraph exceeds usableWrapWidthPt
   let wrappedLineCount = 0;
@@ -434,12 +446,18 @@ export function calculateTextFitDimensions(
   }
 
   // Final fitted width and height:
-  // Add 6pt (~2.1mm) safety buffer to guarantee browser sub-pixel antialiasing
-  // and DPI rounding NEVER drop the last word to a new line!
+  // Add generous +8pt (~2.8mm) safety buffer to guarantee browser sub-pixel antialiasing
+  // and font hinting NEVER drop the last word to an extra line on the canvas!
+  const safetyBufferPt = 8;
   const tightestWidthPt = Math.max(30, maxWrappedLineWidthPt + (paddingPt * 2) + safetyBufferPt);
-  const finalWidthPt = Math.min(tightestWidthPt, wrapLimitPt);
+  const finalWidthPt = targetWidthPt !== undefined
+    ? (maxAllowedWidth !== undefined && maxAllowedWidth > 0 ? Math.min(tightestWidthPt, maxBoundaryPt) : tightestWidthPt)
+    : Math.min(tightestWidthPt, maxBoundaryPt);
 
-  const totalHeightPt = (Math.max(1, wrappedLineCount) * fontSize * lineHeight) + (paddingPt * 2);
+  // Line height calculation with +5pt descender clearance buffer
+  // Guarantees letters like 'g', 'j', 'p', 'q', 'y' and diacritics are NEVER clipped or pushed out of frame
+  const descenderBufferPt = 5;
+  const totalHeightPt = (Math.max(1, wrappedLineCount) * effectiveFontSize * lineHeight) + (paddingPt * 2) + descenderBufferPt;
 
   const widthInUnit = convertPtToUnit(finalWidthPt, unit, dpi);
   const heightInUnit = convertPtToUnit(totalHeightPt, unit, dpi);
@@ -447,6 +465,7 @@ export function calculateTextFitDimensions(
   return {
     width: Math.max(convertPtToUnit(15, unit, dpi), Math.ceil(widthInUnit * 100) / 100),
     height: Math.max(convertPtToUnit(8, unit, dpi), Math.ceil(heightInUnit * 100) / 100),
+    lineCount: Math.max(1, wrappedLineCount),
   };
 }
 
@@ -459,9 +478,10 @@ export function calculateTextFitHeight(
   style: Partial<TextStyle>,
   boxWidth: number,
   unit: Unit = 'mm',
-  dpi: number = 300
+  dpi: number = 300,
+  styledRanges?: import('./styledRanges').StyledRange[]
 ): number {
-  const fitted = calculateTextFitDimensions(text, style, unit, dpi, boxWidth);
+  const fitted = calculateTextFitDimensions(text, style, unit, dpi, boxWidth, undefined, styledRanges);
   return fitted.height;
 }
 
@@ -490,7 +510,8 @@ export function applyTextPreset(
     mergedStyle,
     targetW,
     unit,
-    dpi
+    dpi,
+    element.styledRanges
   );
 
   return {

@@ -179,8 +179,19 @@ export function TextInlineEditor({
           zIndex: 51,
         }}
       >
+        <style>{`
+          .canvas-inline-editor-textarea::selection {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+          }
+          .canvas-inline-editor-textarea::-moz-selection {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+          }
+        `}</style>
         <textarea
           ref={textareaRef}
+          className="canvas-inline-editor-textarea"
           value={val}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
@@ -197,10 +208,10 @@ export function TextInlineEditor({
             lineHeight: style.lineHeight || 1.3,
             letterSpacing: `${letterSpacingPx}px`,
             padding: `${paddingPx}px`,
-            background: 'rgba(15, 23, 42, 0.55)',
+            background: 'rgba(15, 23, 42, 0.20)',
             border: '2px solid var(--color-accent, #3b82f6)',
             borderRadius: '4px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
             resize: 'vertical',
             outline: 'none',
             overflow: 'auto',
@@ -216,9 +227,9 @@ export function TextInlineEditor({
             fontSize: '10px',
             fontWeight: 600,
             borderRadius: '3px',
-            background: '#0f172a',
+            background: 'rgba(15, 23, 42, 0.65)',
             color: '#94a3b8',
-            border: '1px solid #334155',
+            border: '1px solid rgba(51, 65, 85, 0.6)',
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
           }}

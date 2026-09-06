@@ -9,8 +9,13 @@
 }
 
 ::selection {
-  background-color: rgba(74, 158, 255, 0.3);
-  color: var(--color-text-primary);
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background-color: #2563eb;
+  color: #ffffff;
 }
 
 * {

@@ -18,6 +18,7 @@ import {
   removeStyleRange,
   shiftRangesOnTextEdit,
 } from '../../domain/text';
+import { roundToHundredth } from '../../domain/editor';
 import { ColorPicker } from '../../components/ui/ColorPicker';
 
 interface TypographyPanelProps {
@@ -120,7 +121,23 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const style = { ...DEFAULT_TEXT_STYLE, ...(element.style || {}) };
 
   const handleUpdateStyle = (updates: Partial<typeof style>, skipHistory: boolean = false) => {
+    let nextHeight = element.height;
+    if (updates.fontSize && updates.fontSize > (style.fontSize || 24)) {
+      const fittedH = calculateTextFitHeight(
+        element.text || ' ',
+        { ...style, ...updates },
+        element.width,
+        currentProject?.canvasUnit || 'mm',
+        currentProject?.canvasDpi || 300,
+        element.styledRanges
+      );
+      if (fittedH > element.height) {
+        nextHeight = fittedH;
+      }
+    }
+
     updateTextElement(activeSpreadId, element.id, {
+      height: nextHeight,
       style: {
         ...style,
         ...updates,
@@ -152,9 +169,13 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
       style,
       element.width,
       currentProject?.canvasUnit || 'mm',
-      currentProject?.canvasDpi || 300
+      currentProject?.canvasDpi || 300,
+      element.styledRanges
     );
+
+    // Keep top edge anchored at element.y so text NEVER jumps or shifts downwards!
     updateTextElement(activeSpreadId, element.id, {
+      y: roundToHundredth(element.y),
       height: fittedH,
     });
     if (onToast) {
@@ -164,16 +185,30 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
 
   // 2. Fit Frame to Content (Hug Width & Height) — Ideal for Titles, Dates, Badges
   const handleFitBothWidthAndHeight = () => {
-    const maxTextW = currentProject ? currentProject.canvasWidth * 0.85 : undefined;
+    const maxTextW = currentProject ? currentProject.canvasWidth * 0.95 : 800;
     const fitted = calculateTextFitDimensions(
       element.text || ' ',
       style,
       currentProject?.canvasUnit || 'mm',
       currentProject?.canvasDpi || 300,
-      undefined,
-      maxTextW
+      element.width,
+      maxTextW,
+      element.styledRanges
     );
+
+    const deltaW = element.width - fitted.width;
+
+    let newX = element.x;
+    if (style.align === 'center') {
+      newX = element.x + deltaW / 2;
+    } else if (style.align === 'right') {
+      newX = element.x + deltaW;
+    }
+
+    // Keep top edge anchored at element.y so text NEVER jumps or shifts downwards!
     updateTextElement(activeSpreadId, element.id, {
+      x: roundToHundredth(newX),
+      y: roundToHundredth(element.y),
       width: fitted.width,
       height: fitted.height,
     });

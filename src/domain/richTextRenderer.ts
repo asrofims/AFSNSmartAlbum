@@ -1,4 +1,4 @@
-import { TextStyle, TextRun } from './text';
+import { TextStyle, TextRun, resolveCssFontFamily } from './text';
 import { Unit, ptToScreenPx, convertPtToUnit } from './units';
 
 export interface MeasuredToken {
@@ -62,11 +62,11 @@ export function layoutRichText(
   dpi: number = 300
 ): RichTextLayout {
   const ctx = getMeasureContext();
-  const paddingPt = Number.isFinite(baseStyle.padding) ? baseStyle.padding : 6;
-  const rawPaddingPx = ptToScreenPx(paddingPt, canvasUnit, dpi, scaleFactor);
-  const paddingPx = Math.max(2, Math.min(Math.floor(boxWidth / 4), Number.isFinite(rawPaddingPx) ? rawPaddingPx : 4));
-  const availableWidth = Math.max(10, boxWidth - 2 * paddingPx);
-  const availableHeight = Math.max(10, boxHeight - 2 * paddingPx);
+  const paddingPt = Number.isFinite(baseStyle.padding) ? (baseStyle.padding as number) : 4;
+  const paddingInUnit = convertPtToUnit(paddingPt, canvasUnit, dpi);
+  const paddingPx = Math.max(0, paddingInUnit * scaleFactor);
+  const availableWidth = Math.max(1, boxWidth - 2 * paddingPx);
+  const availableHeight = Math.max(1, boxHeight - 2 * paddingPx);
 
   // 1. Tokenize runs into atomic words, spaces, and newlines
   const rawTokens: Array<{
@@ -89,7 +89,7 @@ export function layoutRichText(
     const fFamily = run.fontFamily || baseStyle.fontFamily || 'Inter';
     const fWeight = run.fontWeight || baseStyle.fontWeight || 'normal';
     const fStyle = run.fontStyle || baseStyle.fontStyle || 'normal';
-    const fontStr = `${fStyle} ${fWeight} ${fontSizePx}px "${fFamily}", sans-serif`;
+    const fontStr = `${fStyle} ${fWeight} ${fontSizePx}px ${resolveCssFontFamily(fFamily)}`;
 
     if (ctx && ctx.font !== undefined) {
       ctx.font = fontStr;

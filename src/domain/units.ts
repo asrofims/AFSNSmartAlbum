@@ -98,7 +98,7 @@ export function convertUnitToPt(val: number, from: Unit, dpi: number = 300): num
  */
 export function ptToScreenPx(pt: number, canvasUnit: Unit, dpi: number, scaleFactor: number): number {
   const inUnit = convertPtToUnit(pt, canvasUnit, dpi);
-  return Math.max(6, Math.round(inUnit * scaleFactor));
+  return Math.max(1, inUnit * scaleFactor);
 }
 
 /**

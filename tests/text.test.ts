@@ -68,10 +68,10 @@ assert.strictEqual(pt24InPx, 100, '24pt at 300 DPI must be 100px');
 const scaleFactorMm = 1.5; // 900px / 600mm
 const screenPxFromMm = ptToScreenPx(24, 'mm', 300, scaleFactorMm);
 
-const scaleFactorInch = 37.5; // 900px / 24 inches
+const scaleFactorInch = scaleFactorMm * 25.4; // Exact scale factor for 600mm spread in inches
 const screenPxFromInch = ptToScreenPx(24, 'inch', 300, scaleFactorInch);
 
-assert.strictEqual(screenPxFromMm, screenPxFromInch, 'Screen pixel font size must match across physical units');
+assert.strictEqual(Math.round(screenPxFromMm * 1000) / 1000, Math.round(screenPxFromInch * 1000) / 1000, 'Screen pixel font size must match across physical units');
 
 // 8. 1pt fine-print font size validation
 const pt1InMm = convertPtToUnit(1, 'mm');
@@ -125,5 +125,44 @@ const multilineText = 'First Line Title\nSecond Line Date';
 const multilineFit = calculateTextFitDimensions(multilineText, { fontSize: 24, padding: 4 }, 'mm', 300, 100);
 assert.ok(multilineFit.width < 100, 'Fit box to text must shrink width to hug longest line (<100mm)');
 assert.ok(multilineFit.height > shortFit.height * 1.5, 'Multiline fit height must preserve multiple lines');
+// 14. calculateTextFitDimensions - styledRanges with enlarged word
+const styledRanges = [
+  { id: 'r-1', start: 0, end: 5, fontSize: 48 }, // First word is 48pt
+];
+const textWithEnlargedWord = 'Large text follows';
+const styledFit = calculateTextFitDimensions(
+  textWithEnlargedWord,
+  { fontSize: 24, padding: 4 },
+  'mm',
+  300,
+  undefined,
+  undefined,
+  styledRanges
+);
+assert.ok(styledFit.height > shortFit.height, 'Text with enlarged styled range (48pt) must allocate taller height than base 24pt');
+
+// 15. Zero-clipping descender clearance buffer validation
+const descenderText = 'Enjoying joy, laughter, and high energy';
+const descenderFit = calculateTextFitDimensions(descenderText, { fontSize: 24, padding: 4, lineHeight: 1.3 }, 'mm', 300);
+assert.ok(descenderFit.height >= 14, 'Single line with descenders must allocate sufficient vertical space (>= 14mm) for zero clipping');
+
+// 16. Proportional corner resize font scaling and fit persistence invariant
+const initialFontSize = 24;
+const scaleFactorResize = 1.5;
+const scaledFontSize = Math.round(initialFontSize * scaleFactorResize * 10) / 10;
+assert.strictEqual(scaledFontSize, 36, '1.5x corner resize on 24pt text must yield 36pt font size');
+
+const initialFit = calculateTextFitDimensions('Wedding Memories', { fontSize: initialFontSize, padding: 4 }, 'mm', 300);
+const scaledFit = calculateTextFitDimensions('Wedding Memories', { fontSize: scaledFontSize, padding: 4 }, 'mm', 300);
+assert.ok(scaledFit.width > initialFit.width * 1.3, 'Fit at scaled 36pt must produce significantly wider frame than at 24pt');
+assert.ok(scaledFit.height > initialFit.height * 1.3, 'Fit at scaled 36pt must produce significantly taller frame than at 24pt');
+
+// 17. Single-line fit width preservation: wide heading (>150mm) does NOT wrap to 2 lines
+const wideTitle = 'The Wedding Celebration of Alex & Elizabeth';
+const wideSingleLineFit = calculateTextFitDimensions(wideTitle, { fontSize: 24, padding: 4 }, 'mm', 300, 260);
+assert.strictEqual(wideSingleLineFit.lineCount, 1, 'Wide title inside 260mm box must stay on 1 line');
+assert.ok(wideSingleLineFit.width > 150, 'Wide title must be wider than 150mm');
+assert.ok(wideSingleLineFit.width < 260, 'Fit width must snugly hug the text (<260mm)');
 
 console.log('✓ All Text Domain unit tests passed successfully!');
+
