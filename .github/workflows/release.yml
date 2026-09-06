@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Version tag to release (e.g. v1.0.23). Leave empty to use package.json version.'
+        required: false
+        default: ''
 
 jobs:
   release:
@@ -14,37 +19,103 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version tag
+        id: tag_info
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+            TAG="${{ github.event.inputs.version_tag }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            PKG_VER=$(node -p "require('./package.json').version")
+            TAG="v$PKG_VER"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Resolved release tag: $TAG"
+
+      - name: Check if release already exists with complete assets
+        id: check_release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag_info.outputs.tag }}
+        run: |
+          echo "Checking if release $TAG already exists..."
+          RELEASE_JSON=$(gh release view "$TAG" --json assets 2>/dev/null || echo "")
+          if [ -n "$RELEASE_JSON" ]; then
+            HAS_EXE=$(echo "$RELEASE_JSON" | grep -i "\.exe" || echo "")
+            HAS_JSON=$(echo "$RELEASE_JSON" | grep -i "latest\.json" || echo "")
+            if [ -n "$HAS_EXE" ] && [ -n "$HAS_JSON" ]; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+              echo "Release $TAG already exists with complete assets (.exe and latest.json). Skipping build."
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "Release $TAG does not exist or has incomplete assets. Proceeding with build."
+
+      - name: Generate release notes from git commits
+        id: release_notes
+        if: steps.check_release.outputs.skip != 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.tag_info.outputs.tag }}
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -v "^$TAG$" | head -n 1 || echo "")
+          echo "Previous tag: $PREV_TAG"
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          if [ -n "$PREV_TAG" ]; then
+            echo "### What's New in $TAG:" >> $GITHUB_OUTPUT
+            git log "$PREV_TAG..HEAD" --pretty=format:"- %s" --no-merges >> $GITHUB_OUTPUT
+          else
+            echo "### Changes in $TAG:" >> $GITHUB_OUTPUT
+            git log -n 10 --pretty=format:"- %s" --no-merges >> $GITHUB_OUTPUT
+          fi
+          echo "" >> $GITHUB_OUTPUT
+          echo "---" >> $GITHUB_OUTPUT
+          echo "Download the Windows installer below or update directly within AFSNSmartAlbum." >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js
+        if: steps.check_release.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
       - name: Setup Rust toolchain
+        if: steps.check_release.outputs.skip != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
       - name: Rust cache
+        if: steps.check_release.outputs.skip != 'true'
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
       - name: Install dependencies
+        if: steps.check_release.outputs.skip != 'true'
         run: npm ci
 
       - name: Run verification tests
+        if: steps.check_release.outputs.skip != 'true'
         run: npm test
 
       - name: Build Tauri app and publish signed release
+        if: steps.check_release.outputs.skip != 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'AFSNSmartAlbum ${{ github.ref_name }}'
-          releaseBody: 'Automated release of AFSNSmartAlbum ${{ github.ref_name }}.'
+          tagName: ${{ steps.tag_info.outputs.tag }}
+          releaseName: 'AFSNSmartAlbum ${{ steps.tag_info.outputs.tag }}'
+          releaseBody: ${{ steps.release_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false

@@ -124,7 +124,7 @@
 - [x] Advanced Per-Word Tokenized Rich Text Layout & Styling (per-word bold, italic, underline, strike, custom colors, background highlights, multi-line wrapping, floating mini format bar, and keyboard shortcuts)
 - [x] High-Resolution Print Export Text Rasterization in Rust Backend (SIMD-accelerated fontdue glyph rasterization, system font fallback mapping, styled ranges, word-wrapping, baseline alignment, and alpha compositing)
 
-## Phase 10 — Studio Polish & System Lifecycle (v1.0.22)
+## Phase 10 — Studio Polish & System Lifecycle (v1.0.23)
 - [x] Live Scaled Canvas Preview for Export Studio (Spread & Single Page views with guides)
 - [x] True-to-Canvas Export Preview (Elimination of artificial border and shadows)
 - [x] Fixed Action Footer & Scrollable Middle Content in Export Dialog
@@ -147,5 +147,6 @@
 - [x] Real-Time Streaming Download Progress Tracking (% and MB / Total MB) with Non-Blocking Background Download
 - [x] Native In-App Restart Action (`app.restart()`) & Zero-Disruption Offline Launch Resilience
 - [x] Permanent Fallback Manual `.exe` Download Option Preserved Across All Update States
+- [x] Smart GitHub Actions Release Workflow (Asset completeness existence check, redundant run skipping, dynamic version tag resolution, and automated commit-based changelog generation)
 
 
