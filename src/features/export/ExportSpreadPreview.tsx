@@ -183,7 +183,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   left: `${bleedPx}px`,
                   top: `${bleedPx}px`,
                   width: `${Math.round(singlePageW * scale)}px`,
-                  height: `${Math.round(singlePageH * scale)}px`,
+                  height: `${Math.max(1, containerH - bleedPx * 2)}px`,
                   backgroundColor: leftPageBg,
                 }}
               />
@@ -192,8 +192,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   position: 'absolute',
                   left: `${bleedPx + Math.round((singlePageW + gutterW) * scale)}px`,
                   top: `${bleedPx}px`,
-                  width: `${Math.round(singlePageW * scale)}px`,
-                  height: `${Math.round(singlePageH * scale)}px`,
+                  width: `${Math.max(1, containerW - bleedPx * 2 - Math.round((singlePageW + gutterW) * scale))}px`,
+                  height: `${Math.max(1, containerH - bleedPx * 2)}px`,
                   backgroundColor: rightPageBg,
                 }}
               />
@@ -206,8 +206,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                 position: 'absolute',
                 left: `${bleedPx}px`,
                 top: `${bleedPx}px`,
-                width: `${Math.round(singlePageW * scale)}px`,
-                height: `${Math.round(singlePageH * scale)}px`,
+                width: `${Math.max(1, containerW - bleedPx * 2)}px`,
+                height: `${Math.max(1, containerH - bleedPx * 2)}px`,
                 backgroundColor: leftPageBg,
               }}
             />
@@ -219,8 +219,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                 position: 'absolute',
                 left: `${bleedPx}px`,
                 top: `${bleedPx}px`,
-                width: `${Math.round(singlePageW * scale)}px`,
-                height: `${Math.round(singlePageH * scale)}px`,
+                width: `${Math.max(1, containerW - bleedPx * 2)}px`,
+                height: `${Math.max(1, containerH - bleedPx * 2)}px`,
                 backgroundColor: rightPageBg,
               }}
             />
@@ -253,6 +253,34 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const renderH = Math.max(1, Math.round(el.height * scale));
             const rot = el.rotation || 0;
 
+            // Subpixel Edge-Clamping: Prevents 1px rounding gap from exposing white canvas bottom/edges
+            let finalRenderX = renderX;
+            let finalRenderY = renderY;
+            let finalRenderW = renderW;
+            let finalRenderH = renderH;
+
+            if (!rot) {
+              const isNearTop = Math.abs(el.y) < 0.2;
+              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 0.2;
+              const isNearLeft = Math.abs(el.x - viewOffsetX) < 0.2;
+              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 0.2;
+
+              if (isNearTop) {
+                finalRenderY = bleedPx;
+              }
+              if (isNearBottom) {
+                const targetBottomPx = containerH - bleedPx;
+                finalRenderH = Math.max(1, targetBottomPx - finalRenderY);
+              }
+              if (isNearLeft) {
+                finalRenderX = bleedPx;
+              }
+              if (isNearRight) {
+                const targetRightPx = containerW - bleedPx;
+                finalRenderW = Math.max(1, targetRightPx - finalRenderX);
+              }
+            }
+
             if (el.type === 'text') {
               const textEl = el as TextNodeElement;
               const fontPt = Number.isFinite(textEl.style?.fontSize) ? textEl.style.fontSize : 24;
@@ -264,8 +292,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               const targetVirtualPx = 14;
               const k = rawFontSizePx < targetVirtualPx ? targetVirtualPx / Math.max(0.5, rawFontSizePx) : 1;
               const virtualFontSize = Math.round(rawFontSizePx * k * 10) / 10;
-              const virtualW = Math.round(renderW * k * 10) / 10;
-              const virtualH = Math.round(renderH * k * 10) / 10;
+              const virtualW = Math.round(finalRenderW * k * 10) / 10;
+              const virtualH = Math.round(finalRenderH * k * 10) / 10;
 
               const isBold = textEl.style?.fontWeight === 'bold' || Number(textEl.style?.fontWeight) >= 600;
               const isItalic = textEl.style?.fontStyle === 'italic';
@@ -289,10 +317,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   key={textEl.id}
                   style={{
                     position: 'absolute',
-                    left: `${renderX}px`,
-                    top: `${renderY}px`,
-                    width: `${renderW}px`,
-                    height: `${renderH}px`,
+                    left: `${finalRenderX}px`,
+                    top: `${finalRenderY}px`,
+                    width: `${finalRenderW}px`,
+                    height: `${finalRenderH}px`,
                     transform: rot ? `rotate(${rot}deg)` : undefined,
                     transformOrigin: '0 0',
                     overflow: 'hidden',
@@ -367,10 +395,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                 key={photoEl.id}
                 style={{
                   position: 'absolute',
-                  left: `${renderX}px`,
-                  top: `${renderY}px`,
-                  width: `${renderW}px`,
-                  height: `${renderH}px`,
+                  left: `${finalRenderX}px`,
+                  top: `${finalRenderY}px`,
+                  width: `${finalRenderW}px`,
+                  height: `${finalRenderH}px`,
                   transform: rot ? `rotate(${rot}deg)` : undefined,
                   transformOrigin: '0 0',
                   overflow: 'hidden',
