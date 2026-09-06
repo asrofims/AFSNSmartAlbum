@@ -117,5 +117,6 @@ jobs:
           tagName: ${{ steps.tag_info.outputs.tag }}
           releaseName: 'AFSNSmartAlbum ${{ steps.tag_info.outputs.tag }}'
           releaseBody: ${{ steps.release_notes.outputs.notes }}
+          includeUpdaterJson: true
           releaseDraft: false
           prerelease: false

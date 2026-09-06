@@ -265,30 +265,36 @@ export function UpdateModal() {
         {/* Footer Actions */}
         <div className={styles.footer}>
           {status === 'checking' && (
-            <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
-              Cancel
-            </button>
+            <div className={styles.footerRight}>
+              <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
+                Cancel
+              </button>
+            </div>
           )}
 
           {status === 'uptodate' && (
-            <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
-              Done
-            </button>
+            <div className={styles.footerRight}>
+              <button type="button" className={styles.btnPrimary} onClick={closeUpdateModal}>
+                Done
+              </button>
+            </div>
           )}
 
           {status === 'downloading' && (
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={closeUpdateModal}
-              title="Continue download in background"
-            >
-              Background
-            </button>
+            <div className={styles.footerRight}>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={closeUpdateModal}
+                title="Continue download in background"
+              >
+                Download in Background
+              </button>
+            </div>
           )}
 
           {status === 'ready' && (
-            <>
+            <div className={styles.footerRight}>
               <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
                 Later
               </button>
@@ -297,69 +303,75 @@ export function UpdateModal() {
                 className={styles.btnPrimary}
                 onClick={handleRestart}
               >
-                🔄 Restart Now
+                Restart Now
               </button>
-            </>
+            </div>
           )}
 
           {status === 'error' && (
             <>
-              <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
-                Close
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={runCheck}>
-                🔄 Retry
-              </button>
-              {result?.downloadUrl && (
-                <button
-                  type="button"
-                  className={styles.btnPrimary}
-                  onClick={() => handleOpenUrl(result.downloadUrl)}
-                  title="Download the .exe installer manually from GitHub"
-                >
-                  📥 Manual Download
+              <div className={styles.footerLeft}>
+                {result?.downloadUrl && (
+                  <button
+                    type="button"
+                    className={styles.btnLink}
+                    onClick={() => handleOpenUrl(result.downloadUrl)}
+                    title="Download standalone installer via browser"
+                  >
+                    📥 Manual Download (.exe)
+                  </button>
+                )}
+              </div>
+              <div className={styles.footerRight}>
+                <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
+                  Close
                 </button>
-              )}
+                <button type="button" className={styles.btnPrimary} onClick={runCheck}>
+                  Retry
+                </button>
+              </div>
             </>
           )}
 
           {status === 'available' && result && (
             <>
-              <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
-                Later
-              </button>
-              {result.releaseUrl && (
+              <div className={styles.footerLeft}>
+                {result.isAutoUpdateSupported && result.downloadUrl ? (
+                  <button
+                    type="button"
+                    className={styles.btnLink}
+                    onClick={() => handleOpenUrl(result.downloadUrl)}
+                    title="Download the standalone .exe installer in browser"
+                  >
+                    📥 Manual Download (.exe)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.btnLink}
+                    onClick={() => handleOpenUrl(result.releaseUrl || result.downloadUrl)}
+                    title="View full release on GitHub"
+                  >
+                    🌐 View on GitHub
+                  </button>
+                )}
+              </div>
+              <div className={styles.footerRight}>
+                <button type="button" className={styles.btnSecondary} onClick={closeUpdateModal}>
+                  Later
+                </button>
                 <button
                   type="button"
-                  className={styles.btnSecondary}
-                  onClick={() => handleOpenUrl(result.releaseUrl)}
+                  className={styles.btnPrimary}
+                  onClick={
+                    result.isAutoUpdateSupported
+                      ? handleStartAutoUpdate
+                      : () => handleOpenUrl(result.downloadUrl)
+                  }
                 >
-                  🌐 Release Notes
+                  {result.isAutoUpdateSupported ? '⚡ Update Now' : 'Download Installer (.exe)'}
                 </button>
-              )}
-              {/* Permanent Fallback: Manual Download Button */}
-              {result.downloadUrl && (
-                <button
-                  type="button"
-                  className={styles.btnSecondary}
-                  onClick={() => handleOpenUrl(result.downloadUrl)}
-                  title="Download installer directly in browser"
-                >
-                  📥 Manual Download
-                </button>
-              )}
-              {/* Primary: Auto-Update Button */}
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                onClick={
-                  result.isAutoUpdateSupported
-                    ? handleStartAutoUpdate
-                    : () => handleOpenUrl(result.downloadUrl)
-                }
-              >
-                {result.isAutoUpdateSupported ? '⚡ Update Now' : '📥 Install Update'}
-              </button>
+              </div>
             </>
           )}
         </div>
