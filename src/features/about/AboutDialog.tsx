@@ -1,17 +1,19 @@
+import React from 'react';
 import { Dialog } from '../../components/ui/Dialog';
 import { APP_CONFIG } from '../../config/app';
 import { useAppStore } from '../../stores/appStore';
 import { formatPlatform, isTauri } from '../../utils/platform';
+import appLogo from '../../assets/app-logo.png';
 import styles from './AboutDialog.module.css';
 
 export function AboutDialog() {
   const isAboutOpen = useAppStore((s) => s.isAboutOpen);
   const closeAbout = useAppStore((s) => s.closeAbout);
   const openUpdateModal = useAppStore((s) => s.openUpdateModal);
+  const openSupportModal = useAppStore((s) => s.openSupportModal);
   const appInfo = useAppStore((s) => s.appInfo);
 
   const handleStartUpdateCheck = () => {
-    closeAbout();
     openUpdateModal();
   };
 
@@ -30,108 +32,108 @@ export function AboutDialog() {
       isOpen={isAboutOpen}
       onClose={closeAbout}
       title="About AFSNSmartAlbum"
-      width={440}
+      width={480}
+      noPadding
     >
-      <div className={styles.content}>
-        <div className={styles.topSection}>
-          <div className={styles.appName}>AFSNSmartAlbum</div>
-          <div className={styles.tagline}>Professional Photo Album Layout Software</div>
-        </div>
+      <div className={styles.container}>
+        {/* 1. Hero Section with App Logo */}
+        <div className={styles.heroSection}>
+          <div className={styles.logoWrapper}>
+            <img src={appLogo} alt="AFSNSmartAlbum Logo" className={styles.logoImg} />
+          </div>
 
-        <div className={styles.infoGrid}>
-          <span className={styles.infoLabel}>Version:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className={styles.infoValue}>{appInfo.version}</span>
+          <div className={styles.brandText}>
+            <h2 className={styles.appName}>AFSNSmartAlbum</h2>
+            <p className={styles.tagline}>
+              Professional Offline Desktop Photo Album Layout Application
+            </p>
+          </div>
+
+          <div className={styles.versionRow}>
+            <span className={styles.versionBadge}>{appInfo.version}</span>
             <button
               type="button"
-              style={{
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                color: '#818cf8',
-                fontSize: '10.5px',
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
+              className={styles.updateBtn}
               onClick={handleStartUpdateCheck}
               title="Check for software updates"
             >
-              🔄 Check Updates
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+              <span>Check Updates</span>
             </button>
           </div>
-
-          <span className={styles.infoLabel}>Build:</span>
-          <span className={styles.infoValue}>{appInfo.buildNumber}</span>
-
-          <span className={styles.infoLabel}>Platform:</span>
-          <span className={styles.infoValue}>{formatPlatform(appInfo.platform)}</span>
-
-          <span className={styles.infoLabel}>License:</span>
-          <span className={styles.infoValue}>{APP_CONFIG.license}</span>
         </div>
 
-        {/* Support & Contribution via QRIS */}
+        {/* 2. Technical Specs & Environment Card */}
+        <div className={styles.specCard}>
+          <div className={styles.specRow}>
+            <span className={styles.specLabel}>Developer</span>
+            <span className={styles.specValue}>Asrofims · Afsunmedia</span>
+          </div>
+          <div className={styles.specRow}>
+            <span className={styles.specLabel}>Platform</span>
+            <span className={styles.specValue}>{formatPlatform(appInfo.platform)}</span>
+          </div>
+          <div className={styles.specRow}>
+            <span className={styles.specLabel}>Core Engine</span>
+            <span className={styles.specValue}>Tauri 2 · Rust · SQLite WAL · libvips</span>
+          </div>
+          <div className={styles.specRow}>
+            <span className={styles.specLabel}>License</span>
+            <span className={styles.specValue}>{APP_CONFIG.license}</span>
+          </div>
+        </div>
+
+        {/* 3. Support Independent Development (QRIS) */}
         <div className={styles.supportCard}>
-          <div>
-            <div className={styles.supportTitle}>Support Independent Development</div>
-            <div className={styles.supportDesc}>Fund future features & updates via QRIS</div>
+          <div className={styles.supportInfo}>
+            <div className={styles.supportTitle}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ec4899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+              </svg>
+              <span>Support Development</span>
+            </div>
+            <div className={styles.supportDesc}>
+              Fund future layout templates, algorithms & updates via QRIS
+            </div>
           </div>
           <button
             type="button"
-            className={styles.ackLink}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: 'var(--color-primary, #6366f1)',
-              color: '#ffffff',
-              borderRadius: 'var(--radius-sm, 4px)',
-              fontSize: '11px',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className={styles.donateBtn}
             onClick={() => {
               closeAbout();
-              useAppStore.getState().openSupportModal();
+              openSupportModal();
             }}
           >
-            ☕ Donate (QRIS)
+            <span>☕ Donate (QRIS)</span>
           </button>
         </div>
 
-        <div className={styles.divider} />
-
-        <div>
-          <h4 className={styles.sectionTitle}>Credits</h4>
-          <ul className={styles.creditsList}>
-            {APP_CONFIG.credits.map((credit, i) => (
-              <li key={i}>{credit}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className={styles.divider} />
-
-        <div>
-          <h4 className={styles.sectionTitle}>Open Source Acknowledgements</h4>
-          <ul className={styles.ackList}>
+        {/* 4. Open Source Foundations */}
+        <div className={styles.ackSection}>
+          <div className={styles.ackHeader}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            <span>Open Source Technologies</span>
+          </div>
+          <div className={styles.ackChips}>
             {APP_CONFIG.acknowledgements.map((ack, i) => (
-              <li key={i}>
-                <a
-                  href={ack.url}
-                  className={styles.ackLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleLinkClick(ack.url)}
-                >
-                  {ack.name}
-                </a>{' '}
-                ({ack.license})
-              </li>
+              <a
+                key={i}
+                href={ack.url}
+                className={styles.ackChip}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleLinkClick(ack.url)}
+                title={`Open ${ack.name} website (${ack.license})`}
+              >
+                <span>{ack.name}</span>
+                <span className={styles.ackLicense}>{ack.license}</span>
+              </a>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </Dialog>
