@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
@@ -283,6 +283,8 @@ export function PageNavigator() {
   const [spreadsToDelete, setSpreadsToDelete] = useState<Spread[] | null>(null);
   const [draggedSpreadIndex, setDraggedSpreadIndex] = useState<number | null>(null);
   const [dragOverSpreadIndex, setDragOverSpreadIndex] = useState<number | null>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const isDrawerHoveredRef = useRef(false);
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     x: number;
@@ -309,9 +311,12 @@ export function PageNavigator() {
         e.preventDefault();
         prevSpread();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && isSpreadDrawerOpen) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        selectAllSpreads();
+        const isTargetInside = isDrawerHoveredRef.current || (drawerRef.current && drawerRef.current.contains(e.target as Node));
+        if (isTargetInside) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          selectAllSpreads();
+        }
       } else if (e.key === 'Escape') {
         if (contextMenu.isOpen) {
           setContextMenu((prev) => ({ ...prev, isOpen: false }));
@@ -319,6 +324,18 @@ export function PageNavigator() {
           clearSpreadSelection();
         }
       } else if (e.key === 'Delete' && isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
+        // Strict guard: if the user has selected objects on the canvas, canvas deletion takes precedence!
+        const { selectedFrameIds } = useEditorStore.getState();
+        if (selectedFrameIds.length > 0) {
+          return;
+        }
+
+        const isTargetInside = isDrawerHoveredRef.current || (drawerRef.current && drawerRef.current.contains(e.target as Node));
+        // Only delete spreads if the spread drawer is hovered/focused OR multiple spreads are selected
+        if (!isTargetInside && selectedSpreadIds.length <= 1) {
+          return;
+        }
+
         e.preventDefault();
         e.stopImmediatePropagation();
         const { currentAlbum: album } = useAlbumStore.getState();
@@ -326,9 +343,6 @@ export function PageNavigator() {
         const spreads = getAllAlbumSpreads(album);
         const selected = spreads.filter((s) => selectedSpreadIds.includes(s.id));
         if (selected.length === 0) return;
-
-        // Clear canvas selection so canvas objects are never touched
-        useEditorStore.getState().clearSelection();
 
         const hasElements = selected.some((s) => (s.elements || []).length > 0);
         // If single spread, completely empty, and more than 1 spread exists in album, delete immediately
@@ -537,7 +551,17 @@ export function PageNavigator() {
   return (
     <div className={styles.navigatorContainer}>
       {/* Spread Thumbnail Drawer (Collapsible with Hardware-Accelerated Smooth Slide) */}
-      <div className={`${styles.drawerWrapper} ${!isSpreadDrawerOpen ? styles.drawerWrapperCollapsed : ''}`}>
+      <div
+        ref={drawerRef}
+        data-spread-drawer="true"
+        className={`${styles.drawerWrapper} ${!isSpreadDrawerOpen ? styles.drawerWrapperCollapsed : ''}`}
+        onMouseEnter={() => {
+          isDrawerHoveredRef.current = true;
+        }}
+        onMouseLeave={() => {
+          isDrawerHoveredRef.current = false;
+        }}
+      >
         <div className={styles.drawerInner}>
           <div className={styles.drawerHeader}>
             <span className={styles.drawerTitle}>Album Spreads ({allSpreads.length})</span>

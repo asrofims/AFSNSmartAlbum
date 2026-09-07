@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   checkForAppUpdates,
   downloadAndInstallAutoUpdate,
+  formatStandardDate,
   restartApp,
   UpdateCheckResult,
 } from '../../services/updateService';
@@ -249,7 +250,9 @@ export function UpdateModal() {
                   </span>
                 </div>
                 {result.publishedAt && (
-                  <span className={styles.releaseDateText}>{result.publishedAt}</span>
+                  <span className={styles.releaseDateText}>
+                    {formatStandardDate(result.publishedAt)}
+                  </span>
                 )}
               </div>
 

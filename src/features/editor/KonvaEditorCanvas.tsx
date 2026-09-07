@@ -1037,13 +1037,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const isModalOpen = Boolean(document.querySelector('[role="dialog"]') || document.querySelector('.modal'));
       if (isModalOpen) return;
 
-      const { isSpreadDrawerOpen, selectedSpreadIds } = useAlbumStore.getState();
-
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // If spread drawer is open and spreads are selected, spread drawer handles deletion
-        if (isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
-          return;
-        }
         if (editingCropFrameId) {
           e.preventDefault();
           return;
@@ -1051,6 +1045,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         if (selectedFrameIds.length > 0) {
           e.preventDefault();
           deleteSelectedFrames(activeSpread.id);
+          return;
         }
       } else if (e.key === 'Enter') {
         if (editingCropFrameId) {
@@ -1065,10 +1060,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           clearSelection();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        // If spread drawer is open, Ctrl+A belongs to spread drawer
-        if (isSpreadDrawerOpen) return;
+        const isHoveredOnSpreadDrawer = Boolean(document.querySelector('[data-spread-drawer="true"]:hover'));
         const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
-        if (!isHoveredOnFilmstrip && activeSpread) {
+        if (!isHoveredOnSpreadDrawer && !isHoveredOnFilmstrip && activeSpread) {
           e.preventDefault();
           const allFrameIds = (activeSpread.elements || []).map((f) => f.id);
           if (allFrameIds.length > 0) {

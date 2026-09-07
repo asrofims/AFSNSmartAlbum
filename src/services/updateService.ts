@@ -105,7 +105,7 @@ export async function checkForAppUpdates(currentVersion: string): Promise<Update
           latestVersion: update.version.startsWith('v') ? update.version : `v${update.version}`,
           releaseName: `AFSNSmartAlbum v${update.version}`,
           releaseNotes: update.body || 'A new update of AFSNSmartAlbum is available.',
-          publishedAt: update.date || '',
+          publishedAt: formatStandardDate(update.date),
           downloadUrl: `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`,
           releaseUrl: `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`,
           isAutoUpdateSupported: true,
@@ -178,6 +178,49 @@ export async function checkForAppUpdates(currentVersion: string): Promise<Update
   }
 }
 
+/**
+ * Formats an ISO, timestamp, or raw date string into formal standard Indonesian date (e.g. "7 September 2026").
+ * Conforms to PUEBI standard formal date conventions (D MMMM YYYY).
+ */
+export function formatStandardDate(rawDate?: string | null): string {
+  if (!rawDate || typeof rawDate !== 'string' || !rawDate.trim()) return '';
+  const trimmed = rawDate.trim();
+
+  // If already formatted like "7 September 2026"
+  if (/^\d{1,2}\s+[A-Za-z]+\s+\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  let d = new Date(trimmed);
+  if (isNaN(d.getTime())) {
+    d = new Date(trimmed.replace(' ', 'T'));
+  }
+  if (isNaN(d.getTime())) {
+    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+  }
+
+  if (isNaN(d.getTime())) {
+    return rawDate;
+  }
+
+  try {
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(d);
+  } catch {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+}
+
 function processRelease(release: GitHubRelease, currentVersion: string): UpdateCheckResult {
   const latestTag = release.tag_name || '';
   const isNewer = compareVersions(latestTag, currentVersion) > 0;
@@ -199,13 +242,7 @@ function processRelease(release: GitHubRelease, currentVersion: string): UpdateC
     latestVersion: latestTag.startsWith('v') ? latestTag : `v${latestTag}`,
     releaseName: release.name || latestTag,
     releaseNotes: release.body || 'No release notes provided for this version.',
-    publishedAt: release.published_at
-      ? new Date(release.published_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      : '',
+    publishedAt: formatStandardDate(release.published_at),
     downloadUrl,
     releaseUrl: release.html_url,
     isAutoUpdateSupported: false,

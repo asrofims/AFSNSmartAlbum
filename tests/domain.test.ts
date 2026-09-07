@@ -162,4 +162,15 @@ assert.ok(range.includes('3'));
 
 console.log('✓ Photo Domain & Range Selection passed.');
 
+// Test 5: Date Formatting Standard (PUEBI / Formal Standard)
+console.log('Testing Date Formatting Standard...');
+const { formatStandardDate } = await import('../src/services/updateService');
+assert.strictEqual(formatStandardDate('2026-09-07T02:27:38Z'), '7 September 2026');
+assert.strictEqual(formatStandardDate('2026-09-07 02:27:38 +00:00'), '7 September 2026');
+assert.strictEqual(formatStandardDate('2026-01-15'), '15 Januari 2026');
+assert.strictEqual(formatStandardDate('7 September 2026'), '7 September 2026');
+assert.strictEqual(formatStandardDate(''), '');
+assert.strictEqual(formatStandardDate(null), '');
+console.log('✓ Date Formatting Standard passed.');
+
 console.log('ALL TESTS PASSED!');

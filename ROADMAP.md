@@ -181,4 +181,11 @@
 - [x] Clean Export Packaged Filter (Simplified file save filter to pure `ZIP Archive (*.zip)`, removing confusing legacy `.afsnz` label)
 - [x] Enhanced Project Import Filter (Open dialog now supports both single `.afsn` files and bundled `.zip` archives)
 
+## Phase 15 — Canvas Keyboard Deletion Restored & Standard Formal Date Localization (v1.0.32)
+- [x] Unhindered Canvas Object Keyboard Deletion (Eliminated drawer-based Delete/Backspace interception so selected canvas photo/text frames are deleted instantly via keyboard even when spread drawer is open)
+- [x] Context-Aware Drawer vs Canvas Keyboard Routing (Keyboard Delete strictly prioritizes active canvas objects; drawer deletion only fires when drawer is hovered or multi-spreads are explicitly targeted)
+- [x] Synchronized Ctrl+A Selection Hierarchy (Context-sensitive shortcut routing between canvas elements, photo filmstrip, and spread drawer)
+- [x] Standard Formal Date Formatting (Implemented `formatStandardDate` conforming to Indonesian formal standard / PUEBI "D MMMM YYYY", resolving raw/informal timestamps in update dialogues)
+
+
 
