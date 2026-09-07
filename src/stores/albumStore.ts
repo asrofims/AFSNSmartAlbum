@@ -30,7 +30,7 @@ import {
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
 import { useProjectStore } from './projectStore';
-import type { PhotoFrameElement } from '../domain/editor';
+import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
 export interface AlbumState {
@@ -164,10 +164,16 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           textRuns,
         };
       }
+      const [tl, tr, br, bl] = getCornerRadii(el);
       return {
         ...el,
         type: 'photo',
         locked: Boolean(el.locked),
+        cornerRadiusTl: tl,
+        cornerRadiusTr: tr,
+        cornerRadiusBr: br,
+        cornerRadiusBl: bl,
+        cornerRadius: (tl === tr && tr === br && br === bl) ? tl : [tl, tr, br, bl],
       };
     };
 
@@ -296,6 +302,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           cropRotation: 0,
           borderEnabled: false,
           borderWidth: 0,
+          cornerRadius: 0,
+          cornerRadiusTl: 0,
+          cornerRadiusTr: 0,
+          cornerRadiusBr: 0,
+          cornerRadiusBl: 0,
           borderColor: '#FFFFFF',
           opacity: 1.0,
           locked: Boolean(textEl.locked),
@@ -306,6 +317,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           }),
         };
       }
+      const [rTl, rTr, rBr, rBl] = getCornerRadii(el as PhotoFrameElement);
       return {
         ...el,
         type: el.type || 'photo',
@@ -331,6 +343,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         borderEnabled: Boolean(el.borderEnabled),
         borderWidth: Number.isFinite(el.borderWidth) ? el.borderWidth : 0,
         borderColor: el.borderColor || '#FFFFFF',
+        cornerRadiusTl: rTl,
+        cornerRadiusTr: rTr,
+        cornerRadiusBr: rBr,
+        cornerRadiusBl: rBl,
+        cornerRadius: (rTl === rTr && rTr === rBr && rBr === rBl) ? rTl : [rTl, rTr, rBr, rBl],
         opacity: Number.isFinite(el.opacity) ? el.opacity : 1.0,
         locked: Boolean(el.locked),
         textPayload: null,

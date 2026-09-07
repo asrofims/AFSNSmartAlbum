@@ -36,9 +36,70 @@ export interface PhotoFrameElement {
   borderEnabled: boolean;
   borderWidth: number;
   borderColor: string;
+  cornerRadius?: number | [number, number, number, number];
+  cornerRadiusTl?: number;
+  cornerRadiusTr?: number;
+  cornerRadiusBr?: number;
+  cornerRadiusBl?: number;
   opacity: number;
   locked?: boolean;
   isMissing?: boolean;
+}
+
+/**
+ * Normalizes corner radius values from an element into [top-left, top-right, bottom-right, bottom-left].
+ * Supports scalar number, 4-tuple array, or individual per-corner properties.
+ */
+export function getCornerRadii(elem?: {
+  cornerRadius?: number | [number, number, number, number];
+  cornerRadiusTl?: number;
+  cornerRadiusTr?: number;
+  cornerRadiusBr?: number;
+  cornerRadiusBl?: number;
+} | null): [number, number, number, number] {
+  if (!elem) return [0, 0, 0, 0];
+
+  if (Array.isArray(elem.cornerRadius)) {
+    return [
+      Number.isFinite(elem.cornerRadius[0]) ? Math.max(0, elem.cornerRadius[0]) : 0,
+      Number.isFinite(elem.cornerRadius[1]) ? Math.max(0, elem.cornerRadius[1]) : 0,
+      Number.isFinite(elem.cornerRadius[2]) ? Math.max(0, elem.cornerRadius[2]) : 0,
+      Number.isFinite(elem.cornerRadius[3]) ? Math.max(0, elem.cornerRadius[3]) : 0,
+    ];
+  }
+
+  if (
+    elem.cornerRadiusTl !== undefined ||
+    elem.cornerRadiusTr !== undefined ||
+    elem.cornerRadiusBr !== undefined ||
+    elem.cornerRadiusBl !== undefined
+  ) {
+    return [
+      Math.max(0, elem.cornerRadiusTl || 0),
+      Math.max(0, elem.cornerRadiusTr || 0),
+      Math.max(0, elem.cornerRadiusBr || 0),
+      Math.max(0, elem.cornerRadiusBl || 0),
+    ];
+  }
+
+  const r = typeof elem.cornerRadius === 'number' && Number.isFinite(elem.cornerRadius)
+    ? Math.max(0, elem.cornerRadius)
+    : 0;
+  return [r, r, r, r];
+}
+
+/**
+ * Checks if an element has any active corner rounding (> 0).
+ */
+export function hasCornerRadius(elem?: {
+  cornerRadius?: number | [number, number, number, number];
+  cornerRadiusTl?: number;
+  cornerRadiusTr?: number;
+  cornerRadiusBr?: number;
+  cornerRadiusBl?: number;
+} | null): boolean {
+  const [tl, tr, br, bl] = getCornerRadii(elem);
+  return tl > 0 || tr > 0 || br > 0 || bl > 0;
 }
 
 export interface SnapLine {

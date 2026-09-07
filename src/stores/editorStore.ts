@@ -408,6 +408,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       borderEnabled: currentProject.borderEnabled || false,
       borderWidth: currentProject.borderWidth || 1,
       borderColor: currentProject.borderColor || '#FFFFFF',
+      cornerRadius: 0,
+      cornerRadiusTl: 0,
+      cornerRadiusTr: 0,
+      cornerRadiusBr: 0,
+      cornerRadiusBl: 0,
       opacity: 1,
     };
 

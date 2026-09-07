@@ -501,9 +501,53 @@ fn render_photo_element(
         out_buf
     };
 
-    // 3. Blit into canvas
+    // Corner radii in physical canvas units converted to export pixels
+    let raw_radii = elem.corner_radii();
+    let max_radius_px = (frame_px_w as f64 / 2.0).min(frame_px_h as f64 / 2.0);
+    let r_tl = (raw_radii.0 * scale_factor).clamp(0.0, max_radius_px);
+    let r_tr = (raw_radii.1 * scale_factor).clamp(0.0, max_radius_px);
+    let r_br = (raw_radii.2 * scale_factor).clamp(0.0, max_radius_px);
+    let r_bl = (raw_radii.3 * scale_factor).clamp(0.0, max_radius_px);
+    let has_corner_radius = r_tl > 0.5 || r_tr > 0.5 || r_br > 0.5 || r_bl > 0.5;
+
+    // Helper for subpixel anti-aliased rounded corner coverage (0.0 = completely clipped, 1.0 = fully inside)
+    let compute_corner_alpha = |x: f64, y: f64, w: f64, h: f64, rtl: f64, rtr: f64, rbr: f64, rbl: f64| -> f64 {
+        // Top-Left corner
+        if rtl > 0.5 && x < rtl && y < rtl {
+            let dx = x - rtl;
+            let dy = y - rtl;
+            let d = (dx * dx + dy * dy).sqrt();
+            return (rtl + 0.5 - d).clamp(0.0, 1.0);
+        }
+        // Top-Right corner
+        if rtr > 0.5 && x >= w - rtr && y < rtr {
+            let dx = x - (w - rtr);
+            let dy = y - rtr;
+            let d = (dx * dx + dy * dy).sqrt();
+            return (rtr + 0.5 - d).clamp(0.0, 1.0);
+        }
+        // Bottom-Right corner
+        if rbr > 0.5 && x >= w - rbr && y >= h - rbr {
+            let dx = x - (w - rbr);
+            let dy = y - (h - rbr);
+            let d = (dx * dx + dy * dy).sqrt();
+            return (rbr + 0.5 - d).clamp(0.0, 1.0);
+        }
+        // Bottom-Left corner
+        if rbl > 0.5 && x < rbl && y >= h - rbl {
+            let dx = x - rbl;
+            let dy = y - (h - rbl);
+            let d = (dx * dx + dy * dy).sqrt();
+            return (rbl + 0.5 - d).clamp(0.0, 1.0);
+        }
+        1.0
+    };
+
+    // 3. Blit into canvas with subpixel anti-aliased corner clipping
     let render_w = resized_rgba.width();
     let render_h = resized_rgba.height();
+    let frame_w_f = frame_px_w as f64;
+    let frame_h_f = frame_px_h as f64;
 
     for fy in 0..render_h {
         let dest_y = frame_px_y + fy as i64;
@@ -517,8 +561,27 @@ fn render_photo_element(
                 continue;
             }
 
+            let corner_alpha = if has_corner_radius {
+                compute_corner_alpha(
+                    fx as f64 + 0.5,
+                    fy as f64 + 0.5,
+                    frame_w_f,
+                    frame_h_f,
+                    r_tl,
+                    r_tr,
+                    r_br,
+                    r_bl,
+                )
+            } else {
+                1.0
+            };
+
+            if corner_alpha < 0.001 {
+                continue;
+            }
+
             let p = resized_rgba.get_pixel(fx, fy);
-            let effective_alpha = (p[3] as f64 / 255.0 * elem.opacity).clamp(0.0, 1.0);
+            let effective_alpha = (p[3] as f64 / 255.0 * elem.opacity * corner_alpha).clamp(0.0, 1.0);
             if effective_alpha < 0.001 {
                 // Completely transparent pixel, leave canvas background intact
                 continue;
@@ -538,33 +601,96 @@ fn render_photo_element(
 
     // 4. Render frame border if enabled
     if elem.border_enabled && elem.border_width > 0.0 {
-        let border_px = (elem.border_width * scale_factor).round().max(1.0) as i64;
+        let border_px = (elem.border_width * scale_factor).round().max(1.0);
         let border_color = parse_hex_color(&elem.border_color);
 
-        for b in 0..border_px {
-            for fx in 0..frame_px_w as i64 {
-                let dx = frame_px_x + fx;
-                if dx >= 0 && dx < canvas_w {
-                    let dy_top = frame_px_y + b;
-                    let dy_bot = frame_px_y + frame_px_h as i64 - 1 - b;
-                    if dy_top >= 0 && dy_top < canvas_h {
-                        canvas.put_pixel(dx as u32, dy_top as u32, border_color);
+        if !has_corner_radius {
+            // Fast standard rectangular border
+            let b_px = border_px as i64;
+            for b in 0..b_px {
+                for fx in 0..frame_px_w as i64 {
+                    let dx = frame_px_x + fx;
+                    if dx >= 0 && dx < canvas_w {
+                        let dy_top = frame_px_y + b;
+                        let dy_bot = frame_px_y + frame_px_h as i64 - 1 - b;
+                        if dy_top >= 0 && dy_top < canvas_h {
+                            canvas.put_pixel(dx as u32, dy_top as u32, border_color);
+                        }
+                        if dy_bot >= 0 && dy_bot < canvas_h {
+                            canvas.put_pixel(dx as u32, dy_bot as u32, border_color);
+                        }
                     }
-                    if dy_bot >= 0 && dy_bot < canvas_h {
-                        canvas.put_pixel(dx as u32, dy_bot as u32, border_color);
+                }
+                for fy in 0..frame_px_h as i64 {
+                    let dy = frame_px_y + fy;
+                    if dy >= 0 && dy < canvas_h {
+                        let dx_left = frame_px_x + b;
+                        let dx_right = frame_px_x + frame_px_w as i64 - 1 - b;
+                        if dx_left >= 0 && dx_left < canvas_w {
+                            canvas.put_pixel(dx_left as u32, dy as u32, border_color);
+                        }
+                        if dx_right >= 0 && dx_right < canvas_w {
+                            canvas.put_pixel(dx_right as u32, dy as u32, border_color);
+                        }
                     }
                 }
             }
-            for fy in 0..frame_px_h as i64 {
-                let dy = frame_px_y + fy;
-                if dy >= 0 && dy < canvas_h {
-                    let dx_left = frame_px_x + b;
-                    let dx_right = frame_px_x + frame_px_w as i64 - 1 - b;
-                    if dx_left >= 0 && dx_left < canvas_w {
-                        canvas.put_pixel(dx_left as u32, dy as u32, border_color);
+        } else {
+            // Anti-aliased rounded corner border
+            let inner_w = (frame_w_f - 2.0 * border_px).max(0.0);
+            let inner_h = (frame_h_f - 2.0 * border_px).max(0.0);
+            let inner_r_tl = (r_tl - border_px).max(0.0);
+            let inner_r_tr = (r_tr - border_px).max(0.0);
+            let inner_r_br = (r_br - border_px).max(0.0);
+            let inner_r_bl = (r_bl - border_px).max(0.0);
+
+            for fy in 0..frame_px_h {
+                let dest_y = frame_px_y + fy as i64;
+                if dest_y < 0 || dest_y >= canvas_h {
+                    continue;
+                }
+                for fx in 0..frame_px_w {
+                    let dest_x = frame_px_x + fx as i64;
+                    if dest_x < 0 || dest_x >= canvas_w {
+                        continue;
                     }
-                    if dx_right >= 0 && dx_right < canvas_w {
-                        canvas.put_pixel(dx_right as u32, dy as u32, border_color);
+
+                    let px_center_x = fx as f64 + 0.5;
+                    let px_center_y = fy as f64 + 0.5;
+
+                    let outer_alpha = compute_corner_alpha(
+                        px_center_x, px_center_y,
+                        frame_w_f, frame_h_f,
+                        r_tl, r_tr, r_br, r_bl,
+                    );
+                    if outer_alpha < 0.001 {
+                        continue;
+                    }
+
+                    let inner_alpha = if inner_w > 0.0 && inner_h > 0.0 && px_center_x >= border_px && px_center_x < (frame_w_f - border_px) && px_center_y >= border_px && px_center_y < (frame_h_f - border_px) {
+                        compute_corner_alpha(
+                            px_center_x - border_px, px_center_y - border_px,
+                            inner_w, inner_h,
+                            inner_r_tl, inner_r_tr, inner_r_br, inner_r_bl,
+                        )
+                    } else {
+                        0.0
+                    };
+
+                    let border_alpha = (outer_alpha - inner_alpha).clamp(0.0, 1.0);
+                    if border_alpha < 0.001 {
+                        continue;
+                    }
+
+                    if border_alpha > 0.999 {
+                        canvas.put_pixel(dest_x as u32, dest_y as u32, border_color);
+                    } else {
+                        let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
+                        let inv_a = 1.0 - border_alpha;
+                        existing[0] = ((border_color[0] as f64 * border_alpha) + (existing[0] as f64 * inv_a)).round() as u8;
+                        existing[1] = ((border_color[1] as f64 * border_alpha) + (existing[1] as f64 * inv_a)).round() as u8;
+                        existing[2] = ((border_color[2] as f64 * border_alpha) + (existing[2] as f64 * inv_a)).round() as u8;
+                        existing[3] = 255;
                     }
                 }
             }

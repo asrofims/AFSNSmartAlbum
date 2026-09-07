@@ -15,7 +15,7 @@ import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
 import { formatDimensions, convertUnit } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement } from '../../domain/editor';
+import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement, getCornerRadii } from '../../domain/editor';
 import { formatImportNoticeToast } from '../../domain/photo';
 import { FilmstripTray } from '../photos/FilmstripTray';
 import { RelinkDialog } from '../photos/RelinkDialog';
@@ -93,9 +93,11 @@ export function WorkspaceLayout() {
   const toggleLockSelectedFrames = useEditorStore((s) => s.toggleLockSelectedFrames);
   const addTextToSpread = useEditorStore((s) => s.addTextToSpread);
   const setEditingTextElementId = useEditorStore((s) => s.setEditingTextElementId);
+  const batchUpdateFrames = useEditorStore((s) => s.batchUpdateFrames);
 
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
+  const [isCornersLinked, setIsCornersLinked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
   const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout' | 'locks'>('properties');
   const [bgScope, setBgScope] = useState<'spread' | 'left' | 'right'>('spread');
@@ -1320,6 +1322,108 @@ export function WorkspaceLayout() {
                             ↺ Reset Crop
                           </button>
                         </div>
+
+                        {/* Multi-Selection Batch Corner Radius */}
+                        <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                          {(() => {
+                            const selectedFrames = (activeSpread?.elements || []).filter((f) => selectedFrameIds.includes(f.id) && f.type === 'photo') as PhotoFrameElement[];
+                            const firstFrame = selectedFrames[0];
+                            const currentVal = firstFrame ? getCornerRadii(firstFrame)[0] : 0;
+                            const minFrameDim = selectedFrames.reduce((acc, f) => Math.min(acc, f.width, f.height), 100);
+                            const maxVal = Math.round((minFrameDim / 2) * 10) / 10;
+                            const step = currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1;
+                            const precision = currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1;
+                            const hasAnyRounding = selectedFrames.some((f) => {
+                              const [tl, tr, br, bl] = getCornerRadii(f);
+                              return tl > 0 || tr > 0 || br > 0 || bl > 0;
+                            });
+
+                            const applyRadiusToAll = (val: number) => {
+                              const clamped = Math.max(0, val);
+                              batchUpdateFrames(
+                                activeSpread.id,
+                                selectedFrames.map((f) => {
+                                  const maxF = Math.min(f.width, f.height) / 2;
+                                  const r = Math.min(clamped, maxF);
+                                  return {
+                                    id: f.id,
+                                    geometry: {
+                                      cornerRadius: r,
+                                      cornerRadiusTl: r,
+                                      cornerRadiusTr: r,
+                                      cornerRadiusBr: r,
+                                      cornerRadiusBl: r,
+                                    },
+                                  };
+                                })
+                              );
+                            };
+
+                            return (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: hasAnyRounding ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+                                      <rect x="3" y="3" width="18" height="18" rx="6" ry="6" />
+                                    </svg>
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                      Corner Radius
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    {hasAnyRounding && (
+                                      <button
+                                        type="button"
+                                        onClick={() => applyRadiusToAll(0)}
+                                        style={{
+                                          width: '22px',
+                                          height: '22px',
+                                          padding: 0,
+                                          borderRadius: 'var(--radius-sm)',
+                                          backgroundColor: 'rgba(255,255,255,0.06)',
+                                          border: '1px solid var(--color-border)',
+                                          color: 'var(--color-text-muted)',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                        title="Reset corner radius to 0 for all selected frames"
+                                      >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                          <path d="M3 3v5h5" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <input
+                                    type="range"
+                                    min={0}
+                                    max={maxVal}
+                                    step={step}
+                                    value={currentVal}
+                                    onChange={(e) => applyRadiusToAll(Number(e.target.value))}
+                                    style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
+                                  />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '85px' }}>
+                                    <NumberInput
+                                      value={currentVal}
+                                      onChange={(val) => applyRadiusToAll(val)}
+                                      min={0}
+                                      max={maxVal}
+                                      step={step}
+                                      precision={precision}
+                                    />
+                                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1678,6 +1782,290 @@ export function WorkspaceLayout() {
                         </div>
                       </div>
                     )}
+
+                    {/* Corner Radius Inspector Card */}
+                    {(() => {
+                      const [crTl, crTr, crBr, crBl] = getCornerRadii(selectedFrame);
+                      const maxCornerRadius = Math.round((Math.min(selectedFrame.width, selectedFrame.height) / 2) * 10) / 10;
+                      const radiusStep = currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1;
+                      const radiusPrecision = currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1;
+                      const hasAnyRounding = crTl > 0 || crTr > 0 || crBr > 0 || crBl > 0;
+
+                      return (
+                        <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                          {/* Header: Label, Reset Button, Link/Unlink Toggle */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: hasAnyRounding ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+                                <rect x="3" y="3" width="18" height="18" rx="6" ry="6" />
+                              </svg>
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Corner Radius</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {hasAnyRounding && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadius: 0,
+                                      cornerRadiusTl: 0,
+                                      cornerRadiusTr: 0,
+                                      cornerRadiusBr: 0,
+                                      cornerRadiusBl: 0,
+                                    });
+                                  }}
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    padding: 0,
+                                    borderRadius: 'var(--radius-sm)',
+                                    backgroundColor: 'rgba(255,255,255,0.06)',
+                                    border: '1px solid var(--color-border)',
+                                    color: 'var(--color-text-muted)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  title="Reset corner radius to 0"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                  </svg>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setIsCornersLinked(!isCornersLinked)}
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  padding: 0,
+                                  borderRadius: 'var(--radius-sm)',
+                                  backgroundColor: isCornersLinked ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.06)',
+                                  border: isCornersLinked ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--color-border)',
+                                  color: isCornersLinked ? '#60a5fa' : 'var(--color-text-secondary)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                title={isCornersLinked ? 'Corners linked (uniform) — click for independent corner control' : 'Independent corners — click to link all corners together'}
+                              >
+                                {isCornersLinked ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                                  </svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                    <path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71" />
+                                    <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {isCornersLinked ? (
+                            /* Linked Mode: Master slider + NumberInput */
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                type="range"
+                                min={0}
+                                max={maxCornerRadius}
+                                step={radiusStep}
+                                value={crTl}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                    cornerRadius: val,
+                                    cornerRadiusTl: val,
+                                    cornerRadiusTr: val,
+                                    cornerRadiusBr: val,
+                                    cornerRadiusBl: val,
+                                  });
+                                }}
+                                style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
+                              />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '85px' }}>
+                                <NumberInput
+                                  value={crTl}
+                                  onChange={(val) => {
+                                    const clamped = Math.min(maxCornerRadius, Math.max(0, val));
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadius: clamped,
+                                      cornerRadiusTl: clamped,
+                                      cornerRadiusTr: clamped,
+                                      cornerRadiusBr: clamped,
+                                      cornerRadiusBl: clamped,
+                                    });
+                                  }}
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  precision={radiusPrecision}
+                                />
+                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Unlinked Mode: 2x2 grid of the 4 independent corners */
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                              {/* Top-Left */}
+                              <div style={{ padding: '6px 8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '9.5px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>⌜ Top-Left</span>
+                                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                                </div>
+                                <NumberInput
+                                  value={crTl}
+                                  onChange={(val) => {
+                                    const clamped = Math.min(maxCornerRadius, Math.max(0, val));
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusTl: clamped,
+                                      cornerRadius: [clamped, crTr, crBr, crBl],
+                                    });
+                                  }}
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  precision={radiusPrecision}
+                                />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  value={crTl}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusTl: val,
+                                      cornerRadius: [val, crTr, crBr, crBl],
+                                    });
+                                  }}
+                                  style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', height: '4px' }}
+                                />
+                              </div>
+
+                              {/* Top-Right */}
+                              <div style={{ padding: '6px 8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '9.5px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Top-Right ⌝</span>
+                                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                                </div>
+                                <NumberInput
+                                  value={crTr}
+                                  onChange={(val) => {
+                                    const clamped = Math.min(maxCornerRadius, Math.max(0, val));
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusTr: clamped,
+                                      cornerRadius: [crTl, clamped, crBr, crBl],
+                                    });
+                                  }}
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  precision={radiusPrecision}
+                                />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  value={crTr}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusTr: val,
+                                      cornerRadius: [crTl, val, crBr, crBl],
+                                    });
+                                  }}
+                                  style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', height: '4px' }}
+                                />
+                              </div>
+
+                              {/* Bottom-Left */}
+                              <div style={{ padding: '6px 8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '9.5px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>⌞ Bottom-Left</span>
+                                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                                </div>
+                                <NumberInput
+                                  value={crBl}
+                                  onChange={(val) => {
+                                    const clamped = Math.min(maxCornerRadius, Math.max(0, val));
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusBl: clamped,
+                                      cornerRadius: [crTl, crTr, crBr, clamped],
+                                    });
+                                  }}
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  precision={radiusPrecision}
+                                />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  value={crBl}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusBl: val,
+                                      cornerRadius: [crTl, crTr, crBr, val],
+                                    });
+                                  }}
+                                  style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', height: '4px' }}
+                                />
+                              </div>
+
+                              {/* Bottom-Right */}
+                              <div style={{ padding: '6px 8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '9.5px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Bottom-Right ⌟</span>
+                                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
+                                </div>
+                                <NumberInput
+                                  value={crBr}
+                                  onChange={(val) => {
+                                    const clamped = Math.min(maxCornerRadius, Math.max(0, val));
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusBr: clamped,
+                                      cornerRadius: [crTl, crTr, clamped, crBl],
+                                    });
+                                  }}
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  precision={radiusPrecision}
+                                />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={maxCornerRadius}
+                                  step={radiusStep}
+                                  value={crBr}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    updateFrameGeometry(activeSpread.id, selectedFrame.id, {
+                                      cornerRadiusBr: val,
+                                      cornerRadius: [crTl, crTr, val, crBl],
+                                    });
+                                  }}
+                                  style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', height: '4px' }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Interactive Frame Dimensions & Position Inspector */}
                     <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -4,7 +4,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
-import { PhotoFrameElement, calculateImageOffset } from '../../domain/editor';
+import { PhotoFrameElement, calculateImageOffset, getCornerRadii } from '../../domain/editor';
 import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
 import { convertPtToUnit } from '../../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -216,6 +216,14 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         const imgHeightPct = (imgPhysicalH / photoEl.height) * 100;
         const cropRot = photoEl.cropRotation || 0;
 
+        const [crTl, crTr, crBr, crBl] = getCornerRadii(photoEl);
+        const maxRPx = Math.min(w, h) / 2;
+        const rTlPx = Math.min(crTl * scale, maxRPx);
+        const rTrPx = Math.min(crTr * scale, maxRPx);
+        const rBrPx = Math.min(crBr * scale, maxRPx);
+        const rBlPx = Math.min(crBl * scale, maxRPx);
+        const hasR = rTlPx > 0.5 || rTrPx > 0.5 || rBrPx > 0.5 || rBlPx > 0.5;
+
         return (
           <div
             key={photoEl.id}
@@ -231,7 +239,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               background: imgSrc ? '#ffffff' : 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: photoEl.opacity ?? 1,
               border: photoEl.borderEnabled && photoEl.borderWidth ? `1px solid ${photoEl.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
-              borderRadius: '1px',
+              borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : '1px',
               zIndex: photoEl.zIndex || 2,
             }}
           >

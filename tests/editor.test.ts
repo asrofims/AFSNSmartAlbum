@@ -11,6 +11,8 @@ import {
   RectBounds,
   resizeCropFromHandle,
   zoomCropAtPoint,
+  getCornerRadii,
+  hasCornerRadius,
   intersectRect,
   alignFrames,
   distributeFrames,
@@ -1165,4 +1167,28 @@ const clampedRotCrop = clampCropTransform(testPhotoFrame, { cropRotation: 45, cr
 console.assert(clampedRotCrop.cropRotation === 45, `Crop rotation should be 45, got ${clampedRotCrop.cropRotation}`);
 console.assert(clampedRotCrop.cropScale === 1.0, `Crop scale must remain independent of rotation (1.0), got ${clampedRotCrop.cropScale}`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, and Snapping Config Persistence tests passed successfully!');
+// 20. Dynamic Per-Corner Rounded Corners (Corner Radius) Tests
+// 20a. Default / undefined
+console.assert(!hasCornerRadius(null), 'null element should not have corner radius');
+console.assert(!hasCornerRadius({}), 'empty element should not have corner radius');
+const defRadii = getCornerRadii({});
+console.assert(defRadii[0] === 0 && defRadii[1] === 0 && defRadii[2] === 0 && defRadii[3] === 0, 'default radii should be [0,0,0,0]');
+
+// 20b. Unified scalar cornerRadius
+const scalarElem = { cornerRadius: 12 };
+console.assert(hasCornerRadius(scalarElem), 'scalar corner radius should be detected');
+const scalarRadii = getCornerRadii(scalarElem);
+console.assert(scalarRadii[0] === 12 && scalarRadii[1] === 12 && scalarRadii[2] === 12 && scalarRadii[3] === 12, 'scalar radii should map to all 4 corners');
+
+// 20c. Per-corner array tuple [TL, TR, BR, BL]
+const tupleElem = { cornerRadius: [5, 10, 15, 20] as [number, number, number, number] };
+const tupleRadii = getCornerRadii(tupleElem);
+console.assert(tupleRadii[0] === 5 && tupleRadii[1] === 10 && tupleRadii[2] === 15 && tupleRadii[3] === 20, 'tuple radii should preserve individual corners');
+
+// 20d. Individual corner properties (e.g. Leaf style)
+const leafElem = { cornerRadiusTl: 15, cornerRadiusBr: 15 };
+console.assert(hasCornerRadius(leafElem), 'leaf element should have corner radius');
+const leafRadii = getCornerRadii(leafElem);
+console.assert(leafRadii[0] === 15 && leafRadii[1] === 0 && leafRadii[2] === 15 && leafRadii[3] === 0, 'leaf radii should be [15, 0, 15, 0]');
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, Snapping Config Persistence, and Dynamic Per-Corner Rounded Corners tests passed successfully!');

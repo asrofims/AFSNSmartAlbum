@@ -195,3 +195,11 @@
 - [x] Global Filmstrip Selection Dismissal (Capturing pointerdown listener and spread drawer capture ensure clicking anywhere outside the filmstrip immediately deselects photos)
 - [x] Professional Topbar Alignment & Help Menu (Dedicated 'Help ▾' dropdown containing Settings and About, with centered project action controls)
 
+## Phase 17 — Dynamic Per-Corner Rounded Corners & In-Frame Crop Rotation (v1.0.33)
+- [x] Dynamic Per-Corner Frame Rounded Corners (Physical unit normalization, independent TL, TR, BR, BL radii, Konva clipping & border geometry)
+- [x] High-Resolution Rust Export Anti-Aliased Rounded Corners (Subpixel $\alpha$-masking for photo clipping and rounded borders)
+- [x] SQLite Migration v12 (`corner_radius_tl`, `corner_radius_tr`, `corner_radius_br`, `corner_radius_bl` persistence)
+- [x] Spread Previews Synchronization (`PageNavigator` & `ExportSpreadPreview` reflecting rounded frame geometry)
+- [x] Minimalist Properties Inspector (Clean slider, precision numeric input, icon-only Reset `↺` and Link `🔗`/`🔓` toggles, zero template clutter)
+- [x] In-Frame Photo Crop Rotation & Canvas Previews (White void backing, unified rotation button, angle synchronization across preview & export)
+

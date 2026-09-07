@@ -21,6 +21,7 @@ import {
   doesMarqueeIntersectFrame,
   calculateCropRotationSnap,
   normalizeAngle,
+  getCornerRadii,
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -218,6 +219,16 @@ function PhotoFrameNode({
   const pixelY = frame.y * scaleFactor;
   const pixelW = frame.width * scaleFactor;
   const pixelH = frame.height * scaleFactor;
+
+  // Compute per-corner radii in screen pixels (clamped to half dimension)
+  const [crTl, crTr, crBr, crBl] = getCornerRadii(frame);
+  const maxRadiusPx = Math.min(pixelW, pixelH) / 2;
+  const tlPx = Math.min(crTl * scaleFactor, maxRadiusPx);
+  const trPx = Math.min(crTr * scaleFactor, maxRadiusPx);
+  const brPx = Math.min(crBr * scaleFactor, maxRadiusPx);
+  const blPx = Math.min(crBl * scaleFactor, maxRadiusPx);
+  const hasRounding = tlPx > 0.5 || trPx > 0.5 || brPx > 0.5 || blPx > 0.5;
+  const cornerRadiiArray: [number, number, number, number] = [tlPx, trPx, brPx, blPx];
 
   // Real natural photo aspect ratio from loaded image
   const naturalAspect = (imageObj && imageObj.naturalWidth > 0 && imageObj.naturalHeight > 0)
@@ -513,7 +524,13 @@ function PhotoFrameNode({
       }}
     >
       {/* Base Solid Hit Rect for robust selection & drag events */}
-      <Rect width={pixelW} height={pixelH} fill="rgba(0, 0, 0, 0.001)" listening={!isCropMode} />
+      <Rect
+        width={pixelW}
+        height={pixelH}
+        fill="rgba(0, 0, 0, 0.001)"
+        cornerRadius={hasRounding ? cornerRadiiArray : undefined}
+        listening={!isCropMode}
+      />
 
       {/* Semi-transparent uncropped original image outside the frame */}
       {isCropMode && imageObj && (
@@ -539,13 +556,31 @@ function PhotoFrameNode({
       {/* Clipped Photo Viewport */}
       <Group
         clipFunc={(ctx) => {
-          ctx.rect(0, 0, pixelW, pixelH);
+          if (hasRounding && typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(0, 0, pixelW, pixelH, cornerRadiiArray);
+          } else if (hasRounding) {
+            ctx.beginPath();
+            ctx.moveTo(tlPx, 0);
+            ctx.lineTo(pixelW - trPx, 0);
+            ctx.arcTo(pixelW, 0, pixelW, trPx, trPx);
+            ctx.lineTo(pixelW, pixelH - brPx);
+            ctx.arcTo(pixelW, pixelH, pixelW - brPx, pixelH, brPx);
+            ctx.lineTo(blPx, pixelH);
+            ctx.arcTo(0, pixelH, 0, pixelH - blPx, blPx);
+            ctx.lineTo(0, tlPx);
+            ctx.arcTo(0, 0, tlPx, 0, tlPx);
+            ctx.closePath();
+          } else {
+            ctx.rect(0, 0, pixelW, pixelH);
+          }
         }}
       >
         <Rect
           width={pixelW}
           height={pixelH}
           fill="#ffffff"
+          cornerRadius={hasRounding ? cornerRadiiArray : undefined}
           listening={false}
         />
         {imageObj ? (
@@ -650,6 +685,7 @@ function PhotoFrameNode({
             width={pixelW}
             height={pixelH}
             fill="#1e293b"
+            cornerRadius={hasRounding ? cornerRadiiArray : undefined}
             listening={false}
           />
         )}
@@ -658,6 +694,12 @@ function PhotoFrameNode({
       {/* Frame Border (Inside Stroke to maintain exact outer bounds for snapping) */}
       {frame.borderEnabled && (() => {
         const strokePx = Math.max(1, Math.round((frame.borderWidth || 0) * scaleFactor));
+        const borderRadii: [number, number, number, number] = [
+          Math.max(0, tlPx - strokePx / 2),
+          Math.max(0, trPx - strokePx / 2),
+          Math.max(0, brPx - strokePx / 2),
+          Math.max(0, blPx - strokePx / 2),
+        ];
         return (
           <Rect
             x={strokePx / 2}
@@ -666,6 +708,7 @@ function PhotoFrameNode({
             height={Math.max(0, pixelH - strokePx)}
             stroke={frame.borderColor || '#FFFFFF'}
             strokeWidth={strokePx}
+            cornerRadius={hasRounding ? borderRadii : undefined}
             strokeScaleEnabled={false}
             listening={false}
           />

@@ -1198,6 +1198,11 @@ export function buildSpreadElementsFromVariation(
       borderEnabled: defaultBorderEnabled,
       borderWidth: defaultBorderWidth,
       borderColor: defaultBorderColor,
+      cornerRadius: 0,
+      cornerRadiusTl: 0,
+      cornerRadiusTr: 0,
+      cornerRadiusBr: 0,
+      cornerRadiusBl: 0,
       opacity: 1.0,
     };
   });

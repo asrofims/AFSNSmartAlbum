@@ -125,6 +125,35 @@ pub struct ElementPayload {
     pub locked: Option<bool>,
     #[serde(default)]
     pub text_payload: Option<String>,
+    #[serde(default)]
+    pub corner_radius_tl: f64,
+    #[serde(default)]
+    pub corner_radius_tr: f64,
+    #[serde(default)]
+    pub corner_radius_br: f64,
+    #[serde(default)]
+    pub corner_radius_bl: f64,
+    #[serde(default)]
+    pub corner_radius: Option<f64>,
+}
+
+impl ElementPayload {
+    /// Resolves effective per-corner radii as (TL, TR, BR, BL)
+    pub fn corner_radii(&self) -> (f64, f64, f64, f64) {
+        if self.corner_radius_tl > 0.0 || self.corner_radius_tr > 0.0 || self.corner_radius_br > 0.0 || self.corner_radius_bl > 0.0 {
+            (
+                self.corner_radius_tl.max(0.0),
+                self.corner_radius_tr.max(0.0),
+                self.corner_radius_br.max(0.0),
+                self.corner_radius_bl.max(0.0),
+            )
+        } else if let Some(r) = self.corner_radius {
+            let clamped = r.max(0.0);
+            (clamped, clamped, clamped, clamped)
+        } else {
+            (0.0, 0.0, 0.0, 0.0)
+        }
+    }
 }
 
 /// Represents a single page in a spread.
@@ -305,6 +334,10 @@ impl Database {
 
         if current_version < 11 {
             Self::migrate_v11(conn)?;
+        }
+
+        if current_version < 12 {
+            Self::migrate_v12(conn)?;
         }
 
         Ok(())
@@ -511,6 +544,10 @@ impl Database {
                 border_width REAL NOT NULL DEFAULT 0.0,
                 border_color TEXT NOT NULL DEFAULT '#FFFFFF',
                 opacity REAL NOT NULL DEFAULT 1.0,
+                corner_radius_tl REAL NOT NULL DEFAULT 0.0,
+                corner_radius_tr REAL NOT NULL DEFAULT 0.0,
+                corner_radius_br REAL NOT NULL DEFAULT 0.0,
+                corner_radius_bl REAL NOT NULL DEFAULT 0.0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY(spread_id) REFERENCES album_spreads(id) ON DELETE CASCADE
@@ -642,6 +679,32 @@ impl Database {
         }
 
         log::info!("Applied database migration v11");
+        Ok(())
+    }
+
+    /// Schema version 12: Add per-corner radii (corner_radius_tl, corner_radius_tr, corner_radius_br, corner_radius_bl) to spread_elements table.
+    fn migrate_v12(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"corner_radius_tl".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE spread_elements ADD COLUMN corner_radius_tl REAL NOT NULL DEFAULT 0.0;
+                ALTER TABLE spread_elements ADD COLUMN corner_radius_tr REAL NOT NULL DEFAULT 0.0;
+                ALTER TABLE spread_elements ADD COLUMN corner_radius_br REAL NOT NULL DEFAULT 0.0;
+                ALTER TABLE spread_elements ADD COLUMN corner_radius_bl REAL NOT NULL DEFAULT 0.0;
+                INSERT INTO schema_version (version) VALUES (12);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (12)", [])?;
+        }
+
+        log::info!("Applied database migration v12");
         Ok(())
     }
 
@@ -1400,6 +1463,7 @@ impl Database {
             )?;
 
             for elem in &spread.elements {
+                let radii = elem.corner_radii();
                 tx.execute(
                     "INSERT INTO spread_elements (
                         id, spread_id, element_type, photo_id, group_id, file_path, file_name,
@@ -1407,6 +1471,7 @@ impl Database {
                         rotation, z_index, photo_aspect, original_width, original_height,
                         crop_x, crop_y, crop_scale, crop_rotation,
                         border_enabled, border_width, border_color, opacity, locked, text_payload,
+                        corner_radius_tl, corner_radius_tr, corner_radius_br, corner_radius_bl,
                         created_at, updated_at
                     ) VALUES (
                         ?1, ?2, ?3, ?4, ?5, ?6, ?7,
@@ -1414,6 +1479,7 @@ impl Database {
                         ?14, ?15, ?16, ?17, ?18,
                         ?19, ?20, ?21, ?22,
                         ?23, ?24, ?25, ?26, ?27, ?28,
+                        ?29, ?30, ?31, ?32,
                         datetime('now'), datetime('now')
                     )",
                     rusqlite::params![
@@ -1445,6 +1511,10 @@ impl Database {
                         elem.opacity,
                         elem.locked.unwrap_or(false) as i32,
                         elem.text_payload.as_deref(),
+                        radii.0,
+                        radii.1,
+                        radii.2,
+                        radii.3,
                     ],
                 )?;
             }
@@ -1527,7 +1597,9 @@ impl Database {
                     rotation, z_index, photo_aspect, original_width, original_height,
                     crop_x, crop_y, crop_scale, crop_rotation,
                     border_enabled, border_width, border_color, opacity,
-                    group_id, locked, text_payload, created_at, updated_at
+                    group_id, locked, text_payload,
+                    corner_radius_tl, corner_radius_tr, corner_radius_br, corner_radius_bl,
+                    created_at, updated_at
              FROM spread_elements
              WHERE spread_id = ?1
              ORDER BY z_index ASC",
@@ -1597,6 +1669,11 @@ impl Database {
                     group_id: er.get(25).ok(),
                     locked: Some(locked_int != 0),
                     text_payload: er.get(27).ok(),
+                    corner_radius_tl: er.get(28).unwrap_or(0.0),
+                    corner_radius_tr: er.get(29).unwrap_or(0.0),
+                    corner_radius_br: er.get(30).unwrap_or(0.0),
+                    corner_radius_bl: er.get(31).unwrap_or(0.0),
+                    corner_radius: None,
                 })
             })?;
 
@@ -2159,7 +2236,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 10);
+        assert_eq!(db.get_schema_version().unwrap(), 12);
 
         db.create_project(
             "test-id-1",
@@ -2380,6 +2457,11 @@ mod tests {
                     opacity: 1.0,
                     locked: Some(false),
                     text_payload: None,
+                    corner_radius_tl: 0.0,
+                    corner_radius_tr: 0.0,
+                    corner_radius_br: 0.0,
+                    corner_radius_bl: 0.0,
+                    corner_radius: None,
                 }
             ],
         };

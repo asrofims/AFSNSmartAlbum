@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Spread, mergeFramePhotoAsset } from '../../domain/album';
 import { Project } from '../../domain/project';
-import { PhotoFrameElement, calculateImageOffset } from '../../domain/editor';
+import { PhotoFrameElement, calculateImageOffset, getCornerRadii } from '../../domain/editor';
 import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { calculateExportPixels, convertPtToUnit } from '../../domain/units';
@@ -408,6 +408,14 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const imgHeightPct = (imgPhysicalH / photoEl.height) * 100;
             const cropRot = photoEl.cropRotation || 0;
 
+            const [crTl, crTr, crBr, crBl] = getCornerRadii(photoEl);
+            const maxRPx = Math.min(finalRenderW, finalRenderH) / 2;
+            const rTlPx = Math.min(crTl * scale, maxRPx);
+            const rTrPx = Math.min(crTr * scale, maxRPx);
+            const rBrPx = Math.min(crBr * scale, maxRPx);
+            const rBlPx = Math.min(crBl * scale, maxRPx);
+            const hasR = rTlPx > 0.5 || rTrPx > 0.5 || rBrPx > 0.5 || rBlPx > 0.5;
+
             return (
               <div
                 key={photoEl.id}
@@ -426,6 +434,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   border: photoEl.borderEnabled && photoEl.borderWidth
                     ? `${Math.max(1, Math.round(photoEl.borderWidth * scale))}px solid ${photoEl.borderColor || '#ffffff'}`
                     : 'none',
+                  borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
                   zIndex: photoEl.zIndex || 2,
                 }}
               >

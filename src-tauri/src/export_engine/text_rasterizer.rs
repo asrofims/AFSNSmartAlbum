@@ -1276,6 +1276,11 @@ mod tests {
                 })
                 .unwrap(),
             ),
+            corner_radius_tl: 0.0,
+            corner_radius_tr: 0.0,
+            corner_radius_br: 0.0,
+            corner_radius_bl: 0.0,
+            corner_radius: None,
         };
 
         // Render at 300 DPI, scale = 1.0
