@@ -420,7 +420,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   transform: rot ? `rotate(${rot}deg)` : undefined,
                   transformOrigin: '0 0',
                   overflow: 'hidden',
-                  background: imgSrc ? '#0f172a' : '#1e293b',
+                  background: imgSrc ? '#ffffff' : '#1e293b',
                   opacity: photoEl.opacity ?? 1,
                   boxSizing: 'border-box',
                   border: photoEl.borderEnabled && photoEl.borderWidth

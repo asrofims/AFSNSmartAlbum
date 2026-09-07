@@ -152,6 +152,7 @@ function PhotoFrameNode({
   const cropGroupRef = useRef<Konva.Group>(null);
   const cropImgRef = useRef<Konva.Image>(null);
   const ghostGroupRef = useRef<Konva.Group>(null);
+  const ghostImgGroupRef = useRef<Konva.Group>(null);
   const ghostImgRef = useRef<Konva.Image>(null);
   const ghostRectRef = useRef<Konva.Rect>(null);
   const stalkRef = useRef<Konva.Line>(null);
@@ -514,15 +515,15 @@ function PhotoFrameNode({
       {/* Base Solid Hit Rect for robust selection & drag events */}
       <Rect width={pixelW} height={pixelH} fill="rgba(0, 0, 0, 0.001)" listening={!isCropMode} />
 
-      {/* Ghost Reveal and Interactive Crop Overlay */}
+      {/* Semi-transparent uncropped original image outside the frame */}
       {isCropMode && imageObj && (
         <Group
-          ref={ghostGroupRef}
+          ref={ghostImgGroupRef}
           x={photoCenterX}
           y={photoCenterY}
           rotation={effectiveCropRot}
+          listening={false}
         >
-          {/* Semi-transparent uncropped original image outside the frame */}
           <KonvaImage
             ref={ghostImgRef}
             image={imageObj}
@@ -531,9 +532,154 @@ function PhotoFrameNode({
             width={renderImgW}
             height={renderImgH}
             opacity={0.28}
+          />
+        </Group>
+      )}
+
+      {/* Clipped Photo Viewport */}
+      <Group
+        clipFunc={(ctx) => {
+          ctx.rect(0, 0, pixelW, pixelH);
+        }}
+      >
+        <Rect
+          width={pixelW}
+          height={pixelH}
+          fill="#ffffff"
+          listening={false}
+        />
+        {imageObj ? (
+          <Group
+            id={`crop-group-${frame.id}`}
+            ref={cropGroupRef}
+            x={photoCenterX}
+            y={photoCenterY}
+            rotation={effectiveCropRot}
+            draggable={isCropMode}
+            onMouseDown={(e) => {
+              if (isCropMode) {
+                e.cancelBubble = true;
+              }
+            }}
+            onMouseEnter={(e) => {
+              if (isCropMode) setCursor(e, 'move');
+            }}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onWheel={(e) => {
+              if (isCropMode) {
+                e.evt.preventDefault();
+                e.cancelBubble = true;
+                const scaleDelta = e.evt.deltaY < 0 ? 0.02 : -0.02;
+                const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 100) / 100, 1.0, 3.5);
+                onCropChange({ cropScale: newScale });
+              }
+            }}
+            onDragMove={(e) => {
+              if (isCropMode) {
+                e.cancelBubble = true;
+                const maxExcessX = Math.max(0, renderImgW - pixelW);
+                const maxExcessY = Math.max(0, renderImgH - pixelH);
+                const maxShiftX = maxExcessX / 2;
+                const maxShiftY = maxExcessY / 2;
+                const fcX = pixelW / 2;
+                const fcY = pixelH / 2;
+
+                let targetX = fcX;
+                let targetY = fcY;
+                if (maxShiftX > 0.5) {
+                  targetX = clamp(e.target.x(), fcX - maxShiftX, fcX + maxShiftX);
+                }
+                if (maxShiftY > 0.5) {
+                  targetY = clamp(e.target.y(), fcY - maxShiftY, fcY + maxShiftY);
+                }
+                e.target.x(targetX);
+                e.target.y(targetY);
+
+                if (ghostGroupRef.current) {
+                  ghostGroupRef.current.x(targetX);
+                  ghostGroupRef.current.y(targetY);
+                }
+                if (ghostImgGroupRef.current) {
+                  ghostImgGroupRef.current.x(targetX);
+                  ghostImgGroupRef.current.y(targetY);
+                }
+
+                e.target.getLayer()?.batchDraw();
+              }
+            }}
+            onDragEnd={(e) => {
+              if (isCropMode) {
+                e.cancelBubble = true;
+                const maxExcessX = Math.max(0, renderImgW - pixelW);
+                const maxExcessY = Math.max(0, renderImgH - pixelH);
+                const maxShiftX = maxExcessX / 2;
+                const maxShiftY = maxExcessY / 2;
+                const fcX = pixelW / 2;
+                const fcY = pixelH / 2;
+
+                let normX = 0;
+                let normY = 0;
+                if (maxShiftX > 0.5) {
+                  normX = (e.target.x() - fcX) / maxShiftX;
+                }
+                if (maxShiftY > 0.5) {
+                  normY = (e.target.y() - fcY) / maxShiftY;
+                }
+
+                onCropChange({
+                  cropX: Math.round(clamp(normX, -1, 1) * 1000) / 1000,
+                  cropY: Math.round(clamp(normY, -1, 1) * 1000) / 1000,
+                  cropScale: effectiveCropScale,
+                  cropRotation: effectiveCropRot,
+                });
+              }
+            }}
+          >
+            <KonvaImage
+              id={`crop-img-${frame.id}`}
+              ref={cropImgRef}
+              image={imageObj}
+              x={-renderImgW / 2}
+              y={-renderImgH / 2}
+              width={renderImgW}
+              height={renderImgH}
+            />
+          </Group>
+        ) : (
+          <Rect
+            width={pixelW}
+            height={pixelH}
+            fill="#1e293b"
             listening={false}
           />
+        )}
+      </Group>
 
+      {/* Frame Border (Inside Stroke to maintain exact outer bounds for snapping) */}
+      {frame.borderEnabled && (() => {
+        const strokePx = Math.max(1, Math.round((frame.borderWidth || 0) * scaleFactor));
+        return (
+          <Rect
+            x={strokePx / 2}
+            y={strokePx / 2}
+            width={Math.max(0, pixelW - strokePx)}
+            height={Math.max(0, pixelH - strokePx)}
+            stroke={frame.borderColor || '#FFFFFF'}
+            strokeWidth={strokePx}
+            strokeScaleEnabled={false}
+            listening={false}
+          />
+        );
+      })()}
+
+      {/* Ghost Reveal and Interactive Crop Overlay (ALWAYS ON TOP OF FRAME) */}
+      {isCropMode && imageObj && (
+        <Group
+          ref={ghostGroupRef}
+          x={photoCenterX}
+          y={photoCenterY}
+          rotation={effectiveCropRot}
+        >
           {/* Dashed outer boundary of original uncropped image */}
           <Rect
             ref={ghostRectRef}
@@ -746,132 +892,6 @@ function PhotoFrameNode({
           />
         </Group>
       )}
-
-      {/* Clipped Photo Viewport */}
-      <Group
-        clipFunc={(ctx) => {
-          ctx.rect(0, 0, pixelW, pixelH);
-        }}
-      >
-        {imageObj ? (
-          <Group
-            id={`crop-group-${frame.id}`}
-            ref={cropGroupRef}
-            x={photoCenterX}
-            y={photoCenterY}
-            rotation={effectiveCropRot}
-            draggable={isCropMode}
-            onMouseDown={(e) => {
-              if (isCropMode) {
-                e.cancelBubble = true;
-              }
-            }}
-            onMouseEnter={(e) => {
-              if (isCropMode) setCursor(e, 'move');
-            }}
-            onMouseLeave={(e) => setCursor(e, 'default')}
-            onWheel={(e) => {
-              if (isCropMode) {
-                e.evt.preventDefault();
-                e.cancelBubble = true;
-                const scaleDelta = e.evt.deltaY < 0 ? 0.02 : -0.02;
-                const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 100) / 100, 1.0, 3.5);
-                onCropChange({ cropScale: newScale });
-              }
-            }}
-            onDragMove={(e) => {
-              if (isCropMode) {
-                e.cancelBubble = true;
-                const maxExcessX = Math.max(0, renderImgW - pixelW);
-                const maxExcessY = Math.max(0, renderImgH - pixelH);
-                const maxShiftX = maxExcessX / 2;
-                const maxShiftY = maxExcessY / 2;
-                const fcX = pixelW / 2;
-                const fcY = pixelH / 2;
-
-                let targetX = fcX;
-                let targetY = fcY;
-                if (maxShiftX > 0.5) {
-                  targetX = clamp(e.target.x(), fcX - maxShiftX, fcX + maxShiftX);
-                }
-                if (maxShiftY > 0.5) {
-                  targetY = clamp(e.target.y(), fcY - maxShiftY, fcY + maxShiftY);
-                }
-                e.target.x(targetX);
-                e.target.y(targetY);
-
-                if (ghostGroupRef.current) {
-                  ghostGroupRef.current.x(targetX);
-                  ghostGroupRef.current.y(targetY);
-                }
-
-                e.target.getLayer()?.batchDraw();
-              }
-            }}
-            onDragEnd={(e) => {
-              if (isCropMode) {
-                e.cancelBubble = true;
-                const maxExcessX = Math.max(0, renderImgW - pixelW);
-                const maxExcessY = Math.max(0, renderImgH - pixelH);
-                const maxShiftX = maxExcessX / 2;
-                const maxShiftY = maxExcessY / 2;
-                const fcX = pixelW / 2;
-                const fcY = pixelH / 2;
-
-                let normX = 0;
-                let normY = 0;
-                if (maxShiftX > 0.5) {
-                  normX = (e.target.x() - fcX) / maxShiftX;
-                }
-                if (maxShiftY > 0.5) {
-                  normY = (e.target.y() - fcY) / maxShiftY;
-                }
-
-                onCropChange({
-                  cropX: Math.round(clamp(normX, -1, 1) * 1000) / 1000,
-                  cropY: Math.round(clamp(normY, -1, 1) * 1000) / 1000,
-                  cropScale: effectiveCropScale,
-                  cropRotation: effectiveCropRot,
-                });
-              }
-            }}
-          >
-            <KonvaImage
-              id={`crop-img-${frame.id}`}
-              ref={cropImgRef}
-              image={imageObj}
-              x={-renderImgW / 2}
-              y={-renderImgH / 2}
-              width={renderImgW}
-              height={renderImgH}
-            />
-          </Group>
-        ) : (
-          <Rect
-            width={pixelW}
-            height={pixelH}
-            fill="#1e293b"
-            listening={false}
-          />
-        )}
-      </Group>
-
-      {/* Frame Border (Inside Stroke to maintain exact outer bounds for snapping) */}
-      {frame.borderEnabled && (() => {
-        const strokePx = Math.max(1, Math.round((frame.borderWidth || 0) * scaleFactor));
-        return (
-          <Rect
-            x={strokePx / 2}
-            y={strokePx / 2}
-            width={Math.max(0, pixelW - strokePx)}
-            height={Math.max(0, pixelH - strokePx)}
-            stroke={frame.borderColor || '#FFFFFF'}
-            strokeWidth={strokePx}
-            strokeScaleEnabled={false}
-            listening={false}
-          />
-        );
-      })()}
 
       {/* Multiple Selection Visual Highlight Outline */}
       {isSelected && isMultiSelectActive && !isCropMode && (

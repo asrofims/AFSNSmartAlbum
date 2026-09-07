@@ -228,7 +228,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               transform: rot ? `rotate(${rot}deg)` : undefined,
               transformOrigin: '0 0',
               overflow: 'hidden',
-              background: 'linear-gradient(135deg, #334155, #1e293b)',
+              background: imgSrc ? '#ffffff' : 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: photoEl.opacity ?? 1,
               border: photoEl.borderEnabled && photoEl.borderWidth ? `1px solid ${photoEl.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
               borderRadius: '1px',
