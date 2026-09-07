@@ -203,3 +203,15 @@
 - [x] Minimalist Properties Inspector (Clean slider, precision numeric input, icon-only Reset `↺` and Link `🔗`/`🔓` toggles, zero template clutter)
 - [x] In-Frame Photo Crop Rotation & Canvas Previews (White void backing, unified rotation button, angle synchronization across preview & export)
 
+## Phase 18 — Safe Margin Zero-Value Consistency & Falsy Logic Elimination
+- [x] Zero Safe Margin Preservation (Fixed `min={0.1}` clamping in `NewProjectDialog` allowing exact `0` safe margin for full-bleed and borderless layouts)
+- [x] Falsy Logical OR Fix (Replaced `project.marginValue || 10` with nullish coalescing `?? 10` across album creation, spreads, and workspace properties)
+- [x] Initial Spread 4-Sided Margin Binding (`createInitialAlbum` now binds `safeAreaTop`, `safeAreaBottom`, `safeAreaOutside`, `safeAreaSpine` to Cover and Spread 1)
+- [x] Whole Pixel Stepping & Precision (`px` canvas units now use `step=1` and `precision=0` across wizard, workspace properties, and structure panels)
+- [x] Zero-Value Guide Clamping Removal (`SpreadCanvas` and `AlbumStructurePanel` updated to support `0px` safe area margins cleanly)
+- [x] Test Suite Assertion Consistency (Resolved legacy test assertions and added comprehensive Section 12 unit tests for zero safe margins and seamless spine folds)
+- [x] Dynamic Template Dropdown Unit Synchronization (`formatPresetLabel` dynamically converts template dropdown dimensions to match the active project unit `mm`/`cm`/`inch`/`px`)
+- [x] Smart Cross-Unit Preset Matching (`findMatchingPreset` tolerance matching prevents active preset from resetting to "Custom Dimensions" when changing units)
+- [x] Active Unit Preservation on Preset Select (`handlePresetSelect` converts template dimensions to the user's active unit instead of forcibly resetting `canvasUnit`)
+
+

@@ -11,6 +11,7 @@ import {
   syncAlbumPhotoAssets,
 } from '../src/domain/album';
 import { type PhotoFrameElement, applyFixedGap } from '../src/domain/editor';
+import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
 
 console.log('Testing Album Structure Domain...');
 
@@ -258,11 +259,11 @@ spreadToCustomize.bleed = 5.0; // Customize spread 2
 spreadToCustomize.spacingValue = 6.0;
 spreadToCustomize.safeArea = 15.0;
 
-// Creating new spread 3: must follow project creation defaults (spacingValue: 2, safeArea: 10, bleed: 3.0)
+// Creating new spread 3: must follow project creation defaults (spacingValue: darkProject.spacingValue, safeArea: darkProject.marginValue, bleed: 3.0)
 const darkSpread3 = createInteriorSpread(darkAlbum, darkProject, 3);
 console.assert(darkSpread3.bleed === 3.0, `New spread should follow project default bleed (3.0), got ${darkSpread3.bleed}`);
-console.assert(darkSpread3.spacingValue === 2, `New spread should follow project default spacing (2), got ${darkSpread3.spacingValue}`);
-console.assert(darkSpread3.safeArea === 10, `New spread should follow project default safeArea (10), got ${darkSpread3.safeArea}`);
+console.assert(darkSpread3.spacingValue === darkProject.spacingValue, `New spread should follow project default spacing (${darkProject.spacingValue}), got ${darkSpread3.spacingValue}`);
+console.assert(darkSpread3.safeArea === darkProject.marginValue, `New spread should follow project default safeArea (${darkProject.marginValue}), got ${darkSpread3.safeArea}`);
 
 // Verify previous spread retains its customized dynamic values
 console.assert(spreadToCustomize.bleed === 5.0, `Customized spread bleed must remain 5.0, got ${spreadToCustomize.bleed}`);
@@ -339,4 +340,81 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   console.assert(f1.photoId === 'photo-1' && f2.photoId === 'photo-2', 'Photo identity must never shuffle');
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, and in-place non-shuffling photo gap adjustment)!');
+// 12. Test Zero Safe Margin and Full-Bleed Consistency (Fix 0-value clamping bug)
+{
+  const zeroPixelProject: Project = {
+    ...mockProject,
+    id: 'test-proj-zero-px',
+    canvasWidth: 3000,
+    canvasHeight: 2000,
+    canvasUnit: 'px',
+    canvasDpi: 300,
+    marginEnabled: true,
+    marginValue: 0,
+    marginUnit: 'px',
+    marginTop: 0,
+    marginBottom: 0,
+    marginOutside: 0,
+    marginSpine: 0,
+    spacingValue: 0,
+    spacingUnit: 'px',
+  };
+
+  const zeroAlbum = createInitialAlbum(zeroPixelProject);
+  const cover = zeroAlbum.coverSpread;
+  const spread1 = zeroAlbum.spreads[0];
+
+  // Test cover spread margins strictly 0 (not 0.1 or 10)
+  console.assert(cover.safeArea === 0, `Cover safeArea should be 0, got ${cover.safeArea}`);
+  console.assert(cover.safeAreaTop === 0, `Cover safeAreaTop should be 0, got ${cover.safeAreaTop}`);
+  console.assert(cover.safeAreaBottom === 0, `Cover safeAreaBottom should be 0, got ${cover.safeAreaBottom}`);
+  console.assert(cover.safeAreaOutside === 0, `Cover safeAreaOutside should be 0, got ${cover.safeAreaOutside}`);
+  console.assert(cover.safeAreaSpine === 0, `Cover safeAreaSpine should be 0, got ${cover.safeAreaSpine}`);
+
+  // Test spread 1 margins strictly 0
+  console.assert(spread1.safeArea === 0, `Spread1 safeArea should be 0, got ${spread1.safeArea}`);
+  console.assert(spread1.safeAreaTop === 0, `Spread1 safeAreaTop should be 0, got ${spread1.safeAreaTop}`);
+  console.assert(spread1.safeAreaBottom === 0, `Spread1 safeAreaBottom should be 0, got ${spread1.safeAreaBottom}`);
+  console.assert(spread1.safeAreaOutside === 0, `Spread1 safeAreaOutside should be 0, got ${spread1.safeAreaOutside}`);
+  console.assert(spread1.safeAreaSpine === 0, `Spread1 safeAreaSpine should be 0, got ${spread1.safeAreaSpine}`);
+  console.assert(spread1.leftPage?.safeArea === 0, `Spread1 leftPage safeArea should be 0, got ${spread1.leftPage?.safeArea}`);
+  console.assert(spread1.rightPage?.safeArea === 0, `Spread1 rightPage safeArea should be 0, got ${spread1.rightPage?.safeArea}`);
+
+  // Test new interior spread inherits zero safe margin from project
+  const spread2 = createInteriorSpread(zeroAlbum, zeroPixelProject, 2);
+  console.assert(spread2.safeArea === 0, `Spread2 safeArea should be 0, got ${spread2.safeArea}`);
+  console.assert(spread2.safeAreaTop === 0, `Spread2 safeAreaTop should be 0, got ${spread2.safeAreaTop}`);
+  console.assert(spread2.safeAreaBottom === 0, `Spread2 safeAreaBottom should be 0, got ${spread2.safeAreaBottom}`);
+  console.assert(spread2.safeAreaOutside === 0, `Spread2 safeAreaOutside should be 0, got ${spread2.safeAreaOutside}`);
+  console.assert(spread2.safeAreaSpine === 0, `Spread2 safeAreaSpine should be 0, got ${spread2.safeAreaSpine}`);
+
+  // Test getProjectDimensionsInCanvasUnit preserves 0
+  const dims = getProjectDimensionsInCanvasUnit(zeroPixelProject, spread1);
+  console.assert(dims.safeMargin === 0, `Dims safeMargin should be 0, got ${dims.safeMargin}`);
+  console.assert(dims.safeMarginTop === 0, `Dims safeMarginTop should be 0, got ${dims.safeMarginTop}`);
+  console.assert(dims.safeMarginBottom === 0, `Dims safeMarginBottom should be 0, got ${dims.safeMarginBottom}`);
+  console.assert(dims.safeMarginOutside === 0, `Dims safeMarginOutside should be 0, got ${dims.safeMarginOutside}`);
+  console.assert(dims.safeMarginSpine === 0, `Dims safeMarginSpine should be 0, got ${dims.safeMarginSpine}`);
+
+  // Test 4-sided margin with 0 spine and non-zero outside
+  const seamlessSpineProject: Project = {
+    ...mockProject,
+    id: 'test-proj-seamless-spine',
+    marginValue: 20,
+    marginTop: 15,
+    marginBottom: 15,
+    marginOutside: 25,
+    marginSpine: 0, // Zero spine for seamless layflat center fold
+  };
+  const seamlessAlbum = createInitialAlbum(seamlessSpineProject);
+  const sSpread1 = seamlessAlbum.spreads[0];
+  console.assert(sSpread1.safeAreaSpine === 0, `Seamless spread safeAreaSpine should be 0, got ${sSpread1.safeAreaSpine}`);
+  console.assert(sSpread1.safeAreaOutside === 25, `Seamless spread safeAreaOutside should be 25, got ${sSpread1.safeAreaOutside}`);
+  console.assert(sSpread1.safeAreaTop === 15, `Seamless spread safeAreaTop should be 15, got ${sSpread1.safeAreaTop}`);
+
+  const sDims = getProjectDimensionsInCanvasUnit(seamlessSpineProject, sSpread1);
+  console.assert(sDims.safeMarginSpine === 0, `Seamless dims safeMarginSpine should be 0, got ${sDims.safeMarginSpine}`);
+  console.assert(sDims.safeMarginOutside === 25, `Seamless dims safeMarginOutside should be 25, got ${sDims.safeMarginOutside}`);
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, and in-place non-shuffling photo gap adjustment)!');

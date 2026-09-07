@@ -44,6 +44,7 @@ export function WorkspaceLayout() {
   const closeProject = useProjectStore((s) => s.closeProject);
   const updateProjectName = useProjectStore((s) => s.updateProjectName);
   const updateProjectSpacing = useProjectStore((s) => s.updateProjectSpacing);
+  const updateProjectMargin = useProjectStore((s) => s.updateProjectMargin);
   const updateProjectBackgroundColor = useProjectStore((s) => s.updateProjectBackgroundColor);
   const saveProject = useProjectStore((s) => s.saveProject);
   const exportProjectAsAfsn = useProjectStore((s) => s.exportProjectAsAfsn);
@@ -2512,8 +2513,8 @@ export function WorkspaceLayout() {
                         onBlur={handleCommitGapChange}
                         min={0}
                         max={100}
-                        step={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' ? 0.05 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 0.1 : 0.5}
-                        precision={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' || (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 2 : 1}
+                        step={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' ? 0.05 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 0.1 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'px' ? 1 : 0.5}
+                        precision={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'px' ? 0 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' || (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 2 : 1}
                       />
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '24px' }}>
                         {activeSpread?.spacingUnit ?? currentProject.spacingUnit}
@@ -2772,11 +2773,15 @@ export function WorkspaceLayout() {
                       </span>
                       <div style={{ width: '110px' }}>
                         <NumberInput
-                          value={activeSpread?.safeArea ?? (currentProject.marginValue || 10)}
-                          onChange={(val) => updateSafeArea(val, 'all')}
+                          value={activeSpread?.safeArea ?? (currentProject.marginValue ?? 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'all');
+                            updateProjectMargin(val, currentProject.marginUnit, 'all');
+                          }}
                           min={0}
                           max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                           suffix={currentProject.canvasUnit}
                         />
                       </div>
@@ -2789,11 +2794,15 @@ export function WorkspaceLayout() {
                           <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
                         </div>
                         <NumberInput
-                          value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop || 10)}
-                          onChange={(val) => updateSafeArea(val, 'top')}
+                          value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop ?? 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'top');
+                            updateProjectMargin(val, currentProject.marginUnit, 'top');
+                          }}
                           min={0}
                           max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                           suffix={currentProject.canvasUnit}
                         />
                       </div>
@@ -2804,11 +2813,15 @@ export function WorkspaceLayout() {
                           <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
                         </div>
                         <NumberInput
-                          value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom || 10)}
-                          onChange={(val) => updateSafeArea(val, 'bottom')}
+                          value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom ?? 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'bottom');
+                            updateProjectMargin(val, currentProject.marginUnit, 'bottom');
+                          }}
                           min={0}
                           max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                           suffix={currentProject.canvasUnit}
                         />
                       </div>
@@ -2819,11 +2832,15 @@ export function WorkspaceLayout() {
                           <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Outside</span>
                         </div>
                         <NumberInput
-                          value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside || 10)}
-                          onChange={(val) => updateSafeArea(val, 'outside')}
+                          value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside ?? 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'outside');
+                            updateProjectMargin(val, currentProject.marginUnit, 'outside');
+                          }}
                           min={0}
                           max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                           suffix={currentProject.canvasUnit}
                         />
                       </div>
@@ -2834,11 +2851,15 @@ export function WorkspaceLayout() {
                           <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Spine</span>
                         </div>
                         <NumberInput
-                          value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine || 10)}
-                          onChange={(val) => updateSafeArea(val, 'spine')}
+                          value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine ?? 10)}
+                          onChange={(val) => {
+                            updateSafeArea(val, 'spine');
+                            updateProjectMargin(val, currentProject.marginUnit, 'spine');
+                          }}
                           min={0}
                           max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                           suffix={currentProject.canvasUnit}
                         />
                       </div>

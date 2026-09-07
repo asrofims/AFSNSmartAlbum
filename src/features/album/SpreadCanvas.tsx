@@ -91,9 +91,9 @@ export function SpreadCanvas({ zoomLevel, activeTool }: SpreadCanvasProps) {
   const rightPagePixelW = leftPagePixelW;
   const gutterPixelW = screenSpreadW - leftPagePixelW - rightPagePixelW;
 
-  // Exact bleed & safe area in pixels (no artificial min clamping, allowing 0.5 cm to be thinner to edge)
-  const bleedPixel = Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
-  const safeAreaPixel = Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
+  // Exact bleed & safe area in pixels (allowing 0 for borderless/seamless designs)
+  const bleedPixel = bleedInMm <= 0 ? 0 : Math.max(1, Math.round((bleedInMm / pageWInMm) * leftPagePixelW));
+  const safeAreaPixel = safeAreaInMm <= 0 ? 0 : Math.max(1, Math.round((safeAreaInMm / pageWInMm) * leftPagePixelW));
 
   return (
     <div

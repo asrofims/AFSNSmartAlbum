@@ -11,6 +11,7 @@ import {
   AlbumPreset,
   CUSTOM_PRESET_ID,
   findMatchingPreset,
+  formatPresetLabel,
   getPresetById,
   getAllPresets,
   saveCustomPreset,
@@ -112,35 +113,34 @@ export function NewProjectDialog() {
 
     const preset = allPresets.find((p) => p.id === id) || getPresetById(id);
     if (preset) {
-      setCanvasWidth(preset.width);
-      setCanvasHeight(preset.height);
-      setCanvasDpi(preset.dpi);
-
-      const targetUnit = preset.unit;
-      if (targetUnit !== canvasUnit) {
-        setCanvasUnit(targetUnit);
-      }
+      // Convert preset dimensions to user's active canvasUnit so their unit selection is strictly preserved
+      const targetW = roundUnit(convertUnit(preset.width, preset.unit, canvasUnit, canvasDpi), canvasUnit);
+      const targetH = roundUnit(convertUnit(preset.height, preset.unit, canvasUnit, canvasDpi), canvasUnit);
+      setCanvasWidth(targetW);
+      setCanvasHeight(targetH);
+      if (preset.dpi) setCanvasDpi(preset.dpi);
 
       if (preset.isCustom) {
-        if (preset.spacingValue !== undefined) setSpacingValue(preset.spacingValue);
-        if (preset.spacingUnit) setSpacingUnit(preset.spacingUnit);
+        if (preset.spacingValue !== undefined) {
+          const sp = roundUnit(convertUnit(preset.spacingValue, preset.spacingUnit || preset.unit, spacingUnit, canvasDpi), spacingUnit);
+          setSpacingValue(sp);
+        }
+        if (preset.marginValue !== undefined) {
+          const mv = roundUnit(convertUnit(preset.marginValue, preset.marginUnit || preset.unit, marginUnit, canvasDpi), marginUnit);
+          setMarginValue(mv);
+          setMarginTop(mv);
+          setMarginBottom(mv);
+          setMarginOutside(mv);
+          setMarginSpine(mv);
+        }
+        if (preset.borderWidth !== undefined) {
+          const bw = roundUnit(convertUnit(preset.borderWidth, preset.borderUnit || preset.unit, borderUnit, canvasDpi), borderUnit);
+          setBorderWidth(bw);
+        }
         if (preset.marginEnabled !== undefined) setMarginEnabled(preset.marginEnabled);
-        if (preset.marginValue !== undefined) setMarginValue(preset.marginValue);
-        if (preset.marginUnit) setMarginUnit(preset.marginUnit);
         if (preset.borderEnabled !== undefined) setBorderEnabled(preset.borderEnabled);
-        if (preset.borderWidth !== undefined) setBorderWidth(preset.borderWidth);
-        if (preset.borderUnit) setBorderUnit(preset.borderUnit);
         if (preset.borderColor) setBorderColor(preset.borderColor);
         if (preset.backgroundColor) setBackgroundColor(preset.backgroundColor);
-      } else {
-        if (targetUnit !== canvasUnit) {
-          setMarginValue(roundUnit(convertUnit(marginValue, marginUnit, targetUnit, preset.dpi), targetUnit));
-          setMarginUnit(targetUnit);
-          setSpacingValue(roundUnit(convertUnit(spacingValue, spacingUnit, targetUnit, preset.dpi), targetUnit));
-          setSpacingUnit(targetUnit);
-          setBorderWidth(roundUnit(convertUnit(borderWidth, borderUnit, targetUnit, preset.dpi), targetUnit));
-          setBorderUnit(targetUnit);
-        }
       }
     }
   };
@@ -218,20 +218,20 @@ export function NewProjectDialog() {
     setBorderWidth(convertedBorder);
     setBorderUnit(newUnit);
 
-    const matched = findMatchingPreset(convertedW, convertedH, newUnit);
+    const matched = findMatchingPreset(convertedW, convertedH, newUnit, canvasDpi);
     setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
   };
 
   // Width & Height changes
   const handleWidthChange = (val: number) => {
     setCanvasWidth(val);
-    const matched = findMatchingPreset(val, canvasHeight, canvasUnit);
+    const matched = findMatchingPreset(val, canvasHeight, canvasUnit, canvasDpi);
     setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
   };
 
   const handleHeightChange = (val: number) => {
     setCanvasHeight(val);
-    const matched = findMatchingPreset(canvasWidth, val, canvasUnit);
+    const matched = findMatchingPreset(canvasWidth, val, canvasUnit, canvasDpi);
     setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
   };
 
@@ -241,7 +241,7 @@ export function NewProjectDialog() {
       const size = canvasWidth;
       setCanvasWidth(size);
       setCanvasHeight(size);
-      const matched = findMatchingPreset(size, size, canvasUnit);
+      const matched = findMatchingPreset(size, size, canvasUnit, canvasDpi);
       setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
     } else if (mode === 'portrait') {
       if (canvasWidth > canvasHeight) {
@@ -249,12 +249,12 @@ export function NewProjectDialog() {
         const h = canvasWidth;
         setCanvasWidth(w);
         setCanvasHeight(h);
-        const matched = findMatchingPreset(w, h, canvasUnit);
+        const matched = findMatchingPreset(w, h, canvasUnit, canvasDpi);
         setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
       } else if (Math.abs(canvasWidth - canvasHeight) < 0.001) {
         const h = Math.round(canvasWidth * 1.25 * 10) / 10;
         setCanvasHeight(h);
-        const matched = findMatchingPreset(canvasWidth, h, canvasUnit);
+        const matched = findMatchingPreset(canvasWidth, h, canvasUnit, canvasDpi);
         setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
       }
     } else if (mode === 'landscape') {
@@ -263,12 +263,12 @@ export function NewProjectDialog() {
         const h = canvasWidth;
         setCanvasWidth(w);
         setCanvasHeight(h);
-        const matched = findMatchingPreset(w, h, canvasUnit);
+        const matched = findMatchingPreset(w, h, canvasUnit, canvasDpi);
         setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
       } else if (Math.abs(canvasWidth - canvasHeight) < 0.001) {
         const w = Math.round(canvasHeight * 1.25 * 10) / 10;
         setCanvasWidth(w);
-        const matched = findMatchingPreset(w, canvasHeight, canvasUnit);
+        const matched = findMatchingPreset(w, canvasHeight, canvasUnit, canvasDpi);
         setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
       }
     }
@@ -280,7 +280,7 @@ export function NewProjectDialog() {
     const nextH = canvasWidth;
     setCanvasWidth(nextW);
     setCanvasHeight(nextH);
-    const matched = findMatchingPreset(nextW, nextH, canvasUnit);
+    const matched = findMatchingPreset(nextW, nextH, canvasUnit, canvasDpi);
     setPresetId(matched ? matched.id : CUSTOM_PRESET_ID);
   };
 
@@ -473,7 +473,7 @@ export function NewProjectDialog() {
                         options={[
                           ...allPresets.map((p) => ({
                             value: p.id,
-                            label: p.isCustom ? `★ ${p.name}` : p.name,
+                            label: formatPresetLabel(p, canvasUnit, canvasDpi),
                           })),
                           { value: CUSTOM_PRESET_ID, label: 'Custom Dimensions' },
                         ]}
@@ -734,9 +734,10 @@ export function NewProjectDialog() {
                           label="Safe Margin (All Sides)"
                           value={marginValue}
                           onChange={setMarginValue}
-                          min={0.1}
+                          min={0}
                           max={1000}
-                          step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                          step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
+                          precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                         />
                       </div>
                       <div className={styles.unitSelectBox}>
@@ -760,7 +761,8 @@ export function NewProjectDialog() {
                             onChange={setMarginTop}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
+                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div>
@@ -770,7 +772,8 @@ export function NewProjectDialog() {
                             onChange={setMarginBottom}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
+                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div title="Outer trim margin protected from paper cutting">
@@ -780,7 +783,8 @@ export function NewProjectDialog() {
                             onChange={setMarginOutside}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
+                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
@@ -790,7 +794,8 @@ export function NewProjectDialog() {
                             onChange={setMarginSpine}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 5 : 0.5}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
+                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                       </div>
@@ -800,7 +805,7 @@ export function NewProjectDialog() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
-                          <span>Seamless Spread: Pages 1 & 2 connect continuously across spine crease</span>
+                          <span>Continuous Seamless Spread: 0 Spine Margin</span>
                         </div>
                       )}
                     </div>
@@ -828,7 +833,8 @@ export function NewProjectDialog() {
                         onChange={setSpacingValue}
                         min={0}
                         max={500}
-                        step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 2 : 0.5}
+                        step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 1 : 0.5}
+                        precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                       />
                     </div>
                     <div className={styles.unitSelectBox}>

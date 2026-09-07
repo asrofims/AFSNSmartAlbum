@@ -139,6 +139,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       activeSpreadIndex: 0, // Default to Spread 1 (Pages 1-2)
       selectedSpreadIds: album.spreads[0]?.id ? [album.spreads[0].id] : [],
       selectedPageId: null,
+      showSafeAreaGuide: project.marginEnabled ?? true,
       saveStatus: 'saved',
       lastSavedAt: new Date().toLocaleTimeString(),
     });
@@ -941,19 +942,25 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     }
 
     if (currentAlbum.coverSpread.id === activeSpreadId) {
+      const cov = currentAlbum.coverSpread;
+      const updatedLeft = cov.leftPage && patch.safeArea !== undefined ? { ...cov.leftPage, safeArea: patch.safeArea } : cov.leftPage;
+      const updatedRight = cov.rightPage && patch.safeArea !== undefined ? { ...cov.rightPage, safeArea: patch.safeArea } : cov.rightPage;
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...currentAlbum.coverSpread, ...patch },
+          coverSpread: { ...cov, ...patch, leftPage: updatedLeft, rightPage: updatedRight },
         },
         saveStatus: 'unsaved',
       });
       return;
     }
 
-    const updatedSpreads = currentAlbum.spreads.map((s) =>
-      s.id === activeSpreadId ? { ...s, ...patch } : s
-    );
+    const updatedSpreads = currentAlbum.spreads.map((s) => {
+      if (s.id !== activeSpreadId) return s;
+      const updatedLeft = s.leftPage && patch.safeArea !== undefined ? { ...s.leftPage, safeArea: patch.safeArea } : s.leftPage;
+      const updatedRight = s.rightPage && patch.safeArea !== undefined ? { ...s.rightPage, safeArea: patch.safeArea } : s.rightPage;
+      return { ...s, ...patch, leftPage: updatedLeft, rightPage: updatedRight };
+    });
 
     set({
       currentAlbum: {

@@ -1,4 +1,4 @@
-import { Unit } from './units';
+import { Unit, convertUnit, formatDimensions } from './units';
 
 export interface AlbumPreset {
   id: string;
@@ -203,6 +203,47 @@ export function getPresetById(id: string): AlbumPreset | undefined {
   return getAllPresets().find((p) => p.id === id);
 }
 
-export function findMatchingPreset(width: number, height: number, unit: Unit): AlbumPreset | undefined {
-  return getAllPresets().find((p) => p.width === width && p.height === height && p.unit === unit);
+export function formatPresetLabel(preset: AlbumPreset, targetUnit: Unit, dpi: number = 300): string {
+  const prefix = preset.isCustom ? '★ ' : '';
+  if (preset.unit === targetUnit) {
+    return `${prefix}${preset.name}`;
+  }
+
+  const roundPresetVal = (val: number, u: Unit): number => {
+    if (u === 'inch' || u === 'cm') return Math.round(val * 100) / 100;
+    if (u === 'mm') return Math.round(val * 10) / 10;
+    return Math.round(val);
+  };
+
+  const convertedW = roundPresetVal(convertUnit(preset.width, preset.unit, targetUnit, dpi), targetUnit);
+  const convertedH = roundPresetVal(convertUnit(preset.height, preset.unit, targetUnit, dpi), targetUnit);
+  const formattedDims = formatDimensions(convertedW, convertedH, targetUnit);
+
+  // Clean title: remove any existing trailing parentheses like "(210 × 297 mm)"
+  const cleanName = preset.name.replace(/\s*\([^)]*\)\s*$/, '');
+  return `${prefix}${cleanName} (${formattedDims})`;
+}
+
+export function findMatchingPreset(
+  width: number,
+  height: number,
+  unit: Unit,
+  dpi: number = 300
+): AlbumPreset | undefined {
+  const presets = getAllPresets();
+
+  // 1. Direct exact match in the same unit
+  const exact = presets.find((p) => p.width === width && p.height === height && p.unit === unit);
+  if (exact) return exact;
+
+  // 2. Cross-unit mathematical equivalence (within 0.5 mm tolerance)
+  const currentMmW = convertUnit(width, unit, 'mm', dpi, 4);
+  const currentMmH = convertUnit(height, unit, 'mm', dpi, 4);
+
+  return presets.find((p) => {
+    const presetDpi = p.dpi || dpi;
+    const presetMmW = convertUnit(p.width, p.unit, 'mm', presetDpi, 4);
+    const presetMmH = convertUnit(p.height, p.unit, 'mm', presetDpi, 4);
+    return Math.abs(currentMmW - presetMmW) <= 0.5 && Math.abs(currentMmH - presetMmH) <= 0.5;
+  });
 }

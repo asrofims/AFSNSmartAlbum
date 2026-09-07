@@ -143,10 +143,10 @@ export function AlbumStructurePanel() {
               <NumberInput
                 value={activeSpread.safeArea}
                 onChange={updateSafeArea}
-                min={1}
-                max={50}
-                step={unit === 'inch' ? 0.05 : 1}
-                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
+                min={0}
+                max={1000}
+                step={unit === 'inch' ? 0.05 : unit === 'cm' ? 0.1 : unit === 'px' ? 1 : 0.5}
+                precision={unit === 'px' ? 0 : unit === 'inch' || unit === 'cm' ? 2 : 1}
               />
               <span className={styles.unitText}>{unit}</span>
             </div>

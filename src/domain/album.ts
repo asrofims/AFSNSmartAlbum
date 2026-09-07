@@ -155,7 +155,11 @@ export function createInitialAlbum(project: Project): Album {
   const unit = project.canvasUnit;
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
-  const marginVal = project.marginValue || 10;
+  const marginVal = project.marginValue ?? 10;
+  const safeAreaTop = project.marginTop ?? marginVal;
+  const safeAreaBottom = project.marginBottom ?? marginVal;
+  const safeAreaOutside = project.marginOutside ?? marginVal;
+  const safeAreaSpine = project.marginSpine ?? marginVal;
   const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0; // Standard 3mm bleed
   const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
 
@@ -197,6 +201,10 @@ export function createInitialAlbum(project: Project): Album {
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
+    safeAreaTop,
+    safeAreaBottom,
+    safeAreaOutside,
+    safeAreaSpine,
     spacingValue: project.spacingValue,
     spacingUnit: project.spacingUnit,
     backgroundColor: project.backgroundColor || '#1e293b',
@@ -243,6 +251,10 @@ export function createInitialAlbum(project: Project): Album {
     gutterUnit: unit,
     bleed: bleedVal,
     safeArea: marginVal,
+    safeAreaTop,
+    safeAreaBottom,
+    safeAreaOutside,
+    safeAreaSpine,
     spacingValue: project.spacingValue,
     spacingUnit: project.spacingUnit,
     backgroundColor: defaultBgColor,
@@ -273,7 +285,7 @@ export function createInteriorSpread(
   const unit = project.canvasUnit;
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
-  const marginVal = project.marginValue || 10;
+  const marginVal = project.marginValue ?? 10;
   const safeAreaTop = project.marginTop ?? marginVal;
   const safeAreaBottom = project.marginBottom ?? marginVal;
   const safeAreaOutside = project.marginOutside ?? marginVal;

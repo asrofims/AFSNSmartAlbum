@@ -66,6 +66,27 @@ assert.ok(allAfterSave.some((p) => p.id === 'a4-portrait'), 'All built-ins must 
 const allAfterDelete = deleteCustomPreset('test-custom-preset');
 assert.ok(!allAfterDelete.some((p) => p.id === 'test-custom-preset'));
 assert.ok(allAfterDelete.some((p) => p.id === 'square-8x8'), 'Built-in presets must remain after deleting custom preset');
+
+// Test 2b: formatPresetLabel and Cross-Unit findMatchingPreset
+const { formatPresetLabel, findMatchingPreset } = await import('../src/domain/presets');
+const p20cm = getPresetById('square-20x20-cm')!;
+assert.ok(p20cm !== undefined);
+assert.strictEqual(formatPresetLabel(p20cm, 'cm'), 'Square 20×20 cm', 'Native unit should display clean name without parentheses');
+assert.strictEqual(formatPresetLabel(p20cm, 'inch', 300), 'Square 20×20 cm (7.87 × 7.87 in)', 'Converted inch unit should include equivalent dimension');
+assert.strictEqual(formatPresetLabel(p20cm, 'px', 300), 'Square 20×20 cm (2362 × 2362 px)', 'Converted px unit should include equivalent dimension');
+assert.strictEqual(formatPresetLabel(p20cm, 'mm', 300), 'Square 20×20 cm (200 × 200 mm)', 'Converted mm unit should include equivalent dimension');
+
+const pA4 = getPresetById('a4-portrait')!;
+assert.strictEqual(formatPresetLabel(pA4, 'inch', 300), 'A4 Portrait (8.27 × 11.69 in)', 'Clean title without redundant parenthesized dimensions');
+
+// Test Cross-Unit findMatchingPreset
+assert.strictEqual(findMatchingPreset(20, 20, 'cm')?.id, 'square-20x20-cm', 'Direct unit match');
+assert.strictEqual(findMatchingPreset(200, 200, 'mm')?.id, 'square-20x20-cm', 'Cross-unit mm to cm match');
+assert.strictEqual(findMatchingPreset(7.87, 7.87, 'inch')?.id, 'square-20x20-cm', 'Cross-unit inch to cm match');
+assert.strictEqual(findMatchingPreset(2362, 2362, 'px', 300)?.id, 'square-20x20-cm', 'Cross-unit px to cm match at 300 DPI');
+assert.strictEqual(findMatchingPreset(2400, 2400, 'px', 300)?.id, 'square-8x8', 'Cross-unit px to 8x8 inch match at 300 DPI');
+assert.strictEqual(findMatchingPreset(25, 25, 'cm'), undefined, 'Non-standard custom dimensions return undefined');
+
 console.log('✓ Presets and Custom Preset lifecycle passed.');
 
 // Test 3: Validation
