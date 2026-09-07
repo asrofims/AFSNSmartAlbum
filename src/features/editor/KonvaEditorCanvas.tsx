@@ -1520,6 +1520,16 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         if (selectedFrameIds.length > 0 && !editingCropFrameId) {
           e.preventDefault();
           rotateSelectedFrames(activeSpread.id, e.shiftKey ? 'ccw' : 'cw');
+        } else if (editingCropFrameId) {
+          e.preventDefault();
+          const cropFrame = (activeSpread.elements || []).find((frame) => frame.id === editingCropFrameId);
+          if (cropFrame && cropFrame.type === 'photo') {
+            const photoEl = cropFrame as PhotoFrameElement;
+            const currentRot = photoEl.cropRotation || 0;
+            const delta = e.shiftKey ? -90 : 90;
+            const nextRot = (currentRot + delta + 360) % 360;
+            updateCrop(activeSpread.id, photoEl.id, { cropRotation: nextRot });
+          }
         }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (editingCropFrameId) {

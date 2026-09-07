@@ -115,25 +115,12 @@ export function FrameToolbar() {
 
           <div className={styles.divider} />
 
-          {/* 4. Rotate Crop 90° CCW */}
+          {/* 4. Rotate Photo 90° CW (Shift+Click for CCW) */}
           <button
             type="button"
-            className={styles.toolBtn}
-            onClick={() => rotateCropBy(-90)}
-            title="Rotate Photo 90° Counter-Clockwise inside Frame"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-          </button>
-
-          {/* 5. Rotate Crop 90° CW */}
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => rotateCropBy(90)}
-            title="Rotate Photo 90° Clockwise inside Frame"
+            className={`${styles.toolBtn} ${styles.toolBtnCropRotate}`}
+            onClick={(e) => rotateCropBy(e.shiftKey ? -90 : 90)}
+            title="Rotate Photo 90° Clockwise (Shift+Click for CCW, or press R)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -143,16 +130,16 @@ export function FrameToolbar() {
 
           <div className={styles.divider} />
 
-          {/* 6. Reset Crop */}
+          {/* 5. Reset Crop (Revert Position, Zoom & Rotation) */}
           <button
             type="button"
-            className={styles.toolBtn}
+            className={`${styles.toolBtn} ${styles.toolBtnCropReset}`}
             onClick={() => resetCrop(activeSpread.id, frame.id)}
-            title="Reset Crop Position, Zoom & Rotation (Center Fit)"
+            title="Reset Crop (Center Fit & 100% Zoom)"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 14 4 9l5-5" />
+              <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
             </svg>
           </button>
         </>

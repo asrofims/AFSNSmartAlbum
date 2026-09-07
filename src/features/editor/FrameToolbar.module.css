@@ -88,3 +88,25 @@
   background-color: var(--color-border);
   margin: 2px 0;
 }
+
+.toolBtnCropRotate {
+  color: #38bdf8 !important;
+}
+
+.toolBtnCropRotate:hover {
+  background-color: rgba(56, 189, 248, 0.18) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  transform: scale(1.06);
+}
+
+.toolBtnCropReset {
+  color: var(--color-text-secondary);
+}
+
+.toolBtnCropReset:hover {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
+  transform: scale(1.06);
+}
