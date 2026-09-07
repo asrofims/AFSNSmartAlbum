@@ -1849,6 +1849,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,
+      cropRotation: 0,
     });
   },
 
@@ -1862,6 +1863,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         cropX: 0,
         cropY: 0,
         cropScale: 1.0,
+        cropRotation: 0,
       },
     }));
 

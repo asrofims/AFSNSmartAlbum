@@ -63,6 +63,7 @@ export interface CropTransform {
   cropX: number; // Normalized pan offset: -1.0 (left/top) to +1.0 (right/bottom), 0.0 is center
   cropY: number;
   cropScale: number; // Zoom level: 1.0 (100% cover fit) to 3.5 (350% zoom)
+  cropRotation?: number; // In-frame rotation angle in degrees (0 - 360)
 }
 
 export interface Point {
@@ -182,11 +183,75 @@ export function getCropImageSize(frame: PhotoFrameElement): { width: number; hei
   return getCoverImageSize(frame);
 }
 
+export function normalizeAngle(angleDeg: number): number {
+  return ((angleDeg % 360) + 360) % 360;
+}
+
+export const STANDARD_ROTATION_SNAPS = [0, 45, 90, 135, 180, 225, 270, 315];
+
+export function calculateCropRotationSnap(
+  angleDeg: number,
+  isShiftPressed: boolean = false,
+  snapAngles: number[] = STANDARD_ROTATION_SNAPS,
+  tolerance: number = 5
+): { angle: number; isSnapped: boolean } {
+  const normalized = normalizeAngle(angleDeg);
+
+  if (isShiftPressed) {
+    // When Shift is held, strictly snap to nearest 45-degree increment
+    const step = 45;
+    const snapped = Math.round(normalized / step) * step;
+    return {
+      angle: normalizeAngle(snapped),
+      isSnapped: true,
+    };
+  }
+
+  for (const snap of snapAngles) {
+    const diff = Math.abs(normalized - snap);
+    const wrapDiff = Math.min(diff, 360 - diff);
+    if (wrapDiff <= tolerance) {
+      return {
+        angle: snap === 360 ? 0 : snap,
+        isSnapped: true,
+      };
+    }
+  }
+
+  return {
+    angle: normalized,
+    isSnapped: false,
+  };
+}
+
+export function calculateMinCropScaleForRotation(
+  frameWidth: number,
+  frameHeight: number,
+  photoAspect: number,
+  rotationDeg: number
+): number {
+  if (frameWidth <= 0 || frameHeight <= 0 || photoAspect <= 0) return 1.0;
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+
+  const neededW = frameWidth * cos + frameHeight * sin;
+  const neededH = frameWidth * sin + frameHeight * cos;
+
+  const baseCover = calculateCoverDimensions(frameWidth, frameHeight, photoAspect, 1.0);
+  const scaleW = neededW / baseCover.width;
+  const scaleH = neededH / baseCover.height;
+
+  const minScale = Math.max(1.0, scaleW, scaleH);
+  return roundToHundredth(minScale);
+}
+
 export function getCenteredCrop(): CropTransform {
   return {
     cropX: 0,
     cropY: 0,
     cropScale: 1.0,
+    cropRotation: 0,
   };
 }
 
@@ -194,6 +259,8 @@ export function clampCropTransform(
   frame: PhotoFrameElement,
   crop: Partial<CropTransform> = {}
 ): CropTransform {
+  const currentRotation = normalizeAngle(crop.cropRotation ?? frame.cropRotation ?? 0);
+
   const zoom = clamp(crop.cropScale ?? frame.cropScale ?? 1.0, 1.0, MAX_CROP_SCALE);
   const panX = clamp(crop.cropX ?? frame.cropX ?? 0, -1, 1);
   const panY = clamp(crop.cropY ?? frame.cropY ?? 0, -1, 1);
@@ -202,6 +269,7 @@ export function clampCropTransform(
     cropX: Math.round(panX * 1000) / 1000,
     cropY: Math.round(panY * 1000) / 1000,
     cropScale: roundToHundredth(zoom),
+    cropRotation: Math.round(currentRotation * 10) / 10,
   };
 }
 

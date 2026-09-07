@@ -29,6 +29,9 @@ import {
   loadSavedSnappingConfig,
   saveSnappingConfig,
   DEFAULT_SNAPPING_CONFIG,
+  calculateCropRotationSnap,
+  calculateMinCropScaleForRotation,
+  normalizeAngle,
 } from '../src/domain/editor';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
@@ -1094,4 +1097,72 @@ console.assert(textResult !== undefined, 'Text element must be present in resize
 console.assert(textResult.geometry.style?.fontSize === 30, `Text fontSize must scale from 20 to 30 (1.5x), got ${textResult.geometry.style?.fontSize}`);
 console.assert(textResult.geometry.styledRanges?.[0]?.fontSize === 45, `StyledRange fontSize must scale from 30 to 45 (1.5x), got ${textResult.geometry.styledRanges?.[0]?.fontSize}`);
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, and Snapping Config Persistence tests passed successfully!');
+// 19. In-Frame Photo Crop Rotation, Magnetic Snapping & Minimum Scale Calculation
+// 19a. normalizeAngle
+console.assert(normalizeAngle(0) === 0, '0 deg should normalize to 0');
+console.assert(normalizeAngle(360) === 0, '360 deg should normalize to 0');
+console.assert(normalizeAngle(-90) === 270, '-90 deg should normalize to 270');
+console.assert(normalizeAngle(450) === 90, '450 deg should normalize to 90');
+
+// 19b. calculateCropRotationSnap - Standard Free Snapping (5° tolerance on 0, 45, 90, 135, 180, 225, 270, 315)
+const snap43 = calculateCropRotationSnap(43, false);
+console.assert(snap43.isSnapped === true && snap43.angle === 45, `43 deg should snap to 45, got ${snap43.angle} (snapped: ${snap43.isSnapped})`);
+
+const snap47 = calculateCropRotationSnap(47, false);
+console.assert(snap47.isSnapped === true && snap47.angle === 45, `47 deg should snap to 45, got ${snap47.angle}`);
+
+const snap52 = calculateCropRotationSnap(52, false);
+console.assert(snap52.isSnapped === false && snap52.angle === 52, `52 deg should not snap, got ${snap52.angle} (snapped: ${snap52.isSnapped})`);
+
+const snap358 = calculateCropRotationSnap(358, false);
+console.assert(snap358.isSnapped === true && snap358.angle === 0, `358 deg should snap to 0, got ${snap358.angle}`);
+
+const snap2 = calculateCropRotationSnap(2, false);
+console.assert(snap2.isSnapped === true && snap2.angle === 0, `2 deg should snap to 0, got ${snap2.angle}`);
+
+const snap89 = calculateCropRotationSnap(89, false);
+console.assert(snap89.isSnapped === true && snap89.angle === 90, `89 deg should snap to 90, got ${snap89.angle}`);
+
+// 19c. calculateCropRotationSnap - Shift-Constrained Snapping (strictly nearest 45° step)
+const shiftSnap20 = calculateCropRotationSnap(20, true);
+console.assert(shiftSnap20.isSnapped === true && shiftSnap20.angle === 0, `20 deg with Shift should snap to 0, got ${shiftSnap20.angle}`);
+
+const shiftSnap24 = calculateCropRotationSnap(24, true);
+console.assert(shiftSnap24.isSnapped === true && shiftSnap24.angle === 45, `24 deg with Shift should snap to 45, got ${shiftSnap24.angle}`);
+
+const shiftSnap70 = calculateCropRotationSnap(70, true);
+console.assert(shiftSnap70.isSnapped === true && shiftSnap70.angle === 90, `70 deg with Shift should snap to 90, got ${shiftSnap70.angle}`);
+
+const shiftSnap150 = calculateCropRotationSnap(150, true);
+console.assert(shiftSnap150.isSnapped === true && shiftSnap150.angle === 135, `150 deg with Shift should snap to 135, got ${shiftSnap150.angle}`);
+
+// 19d. calculateMinCropScaleForRotation
+// 0 deg: base scale 1.0
+const minScale0 = calculateMinCropScaleForRotation(100, 100, 1.0, 0);
+console.assert(minScale0 === 1.0, `0 deg min scale should be 1.0, got ${minScale0}`);
+
+// 45 deg for 1:1 frame: hypotenuse requires scale >= sqrt(2) ≈ 1.41
+const minScale45 = calculateMinCropScaleForRotation(100, 100, 1.0, 45);
+console.assert(minScale45 >= 1.41 && minScale45 <= 1.43, `45 deg square min scale should be ~1.41-1.42, got ${minScale45}`);
+
+// 19e. clampCropTransform with cropRotation
+const testPhotoFrame: PhotoFrameElement = {
+  id: 'crop-rot-frame',
+  type: 'photo',
+  photoId: 'photo-1',
+  filePath: 'sample.jpg',
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 100,
+  rotation: 0,
+  zIndex: 1,
+  cropScale: 1.0,
+  cropRotation: 0,
+};
+
+const clampedRotCrop = clampCropTransform(testPhotoFrame, { cropRotation: 45, cropScale: 1.0 });
+console.assert(clampedRotCrop.cropRotation === 45, `Crop rotation should be 45, got ${clampedRotCrop.cropRotation}`);
+console.assert(clampedRotCrop.cropScale === 1.0, `Crop scale must remain independent of rotation (1.0), got ${clampedRotCrop.cropScale}`);
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, and Snapping Config Persistence tests passed successfully!');

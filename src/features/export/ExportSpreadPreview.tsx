@@ -406,6 +406,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const imgTopPct = (offsetY / photoEl.height) * 100;
             const imgWidthPct = (imgPhysicalW / photoEl.width) * 100;
             const imgHeightPct = (imgPhysicalH / photoEl.height) * 100;
+            const cropRot = photoEl.cropRotation || 0;
 
             return (
               <div
@@ -440,6 +441,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                       height: `${imgHeightPct}%`,
                       maxWidth: 'none',
                       maxHeight: 'none',
+                      transform: cropRot ? `rotate(${cropRot}deg)` : undefined,
+                      transformOrigin: 'center center',
                       pointerEvents: 'none',
                       userSelect: 'none',
                       objectFit: 'fill',

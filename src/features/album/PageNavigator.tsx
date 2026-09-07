@@ -3,9 +3,8 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useEditorStore } from '../../stores/editorStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
-import { PhotoFrameElement } from '../../domain/editor';
+import { PhotoFrameElement, calculateImageOffset } from '../../domain/editor';
 import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
 import { convertPtToUnit } from '../../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -202,6 +201,21 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
 
         const photoMeta = photoEl.photoId ? photoById.get(photoEl.photoId) : null;
 
+        const { offsetX, offsetY, width: imgPhysicalW, height: imgPhysicalH } = calculateImageOffset(
+          photoEl.width,
+          photoEl.height,
+          photoEl.photoAspect || 1.5,
+          Math.max(1.0, photoEl.cropScale || 1.0),
+          photoEl.cropX || 0,
+          photoEl.cropY || 0
+        );
+
+        const imgLeftPct = (offsetX / photoEl.width) * 100;
+        const imgTopPct = (offsetY / photoEl.height) * 100;
+        const imgWidthPct = (imgPhysicalW / photoEl.width) * 100;
+        const imgHeightPct = (imgPhysicalH / photoEl.height) * 100;
+        const cropRot = photoEl.cropRotation || 0;
+
         return (
           <div
             key={photoEl.id}
@@ -223,13 +237,20 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           >
             {imgSrc && (
               <img
-                key={`${photoEl.id}_${imgSrc}_${photoMeta?.updatedAt || ''}`}
+                key={`${photoEl.id}_${imgSrc}_${photoMeta?.updatedAt || ''}_${photoEl.cropScale || 1}_${photoEl.cropX || 0}_${photoEl.cropY || 0}_${cropRot}`}
                 src={safeConvertFileSrc(imgSrc)}
                 alt=""
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
+                  position: 'absolute',
+                  left: `${imgLeftPct}%`,
+                  top: `${imgTopPct}%`,
+                  width: `${imgWidthPct}%`,
+                  height: `${imgHeightPct}%`,
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                  transform: cropRot ? `rotate(${cropRot}deg)` : undefined,
+                  transformOrigin: 'center center',
+                  objectFit: 'fill',
                   display: 'block',
                   pointerEvents: 'none',
                   opacity: 0,

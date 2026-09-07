@@ -52,6 +52,12 @@ export function FrameToolbar() {
     updateCrop(activeSpread.id, frame.id, nextCrop);
   };
 
+  const rotateCropBy = (angleDelta: number) => {
+    const currentRot = frame.cropRotation || 0;
+    const nextRot = (currentRot + angleDelta + 360) % 360;
+    updateCrop(activeSpread.id, frame.id, { cropRotation: nextRot });
+  };
+
   return (
     <div className={styles.verticalDockContainer}>
       {/* When in Crop Mode: Clean Pure Icon Dock */}
@@ -109,12 +115,40 @@ export function FrameToolbar() {
 
           <div className={styles.divider} />
 
-          {/* 4. Reset Crop */}
+          {/* 4. Rotate Crop 90° CCW */}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => rotateCropBy(-90)}
+            title="Rotate Photo 90° Counter-Clockwise inside Frame"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+          </button>
+
+          {/* 5. Rotate Crop 90° CW */}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => rotateCropBy(90)}
+            title="Rotate Photo 90° Clockwise inside Frame"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
+          </button>
+
+          <div className={styles.divider} />
+
+          {/* 6. Reset Crop */}
           <button
             type="button"
             className={styles.toolBtn}
             onClick={() => resetCrop(activeSpread.id, frame.id)}
-            title="Reset Crop Position & Scale (Center Fit)"
+            title="Reset Crop Position, Zoom & Rotation (Center Fit)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

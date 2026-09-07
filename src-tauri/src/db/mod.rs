@@ -303,6 +303,10 @@ impl Database {
             Self::migrate_v10(conn)?;
         }
 
+        if current_version < 11 {
+            Self::migrate_v11(conn)?;
+        }
+
         Ok(())
     }
 
@@ -615,6 +619,29 @@ impl Database {
         }
 
         log::info!("Applied database migration v10");
+        Ok(())
+    }
+
+    /// Schema version 11: Add crop_rotation to spread_elements table.
+    fn migrate_v11(conn: &Connection) -> SqliteResult<()> {
+        let mut cols = conn.prepare("PRAGMA table_info(spread_elements)")?;
+        let col_names: Vec<String> = cols
+            .query_map([], |row| row.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !col_names.contains(&"crop_rotation".to_string()) {
+            conn.execute_batch(
+                "BEGIN;
+                ALTER TABLE spread_elements ADD COLUMN crop_rotation REAL NOT NULL DEFAULT 0.0;
+                INSERT INTO schema_version (version) VALUES (11);
+                COMMIT;",
+            )?;
+        } else {
+            conn.execute("INSERT INTO schema_version (version) VALUES (11)", [])?;
+        }
+
+        log::info!("Applied database migration v11");
         Ok(())
     }
 

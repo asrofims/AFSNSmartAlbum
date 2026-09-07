@@ -409,14 +409,97 @@ fn render_photo_element(
     let crop_w_px = (visible_w.round() as u32).min(img_w.saturating_sub(crop_x_px)).max(1);
     let crop_h_px = (visible_h.round() as u32).min(img_h.saturating_sub(crop_y_px)).max(1);
 
-    // 1. Pre-crop the original image (virtually instant sub-view)
-    let cropped_sub = image::imageops::crop_imm(&dynamic_img, crop_x_px, crop_y_px, crop_w_px, crop_h_px);
+    let crop_rot_deg = elem.crop_rotation.unwrap_or(0.0);
+    let norm_crop_rot = (crop_rot_deg % 360.0 + 360.0) % 360.0;
 
-    // 2. High speed, high quality Triangle/Bilinear resampling directly to frame dimensions
-    let resized_img = cropped_sub.to_image();
-    let resized_dynamic = image::DynamicImage::ImageRgba8(resized_img);
-    let final_frame_img = resized_dynamic.resize_exact(frame_px_w, frame_px_h, image::imageops::FilterType::Triangle);
-    let resized_rgba = final_frame_img.to_rgba8();
+    let resized_rgba = if norm_crop_rot.abs() < 0.1 {
+        // 1. Fast-path: Pre-crop the original image and bilinear resample directly to frame dimensions
+        let cropped_sub = image::imageops::crop_imm(&dynamic_img, crop_x_px, crop_y_px, crop_w_px, crop_h_px);
+        let resized_img = cropped_sub.to_image();
+        let resized_dynamic = image::DynamicImage::ImageRgba8(resized_img);
+        let final_frame_img = resized_dynamic.resize_exact(frame_px_w, frame_px_h, image::imageops::FilterType::Triangle);
+        final_frame_img.to_rgba8()
+    } else {
+        // 2. High-fidelity in-frame rotation with bilinear sampling for any angle (45°, 90°, 180°, etc.)
+        let img_rgba = dynamic_img.to_rgba8();
+        let frame_w = frame_px_w as f64;
+        let frame_h = frame_px_h as f64;
+        let orig_w = img_w as f64;
+        let orig_h = img_h as f64;
+
+        // Cover dimensions in frame pixels
+        let (cover_w, cover_h) = if photo_aspect >= (frame_w / frame_h) {
+            let h = frame_h * crop_scale;
+            let w = h * photo_aspect;
+            (w, h)
+        } else {
+            let w = frame_w * crop_scale;
+            let h = w / photo_aspect.max(0.001);
+            (w, h)
+        };
+
+        let max_excess_x = (cover_w - frame_w).max(0.0);
+        let max_excess_y = (cover_h - frame_h).max(0.0);
+
+        // Center offset - pan offset (matches Konva calculateImageOffset in editor.ts)
+        let offset_x = -(max_excess_x / 2.0) + (norm_x * (max_excess_x / 2.0));
+        let offset_y = -(max_excess_y / 2.0) + (norm_y * (max_excess_y / 2.0));
+
+        let center_x = offset_x + cover_w / 2.0;
+        let center_y = offset_y + cover_h / 2.0;
+
+        let rad = norm_crop_rot * std::f64::consts::PI / 180.0;
+        let cos_t = rad.cos();
+        let sin_t = rad.sin();
+
+        let mut out_buf: RgbaImage = ImageBuffer::new(frame_px_w, frame_px_h);
+
+        for py in 0..frame_px_h {
+            for px in 0..frame_px_w {
+                let dx = px as f64 + 0.5 - center_x;
+                let dy = py as f64 + 0.5 - center_y;
+
+                // Inverse rotate by -rad around photo center
+                let unrot_x = dx * cos_t + dy * sin_t;
+                let unrot_y = -dx * sin_t + dy * cos_t;
+
+                let u = unrot_x + cover_w / 2.0;
+                let v = unrot_y + cover_h / 2.0;
+
+                let src_xf = (u / cover_w) * orig_w;
+                let src_yf = (v / cover_h) * orig_h;
+
+                if src_xf >= 0.0 && src_xf < orig_w && src_yf >= 0.0 && src_yf < orig_h {
+                    let x0 = (src_xf.floor() as u32).min(img_w - 1);
+                    let y0 = (src_yf.floor() as u32).min(img_h - 1);
+                    let x1 = (x0 + 1).min(img_w - 1);
+                    let y1 = (y0 + 1).min(img_h - 1);
+
+                    let fx = src_xf - x0 as f64;
+                    let fy = src_yf - y0 as f64;
+
+                    let p00 = img_rgba.get_pixel(x0, y0);
+                    let p10 = img_rgba.get_pixel(x1, y0);
+                    let p01 = img_rgba.get_pixel(x0, y1);
+                    let p11 = img_rgba.get_pixel(x1, y1);
+
+                    let w00 = (1.0 - fx) * (1.0 - fy);
+                    let w10 = fx * (1.0 - fy);
+                    let w01 = (1.0 - fx) * fy;
+                    let w11 = fx * fy;
+
+                    let r = (w00 * p00[0] as f64 + w10 * p10[0] as f64 + w01 * p01[0] as f64 + w11 * p11[0] as f64).round() as u8;
+                    let g = (w00 * p00[1] as f64 + w10 * p10[1] as f64 + w01 * p01[1] as f64 + w11 * p11[1] as f64).round() as u8;
+                    let b = (w00 * p00[2] as f64 + w10 * p10[2] as f64 + w01 * p01[2] as f64 + w11 * p11[2] as f64).round() as u8;
+                    let a = (w00 * p00[3] as f64 + w10 * p10[3] as f64 + w01 * p01[3] as f64 + w11 * p11[3] as f64).round() as u8;
+
+                    out_buf.put_pixel(px, py, image::Rgba([r, g, b, a]));
+                }
+            }
+        }
+
+        out_buf
+    };
 
     // 3. Blit into canvas
     let render_w = resized_rgba.width();

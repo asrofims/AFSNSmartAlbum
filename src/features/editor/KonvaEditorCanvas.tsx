@@ -19,6 +19,8 @@ import {
   getPhotoAspect,
   clamp,
   doesMarqueeIntersectFrame,
+  calculateCropRotationSnap,
+  normalizeAngle,
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -103,6 +105,7 @@ function PhotoFrameNode({
   onFrameChange,
   onCropChange,
   onDoubleClick,
+  isShiftPressed = false,
 }: {
   frame: PhotoFrameElement;
   isSelected: boolean;
@@ -120,6 +123,7 @@ function PhotoFrameNode({
   onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
+  isShiftPressed?: boolean;
 }) {
   // Strict guard: NEVER load raw full-resolution camera original (filePath).
   // Only generated thumbnails/previews in cache are permitted.
@@ -135,9 +139,27 @@ function PhotoFrameNode({
   const cachedCandidate = cacheKey ? getCachedPhotoImage(cacheKey) : null;
   const cachedImg = cachedCandidate && cachedCandidate.naturalWidth > 0 ? cachedCandidate : null;
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(cachedImg);
+  const [liveRotation, setLiveRotation] = useState<number | null>(null);
+  const [liveScale, setLiveScale] = useState<number | null>(null);
+  const [rotatingAngleDisplay, setRotatingAngleDisplay] = useState<number | null>(null);
+  const [isAngleSnapped, setIsAngleSnapped] = useState(false);
+
+  const zoomDragStartRef = useRef<{ initialScale: number; initialDist: number } | null>(null);
+  const currentDragScaleRef = useRef<number>(frame.cropScale || 1.0);
+  const currentDragRotRef = useRef<number>(frame.cropRotation || 0);
+
   const shapeRef = useRef<Konva.Group>(null);
+  const cropGroupRef = useRef<Konva.Group>(null);
+  const cropImgRef = useRef<Konva.Image>(null);
+  const ghostGroupRef = useRef<Konva.Group>(null);
   const ghostImgRef = useRef<Konva.Image>(null);
   const ghostRectRef = useRef<Konva.Rect>(null);
+  const stalkRef = useRef<Konva.Line>(null);
+  const rotHandleRef = useRef<Konva.Circle>(null);
+  const tlHandleRef = useRef<Konva.Rect>(null);
+  const trHandleRef = useRef<Konva.Rect>(null);
+  const brHandleRef = useRef<Konva.Rect>(null);
+  const blHandleRef = useRef<Konva.Rect>(null);
 
   // Load preview or thumbnail image (uses cache to avoid flash on remount)
   useEffect(() => {
@@ -201,13 +223,16 @@ function PhotoFrameNode({
     ? imageObj.naturalWidth / imageObj.naturalHeight
     : getPhotoAspect(frame);
 
+  const effectiveCropRot = liveRotation !== null ? liveRotation : (frame.cropRotation || 0);
+  const effectiveCropScale = liveScale !== null ? liveScale : Math.max(1.0, frame.cropScale || 1.0);
+
   // Calculate cover dimensions and clamped pixel offset inside frame
   const { offsetX: baseOffsetPhysicalX, offsetY: baseOffsetPhysicalY, width: imgPhysicalW, height: imgPhysicalH } =
     calculateImageOffset(
       frame.width,
       frame.height,
       naturalAspect,
-      Math.max(1.0, frame.cropScale || 1.0),
+      effectiveCropScale,
       frame.cropX || 0,
       frame.cropY || 0
     );
@@ -217,6 +242,10 @@ function PhotoFrameNode({
   const offsetX = baseOffsetPhysicalX * scaleFactor;
   const offsetY = baseOffsetPhysicalY * scaleFactor;
 
+  // Exact center of photo relative to frame (frame top-left is 0,0)
+  const photoCenterX = offsetX + renderImgW / 2;
+  const photoCenterY = offsetY + renderImgH / 2;
+
   const setCursor = (e: Konva.KonvaEventObject<any>, cursor: string) => {
     const stage = e.target.getStage();
     if (stage) {
@@ -225,6 +254,101 @@ function PhotoFrameNode({
   };
 
   const isDraggingRef = useRef(false);
+
+  const handleZoomDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    const stage = e.target.getStage();
+    const ptr = stage?.getPointerPosition();
+    if (ptr && shapeRef.current) {
+      const absCenter = shapeRef.current.getAbsoluteTransform().point({ x: photoCenterX, y: photoCenterY });
+      const initialDist = Math.hypot(ptr.x - absCenter.x, ptr.y - absCenter.y);
+      zoomDragStartRef.current = {
+        initialScale: effectiveCropScale,
+        initialDist: Math.max(10, initialDist),
+      };
+      currentDragScaleRef.current = effectiveCropScale;
+    }
+  };
+
+  const handleZoomDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    if (!zoomDragStartRef.current) return;
+    const stage = e.target.getStage();
+    const ptr = stage?.getPointerPosition();
+    if (ptr && shapeRef.current) {
+      const absCenter = shapeRef.current.getAbsoluteTransform().point({ x: photoCenterX, y: photoCenterY });
+      const currentDist = Math.hypot(ptr.x - absCenter.x, ptr.y - absCenter.y);
+      const ratio = currentDist / zoomDragStartRef.current.initialDist;
+      const targetScale = clamp(roundToHundredth(zoomDragStartRef.current.initialScale * ratio), 1.0, 3.5);
+      currentDragScaleRef.current = targetScale;
+      setLiveScale(targetScale);
+    }
+  };
+
+  const handleZoomDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    const finalScale = currentDragScaleRef.current;
+    zoomDragStartRef.current = null;
+    setLiveScale(null);
+    if (tlHandleRef.current) { tlHandleRef.current.x(-renderImgW / 2); tlHandleRef.current.y(-renderImgH / 2); }
+    if (trHandleRef.current) { trHandleRef.current.x(renderImgW / 2); trHandleRef.current.y(-renderImgH / 2); }
+    if (brHandleRef.current) { brHandleRef.current.x(renderImgW / 2); brHandleRef.current.y(renderImgH / 2); }
+    if (blHandleRef.current) { blHandleRef.current.x(-renderImgW / 2); blHandleRef.current.y(renderImgH / 2); }
+    onCropChange({
+      cropScale: finalScale,
+      cropRotation: effectiveCropRot,
+      cropX: frame.cropX || 0,
+      cropY: frame.cropY || 0,
+    });
+  };
+
+  const handleRotationDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    setCursor(e, ROTATE_CURSOR);
+  };
+
+  const handleRotationDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    setCursor(e, ROTATE_CURSOR);
+    // Anchor handle firmly to stalk tip so it never drifts during drag
+    e.target.x(0);
+    e.target.y(-renderImgH / 2 - 26);
+    const stage = e.target.getStage();
+    const ptr = stage?.getPointerPosition();
+    if (ptr && shapeRef.current) {
+      const absCenter = shapeRef.current.getAbsoluteTransform().point({ x: photoCenterX, y: photoCenterY });
+      const dx = ptr.x - absCenter.x;
+      const dy = ptr.y - absCenter.y;
+      let pointerAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI + 90 - (frame.rotation || 0);
+      const { angle: snappedAngle, isSnapped } = calculateCropRotationSnap(
+        normalizeAngle(pointerAngleDeg),
+        isShiftPressed
+      );
+
+      currentDragRotRef.current = snappedAngle;
+      setLiveRotation(snappedAngle);
+      setRotatingAngleDisplay(snappedAngle);
+      setIsAngleSnapped(isSnapped);
+    }
+  };
+
+  const handleRotationDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    setCursor(e, 'default');
+    e.target.x(0);
+    e.target.y(-renderImgH / 2 - 26);
+    const finalRot = currentDragRotRef.current;
+    setLiveRotation(null);
+    setRotatingAngleDisplay(null);
+    setIsAngleSnapped(false);
+
+    onCropChange({
+      cropRotation: finalRot,
+      cropScale: frame.cropScale || 1.0,
+      cropX: frame.cropX || 0,
+      cropY: frame.cropY || 0,
+    });
+  };
 
   useEffect(() => {
     const node = shapeRef.current;
@@ -390,27 +514,235 @@ function PhotoFrameNode({
       {/* Base Solid Hit Rect for robust selection & drag events */}
       <Rect width={pixelW} height={pixelH} fill="rgba(0, 0, 0, 0.001)" listening={!isCropMode} />
 
-      {/* Ghost Reveal: Semi-transparent uncropped original image outside the frame in Crop Mode */}
+      {/* Ghost Reveal and Interactive Crop Overlay */}
       {isCropMode && imageObj && (
-        <Group listening={false}>
+        <Group
+          ref={ghostGroupRef}
+          x={photoCenterX}
+          y={photoCenterY}
+          rotation={effectiveCropRot}
+        >
+          {/* Semi-transparent uncropped original image outside the frame */}
           <KonvaImage
             ref={ghostImgRef}
             image={imageObj}
-            x={offsetX}
-            y={offsetY}
+            x={-renderImgW / 2}
+            y={-renderImgH / 2}
             width={renderImgW}
             height={renderImgH}
-            opacity={0.25}
+            opacity={0.28}
+            listening={false}
           />
+
+          {/* Dashed outer boundary of original uncropped image */}
           <Rect
             ref={ghostRectRef}
-            x={offsetX}
-            y={offsetY}
+            x={-renderImgW / 2}
+            y={-renderImgH / 2}
             width={renderImgW}
             height={renderImgH}
-            stroke="rgba(245, 158, 11, 0.8)"
+            stroke="rgba(245, 158, 11, 0.85)"
             strokeWidth={1.5}
             dash={[6, 4]}
+            listening={false}
+          />
+
+          {/* Rotation Stalk Line from top center of image to rotation handle */}
+          <Line
+            ref={stalkRef}
+            points={[0, -renderImgH / 2, 0, -renderImgH / 2 - 26]}
+            stroke="#0284c7"
+            strokeWidth={1.5}
+            dash={[4, 3]}
+            listening={false}
+          />
+
+          {/* Rotation Handle Circle */}
+          <Circle
+            ref={rotHandleRef}
+            x={0}
+            y={-renderImgH / 2 - 26}
+            radius={7}
+            fill="#ffffff"
+            stroke={isAngleSnapped ? '#0284c7' : '#38bdf8'}
+            strokeWidth={2.5}
+            shadowColor="rgba(0, 0, 0, 0.35)"
+            shadowBlur={5}
+            shadowOffset={{ x: 0, y: 1 }}
+            draggable
+            dragBoundFunc={() => {
+              if (ghostGroupRef.current) {
+                return ghostGroupRef.current.getAbsoluteTransform().point({ x: 0, y: -renderImgH / 2 - 26 });
+              }
+              return { x: 0, y: 0 };
+            }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => setCursor(e, ROTATE_CURSOR)}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onDragStart={handleRotationDragStart}
+            onDragMove={handleRotationDragMove}
+            onDragEnd={handleRotationDragEnd}
+          />
+
+          {/* Live Angle HUD Tooltip Badge */}
+          {rotatingAngleDisplay !== null && (
+            <Group
+              x={0}
+              y={-renderImgH / 2 - 54}
+              rotation={-effectiveCropRot}
+              listening={false}
+            >
+              <Label offsetX={rotatingAngleDisplay >= 100 ? 24 : 18} offsetY={12}>
+                <Tag
+                  fill="#090d16"
+                  stroke={isAngleSnapped ? '#0284c7' : 'rgba(245, 158, 11, 0.8)'}
+                  strokeWidth={isAngleSnapped ? 2 : 1}
+                  cornerRadius={4}
+                  shadowColor={isAngleSnapped ? 'rgba(2, 132, 199, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
+                  shadowBlur={isAngleSnapped ? 12 : 6}
+                  shadowOffset={{ x: 0, y: 1 }}
+                />
+                <KonvaText
+                  text={isAngleSnapped ? `🧲 ${rotatingAngleDisplay}°` : `${rotatingAngleDisplay}°`}
+                  fill={isAngleSnapped ? '#38bdf8' : '#f8fafc'}
+                  fontSize={11}
+                  fontStyle="bold"
+                  padding={5}
+                  align="center"
+                />
+              </Label>
+            </Group>
+          )}
+
+          {/* 4 Corner Zoom Handles */}
+          {/* Top-Left */}
+          <Rect
+            ref={tlHandleRef}
+            x={-renderImgW / 2}
+            y={-renderImgH / 2}
+            width={10}
+            height={10}
+            offsetX={5}
+            offsetY={5}
+            cornerRadius={2}
+            fill="#ffffff"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            shadowColor="rgba(0, 0, 0, 0.35)"
+            shadowBlur={4}
+            draggable
+            dragBoundFunc={() => {
+              if (ghostGroupRef.current) {
+                return ghostGroupRef.current.getAbsoluteTransform().point({ x: -renderImgW / 2, y: -renderImgH / 2 });
+              }
+              return { x: 0, y: 0 };
+            }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => setCursor(e, 'nwse-resize')}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onDragStart={handleZoomDragStart}
+            onDragMove={handleZoomDragMove}
+            onDragEnd={handleZoomDragEnd}
+          />
+
+          {/* Top-Right */}
+          <Rect
+            ref={trHandleRef}
+            x={renderImgW / 2}
+            y={-renderImgH / 2}
+            width={10}
+            height={10}
+            offsetX={5}
+            offsetY={5}
+            cornerRadius={2}
+            fill="#ffffff"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            shadowColor="rgba(0, 0, 0, 0.35)"
+            shadowBlur={4}
+            draggable
+            dragBoundFunc={() => {
+              if (ghostGroupRef.current) {
+                return ghostGroupRef.current.getAbsoluteTransform().point({ x: renderImgW / 2, y: -renderImgH / 2 });
+              }
+              return { x: 0, y: 0 };
+            }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => setCursor(e, 'nesw-resize')}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onDragStart={handleZoomDragStart}
+            onDragMove={handleZoomDragMove}
+            onDragEnd={handleZoomDragEnd}
+          />
+
+          {/* Bottom-Right */}
+          <Rect
+            ref={brHandleRef}
+            x={renderImgW / 2}
+            y={renderImgH / 2}
+            width={10}
+            height={10}
+            offsetX={5}
+            offsetY={5}
+            cornerRadius={2}
+            fill="#ffffff"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            shadowColor="rgba(0, 0, 0, 0.35)"
+            shadowBlur={4}
+            draggable
+            dragBoundFunc={() => {
+              if (ghostGroupRef.current) {
+                return ghostGroupRef.current.getAbsoluteTransform().point({ x: renderImgW / 2, y: renderImgH / 2 });
+              }
+              return { x: 0, y: 0 };
+            }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => setCursor(e, 'nwse-resize')}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onDragStart={handleZoomDragStart}
+            onDragMove={handleZoomDragMove}
+            onDragEnd={handleZoomDragEnd}
+          />
+
+          {/* Bottom-Left */}
+          <Rect
+            ref={blHandleRef}
+            x={-renderImgW / 2}
+            y={renderImgH / 2}
+            width={10}
+            height={10}
+            offsetX={5}
+            offsetY={5}
+            cornerRadius={2}
+            fill="#ffffff"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            shadowColor="rgba(0, 0, 0, 0.35)"
+            shadowBlur={4}
+            draggable
+            dragBoundFunc={() => {
+              if (ghostGroupRef.current) {
+                return ghostGroupRef.current.getAbsoluteTransform().point({ x: -renderImgW / 2, y: renderImgH / 2 });
+              }
+              return { x: 0, y: 0 };
+            }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => setCursor(e, 'nesw-resize')}
+            onMouseLeave={(e) => setCursor(e, 'default')}
+            onDragStart={handleZoomDragStart}
+            onDragMove={handleZoomDragMove}
+            onDragEnd={handleZoomDragEnd}
           />
         </Group>
       )}
@@ -422,13 +754,12 @@ function PhotoFrameNode({
         }}
       >
         {imageObj ? (
-          <KonvaImage
-            id={`crop-img-${frame.id}`}
-            image={imageObj}
-            x={offsetX}
-            y={offsetY}
-            width={renderImgW}
-            height={renderImgH}
+          <Group
+            id={`crop-group-${frame.id}`}
+            ref={cropGroupRef}
+            x={photoCenterX}
+            y={photoCenterY}
+            rotation={effectiveCropRot}
             draggable={isCropMode}
             onMouseDown={(e) => {
               if (isCropMode) {
@@ -443,7 +774,7 @@ function PhotoFrameNode({
               if (isCropMode) {
                 e.evt.preventDefault();
                 e.cancelBubble = true;
-                const scaleDelta = e.evt.deltaY < 0 ? 0.01 : -0.01;
+                const scaleDelta = e.evt.deltaY < 0 ? 0.02 : -0.02;
                 const newScale = clamp(Math.round(((frame.cropScale || 1.0) + scaleDelta) * 100) / 100, 1.0, 3.5);
                 onCropChange({ cropScale: newScale });
               }
@@ -453,27 +784,25 @@ function PhotoFrameNode({
                 e.cancelBubble = true;
                 const maxExcessX = Math.max(0, renderImgW - pixelW);
                 const maxExcessY = Math.max(0, renderImgH - pixelH);
-                
-                let targetX = -(maxExcessX / 2);
-                let targetY = -(maxExcessY / 2);
-                
-                if (maxExcessX > 0.5) {
-                  targetX = clamp(e.target.x(), -maxExcessX, 0);
+                const maxShiftX = maxExcessX / 2;
+                const maxShiftY = maxExcessY / 2;
+                const fcX = pixelW / 2;
+                const fcY = pixelH / 2;
+
+                let targetX = fcX;
+                let targetY = fcY;
+                if (maxShiftX > 0.5) {
+                  targetX = clamp(e.target.x(), fcX - maxShiftX, fcX + maxShiftX);
                 }
-                if (maxExcessY > 0.5) {
-                  targetY = clamp(e.target.y(), -maxExcessY, 0);
+                if (maxShiftY > 0.5) {
+                  targetY = clamp(e.target.y(), fcY - maxShiftY, fcY + maxShiftY);
                 }
                 e.target.x(targetX);
                 e.target.y(targetY);
 
-                // Synchronize ghost reveal uncropped image & dashed border in real-time
-                if (ghostImgRef.current) {
-                  ghostImgRef.current.x(targetX);
-                  ghostImgRef.current.y(targetY);
-                }
-                if (ghostRectRef.current) {
-                  ghostRectRef.current.x(targetX);
-                  ghostRectRef.current.y(targetY);
+                if (ghostGroupRef.current) {
+                  ghostGroupRef.current.x(targetX);
+                  ghostGroupRef.current.y(targetY);
                 }
 
                 e.target.getLayer()?.batchDraw();
@@ -484,26 +813,39 @@ function PhotoFrameNode({
                 e.cancelBubble = true;
                 const maxExcessX = Math.max(0, renderImgW - pixelW);
                 const maxExcessY = Math.max(0, renderImgH - pixelH);
-                
+                const maxShiftX = maxExcessX / 2;
+                const maxShiftY = maxExcessY / 2;
+                const fcX = pixelW / 2;
+                const fcY = pixelH / 2;
+
                 let normX = 0;
                 let normY = 0;
-                if (maxExcessX > 0.5) {
-                  const targetX = clamp(e.target.x(), -maxExcessX, 0);
-                  normX = (targetX + maxExcessX / 2) / (maxExcessX / 2);
+                if (maxShiftX > 0.5) {
+                  normX = (e.target.x() - fcX) / maxShiftX;
                 }
-                if (maxExcessY > 0.5) {
-                  const targetY = clamp(e.target.y(), -maxExcessY, 0);
-                  normY = (targetY + maxExcessY / 2) / (maxExcessY / 2);
+                if (maxShiftY > 0.5) {
+                  normY = (e.target.y() - fcY) / maxShiftY;
                 }
-                
+
                 onCropChange({
                   cropX: Math.round(clamp(normX, -1, 1) * 1000) / 1000,
                   cropY: Math.round(clamp(normY, -1, 1) * 1000) / 1000,
-                  cropScale: frame.cropScale || 1.0,
+                  cropScale: effectiveCropScale,
+                  cropRotation: effectiveCropRot,
                 });
               }
             }}
-          />
+          >
+            <KonvaImage
+              id={`crop-img-${frame.id}`}
+              ref={cropImgRef}
+              image={imageObj}
+              x={-renderImgW / 2}
+              y={-renderImgH / 2}
+              width={renderImgW}
+              height={renderImgH}
+            />
+          </Group>
         ) : (
           <Rect
             width={pixelW}
@@ -2441,6 +2783,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   isHoveredForDrop={hoveredDropFrameId === frame.id}
                   isAltDrop={isHoveredDropAlt}
                   scaleFactor={scaleFactor}
+                  isShiftPressed={isShiftPressed}
                   onSelect={(e) => {
                     if (justDroppedRef.current) return;
                     if (e) {
