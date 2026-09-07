@@ -187,5 +187,11 @@
 - [x] Synchronized Ctrl+A Selection Hierarchy (Context-sensitive shortcut routing between canvas elements, photo filmstrip, and spread drawer)
 - [x] Standard Formal Date Formatting (Implemented `formatStandardDate` conforming to Indonesian formal standard / PUEBI "D MMMM YYYY", resolving raw/informal timestamps in update dialogues)
 
-
+## Phase 16 — Native Window Close Interception, Unsaved Changes Alert & Global Filmstrip Selection Clearance
+- [x] Native OS Window Close Interception (Rust `.on_window_event` intercepts `CloseRequested` cleanly without IPC security rejections)
+- [x] Unsaved Changes Protection Alert (Automatic dirty state synchronization from Zustand store to Rust backend prevents accidental application closing when changes are unsaved)
+- [x] Direct Native Force Exit Command (`exit_app` in Rust with `app.exit(0)` and `std::process::exit(0)` for clean, non-hanging shutdown on "Exit Without Saving")
+- [x] Uninhibited Window Close for Saved Projects (Native OS window close button 'X' closes immediately with 0 delay when project is saved or on Welcome screen)
+- [x] Global Filmstrip Selection Dismissal (Capturing pointerdown listener and spread drawer capture ensure clicking anywhere outside the filmstrip immediately deselects photos)
+- [x] Professional Topbar Alignment & Help Menu (Dedicated 'Help ▾' dropdown containing Settings and About, with centered project action controls)
 

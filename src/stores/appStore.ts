@@ -31,6 +31,9 @@ interface AppState {
   closeUpdateModal: () => void;
   setUpdateAvailableVersion: (version: string | null) => void;
   setSettingsActiveTab: (tab: string) => void;
+  isExitWarningOpen: boolean;
+  openExitWarning: () => void;
+  closeExitWarning: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -58,4 +61,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeUpdateModal: () => set({ isUpdateModalOpen: false }),
   setUpdateAvailableVersion: (version) => set({ updateAvailableVersion: version }),
   setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
+  isExitWarningOpen: false,
+  openExitWarning: () => set({ isExitWarningOpen: true }),
+  closeExitWarning: () => set({ isExitWarningOpen: false }),
 }));

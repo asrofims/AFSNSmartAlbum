@@ -52,6 +52,16 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if let Some(state) = window.try_state::<commands::app_commands::AppExitState>() {
+                    if state.is_unsaved.load(std::sync::atomic::Ordering::Relaxed) {
+                        api.prevent_close();
+                        let _ = window.emit("request-close-warning", ());
+                    }
+                }
+            }
+        })
         .setup(|app| {
             // Initialize logging in debug mode
             if cfg!(debug_assertions) {
@@ -85,11 +95,12 @@ pub fn run() {
                 Err(err) => log::warn!("Photo cache cleanup skipped: {}", err),
             }
 
-            // Make database, launch state, import and export state available as managed state
+            // Make database, launch state, import, export, and exit state available as managed state
             app.manage(database);
             app.manage(launch_state);
             app.manage(commands::photo_commands::ImportState::default());
             app.manage(commands::export_commands::ExportState::default());
+            app.manage(commands::app_commands::AppExitState::default());
 
             log::info!("AFSNSmartAlbum started successfully");
             Ok(())
@@ -98,6 +109,8 @@ pub fn run() {
             commands::app_commands::get_app_info,
             commands::app_commands::get_db_status,
             commands::app_commands::restart_app,
+            commands::app_commands::exit_app,
+            commands::app_commands::set_unsaved_status,
             commands::app_commands::sample_screen_color,
             commands::app_commands::get_system_fonts,
             commands::project_commands::get_initial_open_path,

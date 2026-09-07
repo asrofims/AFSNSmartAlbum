@@ -5,8 +5,10 @@ import { SettingsDialog } from './features/settings/SettingsDialog';
 import { NewProjectDialog } from './features/project/NewProjectDialog';
 import { SupportDonationModal } from './features/support/SupportDonationModal';
 import { UpdateModal } from './features/updates/UpdateModal';
+import { ExitWarningModal } from './features/workspace/ExitWarningModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './stores/projectStore';
+import { useAlbumStore } from './stores/albumStore';
 import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
 import { checkForAppUpdates } from './services/updateService';
@@ -110,8 +112,35 @@ export default function App() {
       });
     });
 
+    // 3. Listen for window close warning requests emitted by Rust when project is unsaved
+    let unlistenCloseWarning: (() => void) | undefined;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen('request-close-warning', () => {
+        useAppStore.getState().openExitWarning();
+      }).then((unlisten) => {
+        unlistenCloseWarning = unlisten;
+      });
+    });
+
+    // 4. Continuously synchronize unsaved status with native Rust backend
+    const syncUnsavedStatus = () => {
+      import('@tauri-apps/api/core').then(({ invoke }) => {
+        const project = useProjectStore.getState().currentProject;
+        const saveStatus = useAlbumStore.getState().saveStatus;
+        const isUnsaved = Boolean(project && (saveStatus === 'unsaved' || saveStatus === 'saving'));
+        invoke('set_unsaved_status', { unsaved: isUnsaved }).catch(() => {});
+      });
+    };
+
+    syncUnsavedStatus();
+    const unsubAlbum = useAlbumStore.subscribe(syncUnsavedStatus);
+    const unsubProject = useProjectStore.subscribe(syncUnsavedStatus);
+
     return () => {
       if (unlistenFn) unlistenFn();
+      if (unlistenCloseWarning) unlistenCloseWarning();
+      unsubAlbum();
+      unsubProject();
     };
   }, []);
 
@@ -123,6 +152,7 @@ export default function App() {
       <NewProjectDialog />
       <SupportDonationModal />
       <UpdateModal />
+      <ExitWarningModal />
     </ErrorBoundary>
   );
 }

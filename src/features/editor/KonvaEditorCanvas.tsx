@@ -1037,6 +1037,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const isModalOpen = Boolean(document.querySelector('[role="dialog"]') || document.querySelector('.modal'));
       if (isModalOpen) return;
 
+      // If focus is inside the spread drawer, let the drawer handle the Delete key!
+      const targetElement = e.target as HTMLElement;
+      const isFocusedInDrawer = Boolean(targetElement?.closest('[data-spread-drawer="true"]'));
+      if (isFocusedInDrawer && (e.key === 'Delete' || e.key === 'Backspace')) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (editingCropFrameId) {
           e.preventDefault();
@@ -1945,6 +1950,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       onContextMenu={(e) => {
         e.preventDefault();
         openContextMenuAt(e.clientX, e.clientY);
+      }}
+      onMouseDownCapture={() => {
+        usePhotoStore.getState().clearSelection();
+      }}
+      onPointerDownCapture={() => {
+        usePhotoStore.getState().clearSelection();
       }}
       onMouseDown={(e) => {
         if (isSpacePressed || e.button === 1 || activeTool === 'pan') {

@@ -104,6 +104,37 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     };
   }, [setupListeners]);
 
+  // Deselect filmstrip photos whenever user clicks/taps outside the filmstrip tray (spread, canvas, properties, etc.)
+  useEffect(() => {
+    const handleGlobalPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (usePhotoStore.getState().selectedPhotoIds.length === 0) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Ignore if click is inside dialogs, context menus, or modals
+      if (
+        target.closest('[role="dialog"]') ||
+        target.closest('.modal') ||
+        target.closest('[data-context-menu]')
+      ) {
+        return;
+      }
+
+      // If clicked outside filmstrip, clear photo selection!
+      if (filmstripRef.current && !filmstripRef.current.contains(target)) {
+        clearSelection();
+      }
+    };
+
+    window.addEventListener('mousedown', handleGlobalPointerDown, true);
+    window.addEventListener('pointerdown', handleGlobalPointerDown, true);
+    return () => {
+      window.removeEventListener('mousedown', handleGlobalPointerDown, true);
+      window.removeEventListener('pointerdown', handleGlobalPointerDown, true);
+    };
+  }, [clearSelection]);
+
   // Load photos and folders when project changes
   useEffect(() => {
     if (currentProject) {

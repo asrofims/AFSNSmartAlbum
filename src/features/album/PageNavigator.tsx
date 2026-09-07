@@ -324,13 +324,16 @@ export function PageNavigator() {
           clearSpreadSelection();
         }
       } else if (e.key === 'Delete' && isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
-        // Strict guard: if the user has selected objects on the canvas, canvas deletion takes precedence!
+        const targetElement = e.target as HTMLElement;
+        const isFocusedInDrawer = Boolean(targetElement?.closest('[data-spread-drawer="true"]'));
+        const isTargetInside = isDrawerHoveredRef.current || isFocusedInDrawer || (drawerRef.current && drawerRef.current.contains(targetElement));
+
+        // If the user hasn't explicitly focused/hovered the drawer, AND they have canvas objects selected, skip spread deletion (let canvas handle it)
         const { selectedFrameIds } = useEditorStore.getState();
-        if (selectedFrameIds.length > 0) {
+        if (!isTargetInside && selectedFrameIds.length > 0) {
           return;
         }
 
-        const isTargetInside = isDrawerHoveredRef.current || (drawerRef.current && drawerRef.current.contains(e.target as Node));
         // Only delete spreads if the spread drawer is hovered/focused OR multiple spreads are selected
         if (!isTargetInside && selectedSpreadIds.length <= 1) {
           return;
@@ -549,7 +552,12 @@ export function PageNavigator() {
   };
 
   return (
-    <div className={styles.navigatorContainer}>
+    <div
+      className={styles.navigatorContainer}
+      onMouseDownCapture={() => {
+        usePhotoStore.getState().clearSelection();
+      }}
+    >
       {/* Spread Thumbnail Drawer (Collapsible with Hardware-Accelerated Smooth Slide) */}
       <div
         ref={drawerRef}
@@ -598,8 +606,10 @@ export function PageNavigator() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
+                  tabIndex={0}
                   className={`${styles.thumbnailCard} ${isActive ? styles.cardActive : ''} ${isSelected && !isActive ? styles.cardSelected : ''} ${isDragging ? styles.draggingCard : ''} ${dragOverClass}`}
                   onClick={(e) => {
+                    usePhotoStore.getState().clearSelection();
                     const isMulti = Boolean(e.ctrlKey || e.metaKey);
                     const isRange = Boolean(e.shiftKey);
                     toggleSpreadSelection(spread.id, isMulti, isRange);

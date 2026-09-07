@@ -4,6 +4,7 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
+    "core:window:default",
     "os:default",
     "shell:default",
     "shell:allow-open",

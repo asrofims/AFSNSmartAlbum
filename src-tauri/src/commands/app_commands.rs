@@ -53,6 +53,25 @@ pub fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
+/// Forcefully exit the application without saving.
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    log::info!("exit_app invoked: terminating application runtime");
+    app.exit(0);
+    std::process::exit(0);
+}
+
+#[derive(Default)]
+pub struct AppExitState {
+    pub is_unsaved: std::sync::atomic::AtomicBool,
+}
+
+/// Synchronize project unsaved dirty state from frontend to native backend.
+#[tauri::command]
+pub fn set_unsaved_status(state: State<'_, AppExitState>, unsaved: bool) {
+    state.is_unsaved.store(unsaved, std::sync::atomic::Ordering::Relaxed);
+}
+
 #[cfg(target_os = "windows")]
 mod win32_color {
     #[link(name = "user32")]

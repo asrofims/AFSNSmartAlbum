@@ -103,6 +103,8 @@ export function WorkspaceLayout() {
 
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
+  const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const helpMenuRef = useRef<HTMLDivElement>(null);
   const propertyListRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
@@ -227,12 +229,15 @@ export function WorkspaceLayout() {
       if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
         setIsFileMenuOpen(false);
       }
+      if (helpMenuRef.current && !helpMenuRef.current.contains(e.target as Node)) {
+        setIsHelpMenuOpen(false);
+      }
     };
-    if (isFileMenuOpen) {
+    if (isFileMenuOpen || isHelpMenuOpen) {
       window.addEventListener('mousedown', onMouseDown);
     }
     return () => window.removeEventListener('mousedown', onMouseDown);
-  }, [isFileMenuOpen]);
+  }, [isFileMenuOpen, isHelpMenuOpen]);
 
   // Window BeforeUnload Warning when modifications are unsaved
   useEffect(() => {
@@ -506,8 +511,9 @@ export function WorkspaceLayout() {
     <div className={styles.workspace}>
       {/* Top Main Toolbar */}
       <header className={styles.toolbar} data-tauri-drag-region>
-        {/* Left Section: File Actions & Menus */}
-        <div className={styles.toolbarSection}>
+        
+        {/* Left Section: File & Help Menus */}
+        <div className={styles.toolbarSideSection} style={{ justifyContent: 'flex-start' }}>
           {/* Professional File Menu Dropdown */}
           <div className={styles.menuContainer} ref={fileMenuRef}>
             <Button
@@ -631,7 +637,51 @@ export function WorkspaceLayout() {
               </div>
             )}
           </div>
+          
+          {/* Help / App Menu Dropdown */}
+          <div className={styles.menuContainer} ref={helpMenuRef}>
+            <Button
+              variant={isHelpMenuOpen ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setIsHelpMenuOpen(!isHelpMenuOpen)}
+              title="Help & Settings"
+            >
+              <span>Help ▾</span>
+            </Button>
 
+            {isHelpMenuOpen && (
+              <div className={styles.dropdownMenu}>
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  onClick={() => {
+                    setIsHelpMenuOpen(false);
+                    openSettings('snapping');
+                  }}
+                >
+                  <span>⚙️ Settings...</span>
+                </button>
+                
+                <div className={styles.menuDivider} />
+                
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  onClick={() => {
+                    setIsHelpMenuOpen(false);
+                    openAbout();
+                  }}
+                >
+                  <span>ℹ️ About AFSNSmartAlbum</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Center Section: Project Name, Actions, Zoom */}
+        <div className={styles.toolbarCenterSection}>
           {currentProject && (
             <div className={styles.activeProjectBadge}>
               {isEditingProjectName ? (
@@ -823,8 +873,8 @@ export function WorkspaceLayout() {
           )}
         </div>
 
-        {/* Right Section: View Toggles & About */}
-        <div className={styles.toolbarSection}>
+        {/* Right Section: View Toggles & Export */}
+        <div className={styles.toolbarSideSection} style={{ justifyContent: 'flex-end' }}>
           {currentProject && (
             <>
               {/* High-Resolution Print Export Button */}
@@ -858,33 +908,6 @@ export function WorkspaceLayout() {
               </Button>
             </>
           )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openSettings('snapping')}
-            title="Open Settings"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            Settings
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openAbout}
-            title="About AFSNSmartAlbum"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 16v-4"/>
-              <path d="M12 8h.01"/>
-            </svg>
-            About
-          </Button>
 
           {updateAvailableVersion && (
             <Button
