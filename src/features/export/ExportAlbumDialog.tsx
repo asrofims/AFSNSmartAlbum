@@ -114,8 +114,18 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [isMissingModalOpen, setIsMissingModalOpen] = useState(false);
 
   const allSpreads: Spread[] = useMemo(() => {
-    return currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
-  }, [currentAlbum]);
+    if (!currentAlbum) return [];
+    const list: Spread[] = [];
+    if (
+      currentAlbum.coverSpread &&
+      ((currentAlbum.coverSpread.elements && currentAlbum.coverSpread.elements.length > 0) ||
+        currentAlbum.coverSpread.id === activeSpreadId)
+    ) {
+      list.push(currentAlbum.coverSpread);
+    }
+    list.push(...getAllAlbumSpreads(currentAlbum));
+    return list;
+  }, [currentAlbum, activeSpreadId]);
 
   const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
 
@@ -123,13 +133,19 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
   const [activePreviewSpreadId, setActivePreviewSpreadId] = useState<string>('');
   const [previewViewMode, setPreviewViewMode] = useState<ExportPreviewViewMode>('spread');
   const [showBleedGuide, setShowBleedGuide] = useState<boolean>(true);
+  const [showSafeAreaGuide, setShowSafeAreaGuide] = useState<boolean>(() => {
+    return useAlbumStore.getState().showSafeAreaGuide ?? true;
+  });
 
-  // Sync initial preview spread
+  // Sync active spread whenever dialog opens or active spread changes
   useEffect(() => {
-    if (!activePreviewSpreadId && allSpreads.length > 0) {
-      setActivePreviewSpreadId(activeSpread?.id || allSpreads[0]?.id || '');
+    if (isOpen) {
+      const targetId = activeSpreadId && allSpreads.some((s) => s.id === activeSpreadId)
+        ? activeSpreadId
+        : (activeSpread?.id || allSpreads[0]?.id || '');
+      setActivePreviewSpreadId(targetId);
     }
-  }, [allSpreads, activeSpread, activePreviewSpreadId]);
+  }, [isOpen, activeSpreadId, activeSpread?.id, allSpreads]);
 
   const previewSpread = useMemo(() => {
     return allSpreads.find((s) => s.id === activePreviewSpreadId) || activeSpread || allSpreads[0];
@@ -355,17 +371,29 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                 </button>
               </div>
 
-              {includeBleed && (
+              <div className={styles.toolbarActions}>
                 <button
                   type="button"
-                  className={`${styles.guideToggleBtn} ${showBleedGuide ? styles.guideToggleBtnActive : ''}`}
-                  onClick={() => setShowBleedGuide(!showBleedGuide)}
-                  title="Toggle dashed red line showing print lab trim cut line"
+                  className={`${styles.guideToggleBtn} ${showSafeAreaGuide ? styles.safeAreaToggleBtnActive : ''}`}
+                  onClick={() => setShowSafeAreaGuide(!showSafeAreaGuide)}
+                  title="Toggle dashed blue line showing safe area margins"
                 >
-                  <span>✂</span>
-                  <span>Trim Guide</span>
+                  <span>🛡️</span>
+                  <span>Safe Area</span>
                 </button>
-              )}
+
+                {includeBleed && (
+                  <button
+                    type="button"
+                    className={`${styles.guideToggleBtn} ${showBleedGuide ? styles.guideToggleBtnActive : ''}`}
+                    onClick={() => setShowBleedGuide(!showBleedGuide)}
+                    title="Toggle dashed red line showing print lab trim cut line"
+                  >
+                    <span>✂</span>
+                    <span>Trim Guide</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Interactive Live Scaled Preview */}
@@ -376,6 +404,7 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
                 viewMode={previewViewMode}
                 includeBleed={includeBleed}
                 showBleedGuide={showBleedGuide}
+                showSafeAreaGuide={showSafeAreaGuide}
                 splitPages={splitPages}
                 dpi={dpi}
                 format={format}

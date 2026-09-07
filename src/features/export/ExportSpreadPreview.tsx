@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Spread, mergeFramePhotoAsset } from '../../domain/album';
 import { Project } from '../../domain/project';
-import { PhotoFrameElement, calculateImageOffset, getCornerRadii } from '../../domain/editor';
+import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { calculateExportPixels, convertPtToUnit } from '../../domain/units';
@@ -25,6 +25,7 @@ interface ExportSpreadPreviewProps {
   viewMode: ExportPreviewViewMode;
   includeBleed: boolean;
   showBleedGuide: boolean;
+  showSafeAreaGuide?: boolean;
   splitPages: boolean;
   dpi: number;
   format: 'jpeg' | 'png' | 'pdf';
@@ -36,6 +37,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
   viewMode,
   includeBleed,
   showBleedGuide,
+  showSafeAreaGuide = false,
   splitPages,
   dpi,
   format,
@@ -167,10 +169,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
           <div
             style={{
               position: 'absolute',
-              left: `${bleedPx}px`,
-              top: `${bleedPx}px`,
-              width: `${Math.max(1, containerW - bleedPx * 2)}px`,
-              height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+              left: 0,
+              top: 0,
+              width: `${containerW}px`,
+              height: `${containerH}px`,
               backgroundColor: spreadBgColor,
             }}
           />
@@ -256,8 +258,46 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             </div>
           )}
 
+          {/* Safe Area Margins Guide (matching real canvas blue dashed guide) */}
+          {showSafeAreaGuide && (
+            <>
+              {/* Left Page Safe Area */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${bleedPx + Math.round(dims.safeMarginOutside * scale)}px`,
+                  top: `${bleedPx + Math.round(dims.safeMarginTop * scale)}px`,
+                  width: `${Math.max(1, Math.round((dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scale))}px`,
+                  height: `${Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scale))}px`,
+                  border: '1px dashed rgba(59, 130, 246, 0.75)',
+                  pointerEvents: 'none',
+                  boxSizing: 'border-box',
+                  zIndex: 20,
+                }}
+                title={`Safe Area Margin (Left Page): ${dims.safeMarginOutside} ${dims.unit}`}
+              />
+              {/* Right Page Safe Area (when in full spread view) */}
+              {viewMode === 'spread' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${bleedPx + Math.round((dims.pageWidth + gutterW + dims.safeMarginSpine) * scale)}px`,
+                    top: `${bleedPx + Math.round(dims.safeMarginTop * scale)}px`,
+                    width: `${Math.max(1, Math.round((dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scale))}px`,
+                    height: `${Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scale))}px`,
+                    border: '1px dashed rgba(59, 130, 246, 0.75)',
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                    zIndex: 20,
+                  }}
+                  title={`Safe Area Margin (Right Page): ${dims.safeMarginSpine} ${dims.unit}`}
+                />
+              )}
+            </>
+          )}
+
           {/* Scaled Rendered Elements */}
-          {visibleElements.map((el) => {
+          {visibleElements.map((el, idx) => {
             // Coordinate transformation relative to view container
             const localX = el.x - viewOffsetX + bleed;
             const localY = el.y + bleed;
@@ -268,33 +308,34 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const renderH = Math.max(1, Math.round(el.height * scale));
             const rot = el.rotation || 0;
 
-            // Subpixel Edge-Clamping: Prevents 1px rounding gap from exposing white canvas bottom/edges
+            // Strict 1:1 physical positioning matching real canvas
             let finalRenderX = renderX;
             let finalRenderY = renderY;
             let finalRenderW = renderW;
             let finalRenderH = renderH;
 
-            if (!rot) {
-              const isNearTop = Math.abs(el.y) < 2.0;
-              const isNearBottom = Math.abs((el.y + el.height) - baseSpreadH) < 2.5;
-              const isNearLeft = Math.abs(el.x - viewOffsetX) < 2.0;
-              const isNearRight = Math.abs((el.x + el.width - viewOffsetX) - targetW) < 2.5;
+            // Only extend full-bleed photos into outer bleed margin when includeBleed is ACTIVE
+            // and the frame touches the spread outer boundary in canvas coordinates (tolerance <= 0.05 mm/unit)
+            if (includeBleed && !rot && bleedPx > 0) {
+              const tol = 0.05;
+              const touchesLeft = (el.x - viewOffsetX) <= tol;
+              const touchesTop = el.y <= tol;
+              const touchesRight = (el.x + el.width - viewOffsetX) >= (targetW - tol);
+              const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
 
-              if (isNearTop) {
-                finalRenderY = bleedPx;
+              if (touchesLeft) {
+                finalRenderX = 0;
+                finalRenderW += bleedPx;
               }
-              if (isNearBottom) {
-                const targetBottomPx = containerH - bleedPx;
-                // Extend by +4px into bottom boundary (clipped by overflow:hidden) to guarantee zero white gap
-                finalRenderH = Math.max(1, targetBottomPx - finalRenderY + 4);
+              if (touchesTop) {
+                finalRenderY = 0;
+                finalRenderH += bleedPx;
               }
-              if (isNearLeft) {
-                finalRenderX = bleedPx;
+              if (touchesRight) {
+                finalRenderW = containerW - finalRenderX;
               }
-              if (isNearRight) {
-                const targetRightPx = containerW - bleedPx;
-                // Extend by +4px into right boundary (clipped by overflow:hidden) to guarantee zero white gap
-                finalRenderW = Math.max(1, targetRightPx - finalRenderX + 4);
+              if (touchesBottom) {
+                finalRenderH = containerH - finalRenderY;
               }
             }
 
@@ -343,7 +384,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     overflow: 'hidden',
                     pointerEvents: 'none',
                     userSelect: 'none',
-                    zIndex: textEl.zIndex || 2,
+                    zIndex: textEl.zIndex ?? (idx + 1),
                   }}
                 >
                   <div
@@ -391,11 +432,13 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               ? (safePreview || safeThumb || hydrated.filePath || null)
               : null;
 
-            // In-place calculate crop and zoom offsets
+            const photoAspect = getPhotoAspect(hydrated);
+
+            // In-place calculate crop and zoom offsets using actual photo aspect ratio
             const { offsetX, offsetY, width: imgPhysicalW, height: imgPhysicalH } = calculateImageOffset(
               photoEl.width,
               photoEl.height,
-              photoEl.photoAspect || 1.5,
+              photoAspect,
               Math.max(1.0, photoEl.cropScale || 1.0),
               photoEl.cropX || 0,
               photoEl.cropY || 0
@@ -435,7 +478,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     ? `${Math.max(1, Math.round(photoEl.borderWidth * scale))}px solid ${photoEl.borderColor || '#ffffff'}`
                     : 'none',
                   borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
-                  zIndex: photoEl.zIndex || 2,
+                  zIndex: photoEl.zIndex ?? (idx + 1),
                 }}
               >
                 {imgSrc ? (
