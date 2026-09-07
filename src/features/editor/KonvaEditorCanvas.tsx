@@ -1033,7 +1033,17 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (!activeSpread) return;
 
+      // Do not process canvas keyboard shortcuts if a modal/dialog is open
+      const isModalOpen = Boolean(document.querySelector('[role="dialog"]') || document.querySelector('.modal'));
+      if (isModalOpen) return;
+
+      const { isSpreadDrawerOpen, selectedSpreadIds } = useAlbumStore.getState();
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // If spread drawer is open and spreads are selected, spread drawer handles deletion
+        if (isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
+          return;
+        }
         if (editingCropFrameId) {
           e.preventDefault();
           return;
@@ -1055,6 +1065,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           clearSelection();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        // If spread drawer is open, Ctrl+A belongs to spread drawer
+        if (isSpreadDrawerOpen) return;
         const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
         if (!isHoveredOnFilmstrip && activeSpread) {
           e.preventDefault();

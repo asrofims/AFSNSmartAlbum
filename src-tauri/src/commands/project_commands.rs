@@ -367,7 +367,7 @@ pub async fn export_bundled_package_with_dialog(
         rfd::FileDialog::new()
             .set_title("Export Complete Album Package with Photos (.zip)")
             .set_file_name(&format!("{}-Package.zip", default_name))
-            .add_filter("AFSNSmartAlbum Complete Archive (*.zip, *.afsnz)", &["zip", "afsnz"])
+            .add_filter("ZIP Archive (*.zip)", &["zip"])
             .save_file()
     })
     .await
@@ -375,7 +375,7 @@ pub async fn export_bundled_package_with_dialog(
 
     if let Some(mut path) = file_path {
         let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-        if ext != "zip" && ext != "afsnz" {
+        if ext != "zip" {
             path.set_extension("zip");
         }
         let path_str = path.to_string_lossy().to_string();
@@ -397,8 +397,8 @@ pub async fn import_afsn_with_dialog(
 ) -> Result<Option<ProjectPackagePayload>, String> {
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
-            .set_title("Open AFSNSmartAlbum Project (.afsn)")
-            .add_filter("AFSNSmartAlbum Project (*.afsn)", &["afsn"])
+            .set_title("Open AFSNSmartAlbum Project (.afsn, .zip)")
+            .add_filter("AFSNSmartAlbum Project (*.afsn, *.zip)", &["afsn", "zip"])
             .pick_file()
     })
     .await

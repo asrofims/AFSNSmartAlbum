@@ -174,4 +174,11 @@
 - [x] Web Typography Font Embeds (Google Web Fonts loaded for true Inter, Playfair Display, Cinzel, Montserrat, Cormorant Garamond, and Great Vibes canvas rendering)
 - [x] Export Spread Preview Subpixel Edge-Clamping (Exact container height mapping and frame boundary snapping eliminate 1px white border gaps)
 
+## Phase 14 — Batch Spread Deletion Isolation, Auto-Empty Spread Reset & Clean Package Archiving (v1.0.31)
+- [x] Canvas Object Protection on Spread Deletion (Shortcut isolation guards canvas from accidental element deletion when interacting with spread drawer or confirmation modals)
+- [x] Unrestricted Multi-Spread Batch Deletion (Allowed deleting all spreads simultaneously with intuitive confirmation dialog)
+- [x] Automatic Blank Spread Fallback (Deleting all spreads instantly provisions a fresh, clean Spread 1 to preserve album integrity and design readiness)
+- [x] Clean Export Packaged Filter (Simplified file save filter to pure `ZIP Archive (*.zip)`, removing confusing legacy `.afsnz` label)
+- [x] Enhanced Project Import Filter (Open dialog now supports both single `.afsn` files and bundled `.zip` archives)
+
 

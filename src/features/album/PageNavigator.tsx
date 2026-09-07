@@ -3,6 +3,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAlbumStore } from '../../stores/albumStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useEditorStore } from '../../stores/editorStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
 import { PhotoFrameElement } from '../../domain/editor';
 import { TextNodeElement, stripRichTextMarkup, resolveCssFontFamily } from '../../domain/text';
@@ -309,6 +310,7 @@ export function PageNavigator() {
         prevSpread();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && isSpreadDrawerOpen) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         selectAllSpreads();
       } else if (e.key === 'Escape') {
         if (contextMenu.isOpen) {
@@ -318,15 +320,19 @@ export function PageNavigator() {
         }
       } else if (e.key === 'Delete' && isSpreadDrawerOpen && selectedSpreadIds.length > 0) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         const { currentAlbum: album } = useAlbumStore.getState();
         if (!album) return;
         const spreads = getAllAlbumSpreads(album);
         const selected = spreads.filter((s) => selectedSpreadIds.includes(s.id));
-        // Must keep at least 1 spread
-        if (spreads.length - selected.length < 1) return;
+        if (selected.length === 0) return;
+
+        // Clear canvas selection so canvas objects are never touched
+        useEditorStore.getState().clearSelection();
 
         const hasElements = selected.some((s) => (s.elements || []).length > 0);
-        if (selected.length === 1 && !hasElements) {
+        // If single spread, completely empty, and more than 1 spread exists in album, delete immediately
+        if (selected.length === 1 && !hasElements && spreads.length > 1) {
           deleteSpread(selected[0]!.id);
         } else {
           setSpreadsToDelete(selected);
@@ -357,22 +363,26 @@ export function PageNavigator() {
     e.stopPropagation();
     if (targetSpreads.length === 0) return;
 
+    useEditorStore.getState().clearSelection();
+
+    const allSpreads = getAllAlbumSpreads(currentAlbum);
     // Check if any spread has elements
     const hasElements = targetSpreads.some((s) => (s.elements || []).length > 0);
 
-    // If single spread and completely empty, delete immediately without modal
-    if (targetSpreads.length === 1 && !hasElements) {
+    // If single spread and completely empty, and more than 1 spread exists, delete immediately without modal
+    if (targetSpreads.length === 1 && !hasElements && allSpreads.length > 1) {
       deleteSpread(targetSpreads[0]!.id);
       return;
     }
 
-    // Spread has elements or multiple spreads selected -> prompt confirmation dialog
+    // Spread has elements, multiple spreads selected, or deleting only remaining spread -> prompt confirmation dialog
     setSpreadsToDelete(targetSpreads);
   };
 
   const handleConfirmDelete = () => {
     if (spreadsToDelete && spreadsToDelete.length > 0) {
-      if (spreadsToDelete.length === 1) {
+      useEditorStore.getState().clearSelection();
+      if (spreadsToDelete.length === 1 && allSpreads.length > 1) {
         deleteSpread(spreadsToDelete[0]!.id);
       } else {
         deleteSpreads(spreadsToDelete.map((s) => s.id));
@@ -400,8 +410,8 @@ export function PageNavigator() {
           icon: '🗑️',
           shortcut: 'Delete',
           danger: true,
-          disabled: allSpreads.length - selectedSpreadIds.length < 1,
           onClick: () => {
+            useEditorStore.getState().clearSelection();
             setSpreadsToDelete(selectedSpreads);
           },
         },
@@ -474,12 +484,12 @@ export function PageNavigator() {
       { divider: true, id: 'div-2', label: '' },
       {
         id: 'delete-single',
-        label: 'Delete Spread',
+        label: allSpreads.length <= 1 ? 'Delete & Reset Spread' : 'Delete Spread',
         icon: '🗑️',
         danger: true,
-        disabled: allSpreads.length <= 1,
         onClick: () => {
-          if (spread.elements && spread.elements.length > 0) {
+          useEditorStore.getState().clearSelection();
+          if (allSpreads.length <= 1 || (spread.elements && spread.elements.length > 0)) {
             setSpreadsToDelete([spread]);
           } else {
             deleteSpread(spread.id);
@@ -749,17 +759,26 @@ export function PageNavigator() {
         isOpen={spreadsToDelete !== null && spreadsToDelete.length > 0}
         title={
           spreadsToDelete && spreadsToDelete.length > 1
-            ? `Delete ${spreadsToDelete.length} Album Spreads?`
-            : 'Delete Album Spread?'
+            ? spreadsToDelete.length === allSpreads.length
+              ? `Delete All ${spreadsToDelete.length} Album Spreads?`
+              : `Delete ${spreadsToDelete.length} Album Spreads?`
+            : allSpreads.length === 1
+              ? 'Delete Album Spread & Reset?'
+              : 'Delete Album Spread?'
         }
         message={
           spreadsToDelete && spreadsToDelete.length > 1
-            ? `Are you sure you want to delete ${spreadsToDelete.length} selected spreads?`
-            : `Are you sure you want to delete "${spreadsToDelete?.[0]?.name}"?`
+            ? spreadsToDelete.length === allSpreads.length
+              ? `Are you sure you want to delete all ${spreadsToDelete.length} spreads? All contents will be removed and the album will reset with a new blank spread.`
+              : `Are you sure you want to delete ${spreadsToDelete.length} selected spreads?`
+            : allSpreads.length === 1
+              ? `Are you sure you want to delete "${spreadsToDelete?.[0]?.name}"? The album will reset with a new blank spread.`
+              : `Are you sure you want to delete "${spreadsToDelete?.[0]?.name}"?`
         }
         detail={(() => {
           if (!spreadsToDelete || spreadsToDelete.length === 0) return '';
 
+          const isDeletingAll = spreadsToDelete.length === allSpreads.length;
           const allElements = spreadsToDelete.flatMap((s) => s.elements || []);
           const photoCount = allElements.filter(
             (el) => el.type === 'photo' && Boolean(el.photoId || el.filePath)
@@ -776,6 +795,9 @@ export function PageNavigator() {
 
           const summary = parts.length > 0 ? parts.join(', ') : `${allElements.length} element(s)`;
 
+          if (isDeletingAll) {
+            return `All ${spreadsToDelete.length} spreads containing ${summary} will be removed. A new empty spread will be created so you can continue designing immediately. (You can undo this with Ctrl+Z).`;
+          }
           if (spreadsToDelete.length > 1) {
             return `These ${spreadsToDelete.length} spreads contain a total of ${summary}. Deleting them will permanently remove all their contents from your album.`;
           }
@@ -783,8 +805,12 @@ export function PageNavigator() {
         })()}
         confirmText={
           spreadsToDelete && spreadsToDelete.length > 1
-            ? `Delete ${spreadsToDelete.length} Spreads`
-            : 'Delete Spread'
+            ? spreadsToDelete.length === allSpreads.length
+              ? `Delete All & Reset`
+              : `Delete ${spreadsToDelete.length} Spreads`
+            : allSpreads.length === 1
+              ? 'Delete & Reset'
+              : 'Delete Spread'
         }
         cancelText="Cancel"
         variant="danger"

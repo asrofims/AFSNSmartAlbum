@@ -29,6 +29,7 @@ import {
 } from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
+import { useProjectStore } from './projectStore';
 import type { PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
@@ -523,8 +524,31 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const { currentAlbum, activeSpreadId } = get();
     if (!currentAlbum) return;
 
-    // Must have at least 1 spread
-    if (currentAlbum.spreads.length <= 1) return;
+    // If only 1 spread left, deleting it resets the album to a new blank spread
+    if (currentAlbum.spreads.length <= 1) {
+      const { currentProject } = useProjectStore.getState();
+      if (!currentProject) return;
+
+      useHistoryStore.getState().pushState(currentAlbum);
+
+      const newSpread = createInteriorSpread(currentAlbum, currentProject, 1);
+      const updatedAlbum = recalculateAlbumPageNumbers({
+        ...currentAlbum,
+        spreads: [newSpread],
+      });
+
+      useEditorStore.getState().clearSelection();
+
+      set({
+        currentAlbum: updatedAlbum,
+        activeSpreadId: newSpread.id,
+        activeSpreadIndex: 0,
+        selectedSpreadIds: [newSpread.id],
+        selectedPageId: null,
+        saveStatus: 'unsaved',
+      });
+      return;
+    }
 
     const oldAll = getAllAlbumSpreads(currentAlbum);
     const deletedIndex = oldAll.findIndex((s) => s.id === spreadId);
@@ -574,15 +598,34 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const toDeleteSet = new Set(spreadIds);
     const remainingSpreads = currentAlbum.spreads.filter((s) => !toDeleteSet.has(s.id));
 
-    // Album must retain at least 1 spread!
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    // If all spreads in album were deleted, reset to a new blank spread
     if (remainingSpreads.length === 0) {
+      const { currentProject } = useProjectStore.getState();
+      if (!currentProject) return;
+
+      const newSpread = createInteriorSpread(currentAlbum, currentProject, 1);
+      const updatedAlbum = recalculateAlbumPageNumbers({
+        ...currentAlbum,
+        spreads: [newSpread],
+      });
+
+      useEditorStore.getState().clearSelection();
+
+      set({
+        currentAlbum: updatedAlbum,
+        activeSpreadId: newSpread.id,
+        activeSpreadIndex: 0,
+        selectedSpreadIds: [newSpread.id],
+        selectedPageId: null,
+        saveStatus: 'unsaved',
+      });
       return;
     }
 
     const oldAll = getAllAlbumSpreads(currentAlbum);
     const activeOldIndex = activeSpreadId ? oldAll.findIndex((s) => s.id === activeSpreadId) : -1;
-
-    useHistoryStore.getState().pushState(currentAlbum);
 
     const updatedAlbum = recalculateAlbumPageNumbers({
       ...currentAlbum,
