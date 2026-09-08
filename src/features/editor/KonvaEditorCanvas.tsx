@@ -29,6 +29,7 @@ import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
 import { TextNodeElement, fitTextFrame } from '../../domain/text';
+import { convertPtToUnit } from '../../domain/units';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -1351,6 +1352,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       trRef.current.nodes([]);
       trRef.current.forceUpdate();
       trRef.current.getLayer()?.batchDraw();
+    } else if (trRef.current.isTransforming()) {
+      // Store/viewport rerenders must not reset the active gesture's scale.
+      return;
     } else if (selectedFrameIds.length === 1) {
       const singleNode = stageRef.current.findOne(`#${selectedFrameIds[0]}`);
       if (singleNode) {
@@ -3375,7 +3379,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               }}
               boundBoxFunc={(oldBox, newBox) => {
                 const singleText = selectedFrameIds.length === 1 && activeSpread.elements.find((el) => el.id === selectedFrameIds[0])?.type === 'text';
-                if (singleText) return newBox.width > 0 && newBox.height > 0 ? newBox : oldBox;
+                if (singleText) {
+                  const minTextSize = convertPtToUnit(1, unit, currentProject?.canvasDpi || 300) * scaleFactor;
+                  return newBox.width >= minTextSize && newBox.height >= minTextSize ? newBox : oldBox;
+                }
                 if (newBox.width < 4 || newBox.height < 4) {
                   return oldBox;
                 }

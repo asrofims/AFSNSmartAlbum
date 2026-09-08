@@ -228,6 +228,14 @@
 - [x] Comprehensive Browser Regression Suite: Added `Run Resize Regression` in `tests/typography-browser.html` covering eight handles at 0°/45°, direction reversal, fractional corner resizing of fitted text, release consistency, and overflow bounds (all 547 resize assertions pass).
 - [x] Application version metadata bumped to `v1.0.37`.
 
+### Text Resize and Auto Size Follow-up — 8 September 2026
+
+- [x] Keep the frame transform under Konva ownership throughout a resize; update text drawing synchronously, use frame-only transform bounds, and normalize geometry once on release.
+- [x] Measure live corner-resize text at its starting font size to preserve line wrapping and glyph alignment during continuous scaling.
+- [x] Preserve Auto Size selection across single and group resizing. Height Only continues fitting text through the document update operation.
+- [x] Fit Frame to Content can expand a narrow column up to the page width; Fit buttons read committed text and report when the frame already fits.
+- Validation: code review, whitespace check, and TypeScript `tsc --noEmit` passed; tests and interactive verification were not run, as requested.
+
 ## Project Save/Open Integrity — 8 September 2026
 - [x] Restrict editable documents to AFSN; ZIP packages are extracted before opening and never become Save/autosave targets.
 - [x] Atomic AFSN/ZIP file publication, strict asset-copy error handling, and unchanged destination files after failed writes.

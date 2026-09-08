@@ -150,9 +150,19 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   };
 
   const handleFit = (mode: 'height' | 'content') => {
-    updateTextElement(activeSpreadId, element.id, fitTextFrame(element, mode,
+    // Inline editing commits on blur before the click. Read that committed text
+    // instead of fitting a possibly stale panel prop.
+    const album = useAlbumStore.getState().currentAlbum;
+    const spread = album && [album.coverSpread, ...album.spreads].find((item) => item.id === activeSpreadId);
+    const current = spread?.elements.find((item) => item.id === element.id);
+    if (!current || current.type !== 'text' || current.locked) return;
+    const fitted = fitTextFrame(current, mode,
       currentProject?.canvasUnit || 'mm', currentProject?.canvasDpi || 300,
-      currentProject?.canvasWidth));
+      currentProject?.canvasWidth);
+    const unchanged = fitted.width === current.width && fitted.height === current.height;
+    updateTextElement(activeSpreadId, current.id, fitted);
+    onToast?.(unchanged ? 'The text frame already fits the content.'
+      : mode === 'height' ? 'Text frame height fitted to content.' : 'Text frame fitted to content.');
   };
   const handleFitHeightOnly = () => handleFit('height');
   const handleFitBothWidthAndHeight = () => handleFit('content');
@@ -254,6 +264,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
       </label>
       <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
         Side handles resize the frame. Corner handles scale the text. A red + indicates overflow.
+        {style.autoSize === 'height' && ' Height Only adjusts the height to fit the text. Choose Off for a fixed height.'}
       </div>
 
       {/* 2. Direct Content Input Field with Quick Rich Format Bar */}

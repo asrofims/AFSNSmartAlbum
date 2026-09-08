@@ -1845,7 +1845,6 @@ export function calculateMultiFrameResize(
         fontSize: newFontSize,
         padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
         letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
-        autoSize: 'off',
       };
       const origRanges = (f as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {
@@ -1935,7 +1934,6 @@ export function calculateMultiFrameResize(
           fontSize: newFontSize,
         padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
         letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
-        autoSize: 'off',
         };
         const origRanges = (f as any)?.styledRanges;
         if (origRanges && Array.isArray(origRanges)) {
@@ -2146,7 +2144,6 @@ export function calculateMultiFrameResize(
         fontSize: newFontSize,
         padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
         letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
-        autoSize: 'off',
       };
       const origRanges = (f as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {
@@ -2556,7 +2553,6 @@ export function calculateRotatedMultiFrameResize(
         fontSize: newFontSize,
         padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
         letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
-        autoSize: 'off',
       };
       const origRanges = (orig as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {

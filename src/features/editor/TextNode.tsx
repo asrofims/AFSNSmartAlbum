@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useLayoutEffect } from 'react';
 import { Group, Rect, Text as KonvaText, Circle, Path as KonvaPath, Shape as KonvaShape } from 'react-konva';
 import Konva from 'konva';
 import { useEditorStore } from '../../stores/editorStore';
@@ -8,6 +8,7 @@ import {
   getTextRuns,
   layoutRichText,
   drawRichTextLayout,
+  updateTextNode,
 
 } from '../../domain/text';
 import { Unit, convertPtToUnit, convertUnitToPt } from '../../domain/units';
@@ -48,11 +49,24 @@ export function TextNode({
   onDoubleClick,
 }: TextNodeProps) {
   const shapeRef = useRef<Konva.Group>(null);
+  const hitRef = useRef<Konva.Rect>(null);
+  const textRef = useRef<Konva.Shape>(null);
+  const overflowRef = useRef<Konva.Group>(null);
+  const liveLayoutRef = useRef<ReturnType<typeof layoutRichText> | null>(null);
   const [isHovered, setIsHovered] = useState(false);
+
+  useLayoutEffect(() => {
+    const node = shapeRef.current;
+    if (!node) return;
+    const original = node.getClientRect;
+    // Only the frame defines Transformer bounds, even while child text reflows.
+    node.getClientRect = (config) => hitRef.current?.getClientRect(config) ?? original.call(node, config);
+    return () => { node.getClientRect = original; };
+  }, []);
 
   const unit = canvasUnit || 'mm';
   const currentDpi = dpi || 300;
-  const style = { ...DEFAULT_TEXT_STYLE, ...(element.style || {}) };
+  const style = useMemo(() => ({ ...DEFAULT_TEXT_STYLE, ...(element.style || {}) }), [element.style]);
 
   const pixelX = Number.isFinite(element.x * scaleFactor) ? element.x * scaleFactor : 0;
   const pixelY = Number.isFinite(element.y * scaleFactor) ? element.y * scaleFactor : 0;
@@ -72,13 +86,8 @@ export function TextNode({
     scaledRanges?: typeof element.styledRanges;
   } | null>(null);
 
-  const [liveDimensions, setLiveDimensions] = useState<{
-    width: number;
-    height: number;
-    fontSize?: number;
-  } | null>(null);
-  const displayPixelW = liveDimensions ? liveDimensions.width : pixelW;
-  const displayPixelH = liveDimensions ? liveDimensions.height : pixelH;
+  const displayPixelW = pixelW;
+  const displayPixelH = pixelH;
 
   // Zoom-invariant base resolution for text measurement (prevents word-wrap jumping)
   const baseResolution = convertUnitToPt(1, unit, currentDpi);
@@ -87,24 +96,24 @@ export function TextNode({
   const internalW = (displayPixelW / scaleFactor) * baseResolution;
   const internalH = (displayPixelH / scaleFactor) * baseResolution;
 
-  // Live typographic point size (dynamically scales when corner handles are dragged)
-  const currentFontSize = liveDimensions?.fontSize ?? (style.fontSize || 24);
-  const effectiveStyle = useMemo(() => ({
-    ...style,
-    fontSize: currentFontSize,
-    padding: style.padding * (currentFontSize / style.fontSize),
-    letterSpacing: style.letterSpacing * (currentFontSize / style.fontSize),
-  }), [style, currentFontSize]);
+  const richRuns = useMemo(() => getTextRuns(element.text, style, element.styledRanges),
+    [element.text, element.styledRanges, style]);
+  const richLayout = useMemo(() => layoutRichText(richRuns, style, internalW, internalH, 72, 'inch', currentDpi),
+    [richRuns, style, internalW, internalH, currentDpi]);
 
-  const richRuns = useMemo(() => {
-    const ratio = currentFontSize / style.fontSize;
-    const ranges = ratio === 1 ? element.styledRanges : element.styledRanges?.map((range) => ({
-      ...range, fontSize: range.fontSize ? range.fontSize * ratio : undefined,
-    }));
-    return getTextRuns(element.text, effectiveStyle, ranges);
-  }, [element.text, element.styledRanges, effectiveStyle, currentFontSize, style.fontSize]);
-  const richLayout = useMemo(() => layoutRichText(richRuns, effectiveStyle, internalW, internalH, 72, 'inch', currentDpi),
-    [richRuns, effectiveStyle, internalW, internalH, currentDpi]);
+  useLayoutEffect(() => {
+    if (transformStartRef.current) return;
+    // Restore imperative preview attributes even when a gesture returns to its
+    // original dimensions and React sees no changed geometry props.
+    liveLayoutRef.current = null;
+    textRef.current?.setAttrs({ width: internalW, height: internalH, scaleX: visualScale, scaleY: visualScale });
+    overflowRef.current?.setAttrs({
+      x: Math.max(0, pixelW - 12), y: Math.max(0, pixelH - 12),
+      scaleX: Math.min(1, pixelW / 12, pixelH / 12),
+      scaleY: Math.min(1, pixelW / 12, pixelH / 12),
+      visible: isSelected && !isEditing && richLayout.overflow,
+    });
+  });
 
   return (
     <Group
@@ -166,6 +175,7 @@ export function TextNode({
         if (!node) return;
         const tr = node.getStage()?.findOne('Transformer') as Konva.Transformer | undefined;
         const anchor = tr?.getActiveAnchor() || null;
+        lastTransformStateRef.current = null;
         transformStartRef.current = {
           initialPixelW: node.width(),
           initialPixelH: node.height(),
@@ -184,6 +194,7 @@ export function TextNode({
 
         const scaleX = Math.abs(node.scaleX());
         const scaleY = Math.abs(node.scaleY());
+        if (scaleX === 0 || scaleY === 0) return;
 
         const isCorner =
           anchor === 'top-left' ||
@@ -209,12 +220,6 @@ export function TextNode({
 
         const newPixelW = Math.max(minW, node.width() * scaleX);
         const newPixelH = Math.max(minH, node.height() * scaleY);
-
-        // Immediately reset scale to 1.0 so typography stays crisp and NEVER stretches!
-        node.scaleX(1);
-        node.scaleY(1);
-        node.width(newPixelW);
-        node.height(newPixelH);
 
         let newFontSize = initialFontSize;
         let currentScaledRanges = element.styledRanges;
@@ -242,15 +247,29 @@ export function TextNode({
           scaledRanges: currentScaledRanges,
         };
 
-        const livePixelH = newPixelH;
-        node.height(livePixelH);
-
-        // Update local React state so RichText layout and re-renders stay in sync
-        setLiveDimensions({
-          width: newPixelW,
-          height: livePixelH,
-          fontSize: newFontSize,
+        // Leave frame geometry/scales entirely under Konva during the gesture.
+        // Compensate only the text child so side handles reflow without stretching.
+        // Measure at the original font size to avoid fractional glyph-metric jumps.
+        const fontRatio = newFontSize / initialFontSize;
+        const layoutW = newPixelW / visualScale / fontRatio;
+        const layoutH = newPixelH / visualScale / fontRatio;
+        const layout = Math.abs(layoutW - internalW) < 1e-6 && Math.abs(layoutH - internalH) < 1e-6
+          ? richLayout
+          : layoutRichText(richRuns, style, layoutW, layoutH, 72, 'inch', currentDpi);
+        liveLayoutRef.current = layout;
+        textRef.current?.setAttrs({
+          width: layoutW, height: layoutH,
+          scaleX: visualScale * fontRatio / node.scaleX(),
+          scaleY: visualScale * fontRatio / node.scaleY(),
         });
+        const badgeScale = Math.min(1, newPixelW / 12, newPixelH / 12);
+        overflowRef.current?.setAttrs({
+          x: Math.max(0, newPixelW - 12) / scaleX,
+          y: Math.max(0, newPixelH - 12) / scaleY,
+          scaleX: badgeScale / scaleX, scaleY: badgeScale / scaleY,
+          visible: isSelected && !isEditing && layout.overflow,
+        });
+        node.getLayer()?.batchDraw();
       }}
       onTransformEnd={() => {
         if (isMultiSelectActive || element.locked) return;
@@ -277,14 +296,10 @@ export function TextNode({
         const finalX = node.x() / scaleFactor;
         const finalY = node.y() / scaleFactor;
 
-        node.scaleX(1);
-        node.scaleY(1);
-        const wasRotation = transformStartRef.current?.anchor === 'rotater';
-        setLiveDimensions(null);
         transformStartRef.current = null;
         lastTransformStateRef.current = null;
 
-        onElementChange({
+        const updates: Partial<TextNodeElement> = {
           x: finalX,
           y: finalY,
           width: rawW,
@@ -292,7 +307,6 @@ export function TextNode({
           rotation: node.rotation(),
           style: {
             ...style,
-            autoSize: wasRotation ? style.autoSize : 'off',
             ...(wasCorner ? {
               fontSize: finalFontSize,
               padding: style.padding * finalFontSize / style.fontSize,
@@ -300,11 +314,31 @@ export function TextNode({
             } : {}),
           },
           ...(wasCorner && finalRanges ? { styledRanges: finalRanges } : {}),
+        };
+        // Normalize once, using the same auto-size operation as the store, so
+        // releasing the pointer cannot paint the old dimensions for one frame.
+        const next = updateTextNode(element, updates, unit, currentDpi);
+        const width = next.width * scaleFactor;
+        const height = next.height * scaleFactor;
+        const nextLayout = layoutRichText(getTextRuns(next.text, next.style, next.styledRanges),
+          next.style, width / visualScale, height / visualScale, 72, 'inch', currentDpi);
+        liveLayoutRef.current = nextLayout;
+        node.setAttrs({ x: next.x * scaleFactor, y: next.y * scaleFactor, width, height, scaleX: 1, scaleY: 1 });
+        hitRef.current?.setAttrs({ width, height });
+        textRef.current?.setAttrs({ width: width / visualScale, height: height / visualScale, scaleX: visualScale, scaleY: visualScale });
+        overflowRef.current?.setAttrs({
+          x: Math.max(0, width - 12), y: Math.max(0, height - 12),
+          scaleX: Math.min(1, width / 12, height / 12),
+          scaleY: Math.min(1, width / 12, height / 12),
+          visible: isSelected && !isEditing && nextLayout.overflow,
         });
+        onElementChange(updates);
+        node.getLayer()?.batchDraw();
       }}
     >
       {/* Base Invisible Hit Box for clicking/dragging */}
       <Rect
+        ref={hitRef}
         width={displayPixelW}
         height={displayPixelH}
         fill="rgba(0, 0, 0, 0.001)"
@@ -313,23 +347,23 @@ export function TextNode({
 
       {/* Rendered Text Element - Centered in middle of frame */}
       <KonvaShape
+        ref={textRef}
         width={internalW}
         height={internalH}
         scaleX={visualScale}
         scaleY={visualScale}
         opacity={isEditing ? 0 : 1}
         listening={false}
-        sceneFunc={(context) => drawRichTextLayout(context._context, richLayout)}
+        sceneFunc={(context) => drawRichTextLayout(context._context, liveLayoutRef.current ?? richLayout)}
       />
-      {isSelected && !isEditing && richLayout.overflow && (
-        <Group x={Math.max(0, displayPixelW - 12)} y={Math.max(0, displayPixelH - 12)}
-          scaleX={Math.min(1, displayPixelW / 12, displayPixelH / 12)}
-          scaleY={Math.min(1, displayPixelW / 12, displayPixelH / 12)} listening={false}>
-          {/* Keep the stroke inside the frame: Group bounds drive the Transformer. */}
-          <Rect x={0.5} y={0.5} width={11} height={11} fill="#fff" stroke="#e11d48" strokeWidth={1} />
-          <KonvaText text="+" width={12} height={12} align="center" verticalAlign="middle" fill="#e11d48" fontSize={12} />
-        </Group>
-      )}
+      <Group ref={overflowRef} visible={isSelected && !isEditing && richLayout.overflow}
+        x={Math.max(0, displayPixelW - 12)} y={Math.max(0, displayPixelH - 12)}
+        scaleX={Math.min(1, displayPixelW / 12, displayPixelH / 12)}
+        scaleY={Math.min(1, displayPixelW / 12, displayPixelH / 12)} listening={false}>
+        {/* Keep the overflow badge stroke inside the frame. */}
+        <Rect x={0.5} y={0.5} width={11} height={11} fill="#fff" stroke="#e11d48" strokeWidth={1} />
+        <KonvaText text="+" width={12} height={12} align="center" verticalAlign="middle" fill="#e11d48" fontSize={12} />
+      </Group>
 
       {/* Subtle Hover Outline when not selected and not editing */}
       {isHovered && !isSelected && !isEditing && (

@@ -1102,6 +1102,7 @@ impl Database {
 
     // --- Photo Library Operations ---
 
+    #[allow(dead_code)]
     pub fn add_photo(&self, photo: &PhotoRow) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         Self::insert_photo(&conn, photo)

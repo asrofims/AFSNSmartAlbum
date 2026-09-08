@@ -458,7 +458,9 @@ export function resizeTextFrame(element: TextNodeElement, width: number, height:
 
 export function fitTextFrame(element: TextNodeElement, mode: 'height' | 'content', unit: Unit, dpi: number, maxWidth?: number): Partial<TextNodeElement> {
   if (element.locked) return {};
-  const fit = calculateTextFitDimensions(element.text, element.style, unit, dpi, element.width,
+  // Content fitting may expand a narrow frame up to the page width. Height-only
+  // fitting preserves the current column and its line wrapping.
+  const fit = calculateTextFitDimensions(element.text, element.style, unit, dpi, mode === 'height' ? element.width : undefined,
     mode === 'content' ? maxWidth : undefined, element.styledRanges);
   return resizeTextFrame(element, mode === 'height' ? element.width : fit.width, fit.height);
 }

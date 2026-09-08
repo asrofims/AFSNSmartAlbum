@@ -423,6 +423,7 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
 }
 
 /// Load or retrieve font from memory cache
+#[allow(dead_code)]
 pub fn get_or_load_font(family: &str, is_bold: bool, is_italic: bool) -> Option<Arc<Font>> {
     load_font_weight(family, if is_bold { 700 } else { 400 }, is_italic)
 }
