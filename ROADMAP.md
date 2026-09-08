@@ -228,6 +228,14 @@
 - [x] Comprehensive Browser Regression Suite: Added `Run Resize Regression` in `tests/typography-browser.html` covering eight handles at 0°/45°, direction reversal, fractional corner resizing of fitted text, release consistency, and overflow bounds (all 547 resize assertions pass).
 - [x] Application version metadata bumped to `v1.0.37`.
 
+## Project Save/Open Integrity — 8 September 2026
+- [x] Restrict editable documents to AFSN; ZIP packages are extracted before opening and never become Save/autosave targets.
+- [x] Atomic AFSN/ZIP file publication, strict asset-copy error handling, and unchanged destination files after failed writes.
+- [x] Transactional project imports, independent copy identities, preserved photo collection membership, and relative asset resolution.
+- [x] Guarded Save/Save As/autosave pipeline, serialized recovery writes, honest failure/dirty state, and protection for edits made during saves.
+- [x] Full file save for Save & Continue / Save & Exit, unsaved protection for external opens, and explicit save/open errors.
+- [x] Regression tests for real ZIP extraction/edit/save/reopen, failure rollback, cancellation, and concurrent edits. Details and compatibility limits are recorded in `PROJECT_PERSISTENCE_AUDIT.md`.
+
 
 
 

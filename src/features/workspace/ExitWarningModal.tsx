@@ -3,13 +3,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../../stores/appStore';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { isTauri } from '../../utils/platform';
+import { useProjectStore } from '../../stores/projectStore';
+import { useAlbumStore } from '../../stores/albumStore';
 
 export function ExitWarningModal() {
   const { isExitWarningOpen, closeExitWarning } = useAppStore();
   const [isClosing, setIsClosing] = useState(false);
+  const isSaving = useProjectStore((s) => s.isSaving);
 
   const handleForceExit = async () => {
-    if (isClosing) return;
+    if (isClosing || useProjectStore.getState().isSaving) return;
     setIsClosing(true);
     closeExitWarning();
 
@@ -37,13 +40,19 @@ export function ExitWarningModal() {
     <ConfirmDialog
       isOpen={isExitWarningOpen}
       title="Unsaved Changes"
-      message="You have unsaved changes in your current project. Are you sure you want to exit without saving? All unsaved work will be lost."
-      onConfirm={handleForceExit}
+      message="Save your changes before exiting?"
+      onConfirm={async () => {
+        const result = await useProjectStore.getState().saveProject();
+        if (result.success && useAlbumStore.getState().saveStatus === 'saved') await handleForceExit();
+      }}
+      onSecondary={handleForceExit}
+      secondaryText="Exit Without Saving"
+      isLoading={isSaving || isClosing}
       onCancel={() => {
         setIsClosing(false);
         closeExitWarning();
       }}
-      confirmText="Exit Without Saving"
+      confirmText="Save & Exit"
       cancelText="Cancel"
     />
   );

@@ -7,14 +7,13 @@ const SNAPSHOT_STORAGE_KEY_PREFIX = 'afsn_snapshot_';
 export function useAutoSave() {
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
-  const saveAlbumToDb = useAlbumStore((s) => s.saveAlbumToDb);
   const currentProject = useProjectStore((s) => s.currentProject);
 
   const debounceTimerRef = useRef<number | null>(null);
 
   // 1. Local Storage Crash Snapshot Recovery Protection
   useEffect(() => {
-    if (!currentAlbum || !currentProject) return;
+    if (!currentAlbum || !currentProject || currentAlbum.projectId !== currentProject.id) return;
 
     try {
       const snapshotKey = `${SNAPSHOT_STORAGE_KEY_PREFIX}${currentProject.id}`;
@@ -31,57 +30,46 @@ export function useAutoSave() {
     }
   }, [currentAlbum, currentProject]);
 
-  // 2. Debounced Auto-Save to SQLite Database (8s delay after user stops editing)
+  useEffect(() => {
+    if (!currentProject || currentAlbum?.projectId !== currentProject.id) return;
+    try {
+      const key = `afsn_dirty_${currentProject.id}`;
+      if (saveStatus === 'saved') localStorage.removeItem(key);
+      else localStorage.setItem(key, '1');
+    } catch {}
+  }, [currentProject, currentAlbum, saveStatus]);
+
+  // Both timers use the same guarded save pipeline as Ctrl+S.
+  // Keep unsaved projects dirty after a database-only recovery checkpoint.
+  const lastCheckpoint = useRef<typeof currentAlbum>(null);
+  const checkpoint = async () => {
+    const state = useProjectStore.getState();
+    if (state.isSaving || state.isLoading) return;
+    const project = state.currentProject;
+    const album = useAlbumStore.getState().currentAlbum;
+    if (!project || !album || album.projectId !== project.id) return;
+    // A failed automatic save is shown once per revision. Retry with Save or a
+    // subsequent edit instead of reopening the error dialog every eight seconds.
+    if (lastCheckpoint.current === album) return;
+    lastCheckpoint.current = album;
+    await state.saveProject({ automatic: true });
+  };
+
   useEffect(() => {
     if (saveStatus !== 'unsaved' || !currentAlbum) return;
-
-    if (debounceTimerRef.current) {
-      window.clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = window.setTimeout(async () => {
-      await saveAlbumToDb();
-      if (currentProject?.filePath) {
-        try {
-          const { invoke } = await import('@tauri-apps/api/core');
-          await invoke('export_afsn_package', {
-            projectId: currentProject.id,
-            targetPath: currentProject.filePath,
-          });
-        } catch {}
-      }
-    }, 8000);
-
+    debounceTimerRef.current = window.setTimeout(() => { void checkpoint(); }, 8000);
     return () => {
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
     };
-  }, [currentAlbum, saveStatus, saveAlbumToDb, currentProject]);
+  }, [currentAlbum, saveStatus, currentProject]);
 
-  // 3. Periodic Background Timer (60 seconds interval fallback)
   useEffect(() => {
-    const interval = window.setInterval(async () => {
-      const { saveStatus: currentStatus, currentAlbum: album } = useAlbumStore.getState();
-      const project = useProjectStore.getState().currentProject;
-      if (currentStatus === 'unsaved' && album && project) {
-        await useAlbumStore.getState().saveAlbumToDb();
-        if (project.filePath) {
-          try {
-            const { invoke } = await import('@tauri-apps/api/core');
-            await invoke('export_afsn_package', {
-              projectId: project.id,
-              targetPath: project.filePath,
-            });
-          } catch {}
-        }
-      }
+    const interval = window.setInterval(() => {
+      if (useAlbumStore.getState().saveStatus === 'unsaved') void checkpoint();
     }, 60000);
-
-    return () => {
-      window.clearInterval(interval);
-    };
+    return () => window.clearInterval(interval);
   }, []);
+
 }
 
 /**

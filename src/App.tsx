@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { WorkspaceLayout } from './features/workspace/WorkspaceLayout';
 import { AboutDialog } from './features/about/AboutDialog';
 import { SettingsDialog } from './features/settings/SettingsDialog';
@@ -14,6 +15,18 @@ import { isTauri } from './utils/platform';
 import { checkForAppUpdates } from './services/updateService';
 
 export default function App() {
+  const projectError = useProjectStore((s) => s.error);
+  const isSaving = useProjectStore((s) => s.isSaving);
+  const [pendingOpenPath, setPendingOpenPath] = useState<string | null>(null);
+  const requestOpenFile = (path: string) => {
+    if (useProjectStore.getState().isSaving) {
+      useProjectStore.setState({ error: 'Wait for the current save to finish before opening another project.' });
+    } else if (useProjectStore.getState().currentProject && useAlbumStore.getState().saveStatus !== 'saved') {
+      setPendingOpenPath(path);
+    } else {
+      void useProjectStore.getState().openProjectFromFile(path);
+    }
+  };
   // Catch any unhandled window errors and store them for diagnostics
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
@@ -85,13 +98,13 @@ export default function App() {
   useEffect(() => {
     if (!isTauri()) return;
 
-    // 1. Check if app was started with a project file path (.afsn, .afsnz, .zip)
+    // 1. Check if app was started with a project file path (.afsn).
     import('@tauri-apps/api/core').then(({ invoke }) => {
       invoke<string | null>('get_initial_open_path')
         .then((initialPath) => {
           if (initialPath) {
             console.log('[AFSN] Initial project path from CLI:', initialPath);
-            useProjectStore.getState().openProjectFromFile(initialPath);
+            requestOpenFile(initialPath);
           }
         })
         .catch((err) => {
@@ -105,7 +118,7 @@ export default function App() {
       listen<string>('open-project-file', (event) => {
         if (event.payload) {
           console.log('[AFSN] Received open-project-file event:', event.payload);
-          useProjectStore.getState().openProjectFromFile(event.payload);
+          requestOpenFile(event.payload);
         }
       }).then((unlisten) => {
         unlistenFn = unlisten;
@@ -127,7 +140,7 @@ export default function App() {
       import('@tauri-apps/api/core').then(({ invoke }) => {
         const project = useProjectStore.getState().currentProject;
         const saveStatus = useAlbumStore.getState().saveStatus;
-        const isUnsaved = Boolean(project && (saveStatus === 'unsaved' || saveStatus === 'saving'));
+        const isUnsaved = Boolean(project && (saveStatus !== 'saved' || useProjectStore.getState().isSaving));
         invoke('set_unsaved_status', { unsaved: isUnsaved }).catch(() => {});
       });
     };
@@ -153,6 +166,27 @@ export default function App() {
       <SupportDonationModal />
       <UpdateModal />
       <ExitWarningModal />
+      <ConfirmDialog isOpen={pendingOpenPath !== null} title="Unsaved Changes"
+        message="Save your changes before opening another project?" variant="warning"
+        confirmText="Save & Open" secondaryText="Don't Save" cancelText="Cancel" isLoading={isSaving}
+        onConfirm={async () => {
+          const result = await useProjectStore.getState().saveProject();
+          if (result.success && useAlbumStore.getState().saveStatus === 'saved' && pendingOpenPath) {
+            const path = pendingOpenPath;
+            setPendingOpenPath(null);
+            await useProjectStore.getState().openProjectFromFile(path);
+          }
+        }}
+        onSecondary={async () => {
+          if (pendingOpenPath && !isSaving) {
+            const path = pendingOpenPath;
+            setPendingOpenPath(null);
+            await useProjectStore.getState().openProjectFromFile(path);
+          }
+        }} onCancel={() => { if (!isSaving) setPendingOpenPath(null); }} />
+      <ConfirmDialog isOpen={Boolean(projectError)} title="Project Operation" message={projectError || ''}
+        variant="warning" confirmText="OK" onConfirm={() => useProjectStore.setState({ error: null })}
+        onCancel={() => useProjectStore.setState({ error: null })} />
     </ErrorBoundary>
   );
 }

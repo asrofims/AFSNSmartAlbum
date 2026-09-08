@@ -9,13 +9,13 @@ use db::Database;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Check initial CLI argument for file associations (.afsn, .afsnz, .zip)
+    // ZIP archives are transport packages; open the extracted .afsn project.
     let mut initial_open_file: Option<String> = None;
     for arg in std::env::args().skip(1) {
         let path = std::path::Path::new(&arg);
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             let lower = ext.to_lowercase();
-            if (lower == "afsn" || lower == "afsnz" || lower == "zip") && path.exists() {
+            if lower == "afsn" && path.exists() {
                 log::info!("Initial launch with project file: {}", arg);
                 initial_open_file = Some(arg);
                 break;
@@ -41,7 +41,7 @@ pub fn run() {
                 let path = std::path::Path::new(&arg);
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                     let lower = ext.to_lowercase();
-                    if (lower == "afsn" || lower == "afsnz" || lower == "zip") && path.exists() {
+                    if lower == "afsn" && path.exists() {
                         log::info!("Emitting open-project-file event for: {}", arg);
                         let _ = app.emit("open-project-file", &arg);
                         break;

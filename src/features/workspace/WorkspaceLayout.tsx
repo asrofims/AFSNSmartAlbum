@@ -195,9 +195,10 @@ export function WorkspaceLayout() {
   const [pendingImportCancelAction, setPendingImportCancelAction] = useState<(() => void | Promise<void>) | null>(null);
 
   const confirmSafeAction = useCallback((action: () => void | Promise<void>) => {
+    if (useProjectStore.getState().isSaving || useProjectStore.getState().isLoading) return;
     if (usePhotoStore.getState().isImporting) {
       setPendingImportCancelAction(() => action);
-    } else if (saveStatus === 'unsaved') {
+    } else if (saveStatus !== 'saved') {
       setPendingSafeAction(() => action);
     } else {
       action();
@@ -619,7 +620,7 @@ export function WorkspaceLayout() {
                         if (path) showToast(`✓ Complete package exported to: ${path}`);
                       }}
                     >
-                      <span>📦 Export Packaged (.zip)...</span>
+                      <span>📦 Export Project Package (.zip)...</span>
                     </button>
 
                     <div className={styles.menuDivider} />
@@ -794,7 +795,7 @@ export function WorkspaceLayout() {
                     const path = await exportCompleteProjectPackageWithPhotos();
                     if (path) showToast(`✓ Complete package exported to: ${path}`);
                   }}
-                  title="Export Packaged (.zip)"
+                  title="Export Project Package (.zip). Extract the package before opening project.afsn."
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -3025,7 +3026,8 @@ export function WorkspaceLayout() {
         cancelText="Cancel"
         variant="warning"
         onConfirm={async () => {
-          await saveAlbumToDb();
+          const result = await saveProject();
+          if (!result.success || useAlbumStore.getState().saveStatus !== 'saved') return;
           const act = pendingSafeAction;
           setPendingSafeAction(null);
           if (act) await act();

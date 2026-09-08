@@ -33,6 +33,13 @@ import { useProjectStore } from './projectStore';
 import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
+let databaseWriteQueue: Promise<unknown> = Promise.resolve();
+function persistInOrder(write: () => Promise<boolean>): Promise<boolean> {
+  const result = databaseWriteQueue.then(write, write);
+  databaseWriteQueue = result.catch(() => false);
+  return result;
+}
+
 export interface AlbumState {
   currentAlbum: Album | null;
   activeSpreadId: string | null;
@@ -181,7 +188,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     try {
       const payload = await invoke<any>('load_album_structure', { projectId });
-      if (payload && payload.spreads && payload.spreads.length > 0) {
+      if (payload?.coverSpread && Array.isArray(payload.spreads)) {
         const hydratedAlbum: Album = {
           ...payload,
           coverSpread: {
@@ -222,7 +229,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       const raw = localStorage.getItem(`afsn_snapshot_${projectId}`);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed?.album && parsed.album.spreads && parsed.album.spreads.length > 0) {
+        if (parsed?.album?.coverSpread && Array.isArray(parsed.album.spreads)) {
           const hydratedAlbum: Album = {
             ...parsed.album,
             coverSpread: {
@@ -264,8 +271,8 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     return false;
   },
 
-  saveAlbumToDb: async () => {
-    const { currentAlbum } = get();
+  saveAlbumToDb: () => persistInOrder(async () => {
+    const { currentAlbum, saveStatus: previousStatus } = get();
     if (!currentAlbum) return false;
 
     set({ saveStatus: 'saving' });
@@ -372,39 +379,33 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       await invoke('save_album_structure', { album: sanitizedAlbum });
       // Update local storage crash recovery snapshot
       try {
-        localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+        if (get().currentAlbum === currentAlbum) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
           projectId: sanitizedAlbum.projectId,
           savedAt: new Date().toISOString(),
           album: sanitizedAlbum,
         }));
       } catch {}
 
-      set({
-        currentAlbum: sanitizedAlbum,
-        saveStatus: 'saved',
-        lastSavedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      });
+      // This is a recovery checkpoint, not confirmation that the .afsn file saved.
+      // Never replace edits made while the native write was in flight.
+      if (get().currentAlbum === currentAlbum) {
+        set({ saveStatus: previousStatus === 'saved' ? 'saved' : 'unsaved' });
+      }
       return true;
     } catch (err) {
       console.error('Failed to save album to SQLite DB:', err);
       // Fallback: save to localStorage snapshot so data is never lost
       try {
-        localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+        if (get().currentAlbum === currentAlbum) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
           projectId: sanitizedAlbum.projectId,
           savedAt: new Date().toISOString(),
           album: sanitizedAlbum,
         }));
-        set({
-          currentAlbum: sanitizedAlbum,
-          saveStatus: 'saved',
-          lastSavedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        });
-        return true;
       } catch {}
-      set({ saveStatus: 'unsaved' });
+      if (get().currentAlbum === currentAlbum) set({ saveStatus: 'unsaved' });
       return false;
     }
-  },
+  }),
 
   undo: () => {
     const { currentAlbum } = get();

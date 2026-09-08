@@ -150,7 +150,7 @@ pub fn update_project_name(
     // If an associated .afsn file exists on disk, rename it automatically (Option 1)
     if let Some(ref old_path_str) = existing_proj.file_path {
         let old_path = std::path::Path::new(old_path_str);
-        if old_path.exists() {
+        if old_path.exists() && old_path.extension().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("afsn")) {
             let parent_dir = old_path.parent().unwrap_or_else(|| std::path::Path::new(""));
             let safe_file_stem = clean_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
             let target_file_name = format!("{}.afsn", safe_file_stem);
@@ -184,7 +184,9 @@ pub fn update_project_name(
     // If an associated .afsn file exists, rewrite its internal JSON package with the updated project name!
     if let Some(ref path_str) = new_file_path {
         if std::path::Path::new(path_str).exists() {
-            let _ = db.export_project_package(&id, path_str);
+            if std::path::Path::new(path_str).extension().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("afsn")) {
+                db.export_project_package(&id, path_str).map_err(|e| e.to_string())?;
+            }
         }
     }
 
@@ -269,10 +271,9 @@ pub async fn export_afsn_with_dialog(
     suggested_name: Option<String>,
 ) -> Result<Option<String>, String> {
     let default_name = suggested_name.unwrap_or_else(|| "Album-Project".to_string());
-    let fallback_name = default_name.clone();
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
-            .set_title("Export AFSNSmartAlbum Project (.afsn)")
+            .set_title("Save AFSNSmartAlbum Project (.afsn)")
             .set_file_name(&format!("{}.afsn", default_name))
             .add_filter("AFSNSmartAlbum Package (*.afsn)", &["afsn"])
             .save_file()
@@ -281,19 +282,11 @@ pub async fn export_afsn_with_dialog(
     .map_err(|e| e.to_string())?;
 
     if let Some(mut path) = file_path {
-        if path.extension().and_then(|ext| ext.to_str()) != Some("afsn") {
+        if path.extension().is_none() {
             path.set_extension("afsn");
         }
         let path_str = path.to_string_lossy().to_string();
-        let new_name = path
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| fallback_name);
-
-        // Automatically update the project name and file path in database!
-        let _ = db.update_project_name_and_path(&project_id, &new_name, Some(&path_str));
-
-        log::info!("export_afsn_with_dialog: exporting project {} ({}) to {}", project_id, new_name, path_str);
+        // The writer assigns the path only after the new file is fully written.
         db.export_project_package(&project_id, &path_str)
             .map_err(|e| {
                 log::error!("Failed export_project_package: {:?}", e);
@@ -312,7 +305,6 @@ pub async fn save_project_as_with_dialog(
     suggested_name: Option<String>,
 ) -> Result<Option<ProjectRow>, String> {
     let default_name = suggested_name.unwrap_or_else(|| "Album-Project".to_string());
-    let fallback_name = default_name.clone();
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
             .set_title("Save AFSNSmartAlbum Project As (.afsn)")
@@ -324,31 +316,11 @@ pub async fn save_project_as_with_dialog(
     .map_err(|e| e.to_string())?;
 
     if let Some(mut path) = file_path {
-        if path.extension().and_then(|ext| ext.to_str()) != Some("afsn") {
+        if path.extension().is_none() {
             path.set_extension("afsn");
         }
         let path_str = path.to_string_lossy().to_string();
-        let new_name = path
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| fallback_name);
-
-        let new_id = Uuid::new_v4().to_string();
-        log::info!("save_project_as_with_dialog: forking project {} -> {} ({}) at {}", project_id, new_id, new_name, path_str);
-
-        // Duplicate the project in SQLite with new_id
-        let new_proj = db.duplicate_project(&project_id, &new_id, &new_name, &path_str)
-            .map_err(|e| {
-                log::error!("Failed to duplicate project in save_project_as: {:?}", e);
-                e.to_string()
-            })?;
-
-        // Export package for new_id
-        db.export_project_package(&new_id, &path_str)
-            .map_err(|e| {
-                log::error!("Failed export_project_package in save_project_as: {:?}", e);
-                e.to_string()
-            })?;
+        let new_proj = db.save_project_as(&project_id, &path_str).map_err(|e| e.to_string())?;
 
         Ok(Some(new_proj))
     } else {
@@ -375,7 +347,7 @@ pub async fn export_bundled_package_with_dialog(
 
     if let Some(mut path) = file_path {
         let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-        if ext != "zip" {
+        if ext.is_empty() {
             path.set_extension("zip");
         }
         let path_str = path.to_string_lossy().to_string();
@@ -397,8 +369,8 @@ pub async fn import_afsn_with_dialog(
 ) -> Result<Option<ProjectPackagePayload>, String> {
     let file_path = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
-            .set_title("Open AFSNSmartAlbum Project (.afsn, .zip)")
-            .add_filter("AFSNSmartAlbum Project (*.afsn, *.zip)", &["afsn", "zip"])
+            .set_title("Open AFSNSmartAlbum Project (.afsn)")
+            .add_filter("AFSNSmartAlbum Project (*.afsn)", &["afsn"])
             .pick_file()
     })
     .await

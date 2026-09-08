@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use rusqlite::{Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
+mod package_io;
 
 /// Represents a project record from SQLite.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -232,12 +233,20 @@ pub struct ProjectPackagePayload {
     pub photos: Vec<PhotoRow>,
     pub folders: Vec<PhotoFolderRow>,
     pub album: Option<AlbumPayload>,
+    #[serde(default)]
+    pub folder_members: Vec<FolderMemberPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderMemberPayload {
+    pub folder_id: String,
+    pub photo_id: String,
 }
 
 /// Thread-safe wrapper around SQLite connection.
 pub struct Database {
     conn: Mutex<Connection>,
-    db_path: PathBuf,
 }
 
 impl Database {
@@ -270,7 +279,6 @@ impl Database {
 
         Ok(Self {
             conn: Mutex::new(conn),
-            db_path,
         })
     }
 
@@ -963,6 +971,10 @@ impl Database {
 
     pub fn add_photo(&self, photo: &PhotoRow) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
+        Self::insert_photo(&conn, photo)
+    }
+
+    fn insert_photo(conn: &Connection, photo: &PhotoRow) -> SqliteResult<()> {
         conn.execute(
             "INSERT INTO photos (
                 id, project_id, file_path, file_name, file_size,
@@ -1406,6 +1418,11 @@ impl Database {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
 
+        Self::save_album_in_transaction(&tx, album)?;
+        tx.commit()
+    }
+
+    fn save_album_in_transaction(tx: &rusqlite::Transaction, album: &AlbumPayload) -> SqliteResult<()> {
         // Ensure project exists to satisfy FK constraint
         let project_exists: bool = tx.query_row(
             "SELECT 1 FROM projects WHERE id = ?1",
@@ -1532,7 +1549,6 @@ impl Database {
         // Update project updated_at timestamp
         tx.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?1", [&album.project_id])?;
 
-        tx.commit()?;
         Ok(())
     }
 
@@ -1793,416 +1809,7 @@ impl Database {
         }))
     }
 
-    pub fn export_project_package(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
-        let project = self.get_project(project_id)?.ok_or_else(|| {
-            rusqlite::Error::QueryReturnedNoRows
-        })?;
-        let photos = self.get_photos_for_project(project_id)?;
-        let folders = self.get_folders_for_project(project_id)?;
-        let album = self.load_album_structure(project_id)?;
 
-        let package = ProjectPackagePayload {
-            version: 1,
-            project,
-            photos,
-            folders,
-            album,
-        };
-
-        let json_str = serde_json::to_string_pretty(&package).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to serialize package: {}", e).into())
-        })?;
-
-        std::fs::write(target_path, json_str).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to write .afsn file: {}", e).into())
-        })?;
-
-        let conn = self.conn.lock().unwrap();
-        let _ = conn.execute(
-            "UPDATE projects SET file_path = ?1, updated_at = datetime('now') WHERE id = ?2",
-            rusqlite::params![target_path, project_id],
-        );
-
-        Ok(())
-    }
-
-    /// Exports a standalone complete package (.zip) containing project.afsn and all raw photo files.
-    pub fn export_bundled_project_package(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
-        let project = self.get_project(project_id)?.ok_or_else(|| {
-            rusqlite::Error::QueryReturnedNoRows
-        })?;
-        let mut photos = self.get_photos_for_project(project_id)?;
-        let folders = self.get_folders_for_project(project_id)?;
-        let mut album = self.load_album_structure(project_id)?;
-
-        let file = std::fs::File::create(target_path).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to create package file: {}", e).into())
-        })?;
-        let mut zip = zip::ZipWriter::new(file);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
-
-        let mut path_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-
-        // Write all original photo files into photos/ folder in zip
-        for photo in &mut photos {
-            let orig_path = std::path::Path::new(&photo.file_path);
-            if orig_path.exists() {
-                let safe_name = photo.file_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
-                let zip_entry_name = format!("{}_{}", photo.id, safe_name);
-                let zip_entry_path = format!("photos/{}", zip_entry_name);
-
-                if let Ok(mut src_file) = std::fs::File::open(orig_path) {
-                    if zip.start_file(&zip_entry_path, options).is_ok() {
-                        let _ = std::io::copy(&mut src_file, &mut zip);
-                    }
-                }
-                path_remap.insert(photo.file_path.clone(), zip_entry_path.clone());
-                photo.file_path = zip_entry_path;
-            }
-        }
-
-        // Remap photo paths inside album elements to matching bundled relative paths
-        if let Some(ref mut alb) = album {
-            for elem in &mut alb.cover_spread.elements {
-                if let Some(new_p) = path_remap.get(&elem.file_path) {
-                    elem.file_path = new_p.clone();
-                }
-            }
-            for spread in &mut alb.spreads {
-                for elem in &mut spread.elements {
-                    if let Some(new_p) = path_remap.get(&elem.file_path) {
-                        elem.file_path = new_p.clone();
-                    }
-                }
-            }
-        }
-
-        let package = ProjectPackagePayload {
-            version: 1,
-            project,
-            photos,
-            folders,
-            album,
-        };
-
-        let json_str = serde_json::to_string_pretty(&package).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to serialize package: {}", e).into())
-        })?;
-
-        use std::io::Write;
-        zip.start_file("project.afsn", options).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to add project.afsn to zip: {}", e).into())
-        })?;
-        zip.write_all(json_str.as_bytes()).map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to write project.afsn into zip: {}", e).into())
-        })?;
-
-        zip.finish().map_err(|e| {
-            rusqlite::Error::InvalidPath(format!("Failed to finalize package zip: {}", e).into())
-        })?;
-
-        Ok(())
-    }
-
-    pub fn import_project_package(&self, source_path: &str) -> SqliteResult<ProjectPackagePayload> {
-        let path = std::path::Path::new(source_path);
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-
-        let mut package: ProjectPackagePayload;
-
-        if ext == "zip" || ext == "afsnz" {
-            // Open and extract ZIP package
-            let file = std::fs::File::open(path).map_err(|e| {
-                rusqlite::Error::InvalidPath(format!("Failed to open package zip: {}", e).into())
-            })?;
-            let mut archive = zip::ZipArchive::new(file).map_err(|e| {
-                rusqlite::Error::InvalidPath(format!("Invalid zip archive: {}", e).into())
-            })?;
-
-            // Read project.afsn from zip
-            let json_str = {
-                let mut afsn_file = archive.by_name("project.afsn").map_err(|e| {
-                    rusqlite::Error::InvalidPath(format!("Missing project.afsn inside zip: {}", e).into())
-                })?;
-                let mut s = String::new();
-                use std::io::Read;
-                afsn_file.read_to_string(&mut s).map_err(|e| {
-                    rusqlite::Error::InvalidPath(format!("Failed to read project.afsn from zip: {}", e).into())
-                })?;
-                s
-            };
-
-            package = serde_json::from_str(&json_str).map_err(|e| {
-                rusqlite::Error::InvalidPath(format!("Invalid project.afsn in zip: {}", e).into())
-            })?;
-
-            // Extract bundled photos to local app cache/user directory
-            let extract_base_dir = self.db_path.parent()
-                .unwrap_or_else(|| std::path::Path::new("."))
-                .join("extracted_packages")
-                .join(&package.project.id);
-            let _ = std::fs::create_dir_all(&extract_base_dir);
-
-            for i in 0..archive.len() {
-                if let Ok(mut entry) = archive.by_index(i) {
-                    let entry_name = entry.name().to_string();
-                    if entry_name.starts_with("photos/") && !entry.is_dir() {
-                        let out_path = extract_base_dir.join(&entry_name);
-                        if let Some(parent) = out_path.parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        if let Ok(mut out_file) = std::fs::File::create(&out_path) {
-                            let _ = std::io::copy(&mut entry, &mut out_file);
-                        }
-                    }
-                }
-            }
-
-            // Remap photos to absolute extracted disk paths
-            let mut remapped_paths: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-            for photo in &mut package.photos {
-                if photo.file_path.starts_with("photos/") {
-                    let abs_path = extract_base_dir.join(&photo.file_path);
-                    let abs_str = abs_path.to_string_lossy().to_string();
-                    remapped_paths.insert(photo.file_path.clone(), abs_str.clone());
-                    photo.file_path = abs_str;
-                }
-            }
-
-            // Remap in album elements
-            if let Some(ref mut alb) = package.album {
-                for elem in &mut alb.cover_spread.elements {
-                    if let Some(abs_p) = remapped_paths.get(&elem.file_path) {
-                        elem.file_path = abs_p.clone();
-                    }
-                }
-                for spread in &mut alb.spreads {
-                    for elem in &mut spread.elements {
-                        if let Some(abs_p) = remapped_paths.get(&elem.file_path) {
-                            elem.file_path = abs_p.clone();
-                        }
-                    }
-                }
-            }
-        } else {
-            let json_str = std::fs::read_to_string(source_path).map_err(|e| {
-                rusqlite::Error::InvalidPath(format!("Failed to read .afsn file: {}", e).into())
-            })?;
-
-            package = serde_json::from_str(&json_str).map_err(|e| {
-                rusqlite::Error::InvalidPath(format!("Invalid .afsn package format: {}", e).into())
-            })?;
-
-            // If the .afsn file has a valid custom name on disk, sync the project name with it
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()).filter(|s| !s.is_empty()) {
-                package.project.name = stem.to_string();
-            }
-        }
-
-        package.project.file_path = Some(source_path.to_string());
-
-        // Upsert project into SQLite database
-        let p = &package.project;
-        {
-            let conn = self.conn.lock().unwrap();
-            conn.execute(
-                "INSERT INTO projects (
-                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
-                    spacing_value, spacing_unit,
-                    margin_enabled, margin_value, margin_unit,
-                    border_enabled, border_width, border_unit, border_color,
-                    background_type, background_color, file_path,
-                    created_at, updated_at
-                ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6,
-                    ?7, ?8,
-                    ?9, ?10, ?11,
-                    ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18,
-                    datetime('now'), datetime('now')
-                )
-                ON CONFLICT(id) DO UPDATE SET
-                    name = excluded.name,
-                    canvas_width = excluded.canvas_width,
-                    canvas_height = excluded.canvas_height,
-                    canvas_unit = excluded.canvas_unit,
-                    canvas_dpi = excluded.canvas_dpi,
-                    spacing_value = excluded.spacing_value,
-                    spacing_unit = excluded.spacing_unit,
-                    margin_enabled = excluded.margin_enabled,
-                    margin_value = excluded.margin_value,
-                    margin_unit = excluded.margin_unit,
-                    border_enabled = excluded.border_enabled,
-                    border_width = excluded.border_width,
-                    border_unit = excluded.border_unit,
-                    border_color = excluded.border_color,
-                    background_type = excluded.background_type,
-                    background_color = excluded.background_color,
-                    file_path = excluded.file_path,
-                    updated_at = datetime('now')",
-                rusqlite::params![
-                    p.id, p.name, p.canvas_width, p.canvas_height, p.canvas_unit, p.canvas_dpi,
-                    p.spacing_value, p.spacing_unit,
-                    p.margin_enabled as i32, p.margin_value, p.margin_unit,
-                    p.border_enabled as i32, p.border_width, p.border_unit, p.border_color,
-                    p.background_type, p.background_color, source_path,
-                ],
-            )?;
-        }
-
-        // Import photos
-        for photo in &package.photos {
-            let _ = self.add_photo(photo);
-        }
-
-        // Import folders
-        for folder in &package.folders {
-            let _ = self.create_folder(&folder.id, &folder.project_id, &folder.name);
-        }
-
-        // Import album structure
-        if let Some(album) = &package.album {
-            self.save_album_structure(album)?;
-        }
-
-        Ok(package)
-    }
-
-    /// Duplicates an entire project including folders, photos, album spreads, and elements with a new UUID.
-    pub fn duplicate_project(
-        &self,
-        source_id: &str,
-        new_id: &str,
-        new_name: &str,
-        new_file_path: &str,
-    ) -> SqliteResult<ProjectRow> {
-        let orig_project = self.get_project(source_id)?.ok_or_else(|| {
-            rusqlite::Error::QueryReturnedNoRows
-        })?;
-
-        let file_path_opt = if new_file_path.is_empty() {
-            None
-        } else {
-            Some(new_file_path.to_string())
-        };
-
-        // 1. Insert new project
-        {
-            let conn = self.conn.lock().unwrap();
-            conn.execute(
-                "INSERT INTO projects (
-                    id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
-                    spacing_value, spacing_unit,
-                    margin_enabled, margin_value, margin_unit,
-                    border_enabled, border_width, border_unit, border_color,
-                    background_type, background_color, file_path,
-                    created_at, updated_at
-                ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6,
-                    ?7, ?8,
-                    ?9, ?10, ?11,
-                    ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18,
-                    datetime('now'), datetime('now')
-                )",
-                rusqlite::params![
-                    new_id,
-                    new_name,
-                    orig_project.canvas_width,
-                    orig_project.canvas_height,
-                    orig_project.canvas_unit,
-                    orig_project.canvas_dpi,
-                    orig_project.spacing_value,
-                    orig_project.spacing_unit,
-                    orig_project.margin_enabled as i32,
-                    orig_project.margin_value,
-                    orig_project.margin_unit,
-                    orig_project.border_enabled as i32,
-                    orig_project.border_width,
-                    orig_project.border_unit,
-                    orig_project.border_color,
-                    orig_project.background_type,
-                    orig_project.background_color,
-                    file_path_opt,
-                ],
-            )?;
-        }
-
-        // 2. Duplicate photo folders
-        let folders = self.get_folders_for_project(source_id)?;
-        let mut folder_id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        for f in folders {
-            let new_folder_id = format!("{}-{}", new_id, uuid::Uuid::new_v4());
-            folder_id_map.insert(f.id.clone(), new_folder_id.clone());
-            let _ = self.create_folder(&new_folder_id, new_id, &f.name);
-        }
-
-        // 3. Duplicate photos
-        let photos = self.get_photos_for_project(source_id)?;
-        let mut photo_id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        for mut p in photos {
-            let old_photo_id = p.id.clone();
-            let new_photo_id = format!("{}-{}", new_id, uuid::Uuid::new_v4());
-            photo_id_map.insert(old_photo_id, new_photo_id.clone());
-            p.id = new_photo_id;
-            p.project_id = new_id.to_string();
-            let _ = self.add_photo(&p);
-        }
-
-        // 4. Copy folder membership
-        for (old_fid, new_fid) in &folder_id_map {
-            if let Ok(members) = self.get_photos_for_folder(old_fid) {
-                let new_member_ids: Vec<String> = members
-                    .iter()
-                    .filter_map(|m| photo_id_map.get(&m.id).cloned())
-                    .collect();
-                if !new_member_ids.is_empty() {
-                    let _ = self.add_photos_to_folder(new_fid, &new_member_ids);
-                }
-            }
-        }
-
-        // 5. Duplicate album structure
-        if let Some(mut album) = self.load_album_structure(source_id)? {
-            album.id = format!("album-{}", new_id);
-            album.project_id = new_id.to_string();
-
-            album.cover_spread.id = format!("album-{}-spread-cover", new_id);
-            for elem in &mut album.cover_spread.elements {
-                elem.id = format!("elem-{}-{}", new_id, uuid::Uuid::new_v4());
-                if let Some(ref pid) = elem.photo_id {
-                    if let Some(new_pid) = photo_id_map.get(pid) {
-                        elem.photo_id = Some(new_pid.clone());
-                    }
-                }
-            }
-
-            for (idx, spread) in album.spreads.iter_mut().enumerate() {
-                let spread_idx = idx + 1;
-                let new_spread_id = format!("album-{}-spread-{}", new_id, spread_idx);
-                spread.id = new_spread_id.clone();
-                if let Some(ref mut lp) = spread.left_page {
-                    lp.id = format!("{}-page-{}", new_spread_id, (spread_idx - 1) * 2 + 1);
-                }
-                if let Some(ref mut rp) = spread.right_page {
-                    rp.id = format!("{}-page-{}", new_spread_id, (spread_idx - 1) * 2 + 2);
-                }
-                for elem in &mut spread.elements {
-                    elem.id = format!("elem-{}-{}", new_id, uuid::Uuid::new_v4());
-                    if let Some(ref pid) = elem.photo_id {
-                        if let Some(new_pid) = photo_id_map.get(pid) {
-                            elem.photo_id = Some(new_pid.clone());
-                        }
-                    }
-                }
-            }
-
-            self.save_album_structure(&album)?;
-        }
-
-        self.get_project(new_id)?.ok_or_else(|| rusqlite::Error::QueryReturnedNoRows)
-    }
 }
 
 #[cfg(test)]
@@ -2518,13 +2125,21 @@ mod tests {
         }).unwrap();
 
         let zip_path = temp_dir.join("test_bundle.zip");
+        // A complete package requires every placed photo to be readable.
+        let mut bundle_album = db.load_album_structure("test-id-1").unwrap().unwrap();
+        bundle_album.spreads[0].elements[0].file_path = sample_img_path.to_string_lossy().to_string();
+        bundle_album.spreads[0].elements[0].photo_id = Some("photo-bundle-1".to_string());
+        db.save_album_structure(&bundle_album).unwrap();
         db.export_bundled_project_package("test-id-1", zip_path.to_str().unwrap()).expect("Failed export bundle .zip");
         assert!(zip_path.exists());
 
-        // Test Import from .zip package
-        let zip_imported = db.import_project_package(zip_path.to_str().unwrap()).expect("Failed import zip bundle");
-        assert_eq!(zip_imported.project.id, "test-id-1");
-        assert!(zip_imported.photos.iter().any(|p| p.file_name == "sample_img.jpg"));
+        // ZIP is transport-only. Open the .afsn after extraction.
+        assert!(db.import_project_package(zip_path.to_str().unwrap()).is_err());
+        let extracted = temp_dir.join("unpacked");
+        zip::ZipArchive::new(std::fs::File::open(&zip_path).unwrap()).unwrap().extract(&extracted).unwrap();
+        let opened = db.import_project_package(extracted.join("project.afsn").to_str().unwrap()).unwrap();
+        assert_ne!(opened.project.id, "test-id-1");
+        assert!(opened.photos.iter().any(|p| p.file_name == "sample_img.jpg" && std::path::Path::new(&p.file_path).is_file()));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

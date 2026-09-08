@@ -7,6 +7,7 @@ interface ProjectState {
   recentProjects: Project[];
   isNewProjectOpen: boolean;
   isLoading: boolean;
+  isSaving: boolean;
   error: string | null;
 
   openNewProject: () => void;
@@ -21,7 +22,7 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
   openProjectById: (id: string) => Promise<void>;
-  saveProject: () => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }>;
+  saveProject: (options?: { automatic?: boolean }) => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }>;
   exportProjectAsAfsn: () => Promise<string | null>;
   exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
   importProjectFromAfsn: () => Promise<boolean>;
@@ -35,6 +36,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   recentProjects: [],
   isNewProjectOpen: false,
   isLoading: false,
+  isSaving: false,
   error: null,
 
   openNewProject: () => set({ isNewProjectOpen: true, error: null }),
@@ -216,6 +218,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   closeProject: async () => {
+    if (get().isSaving || get().isLoading) return;
     // 1. Terminate any active or queued photo imports immediately
     try {
       const { usePhotoStore } = await import('./photoStore');
@@ -323,6 +326,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { useAlbumStore } = await import('./albumStore');
       useAlbumStore.getState().initializeAlbum(created);
       await useAlbumStore.getState().saveAlbumToDb();
+      useAlbumStore.getState().setSaveStatus('unsaved');
 
       return created;
     } catch (tauriErr) {
@@ -356,12 +360,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { useAlbumStore } = await import('./albumStore');
       useAlbumStore.getState().initializeAlbum(mockProject);
       await useAlbumStore.getState().saveAlbumToDb();
+      useAlbumStore.getState().setSaveStatus('unsaved');
 
       return mockProject;
     }
   },
 
   openProjectById: async (id: string) => {
+    if (get().isSaving || get().isLoading) return;
+    let hasUnsavedRecovery = false;
+    try { hasUnsavedRecovery = localStorage.getItem(`afsn_dirty_${id}`) === '1'; } catch {}
     // Terminate any existing import tasks before switching projects
     try {
       const { usePhotoStore } = await import('./photoStore');
@@ -399,6 +407,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         if (!loaded) {
           useAlbumStore.getState().initializeAlbum(project);
         }
+        if (hasUnsavedRecovery || !/\.afsn$/i.test(project.filePath || '')) useAlbumStore.getState().setSaveStatus('unsaved');
       } catch (e) {
         console.error('[AFSN] Failed to load album/photos on openProjectById:', e);
       }
@@ -407,161 +416,120 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  saveProject: async (): Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }> => {
+  saveProject: async (options = {}) => {
     const current = get().currentProject;
-    if (!current) return { success: false, filePath: null, isSaveAs: false };
-
-    // 1. Flush latest album state to SQLite and crash snapshot
-    const { useAlbumStore } = await import('./albumStore');
-    await useAlbumStore.getState().saveAlbumToDb();
-
-    // 2. If project already has an assigned .afsn file on disk, overwrite directly!
-    if (current.filePath) {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const fileExists = await invoke<boolean>('check_path_exists', { path: current.filePath });
-
-        await invoke('export_afsn_package', {
-          projectId: current.id,
-          targetPath: current.filePath,
-        });
-
-        const updatedProject: Project = {
-          ...current,
-          updatedAt: new Date().toISOString(),
-        };
-
-        set((state) => ({
-          currentProject: updatedProject,
-          recentProjects: [
-            updatedProject,
-            ...state.recentProjects.filter((p) => p.id !== current.id),
-          ].slice(0, 10),
-        }));
-
-        try {
-          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
-        } catch {}
-
-        return {
-          success: true,
-          filePath: current.filePath,
-          isSaveAs: false,
-          reCreated: !fileExists,
-        };
-      } catch (err) {
-        console.warn('[AFSN] Direct save to filePath failed, fallback to dialog:', err);
-      }
+    const failed = { success: false, filePath: null, isSaveAs: false };
+    if (!current || get().isSaving || get().isLoading) return failed;
+    // Old database entries may still point at a ZIP opened by a previous release.
+    const workingPath = current.filePath && /\.afsn$/i.test(current.filePath) ? current.filePath : null;
+    if (!workingPath && !options.automatic) {
+      const path = await get().exportProjectAsAfsn();
+      return { success: Boolean(path), filePath: path, isSaveAs: true };
     }
-
-    // 3. If no filePath exists yet (first save) or folder was unreachable, prompt Save As (.afsn) dialog
-    const savedPath = await get().exportProjectAsAfsn();
-    return { success: Boolean(savedPath), filePath: savedPath, isSaveAs: true };
+    set({ isSaving: true, error: null });
+    const { useAlbumStore } = await import('./albumStore');
+    const album = useAlbumStore.getState().currentAlbum;
+    try {
+      if (!album || album.projectId !== current.id) throw new Error('The active project is not ready to save.');
+      if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
+      if (get().currentProject?.id !== current.id) return failed;
+      // Unsaved projects receive database recovery checkpoints without opening a dialog.
+      if (!workingPath) return failed;
+      const { invoke } = await import('@tauri-apps/api/core');
+      const exists = await invoke<boolean>('check_path_exists', { path: workingPath });
+      await invoke('export_afsn_package', { projectId: current.id, targetPath: workingPath });
+      if (get().currentProject?.id === current.id && useAlbumStore.getState().currentAlbum === album) {
+        useAlbumStore.setState({ saveStatus: 'saved', lastSavedAt: new Date().toLocaleTimeString() });
+      }
+      return { success: true, filePath: workingPath, isSaveAs: false, reCreated: !exists };
+    } catch (error) {
+      if (get().currentProject?.id === current.id) {
+        useAlbumStore.getState().setSaveStatus('unsaved');
+        set({ error: `Save failed: ${String(error)}` });
+      }
+      return failed;
+    } finally {
+      set({ isSaving: false });
+    }
   },
 
-  exportProjectAsAfsn: async (): Promise<string | null> => {
+  exportProjectAsAfsn: async () => {
     const current = get().currentProject;
-    if (!current) return null;
-
+    if (!current || get().isSaving || get().isLoading) return null;
+    set({ isSaving: true, error: null });
+    const { useAlbumStore } = await import('./albumStore');
+    const album = useAlbumStore.getState().currentAlbum;
     try {
-      // 1. Ensure latest album state in memory is flushed to SQLite
+      if (!album || album.projectId !== current.id) throw new Error('The active project is not ready to save.');
+      const { usePhotoStore } = await import('./photoStore');
+      if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before using Save As.');
+      if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
+      const { invoke } = await import('@tauri-apps/api/core');
+      let saved: Project | null;
+      if (current.filePath && /\.afsn$/i.test(current.filePath)) {
+        saved = await invoke<Project | null>('save_project_as_with_dialog', { projectId: current.id, suggestedName: current.name });
+      } else {
+        const path = await invoke<string | null>('export_afsn_with_dialog', { projectId: current.id, suggestedName: current.name });
+        saved = path ? { ...current, filePath: path, name: path.replace(/^.*[\\/]/, '').replace(/\.afsn$/i, '') } : null;
+      }
+      if (!saved) return null; // Cancel preserves the current identity and dirty state.
+      if (get().currentProject?.id !== current.id) return saved.filePath || null;
+      // Do not discard edits made while the native Save As dialog was open.
+      if (useAlbumStore.getState().currentAlbum !== album && saved.id !== current.id) {
+        set((state) => ({ recentProjects: [saved!, ...state.recentProjects.filter((p) => p.id !== saved!.id)].slice(0, 10),
+          error: 'A copy was saved. Newer edits remain in the current project; save again before switching to the copy.' }));
+        return saved.filePath || null;
+      }
+      set((state) => ({
+        currentProject: saved,
+        recentProjects: [saved!, ...state.recentProjects.filter((p) => p.id !== saved!.id)].slice(0, 10),
+      }));
+      try { localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects)); } catch {}
+      if (saved.id !== current.id) {
+        await usePhotoStore.getState().loadPhotos(saved.id);
+        await usePhotoStore.getState().loadFolders(saved.id);
+        if (!await useAlbumStore.getState().loadAlbumFromDb(saved.id)) throw new Error('The saved copy could not be loaded.');
+      }
+      if (saved.id !== current.id || useAlbumStore.getState().currentAlbum === album) {
+        useAlbumStore.setState({ saveStatus: 'saved', lastSavedAt: new Date().toLocaleTimeString() });
+      }
+      return saved.filePath || null;
+    } catch (error) {
+      useAlbumStore.getState().setSaveStatus('unsaved');
+      set({ error: `Save As failed: ${String(error)}` });
+      return null;
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  exportCompleteProjectPackageWithPhotos: async () => {
+    const current = get().currentProject;
+    if (!current || get().isSaving || get().isLoading) return null;
+    set({ isSaving: true, error: null });
+    try {
       const { useAlbumStore } = await import('./albumStore');
       const { usePhotoStore } = await import('./photoStore');
-      await useAlbumStore.getState().saveAlbumToDb();
-
-      const { invoke } = await import('@tauri-apps/api/core');
-
-      // If project has already been saved to a file previously, "Save As" forks into a separate independent project!
-      if (current.filePath) {
-        const forkedProject = await invoke<Project | null>('save_project_as_with_dialog', {
-          projectId: current.id,
-          suggestedName: current.name,
-        });
-
-        if (forkedProject) {
-          // Prepend new forked project while KEEPING the old project in recent projects!
-          set((state) => ({
-            currentProject: forkedProject,
-            recentProjects: [
-              forkedProject,
-              ...state.recentProjects.filter((p) => p.id !== forkedProject.id),
-            ].slice(0, 10),
-          }));
-
-          try {
-            localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
-          } catch {}
-
-          // Switch active stores to load the newly forked project
-          await usePhotoStore.getState().loadPhotos(forkedProject.id);
-          await usePhotoStore.getState().loadFolders(forkedProject.id);
-          await useAlbumStore.getState().loadAlbumFromDb(forkedProject.id);
-
-          return forkedProject.filePath || null;
-        }
-        return null;
+      if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before exporting a package.');
+      if (useAlbumStore.getState().currentAlbum?.projectId !== current.id || !await useAlbumStore.getState().saveAlbumToDb()) {
+        throw new Error('The current project could not be saved to the recovery database.');
       }
-
-      // First-time save (project was in memory / SQLite without .afsn file):
-      const savedPath = await invoke<string | null>('export_afsn_with_dialog', {
-        projectId: current.id,
-        suggestedName: current.name,
-      });
-
-      if (savedPath) {
-        const fileStem = savedPath.replace(/^.*[\\/]/, '').replace(/\.afsn$/i, '');
-        const updatedProject: Project = {
-          ...current,
-          name: fileStem || current.name,
-          filePath: savedPath,
-          updatedAt: new Date().toISOString(),
-        };
-
-        set((state) => ({
-          currentProject: updatedProject,
-          recentProjects: [
-            updatedProject,
-            ...state.recentProjects.filter((p) => p.id !== current.id),
-          ].slice(0, 10),
-        }));
-
-        try {
-          localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects));
-        } catch {}
-
-        return savedPath;
-      }
-      return null;
-    } catch (err) {
-      console.error('[AFSN] export_afsn_with_dialog failed:', err);
-      return null;
-    }
-  },
-
-  exportCompleteProjectPackageWithPhotos: async (): Promise<string | null> => {
-    const current = get().currentProject;
-    if (!current) return null;
-
-    try {
-      // 1. Ensure latest album state in memory is flushed to SQLite
-      const { useAlbumStore } = await import('./albumStore');
-      await useAlbumStore.getState().saveAlbumToDb();
-
-      // 2. Open native Save File Dialog and write complete .zip package
       const { invoke } = await import('@tauri-apps/api/core');
-      const savedPath = await invoke<string | null>('export_bundled_package_with_dialog', {
-        projectId: current.id,
-        suggestedName: current.name,
-      });
-      return savedPath;
-    } catch (err) {
-      console.error('[AFSN] export_bundled_package_with_dialog failed:', err);
+      return await invoke<string | null>('export_bundled_package_with_dialog', { projectId: current.id, suggestedName: current.name });
+    } catch (error) {
+      set({ error: `Package export failed: ${String(error)}` });
       return null;
+    } finally {
+      set({ isSaving: false });
     }
   },
 
   importProjectFromAfsn: async (): Promise<boolean> => {
+    if (get().isSaving || get().isLoading) return false;
+    set({ isLoading: true, error: null });
     try {
+      const { usePhotoStore } = await import('./photoStore');
+      await usePhotoStore.getState().cancelAllImports();
       const { invoke } = await import('@tauri-apps/api/core');
       const packageData = await invoke<any>('import_afsn_with_dialog');
       if (packageData && packageData.project) {
@@ -586,12 +554,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
     } catch (err) {
       console.error('[AFSN] import_afsn_with_dialog failed:', err);
+      set({ error: `Open failed: ${String(err)}` });
+    } finally {
+      set({ isLoading: false });
     }
     return false;
   },
 
   openProjectFromFile: async (filePath: string): Promise<boolean> => {
+    if (get().isSaving || get().isLoading) return false;
+    if (!/\.afsn$/i.test(filePath)) {
+      set({ error: 'Open .afsn project files only. Extract ZIP packages first, then open project.afsn inside the extracted folder.' });
+      return false;
+    }
+    set({ isLoading: true, error: null });
     try {
+      const { usePhotoStore } = await import('./photoStore');
+      await usePhotoStore.getState().cancelAllImports();
       const { invoke } = await import('@tauri-apps/api/core');
       console.log('[AFSN] Opening project from file:', filePath);
       const packageData = await invoke<any>('import_afsn_package', { sourcePath: filePath });
@@ -617,6 +596,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
     } catch (err) {
       console.error('[AFSN] openProjectFromFile failed:', err);
+      set({ error: `Open failed: ${String(err)}` });
+    } finally {
+      set({ isLoading: false });
     }
     return false;
   },
