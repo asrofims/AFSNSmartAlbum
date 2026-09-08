@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { testTextResize } from './textResize.browser';
 import { Stage, Layer, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { TextNode } from '../src/features/editor/TextNode';
 import { TextInlineEditor } from '../src/features/editor/TextInlineEditor';
 import { loadAlbumFonts } from '../src/domain/bundledFonts';
-import { createTextNode, DEFAULT_TEXT_STYLE, fitTextFrame, layoutRichText, getTextRuns, calculateTextFitDimensions } from '../src/domain/text';
+import { TextNodeElement, createTextNode, DEFAULT_TEXT_STYLE, fitTextFrame, layoutRichText, getTextRuns, calculateTextFitDimensions } from '../src/domain/text';
 import { convertUnitToPt, convertPtToUnit } from '../src/domain/units';
 
 await loadAlbumFonts();
@@ -29,10 +31,13 @@ for (const family of ['Inter', 'Playfair Display', 'Cinzel', 'Great Vibes', 'Mon
 }
 
 function Harness() {
-  const [element, setElement] = useState(() => ({ ...createTextNode({ text: 'Hello beautiful world', x: 20, y: 20,
+  const [element, setElement] = useState<TextNodeElement>(() => ({ ...createTextNode({ text: 'Hello beautiful world', x: 20, y: 20,
     width: 120, height: 65, style: { fontFamily: 'Inter', fontSize: 24, verticalAlign: 'middle' } }),
     styledRanges: [{ id: 'bold', start: 6, end: 15, fontWeight: 'bold' as const, fill: '#b91c1c' }] }));
   const [editing, setEditing] = useState(false);
+  const [resizeResult, setResizeResult] = useState('Resize regression not run');
+  const elementRef = useRef(element);
+  elementRef.current = element;
   const stage = useRef<Konva.Stage>(null);
   const transformer = useRef<Konva.Transformer>(null);
   useEffect(() => {
@@ -46,6 +51,18 @@ function Harness() {
     <button onClick={() => setElement((value) => ({ ...value, ...fitTextFrame(value, 'height', 'mm', 300) }))}>Fit Height</button>{' '}
     <button onClick={() => setElement((value) => ({ ...value, ...fitTextFrame(value, 'content', 'mm', 300) }))}>Fit Content</button>{' '}
     <button onClick={() => setElement((value) => ({ ...value, rotation: (value.rotation + 45) % 360 }))}>Rotate</button>
+    <button disabled={resizeResult === 'Running resize regression'} onClick={async () => {
+      setResizeResult('Running resize regression');
+      try {
+        const result = await testTextResize(stage.current!, transformer.current!,
+          (value) => flushSync(() => setElement(value)), () => elementRef.current);
+        setResizeResult(`${result.assertions} resize assertions; ${result.failures.length ? result.failures.join('; ') : 'all passed'}`);
+      } catch (error) {
+        transformer.current?.stopTransform();
+        setResizeResult(`Resize regression failed: ${String(error)}`);
+      }
+    }}>Run Resize Regression</button>
+    <p>{resizeResult}</p>
     <div style={{ position: 'relative', width: 850, height: 430, background: '#fff', marginTop: 12 }}>
       <Stage width={850} height={430} ref={stage}><Layer>
         <TextNode element={element} isSelected isEditing={editing} scaleFactor={4} canvasUnit="mm" dpi={300}

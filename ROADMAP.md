@@ -221,5 +221,13 @@
 - [x] Full test suite validation: all 62 restored files verified; unit tests (`npm test`), production build (`npm run build`), Rust text rasterizer tests, and 240 canvas browser assertions passing.
 - [x] Application version metadata bumped to `v1.0.36`.
 
+## Phase 20 — Release v1.0.37: Text Frame Resize Jitter Elimination & Transform Stability
+- [x] Fractional Font-Size Preservation: Preserved fractional font sizes during corner resizing so fitted lines do not alternate between wrapping and unwrapping at 0.1 pt rounding boundaries.
+- [x] Styled-Range Font Release Consistency: Committed styled-range font sizes with the exact scale used by the live preview, eliminating changes on mouse release.
+- [x] Text Frame Overflow Indicator Clipping: Kept the overflow indicator, including its stroke, safely inside the text frame even for frames smaller than the indicator. Its appearance no longer alters bounds used by Konva Transformer.
+- [x] Comprehensive Browser Regression Suite: Added `Run Resize Regression` in `tests/typography-browser.html` covering eight handles at 0°/45°, direction reversal, fractional corner resizing of fitted text, release consistency, and overflow bounds (all 547 resize assertions pass).
+- [x] Application version metadata bumped to `v1.0.37`.
+
+
 
 

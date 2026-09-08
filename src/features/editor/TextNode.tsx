@@ -221,13 +221,16 @@ export function TextNode({
 
         if (isCorner && initialPixelW > 0) {
           const scaleRatio = newPixelW / initialPixelW;
-          newFontSize = Math.max(1, Math.min(200, Math.round(initialFontSize * scaleRatio * 10) / 10));
+          // Preserve fractional sizes: rounding can alternately wrap/unwrap a fitted
+          // line as the frame grows continuously between font-size steps.
+          newFontSize = Math.max(1, Math.min(200, initialFontSize * scaleRatio));
+          const fontRatio = newFontSize / initialFontSize;
 
           if (element.styledRanges && element.styledRanges.length > 0) {
             currentScaledRanges = element.styledRanges.map((r) => ({
               ...r,
               fontSize: r.fontSize
-                ? Math.max(1, Math.min(200, Math.round(r.fontSize * scaleRatio * 10) / 10))
+                ? r.fontSize * fontRatio
                 : undefined,
             }));
           }
@@ -319,8 +322,11 @@ export function TextNode({
         sceneFunc={(context) => drawRichTextLayout(context._context, richLayout)}
       />
       {isSelected && !isEditing && richLayout.overflow && (
-        <Group x={Math.max(0, displayPixelW - 12)} y={Math.max(0, displayPixelH - 12)} listening={false}>
-          <Rect width={12} height={12} fill="#fff" stroke="#e11d48" strokeWidth={1} />
+        <Group x={Math.max(0, displayPixelW - 12)} y={Math.max(0, displayPixelH - 12)}
+          scaleX={Math.min(1, displayPixelW / 12, displayPixelH / 12)}
+          scaleY={Math.min(1, displayPixelW / 12, displayPixelH / 12)} listening={false}>
+          {/* Keep the stroke inside the frame: Group bounds drive the Transformer. */}
+          <Rect x={0.5} y={0.5} width={11} height={11} fill="#fff" stroke="#e11d48" strokeWidth={1} />
           <KonvaText text="+" width={12} height={12} align="center" verticalAlign="middle" fill="#e11d48" fontSize={12} />
         </Group>
       )}

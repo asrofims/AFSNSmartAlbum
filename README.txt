@@ -1,6 +1,6 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.0.36
+Version: 1.0.37
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
