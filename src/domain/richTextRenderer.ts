@@ -209,13 +209,15 @@ export function layoutRichText(
       pushCurrentLine();
       continue;
     }
-    if (shouldWrap && !token.isSpace && currentLineTokens.length > 0 && currentLineWidth + tracking + token.width > availableWidth + 1e-6) {
+    // 0.05 pt layout epsilon accommodates physical unit conversion (mm/inch <-> pt) floating-point drift
+    const LAYOUT_EPSILON = 0.05;
+    if (shouldWrap && !token.isSpace && currentLineTokens.length > 0 && currentLineWidth + tracking + token.width > availableWidth + LAYOUT_EPSILON) {
       pushCurrentLine();
     }
-    if (shouldWrap && !token.isSpace && (baseStyle.wordWrap === 'char' || token.width > availableWidth)) {
+    if (shouldWrap && !token.isSpace && (baseStyle.wordWrap === 'char' || token.width > availableWidth + LAYOUT_EPSILON)) {
       for (const char of splitGraphemes(token.text)) {
         const width = measureTrackedText(ctx, char, token.fontStr, token.fontSizePx, 0);
-        if (currentLineTokens.length > 0 && currentLineWidth + tracking + width > availableWidth + 1e-6) pushCurrentLine();
+        if (currentLineTokens.length > 0 && currentLineWidth + tracking + width > availableWidth + LAYOUT_EPSILON) pushCurrentLine();
         append({ ...token, text: char, width });
       }
     } else {
@@ -300,7 +302,7 @@ export function layoutRichText(
     paddingPx,
     boxWidth,
     boxHeight,
-    overflow: totalContentHeight > availableHeight + 1e-6 || lines.some((line) => line.width > availableWidth + 1e-6),
+    overflow: totalContentHeight > availableHeight + 0.05 || lines.some((line) => line.width > availableWidth + 0.05),
   };
 }
 

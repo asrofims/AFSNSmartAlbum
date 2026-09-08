@@ -1913,33 +1913,37 @@ export function calculateMultiFrameResize(
     const f = initialFrames[0];
     if (!f) return [];
     const uniformScale = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
-    const newWidth = roundToHundredth(Math.max(1, f.width * uniformScale));
-    const newHeight = roundToHundredth(Math.max(1, f.height * uniformScale));
+    const isText = (f as any)?.type === 'text';
+    const newWidth = isText
+      ? Math.ceil((f.width * uniformScale) * 100) / 100
+      : roundToHundredth(Math.max(1, f.width * uniformScale));
+    const newHeight = isText
+      ? Math.ceil((f.height * uniformScale) * 100) / 100
+      : roundToHundredth(Math.max(1, f.height * uniformScale));
     const newCenterX = newGroupBounds.x + newGroupBounds.width / 2;
     const newCenterY = newGroupBounds.y + newGroupBounds.height / 2;
     const rad = ((f.rotation || 0) * Math.PI) / 180;
     const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
     const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
-    const isText = (f as any)?.type === 'text';
     const textStyle = isText ? (f as any)?.style : undefined;
     let newStyle = undefined;
     let newStyledRanges = undefined;
 
     if (isText && textStyle) {
       const currentFontSize = textStyle.fontSize || 24;
-      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * uniformScale) * 10) / 10));
+      const newFontSize = Math.max(1, Math.min(200, currentFontSize * uniformScale));
       newStyle = {
         ...textStyle,
         fontSize: newFontSize,
-        padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
-        letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
+        padding: (textStyle.padding ?? 4) * uniformScale,
+        letterSpacing: (textStyle.letterSpacing ?? 0) * uniformScale,
       };
       const origRanges = (f as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {
         newStyledRanges = origRanges.map((r: any) => ({
           ...r,
-          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * uniformScale) * 10) / 10)) : undefined,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * uniformScale)) : undefined,
         }));
       }
     }
@@ -2003,32 +2007,36 @@ export function calculateMultiFrameResize(
       const newVbH = vb.height * scale;
       const newCenterX = newVbX + newVbW / 2;
       const newCenterY = newVbY + newVbH / 2;
-      const newWidth = roundToHundredth(Math.max(1, f.width * scale));
-      const newHeight = roundToHundredth(Math.max(1, f.height * scale));
+      const isText = (f as any)?.type === 'text';
+      const newWidth = isText
+        ? Math.ceil((f.width * scale) * 100) / 100
+        : roundToHundredth(Math.max(1, f.width * scale));
+      const newHeight = isText
+        ? Math.ceil((f.height * scale) * 100) / 100
+        : roundToHundredth(Math.max(1, f.height * scale));
 
       const rad = ((f.rotation || 0) * Math.PI) / 180;
       const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
       const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
-      const isText = (f as any)?.type === 'text';
       const textStyle = isText ? (f as any)?.style : undefined;
       let newStyle = undefined;
       let newStyledRanges = undefined;
 
       if (isText && textStyle) {
         const currentFontSize = textStyle.fontSize || 24;
-        const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * scale) * 10) / 10));
+        const newFontSize = Math.max(1, Math.min(200, currentFontSize * scale));
         newStyle = {
           ...textStyle,
           fontSize: newFontSize,
-        padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
-        letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
+          padding: (textStyle.padding ?? 4) * scale,
+          letterSpacing: (textStyle.letterSpacing ?? 0) * scale,
         };
         const origRanges = (f as any)?.styledRanges;
         if (origRanges && Array.isArray(origRanges)) {
           newStyledRanges = origRanges.map((r: any) => ({
             ...r,
-            fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scale) * 10) / 10)) : undefined,
+            fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * scale)) : undefined,
           }));
         }
       }
@@ -2213,32 +2221,36 @@ export function calculateMultiFrameResize(
     const newVbH = vf.height * uniformScale;
     const newCenterX = newVbX + newVbW / 2;
     const newCenterY = newVbY + newVbH / 2;
-    const newWidth = roundToHundredth(Math.max(1, f.width * uniformScale));
-    const newHeight = roundToHundredth(Math.max(1, f.height * uniformScale));
+    const isText = (f as any)?.type === 'text';
+    const newWidth = isText
+      ? Math.ceil((f.width * uniformScale) * 100) / 100
+      : roundToHundredth(Math.max(1, f.width * uniformScale));
+    const newHeight = isText
+      ? Math.ceil((f.height * uniformScale) * 100) / 100
+      : roundToHundredth(Math.max(1, f.height * uniformScale));
 
     const rad = ((f.rotation || 0) * Math.PI) / 180;
     const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
     const finalY = newCenterY - ((newWidth / 2) * Math.sin(rad) + (newHeight / 2) * Math.cos(rad));
 
-    const isText = (f as any)?.type === 'text';
     const textStyle = isText ? (f as any)?.style : undefined;
     let newStyle = undefined;
     let newStyledRanges = undefined;
 
     if (isText && textStyle) {
       const currentFontSize = textStyle.fontSize || 24;
-      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * uniformScale) * 10) / 10));
+      const newFontSize = Math.max(1, Math.min(200, currentFontSize * uniformScale));
       newStyle = {
         ...textStyle,
         fontSize: newFontSize,
-        padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
-        letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
+        padding: (textStyle.padding ?? 4) * uniformScale,
+        letterSpacing: (textStyle.letterSpacing ?? 0) * uniformScale,
       };
       const origRanges = (f as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {
         newStyledRanges = origRanges.map((r: any) => ({
           ...r,
-          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * uniformScale) * 10) / 10)) : undefined,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * uniformScale)) : undefined,
         }));
       }
     }
@@ -2615,10 +2627,15 @@ export function calculateRotatedMultiFrameResize(
     const origW = orig ? orig.width : 100;
     const origH = orig ? orig.height : 100;
 
+    const isText = (orig as any)?.type === 'text';
     const newLocalX = child.localX * scale;
     const newLocalY = child.localY * scale;
-    const newWidth = roundToHundredth(Math.max(1, origW * scale));
-    const newHeight = roundToHundredth(Math.max(1, origH * scale));
+    const newWidth = isText
+      ? Math.ceil((origW * scale) * 100) / 100
+      : roundToHundredth(Math.max(1, origW * scale));
+    const newHeight = isText
+      ? Math.ceil((origH * scale) * 100) / 100
+      : roundToHundredth(Math.max(1, origH * scale));
 
     const worldGeom = unprojectGroupChildToWorld(
       newGroupX,
@@ -2629,25 +2646,24 @@ export function calculateRotatedMultiFrameResize(
       child.localRotation
     );
 
-    const isText = (orig as any)?.type === 'text';
     const textStyle = isText ? (orig as any)?.style : undefined;
     let newStyle = undefined;
     let newStyledRanges = undefined;
 
     if (isText && textStyle) {
       const currentFontSize = textStyle.fontSize || 24;
-      const newFontSize = Math.max(1, Math.min(200, Math.round((currentFontSize * scale) * 10) / 10));
+      const newFontSize = Math.max(1, Math.min(200, currentFontSize * scale));
       newStyle = {
         ...textStyle,
         fontSize: newFontSize,
-        padding: (textStyle.padding ?? 4) * newFontSize / currentFontSize,
-        letterSpacing: (textStyle.letterSpacing ?? 0) * newFontSize / currentFontSize,
+        padding: (textStyle.padding ?? 4) * scale,
+        letterSpacing: (textStyle.letterSpacing ?? 0) * scale,
       };
       const origRanges = (orig as any)?.styledRanges;
       if (origRanges && Array.isArray(origRanges)) {
         newStyledRanges = origRanges.map((r: any) => ({
           ...r,
-          fontSize: r.fontSize ? Math.max(1, Math.min(200, Math.round((r.fontSize * scale) * 10) / 10)) : undefined,
+          fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * scale)) : undefined,
         }));
       }
     }

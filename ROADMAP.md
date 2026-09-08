@@ -258,6 +258,9 @@
 - [x] SQLite migration v13 backfills existing projects and spreads from the legacy uniform margin while older AFSN documents retain the same fallback behavior.
 - [x] Add native regression coverage for asymmetric project and spread margin round trips.
 
+### Multi-Select Text Resize & Proportional Font Scaling — 8 September 2026
 
-
-
+- [x] Preserve exact unrounded floating-point font sizes and styled-range sizes during multi-selection resize in `calculateRotatedMultiFrameResize` and `calculateMultiFrameResize`.
+- [x] Use ceiled hundredth rounding (`Math.ceil`) for text element dimensions so continuous multi-selection scaling never shrinks frame boundaries below tightly fitted text content.
+- [x] Relax layout engine word-wrap and overflow detection tolerance to `0.05 pt` in `richTextRenderer.ts`, eliminating false rewraps and false red `+` overflow badges caused by unit conversion float drift.
+- [x] Route multi-frame updates for text elements through `updateTextNode` in `batchUpdateFrames` to guarantee clean style normalization and height auto-sizing.

@@ -597,19 +597,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     useHistoryStore.getState().pushState(currentAlbum);
 
     const updateMap = new Map(updates.map((u) => [u.id, u.geometry]));
+    const project = useProjectStore.getState().currentProject;
+    const unit = project?.canvasUnit || 'mm';
+    const dpi = project?.canvasDpi || 300;
+
+    const applyUpdate = (f: AlbumElement): AlbumElement => {
+      const geom = updateMap.get(f.id);
+      if (!geom) return f;
+      if (f.type === 'text') {
+        return updateTextNode(f as TextNodeElement, geom as any, unit, dpi);
+      }
+      return { ...f, ...geom } as AlbumElement;
+    };
 
     const updatedCover = {
       ...currentAlbum.coverSpread,
-      elements: (currentAlbum.coverSpread.elements || []).map((f) =>
-        updateMap.has(f.id) ? ({ ...f, ...updateMap.get(f.id) } as AlbumElement) : f
-      ),
+      elements: (currentAlbum.coverSpread.elements || []).map(applyUpdate),
     };
 
     const updatedSpreads = currentAlbum.spreads.map((spread) => ({
       ...spread,
-      elements: (spread.elements || []).map((f) =>
-        updateMap.has(f.id) ? ({ ...f, ...updateMap.get(f.id) } as AlbumElement) : f
-      ),
+      elements: (spread.elements || []).map(applyUpdate),
     }));
 
     useAlbumStore.setState({
