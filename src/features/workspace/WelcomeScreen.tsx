@@ -266,7 +266,7 @@ export function WelcomeScreen() {
         isOpen={missingFileProject !== null}
         title="Project File Not Found"
         message={`The file for "${missingFileProject?.name}" was moved or deleted.`}
-        detail={`Original location: ${missingFileProject?.filePath || 'Unknown'}\n\nYou can restore this album layout directly from the internal local cache, or remove this entry from your recent list.`}
+        detail={`Original location: ${missingFileProject?.filePath || 'Unknown'}\n\nYou can restore this album layout from the local cache. When you save, you will be asked to choose a file location.`}
         confirmText="Open from Local Cache"
         cancelText="Cancel"
         secondaryText="Remove from List"

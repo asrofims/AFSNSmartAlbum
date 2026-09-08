@@ -145,5 +145,89 @@ native = (command) => command === 'get_project' ? project : command === 'load_al
 await useProjectStore.getState().openProjectById('p');
 assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
 
+// Missing recent files open as unsaved, even without a previous dirty marker.
+reset();
+native = (command) => command === 'get_project' ? project
+  : command === 'load_album_structure' ? createInitialAlbum(project)
+  : command === 'check_path_exists' ? false : [];
+await useProjectStore.getState().openProjectById('p');
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+assert.equal(useProjectStore.getState().currentProject?.filePath, project.filePath);
+
+// Autosave checkpoints missing documents without recreating files or showing dialogs.
+reset();
+useAlbumStore.setState({ saveStatus: 'saved' });
+native = (command) => command === 'check_path_exists' ? false : null;
+assert.equal((await useProjectStore.getState().saveProject({ automatic: true })).success, false);
+assert.ok(calls.includes('save_album_structure'));
+assert.equal(calls.includes('export_afsn_package'), false);
+assert.equal(calls.includes('export_afsn_with_dialog'), false);
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+assert.equal(useProjectStore.getState().error, null);
+
+// Cancelling recovery Save keeps the old path, cached identity, and dirty state.
+const recoveredBefore = useProjectStore.getState().currentProject;
+assert.equal((await useProjectStore.getState().saveProject()).success, false);
+assert.ok(calls.includes('export_afsn_with_dialog'));
+assert.equal(useProjectStore.getState().currentProject, recoveredBefore);
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+assert.equal(useProjectStore.getState().isSaving, false);
+
+// A chosen recovery destination replaces the path without forking the recent entry.
+native = (command) => command === 'check_path_exists' ? false
+  : command === 'export_afsn_with_dialog' ? 'D:/Albums/Recovered.afsn' : null;
+assert.deepEqual(await useProjectStore.getState().saveProject(), {
+  success: true, filePath: 'D:/Albums/Recovered.afsn', isSaveAs: true,
+});
+assert.equal(useProjectStore.getState().currentProject?.id, project.id);
+assert.equal(useProjectStore.getState().currentProject?.name, 'Recovered');
+assert.equal(useProjectStore.getState().recentProjects.length, 1);
+assert.equal(JSON.parse(storage.get('afsn_recent_projects')!)[0].filePath, 'D:/Albums/Recovered.afsn');
+assert.equal(useAlbumStore.getState().saveStatus, 'saved');
+assert.equal(calls.includes('save_project_as_with_dialog'), false);
+calls.length = 0;
+native = (command, args) => {
+  if (command === 'check_path_exists') return true;
+  if (command === 'export_afsn_package') assert.equal(args.targetPath, 'D:/Albums/Recovered.afsn');
+  return null;
+};
+assert.equal((await useProjectStore.getState().saveProject()).success, true);
+assert.ok(calls.includes('export_afsn_package'));
+assert.equal(calls.includes('export_afsn_with_dialog'), false);
+
+// A failed recovery write must not change the association or report success.
+reset();
+native = (command) => {
+  if (command === 'check_path_exists') return false;
+  if (command === 'export_afsn_with_dialog') throw new Error('destination unavailable');
+  return null;
+};
+assert.equal((await useProjectStore.getState().saveProject()).success, false);
+assert.equal(useProjectStore.getState().currentProject?.filePath, project.filePath);
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+assert.ok(useProjectStore.getState().error?.includes('destination unavailable'));
+
+// The recovery picker shares the save lock and preserves edits made while open.
+reset();
+const recoveryStarted = deferred(), recoveryRelease = deferred();
+native = async (command) => {
+  if (command === 'check_path_exists') return false;
+  if (command === 'export_afsn_with_dialog') {
+    recoveryStarted.resolve(); await recoveryRelease.promise;
+    return 'D:/Albums/Recovered.afsn';
+  }
+  return null;
+};
+const recoverySave = useProjectStore.getState().saveProject();
+await recoveryStarted.promise;
+assert.equal((await useProjectStore.getState().saveProject({ automatic: true })).success, false);
+const recoveryEdited = { ...useAlbumStore.getState().currentAlbum!, totalPages: 46 };
+useAlbumStore.setState({ currentAlbum: recoveryEdited, saveStatus: 'unsaved' });
+recoveryRelease.resolve();
+assert.equal((await recoverySave).success, true);
+assert.equal(useAlbumStore.getState().currentAlbum, recoveryEdited);
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+assert.equal(useProjectStore.getState().currentProject?.filePath, 'D:/Albums/Recovered.afsn');
+
 clearMocks();
-console.log('✓ Project persistence regressions passed: failed writes, cancellation, ZIP protection, save serialization and concurrent edits.');
+console.log('✓ Project persistence regressions passed: failed writes, cancellation, ZIP protection, save serialization, concurrent edits and missing-file recovery.');

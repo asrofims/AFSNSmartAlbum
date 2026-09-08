@@ -36,7 +36,7 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>;
   createNewProject: (settings: ProjectSettings) => Promise<Project>;
   openProjectById: (id: string) => Promise<void>;
-  saveProject: (options?: { automatic?: boolean }) => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean; reCreated?: boolean }>;
+  saveProject: (options?: { automatic?: boolean }) => Promise<{ success: boolean; filePath: string | null; isSaveAs: boolean }>;
   exportProjectAsAfsn: () => Promise<string | null>;
   exportCompleteProjectPackageWithPhotos: () => Promise<string | null>;
   importProjectFromAfsn: () => Promise<boolean>;
@@ -436,7 +436,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         if (!loaded) {
           useAlbumStore.getState().initializeAlbum(project);
         }
-        if (hasUnsavedRecovery || !/\.afsn$/i.test(project.filePath || '')) useAlbumStore.getState().setSaveStatus('unsaved');
+        let hasProjectFile = false;
+        if (project.filePath && /\.afsn$/i.test(project.filePath)) {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            hasProjectFile = await invoke<boolean>('check_path_exists', { path: project.filePath });
+          } catch { /* Keep recovery data unsaved if the file cannot be verified. */ }
+        }
+        if (hasUnsavedRecovery || !hasProjectFile) useAlbumStore.getState().setSaveStatus('unsaved');
       } catch (e) {
         console.error('[AFSN] Failed to load album/photos on openProjectById:', e);
       }
@@ -467,11 +474,28 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!workingPath) return failed;
       const { invoke } = await import('@tauri-apps/api/core');
       const exists = await invoke<boolean>('check_path_exists', { path: workingPath });
-      await invoke('export_afsn_package', { projectId: current.id, targetPath: workingPath });
+      let savedPath = workingPath;
+      if (!exists) {
+        useAlbumStore.getState().setSaveStatus('unsaved');
+        // Recovery checkpoints must never recreate a deleted document silently.
+        if (options.automatic) return failed;
+        const path = await invoke<string | null>('export_afsn_with_dialog', { projectId: current.id, suggestedName: current.name });
+        if (!path) return failed;
+        savedPath = path;
+        if (get().currentProject?.id === current.id) {
+          // Relocate the recovered project without creating a duplicate recent entry.
+          const saved = { ...get().currentProject!, filePath: path, name: path.replace(/^.*[\\/]/, '').replace(/\.afsn$/i, '') };
+          set((state) => ({ currentProject: saved,
+            recentProjects: [saved, ...state.recentProjects.filter((p) => p.id !== saved.id)].slice(0, 10) }));
+          try { localStorage.setItem('afsn_recent_projects', JSON.stringify(get().recentProjects)); } catch {}
+        }
+      } else {
+        await invoke('export_afsn_package', { projectId: current.id, targetPath: workingPath });
+      }
       if (get().currentProject?.id === current.id && useAlbumStore.getState().currentAlbum === album) {
         useAlbumStore.setState({ saveStatus: 'saved', lastSavedAt: new Date().toLocaleTimeString() });
       }
-      return { success: true, filePath: workingPath, isSaveAs: false, reCreated: !exists };
+      return { success: true, filePath: savedPath, isSaveAs: !exists };
     } catch (error) {
       if (get().currentProject?.id === current.id) {
         useAlbumStore.getState().setSaveStatus('unsaved');

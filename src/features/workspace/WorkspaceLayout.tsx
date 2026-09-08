@@ -457,9 +457,7 @@ export function WorkspaceLayout() {
           saveProject().then((res) => {
             if (res.success) {
               const fileName = res.filePath ? (res.filePath.split(/[\\/]/).pop() || res.filePath) : '';
-              if (res.reCreated) {
-                showToast(`✓ Project file re-created at: ${fileName} (restored from working memory)`);
-              } else if (res.filePath) {
+              if (res.filePath) {
                 showToast(`✓ Project saved to: ${fileName}`);
               } else {
                 showToast('✓ Project saved to database');
@@ -570,9 +568,7 @@ export function WorkspaceLayout() {
                         const res = await saveProject();
                         if (res.success) {
                           const fileName = res.filePath ? (res.filePath.split(/[\\/]/).pop() || res.filePath) : '';
-                          if (res.reCreated) {
-                            showToast(`✓ Project file re-created at: ${fileName} (restored from working memory)`);
-                          } else if (res.filePath) {
+                          if (res.filePath) {
                             showToast(`✓ Project saved to: ${fileName}`);
                           } else {
                             showToast('✓ Project saved to database');

@@ -251,6 +251,13 @@
 - [x] Full file save for Save & Continue / Save & Exit, unsaved protection for external opens, and explicit save/open errors.
 - [x] Regression tests for real ZIP extraction/edit/save/reopen, failure rollback, cancellation, and concurrent edits. Details and compatibility limits are recorded in `PROJECT_PERSISTENCE_AUDIT.md`.
 
+### Missing Project File Recovery — 9 September 2026
+
+- [x] Mark cached recent projects unsaved when their AFSN file is missing; explain the location choice in the recovery dialog.
+- [x] Prompt for a destination on manual Save when the original file is missing, retaining the recovered project identity and updating its recent entry after successful publication.
+- [x] Keep autosave limited to recovery checkpoints for missing files; preserve the existing path and unsaved state on cancellation or failure.
+- [x] Add regression coverage for missing recent files, autosave, destination selection, cancellation, failed writes, subsequent saves, and edits during the recovery picker.
+
 ## Four-Sided Margin Persistence — 8 September 2026
 
 - [x] Persist Top, Bottom, Outside, and Spine project defaults through the Tauri command and SQLite project schema.
@@ -258,9 +265,9 @@
 - [x] SQLite migration v13 backfills existing projects and spreads from the legacy uniform margin while older AFSN documents retain the same fallback behavior.
 - [x] Add native regression coverage for asymmetric project and spread margin round trips.
 
-## Phase 21 — Release v1.0.38: Multi-Select Text Proportional Font Scaling & Overflow Fix
+### Phase 21 — Release v1.0.39: Multi-Select Text Proportional Font Scaling & Overflow Fix
 - [x] Preserve exact unrounded floating-point font sizes and styled-range sizes during multi-selection resize in `calculateRotatedMultiFrameResize` and `calculateMultiFrameResize`.
 - [x] Use ceiled hundredth rounding (`Math.ceil`) for text element dimensions so continuous multi-selection scaling never shrinks frame boundaries below tightly fitted text content.
 - [x] Relax layout engine word-wrap and overflow detection tolerance to `0.05 pt` in `richTextRenderer.ts`, eliminating false rewraps and false red `+` overflow badges caused by unit conversion float drift.
 - [x] Route multi-frame updates for text elements through `updateTextNode` in `batchUpdateFrames` to guarantee clean style normalization and height auto-sizing.
-- [x] Application version metadata bumped to `v1.0.38`.
+- [x] Application version metadata bumped to `v1.0.39`.
