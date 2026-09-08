@@ -5,6 +5,7 @@ use image::{GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use crate::db::{ElementPayload, ProjectRow, SpreadPayload};
 
+mod bundled_fonts;
 pub mod text_rasterizer;
 pub use text_rasterizer::render_text_element;
 

@@ -1,20 +1,16 @@
-import { useRef, useState, useMemo, useEffect } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { Group, Rect, Text as KonvaText, Circle, Path as KonvaPath, Shape as KonvaShape } from 'react-konva';
 import Konva from 'konva';
 import { useEditorStore } from '../../stores/editorStore';
 import {
   TextNodeElement,
   DEFAULT_TEXT_STYLE,
-  hasRichTextMarkup,
-  parseRichTextRuns,
-  rangesToTextRuns,
+  getTextRuns,
   layoutRichText,
   drawRichTextLayout,
-  calculateTextFitHeight,
-  resolveCssFontFamily,
+
 } from '../../domain/text';
-import { roundToHundredth } from '../../domain/editor';
-import { Unit, ptToScreenPx, convertPtToUnit, convertUnit } from '../../domain/units';
+import { Unit, convertPtToUnit, convertUnitToPt } from '../../domain/units';
 
 interface TextNodeProps {
   element: TextNodeElement;
@@ -52,7 +48,6 @@ export function TextNode({
   onDoubleClick,
 }: TextNodeProps) {
   const shapeRef = useRef<Konva.Group>(null);
-  const textChildRef = useRef<Konva.Text>(null);
   const [isHovered, setIsHovered] = useState(false);
 
   const unit = canvasUnit || 'mm';
@@ -86,7 +81,7 @@ export function TextNode({
   const displayPixelH = liveDimensions ? liveDimensions.height : pixelH;
 
   // Zoom-invariant base resolution for text measurement (prevents word-wrap jumping)
-  const baseResolution = 10;
+  const baseResolution = convertUnitToPt(1, unit, currentDpi);
   const visualScale = scaleFactor / baseResolution;
 
   const internalW = (displayPixelW / scaleFactor) * baseResolution;
@@ -94,92 +89,22 @@ export function TextNode({
 
   // Live typographic point size (dynamically scales when corner handles are dragged)
   const currentFontSize = liveDimensions?.fontSize ?? (style.fontSize || 24);
-  const fontPt = Number.isFinite(currentFontSize) && currentFontSize > 0 ? currentFontSize : 24;
-  
-  // Calculate raw font size at base resolution to guarantee layout invariance across zoom levels
-  const rawFontSizeUnscaled = ptToScreenPx(fontPt, unit, currentDpi, 1);
-  const internalFontSize = Math.max(1, Number.isFinite(rawFontSizeUnscaled) ? rawFontSizeUnscaled * baseResolution : 16);
-
-  // Valid Konva fontStyle: 'normal', 'bold', 'italic', or 'italic bold'
-  const isBold = style.fontWeight === 'bold' || Number(style.fontWeight) >= 600;
-  const isItalic = style.fontStyle === 'italic';
-  const fontStyle = isBold ? (isItalic ? 'italic bold' : 'bold') : (isItalic ? 'italic' : 'normal');
-
-  const paddingPt = Number.isFinite(style.padding) ? style.padding : 4;
-  const paddingInUnit = convertPtToUnit(paddingPt, unit, currentDpi);
-  const internalPadding = Math.max(0, paddingInUnit * baseResolution);
-
-  const internalLetterSpacing = style.letterSpacing
-    ? (convertPtToUnit(style.letterSpacing, unit, currentDpi) || 0) * baseResolution
-    : 0;
-
   const effectiveStyle = useMemo(() => ({
     ...style,
     fontSize: currentFontSize,
+    padding: style.padding * (currentFontSize / style.fontSize),
+    letterSpacing: style.letterSpacing * (currentFontSize / style.fontSize),
   }), [style, currentFontSize]);
 
-  // Rich Text Layout (Range selection or legacy markup)
-  const hasRanges = Boolean(element.styledRanges && element.styledRanges.length > 0);
-  const isMarkup = hasRichTextMarkup(element.text);
-  const isRich = hasRanges || isMarkup;
-
   const richRuns = useMemo(() => {
-    if (!isRich) return null;
-    if (hasRanges) {
-      const scaleRatio = currentFontSize / (style.fontSize || 24);
-      const scaledRanges = scaleRatio === 1
-        ? element.styledRanges
-        : (element.styledRanges || []).map((r) => ({
-            ...r,
-            fontSize: r.fontSize
-              ? Math.round(r.fontSize * scaleRatio * 10) / 10
-              : undefined,
-          }));
-      return rangesToTextRuns(element.text, scaledRanges, effectiveStyle);
-    }
-    return parseRichTextRuns(element.text, effectiveStyle);
-  }, [isRich, hasRanges, element.text, element.styledRanges, effectiveStyle, currentFontSize, style.fontSize]);
-
-  const richLayout = useMemo(() => {
-    if (!isRich || !richRuns) return null;
-    return layoutRichText(richRuns, effectiveStyle, internalW, internalH, baseResolution, unit, currentDpi);
-  }, [isRich, richRuns, effectiveStyle, internalW, internalH, baseResolution, unit, currentDpi]);
-
-  // Zoom-independent box height auto-expansion:
-  // Evaluates strictly in physical units (mm, cm, inch) using calculateTextFitHeight.
-  // NEVER depends on scaleFactor, screen pixels, or canvas zoom!
-  useEffect(() => {
-    if (isEditing || liveDimensions) return;
-
-    const requiredPhysicalH = calculateTextFitHeight(
-      element.text || ' ',
-      effectiveStyle,
-      element.width,
-      unit,
-      currentDpi,
-      element.styledRanges
-    );
-
-    if (requiredPhysicalH > element.height + 0.5) {
-      onElementChange({
-        height: roundToHundredth(requiredPhysicalH),
-      }, true);
-    }
-  }, [
-    element.text,
-    element.width,
-    element.height,
-    currentFontSize,
-    style.lineHeight,
-    style.fontFamily,
-    style.padding,
-    style.wordWrap,
-    unit,
-    currentDpi,
-    isEditing,
-    liveDimensions,
-    onElementChange,
-  ]);
+    const ratio = currentFontSize / style.fontSize;
+    const ranges = ratio === 1 ? element.styledRanges : element.styledRanges?.map((range) => ({
+      ...range, fontSize: range.fontSize ? range.fontSize * ratio : undefined,
+    }));
+    return getTextRuns(element.text, effectiveStyle, ranges);
+  }, [element.text, element.styledRanges, effectiveStyle, currentFontSize, style.fontSize]);
+  const richLayout = useMemo(() => layoutRichText(richRuns, effectiveStyle, internalW, internalH, 72, 'inch', currentDpi),
+    [richRuns, effectiveStyle, internalW, internalH, currentDpi]);
 
   return (
     <Group
@@ -219,11 +144,11 @@ export function TextNode({
         if ('which' in e.evt && e.evt.which !== 1) {
           return;
         }
-        onDoubleClick();
+        if (!element.locked) onDoubleClick();
       }}
       onDblTap={(e) => {
         e.cancelBubble = true;
-        onDoubleClick();
+        if (!element.locked) onDoubleClick();
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -236,7 +161,7 @@ export function TextNode({
         onContextMenu?.(e);
       }}
       onTransformStart={() => {
-        if (isMultiSelectActive) return;
+        if (isMultiSelectActive || element.locked) return;
         const node = shapeRef.current;
         if (!node) return;
         const tr = node.getStage()?.findOne('Transformer') as Konva.Transformer | undefined;
@@ -249,7 +174,7 @@ export function TextNode({
         };
       }}
       onTransform={() => {
-        if (isMultiSelectActive) return;
+        if (isMultiSelectActive || element.locked) return;
 
         const node = shapeRef.current;
         if (!node) return;
@@ -279,11 +204,11 @@ export function TextNode({
         const { initialPixelW, initialFontSize } = transformStartRef.current;
 
         // Minimum boundary in screen pixels
-        const minW = Math.max(20, Math.round(convertUnit(10, 'mm', unit, currentDpi, 2) * scaleFactor));
-        const minH = Math.max(12, Math.round(convertUnit(6, 'mm', unit, currentDpi, 2) * scaleFactor));
+        const minW = convertPtToUnit(1, unit, currentDpi) * scaleFactor;
+        const minH = convertPtToUnit(1, unit, currentDpi) * scaleFactor;
 
-        const newPixelW = Math.max(minW, Math.round(node.width() * scaleX));
-        const newPixelH = Math.max(minH, Math.round(node.height() * scaleY));
+        const newPixelW = Math.max(minW, node.width() * scaleX);
+        const newPixelH = Math.max(minH, node.height() * scaleY);
 
         // Immediately reset scale to 1.0 so typography stays crisp and NEVER stretches!
         node.scaleX(1);
@@ -314,32 +239,8 @@ export function TextNode({
           scaledRanges: currentScaledRanges,
         };
 
-        // Update child KonvaText (triggers instant 60 FPS text wrapping / reflow!)
-        const textChild = textChildRef.current || (node.findOne('Text') as Konva.Text | undefined);
-        let livePixelH = newPixelH;
-
-        if (textChild) {
-          textChild.width((newPixelW / scaleFactor) * baseResolution);
-          if (isCorner) {
-            const liveFontSizeUnscaled = ptToScreenPx(newFontSize, unit, currentDpi, 1);
-            textChild.fontSize(Math.max(1, liveFontSizeUnscaled * baseResolution));
-          }
-          // Real-time live 60 FPS box room expansion: if wrapping text exceeds height, expand box downwards!
-          const actualTextH_Internal = textChild.getTextHeight();
-          const actualTextH_Scaled = Math.ceil((actualTextH_Internal + (4 * baseResolution)) * (scaleFactor / baseResolution));
-          if (actualTextH_Scaled > livePixelH) {
-            livePixelH = actualTextH_Scaled;
-          }
-          textChild.height((livePixelH / scaleFactor) * baseResolution);
-        }
-
+        const livePixelH = newPixelH;
         node.height(livePixelH);
-
-        // Update all child Rect shapes (hitbox, selection dash outline, hover outline)
-        node.find('Rect').forEach((r) => {
-          r.width(newPixelW);
-          r.height(livePixelH);
-        });
 
         // Update local React state so RichText layout and re-renders stay in sync
         setLiveDimensions({
@@ -349,7 +250,7 @@ export function TextNode({
         });
       }}
       onTransformEnd={() => {
-        if (isMultiSelectActive) return;
+        if (isMultiSelectActive || element.locked) return;
 
         const node = shapeRef.current;
         if (!node) return;
@@ -364,51 +265,38 @@ export function TextNode({
         let rawW = (node.width() * scaleX) / scaleFactor;
         let rawH = (node.height() * scaleY) / scaleFactor;
 
-        // Minimum boundary in canvas units (10mm x 6mm)
-        const minW = Math.round(convertUnit(10, 'mm', unit, currentDpi, 2) * 100) / 100;
-        const minH = Math.round(convertUnit(6, 'mm', unit, currentDpi, 2) * 100) / 100;
+        // One typographic point, independent of zoom and project units.
+        const minW = convertPtToUnit(1, unit, currentDpi);
+        const minH = convertPtToUnit(1, unit, currentDpi);
         rawW = Math.max(minW, rawW);
         rawH = Math.max(minH, rawH);
 
         const finalX = node.x() / scaleFactor;
         const finalY = node.y() / scaleFactor;
 
-        const effectiveFinalStyle = wasCorner ? { ...style, fontSize: finalFontSize } : style;
-
-        // Auto-hug height guarantee: ensure box height accommodates all wrapped lines without clipping
-        const fittedH = calculateTextFitHeight(
-          element.text || ' ',
-          effectiveFinalStyle,
-          rawW,
-          unit,
-          currentDpi,
-          finalRanges
-        );
-        const textChild = textChildRef.current || (node.findOne('Text') as Konva.Text | undefined);
-        const actualKonvaH = textChild ? Math.ceil((((textChild.getTextHeight() + (4 * baseResolution)) / baseResolution) * 100)) / 100 : 0;
-        rawH = Math.max(rawH, fittedH, actualKonvaH);
-
         node.scaleX(1);
         node.scaleY(1);
+        const wasRotation = transformStartRef.current?.anchor === 'rotater';
         setLiveDimensions(null);
         transformStartRef.current = null;
         lastTransformStateRef.current = null;
 
         onElementChange({
-          x: roundToHundredth(finalX),
-          y: roundToHundredth(finalY),
-          width: roundToHundredth(rawW),
-          height: roundToHundredth(rawH),
-          rotation: Math.round(node.rotation()),
-          ...(wasCorner
-            ? {
-                style: {
-                  ...style,
-                  fontSize: finalFontSize,
-                },
-                ...(finalRanges ? { styledRanges: finalRanges } : {}),
-              }
-            : {}),
+          x: finalX,
+          y: finalY,
+          width: rawW,
+          height: rawH,
+          rotation: node.rotation(),
+          style: {
+            ...style,
+            autoSize: wasRotation ? style.autoSize : 'off',
+            ...(wasCorner ? {
+              fontSize: finalFontSize,
+              padding: style.padding * finalFontSize / style.fontSize,
+              letterSpacing: style.letterSpacing * finalFontSize / style.fontSize,
+            } : {}),
+          },
+          ...(wasCorner && finalRanges ? { styledRanges: finalRanges } : {}),
         });
       }}
     >
@@ -421,42 +309,20 @@ export function TextNode({
       />
 
       {/* Rendered Text Element - Centered in middle of frame */}
-      {isRich && richLayout ? (
-        <KonvaShape
-          width={internalW}
-          height={internalH}
-          scaleX={visualScale}
-          scaleY={visualScale}
-          opacity={isEditing ? 0 : 1}
-          listening={!isEditing}
-          sceneFunc={(context) => {
-            const nativeCtx = (context as any)._context || context;
-            drawRichTextLayout(nativeCtx, richLayout);
-          }}
-        />
-      ) : (
-        <KonvaText
-          ref={textChildRef}
-          text={element.text || ' '}
-          width={internalW}
-          height={internalH}
-          fontFamily={resolveCssFontFamily(style.fontFamily)}
-          fontSize={internalFontSize}
-          fontStyle={fontStyle}
-          textDecoration={style.textDecoration || 'none'}
-          fill={style.fill || '#1e293b'}
-          align={style.align || 'center'}
-          verticalAlign={style.verticalAlign || 'top'}
-          lineHeight={style.lineHeight || 1.3}
-          letterSpacing={internalLetterSpacing}
-          padding={internalPadding}
-          wrap={style.wordWrap === 'char' ? 'char' : style.wordWrap === 'none' ? 'none' : 'word'}
-          ellipsis={Boolean(style.ellipsis)}
-          opacity={isEditing ? 0 : 1}
-          listening={!isEditing}
-          scaleX={visualScale}
-          scaleY={visualScale}
-        />
+      <KonvaShape
+        width={internalW}
+        height={internalH}
+        scaleX={visualScale}
+        scaleY={visualScale}
+        opacity={isEditing ? 0 : 1}
+        listening={false}
+        sceneFunc={(context) => drawRichTextLayout(context._context, richLayout)}
+      />
+      {isSelected && !isEditing && richLayout.overflow && (
+        <Group x={Math.max(0, displayPixelW - 12)} y={Math.max(0, displayPixelH - 12)} listening={false}>
+          <Rect width={12} height={12} fill="#fff" stroke="#e11d48" strokeWidth={1} />
+          <KonvaText text="+" width={12} height={12} align="center" verticalAlign="middle" fill="#e11d48" fontSize={12} />
+        </Group>
       )}
 
       {/* Subtle Hover Outline when not selected and not editing */}

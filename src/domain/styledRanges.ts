@@ -213,7 +213,7 @@ export function shiftRangesOnTextEdit(
 ): StyledRange[] {
   if (!ranges || ranges.length === 0) return [];
   const delta = insertedLength - removedLength;
-  if (delta === 0) return ranges;
+  if (removedLength === 0 && insertedLength === 0) return ranges;
 
   const updated: StyledRange[] = [];
 
@@ -243,4 +243,14 @@ export function shiftRangesOnTextEdit(
   }
 
   return updated;
+}
+
+/** UTF-16 offsets match textarea selection and the serialized range contract. */
+export function updateRangesForTextChange(ranges: StyledRange[] | undefined, previous: string, next: string): StyledRange[] {
+  let start = 0;
+  while (start < previous.length && start < next.length && previous[start] === next[start]) start++;
+  let oldEnd = previous.length;
+  let newEnd = next.length;
+  while (oldEnd > start && newEnd > start && previous[oldEnd - 1] === next[newEnd - 1]) { oldEnd--; newEnd--; }
+  return shiftRangesOnTextEdit(ranges, start, oldEnd - start, newEnd - start);
 }

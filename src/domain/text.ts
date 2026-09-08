@@ -1,5 +1,7 @@
 import { Unit, convertUnit, convertPtToUnit, convertUnitToPt } from './units';
-import { stripRichTextMarkup } from './richTextParser';
+import { parseRichTextRuns } from './richTextParser';
+import { rangesToTextRuns, StyledRange } from './styledRanges';
+import { layoutRichText } from './richTextRenderer';
 
 export * from './styledRanges';
 export * from './richTextParser';
@@ -30,6 +32,7 @@ export interface TextStyle {
   padding: number;
   wordWrap: 'word' | 'char' | 'none';
   ellipsis: boolean;
+  autoSize?: 'off' | 'height';
 }
 
 export interface TextNodeElement {
@@ -64,6 +67,7 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   padding: 4,
   wordWrap: 'word',
   ellipsis: false,
+  autoSize: 'off',
 };
 
 export type TextPresetKey = 'title' | 'heading' | 'subheading' | 'body' | 'caption' | 'quote';
@@ -316,156 +320,21 @@ export function calculateTextFitDimensions(
   maxAllowedWidth?: number,
   styledRanges?: import('./styledRanges').StyledRange[]
 ): { width: number; height: number; lineCount: number } {
-  const plainText = stripRichTextMarkup(text || ' ');
-  const baseFontSize = style.fontSize || 24;
-  const maxRangeFontSize = styledRanges && styledRanges.length > 0
-    ? Math.max(baseFontSize, ...styledRanges.map((r) => r.fontSize || 0))
-    : baseFontSize;
-  const effectiveFontSize = maxRangeFontSize;
-
-  const lineHeight = style.lineHeight || 1.3;
-  const letterSpacing = style.letterSpacing || 0;
-  const paddingPt = Number.isFinite(style.padding) ? (style.padding as number) : 4;
-
-  const fontFamily = style.fontFamily || 'Inter';
-  const fontWeight = style.fontWeight || 'normal';
-  const fontStyle = style.fontStyle || 'normal';
-
-  // Determine maximum width boundary in points
-  // Default boundary: 800mm (covers double-spread width) to prevent prematurely breaking long single-line titles
-  const defaultMaxMm = 800;
-  const maxBoundaryPt = maxAllowedWidth !== undefined && maxAllowedWidth > 0
-    ? convertUnitToPt(maxAllowedWidth, unit, dpi)
-    : convertUnitToPt(defaultMaxMm, 'mm', dpi);
-
-  const targetWidthPt = targetWidth !== undefined && targetWidth > 0
-    ? convertUnitToPt(targetWidth, unit, dpi)
-    : undefined;
-
-  // True typographic point to CSS screen pixel ratio (1 pt = 96/72 CSS px = 1.333px)
-  const fontSizeCssPx = (effectiveFontSize * 96) / 72;
-
-  // Measurement context returning exact width in typographic points (pt)
-  let measureFn = (str: string): number => str.length * effectiveFontSize * 0.55;
-
-  if (typeof document !== 'undefined') {
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.font = `${fontStyle} ${fontWeight} ${fontSizeCssPx}px ${resolveCssFontFamily(fontFamily)}`;
-        measureFn = (str: string) => {
-          let w = ctx.measureText(str).width;
-          if (letterSpacing > 0 && str.length > 1) {
-            w += (str.length - 1) * letterSpacing;
-          }
-          // Convert measured CSS pixels at 96 DPI back to physical points (72 DPI)
-          return (w * 72) / 96;
-        };
-      }
-    } catch {}
-  }
-
-  // 1. First measure unconstrained single-line width of each explicit paragraph (\n)
-  const paragraphs = plainText.split('\n');
-  let maxParagraphWidthPt = 0;
-  for (const para of paragraphs) {
-    const w = measureFn(para);
-    if (w > maxParagraphWidthPt) {
-      maxParagraphWidthPt = w;
-    }
-  }
-
-  // 2. Decide effective wrapping width limit
-  // If targetWidth was explicitly specified (e.g. user-established box width):
-  //   Respect targetWidth (only bounded if explicit maxAllowedWidth was passed).
-  // If no targetWidth was specified:
-  //   If text is short (< maxBoundaryPt), width hugs the text!
-  //   If text is long (> maxBoundaryPt), wrap at maxBoundaryPt!
-  let wrapLimitPt: number;
-  if (targetWidthPt !== undefined && targetWidthPt > 0) {
-    wrapLimitPt = maxAllowedWidth !== undefined && maxAllowedWidth > 0
-      ? Math.min(targetWidthPt, maxBoundaryPt)
-      : targetWidthPt;
-  } else {
-    wrapLimitPt = maxBoundaryPt;
-  }
-
-  // Usable wrap width inside box boundary (padding deducted)
-  const usableWrapWidthPt = Math.max(30, wrapLimitPt - (paddingPt * 2));
-
-  // 3. Word-wrap paragraphs if any paragraph exceeds usableWrapWidthPt
-  let wrappedLineCount = 0;
-  let maxWrappedLineWidthPt = 0;
-
-  for (const para of paragraphs) {
-    if (!para || para.trim().length === 0) {
-      wrappedLineCount += 1;
-      continue;
-    }
-
-    const words = para.split(/\s+/).filter(Boolean);
-    if (words.length === 0) {
-      wrappedLineCount += 1;
-      continue;
-    }
-
-    let currentLine = '';
-    let currentLineWidth = 0;
-
-    for (const word of words) {
-      const wordWidth = measureFn(word);
-      const spaceWidth = measureFn(' ');
-
-      if (!currentLine) {
-        currentLine = word;
-        currentLineWidth = wordWidth;
-      } else {
-        const testWidth = currentLineWidth + spaceWidth + wordWidth;
-        if (testWidth <= usableWrapWidthPt) {
-          currentLine += ' ' + word;
-          currentLineWidth = testWidth;
-        } else {
-          // Break line!
-          wrappedLineCount += 1;
-          if (currentLineWidth > maxWrappedLineWidthPt) {
-            maxWrappedLineWidthPt = currentLineWidth;
-          }
-          currentLine = word;
-          currentLineWidth = wordWidth;
-        }
-      }
-    }
-
-    if (currentLine) {
-      wrappedLineCount += 1;
-      if (currentLineWidth > maxWrappedLineWidthPt) {
-        maxWrappedLineWidthPt = currentLineWidth;
-      }
-    }
-  }
-
-  // Final fitted width and height:
-  // Add generous +8pt (~2.8mm) safety buffer to guarantee browser sub-pixel antialiasing
-  // and font hinting NEVER drop the last word to an extra line on the canvas!
-  const safetyBufferPt = 8;
-  const tightestWidthPt = Math.max(30, maxWrappedLineWidthPt + (paddingPt * 2) + safetyBufferPt);
-  const finalWidthPt = targetWidthPt !== undefined
-    ? (maxAllowedWidth !== undefined && maxAllowedWidth > 0 ? Math.min(tightestWidthPt, maxBoundaryPt) : tightestWidthPt)
-    : Math.min(tightestWidthPt, maxBoundaryPt);
-
-  // Line height calculation with +5pt descender clearance buffer
-  // Guarantees letters like 'g', 'j', 'p', 'q', 'y' and diacritics are NEVER clipped or pushed out of frame
-  const descenderBufferPt = 5;
-  const totalHeightPt = (Math.max(1, wrappedLineCount) * effectiveFontSize * lineHeight) + (paddingPt * 2) + descenderBufferPt;
-
-  const widthInUnit = convertPtToUnit(finalWidthPt, unit, dpi);
-  const heightInUnit = convertPtToUnit(totalHeightPt, unit, dpi);
-
+  const fullStyle = { ...DEFAULT_TEXT_STYLE, ...style };
+  const widthLimit = convertUnitToPt(maxAllowedWidth ?? convertPtToUnit(2267.716535, unit, dpi), unit, dpi);
+  const columnWidth = targetWidth === undefined ? widthLimit : Math.min(convertUnitToPt(targetWidth, unit, dpi), widthLimit);
+  const runs = getTextRuns(text, fullStyle, styledRanges);
+  // Canonical layout coordinates are typographic points, independent of project units/zoom.
+  const layout = layoutRichText(runs, fullStyle, Math.max(0.01, columnWidth), 1e7, 72, 'inch', dpi);
+  const padding = Math.max(0, fullStyle.padding);
+  const widthPt = Math.min(widthLimit, Math.max(0.01, layout.totalWidth + padding * 2));
+  const heightPt = Math.max(0.01, layout.totalHeight + padding * 2);
+  // Round in points, never in canvas units (0.01 inch is not 0.01 mm).
+  const ceilPt = (value: number) => Math.ceil((value - 1e-7) * 10000) / 10000;
   return {
-    width: Math.max(convertPtToUnit(15, unit, dpi), Math.ceil(widthInUnit * 100) / 100),
-    height: Math.max(convertPtToUnit(8, unit, dpi), Math.ceil(heightInUnit * 100) / 100),
-    lineCount: Math.max(1, wrappedLineCount),
+    width: convertPtToUnit(ceilPt(widthPt), unit, dpi),
+    height: convertPtToUnit(ceilPt(heightPt), unit, dpi),
+    lineCount: layout.lines.length,
   };
 }
 
@@ -534,7 +403,7 @@ export function serializeTextPayload(element: TextNodeElement): string {
     text: element.text,
     style: element.style,
     styledRanges: element.styledRanges,
-    textRuns: element.textRuns,
+    textRuns: getTextRuns(element.text, element.style, element.styledRanges),
   });
 }
 
@@ -566,4 +435,41 @@ export function deserializeTextPayload(
       style: { ...DEFAULT_TEXT_STYLE },
     };
   }
+}
+
+/** Plain text and styled text use the same layout engine. */
+export function getTextRuns(text: string, style: TextStyle, ranges?: StyledRange[]): TextRun[] {
+  return ranges?.length ? rangesToTextRuns(text, ranges, style) : parseRichTextRuns(text, style);
+}
+
+/** Keep the alignment reference point fixed in spread coordinates. */
+export function resizeTextFrame(element: TextNodeElement, width: number, height: number): Partial<TextNodeElement> {
+  const horizontal = element.style.align === 'right' ? 1 : element.style.align === 'center' ? 0.5 : 0;
+  const vertical = element.style.verticalAlign === 'bottom' ? 1 : element.style.verticalAlign === 'middle' ? 0.5 : 0;
+  const dx = (element.width - width) * horizontal;
+  const dy = (element.height - height) * vertical;
+  const radians = element.rotation * Math.PI / 180;
+  return {
+    width, height,
+    x: element.x + dx * Math.cos(radians) - dy * Math.sin(radians),
+    y: element.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+  };
+}
+
+export function fitTextFrame(element: TextNodeElement, mode: 'height' | 'content', unit: Unit, dpi: number, maxWidth?: number): Partial<TextNodeElement> {
+  if (element.locked) return {};
+  const fit = calculateTextFitDimensions(element.text, element.style, unit, dpi, element.width,
+    mode === 'content' ? maxWidth : undefined, element.styledRanges);
+  return resizeTextFrame(element, mode === 'height' ? element.width : fit.width, fit.height);
+}
+
+/** Auto size is an explicit document operation, never a render side effect. */
+export function updateTextNode(element: TextNodeElement, updates: Omit<Partial<TextNodeElement>, 'style'> & { style?: Partial<TextStyle> }, unit: Unit, dpi: number): TextNodeElement {
+  if (element.locked) return element;
+  let next = { ...element, ...updates, style: { ...element.style, ...updates.style } };
+  if (next.style.autoSize === 'height') {
+    const height = calculateTextFitHeight(next.text, next.style, next.width, unit, dpi, next.styledRanges);
+    next = { ...next, ...resizeTextFrame(next, next.width, height) };
+  }
+  return next;
 }

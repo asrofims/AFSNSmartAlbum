@@ -98,7 +98,8 @@ export function convertUnitToPt(val: number, from: Unit, dpi: number = 300): num
  */
 export function ptToScreenPx(pt: number, canvasUnit: Unit, dpi: number, scaleFactor: number): number {
   const inUnit = convertPtToUnit(pt, canvasUnit, dpi);
-  return Math.max(1, inUnit * scaleFactor);
+  // Physical typography must retain subpixel precision, including at small zoom.
+  return inUnit * scaleFactor;
 }
 
 /**
@@ -141,4 +142,3 @@ export function formatDimensions(width: number, height: number, unit: Unit): str
   const label = UNIT_LABELS[unit] ?? unit;
   return `${width} × ${height} ${label}`;
 }
-

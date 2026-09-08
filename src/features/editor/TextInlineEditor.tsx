@@ -1,13 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Konva from 'konva';
-import {
-  TextNodeElement,
-  DEFAULT_TEXT_STYLE,
-  StyledRange,
-  applyStyleToRange,
-  shiftRangesOnTextEdit,
-} from '../../domain/text';
-import { Unit, ptToScreenPx, convertPtToUnit } from '../../domain/units';
+import { TextNodeElement, DEFAULT_TEXT_STYLE, StyledRange, applyStyleToRange,
+  updateRangesForTextChange, getTextRuns, resolveCssFontFamily } from '../../domain/text';
+import { Unit, convertPtToUnit, convertUnitToPt } from '../../domain/units';
 
 interface TextInlineEditorProps {
   element: TextNodeElement;
@@ -15,228 +10,193 @@ interface TextInlineEditorProps {
   scaleFactor: number;
   canvasUnit?: Unit;
   dpi?: number;
-  onCommit: (newText: string, newRanges?: StyledRange[]) => void;
+  onCommit: (text: string, ranges?: StyledRange[]) => void;
   onCancel: () => void;
 }
 
-export function TextInlineEditor({
-  element,
-  stageRef,
-  scaleFactor,
-  canvasUnit,
-  dpi,
-  onCommit,
-  onCancel,
-}: TextInlineEditorProps) {
-  const [val, setVal] = useState(element.text || '');
-  const [ranges, setRanges] = useState<StyledRange[]>(element.styledRanges || []);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const committedRef = useRef(false);
+type Draft = { text: string; ranges: StyledRange[] };
+type SelectionOffsets = { start: number; end: number };
 
-  const unit = canvasUnit || 'mm';
-  const currentDpi = dpi || 300;
-  const style = { ...DEFAULT_TEXT_STYLE, ...(element.style || {}) };
+function getSelectionOffsets(root: HTMLElement): SelectionOffsets | null {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+  const before = document.createRange();
+  before.selectNodeContents(root);
+  before.setEnd(range.startContainer, range.startOffset);
+  return { start: before.toString().length, end: before.toString().length + range.toString().length };
+}
 
-  const safeCommit = (textToCommit: string) => {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    onCommit(textToCommit, ranges);
-  };
-
-  const safeCancel = () => {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    onCancel();
-  };
-
-  const applyRangeStyle = (patch: Partial<Omit<StyledRange, 'id' | 'start' | 'end'>>) => {
-    if (!textareaRef.current) return;
-    const start = textareaRef.current.selectionStart;
-    const end = textareaRef.current.selectionEnd;
-    if (start >= end) return;
-
-    const nextRanges = applyStyleToRange(ranges, start, end, patch);
-    setRanges(nextRanges);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(start, end);
-      }
-    }, 0);
-  };
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const nextVal = e.target.value;
-    const changeStart = e.target.selectionStart;
-    const removedLen = Math.max(0, val.length - nextVal.length);
-    const insertedLen = Math.max(0, nextVal.length - val.length);
-    const nextRanges = shiftRangesOnTextEdit(ranges, changeStart, removedLen, insertedLen);
-    setVal(nextVal);
-    setRanges(nextRanges);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      e.preventDefault();
-      safeCancel();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      // Ctrl+Enter or Cmd+Enter commits
-      e.stopPropagation();
-      e.preventDefault();
-      safeCommit(val);
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      applyRangeStyle({ fontWeight: 'bold' });
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
-      e.preventDefault();
-      applyRangeStyle({ fontStyle: 'italic' });
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-      e.preventDefault();
-      applyRangeStyle({ textDecoration: 'underline' });
+function restoreSelection(root: HTMLElement, offsets: SelectionOffsets) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  const locate = (offset: number): [Node, number] => {
+    for (const node of nodes) {
+      if (offset <= node.length) return [node, offset];
+      offset -= node.length;
     }
+    const last = nodes[nodes.length - 1];
+    return last ? [last, last.length] : [root, 0];
   };
+  const range = document.createRange();
+  range.setStart(...locate(offsets.start));
+  range.setEnd(...locate(offsets.end));
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
 
-  // Compute exact screen coordinate relative to stage container
-  const stage = stageRef.current;
-  const textGroupNode = stage?.findOne(`#${element.id}`) as Konva.Group | undefined;
+export function TextInlineEditor({ element, stageRef, scaleFactor, canvasUnit = 'mm', dpi = 300, onCommit, onCancel }: TextInlineEditorProps) {
+  const [draft, setDraft] = useState<Draft>({ text: element.text || '', ranges: element.styledRanges || [] });
+  const draftRef = useRef(draft);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const done = useRef(false);
+  const composing = useRef(false);
+  const selectionRef = useRef<SelectionOffsets>({ start: 0, end: draft.text.length });
+  const past = useRef<Draft[]>([]);
+  const future = useRef<Draft[]>([]);
+  const style = { ...DEFAULT_TEXT_STYLE, ...element.style };
+  const unit = canvasUnit;
+  const internalScale = 4;
+  const visualScale = convertPtToUnit(1, unit, dpi) * scaleFactor / internalScale;
+  const width = convertUnitToPt(element.width, unit, dpi) * internalScale;
+  const height = convertUnitToPt(element.height, unit, dpi) * internalScale;
+  const node = stageRef.current?.findOne(`#${element.id}`);
+  const pos = node?.getAbsolutePosition() || { x: element.x * scaleFactor, y: element.y * scaleFactor };
+  const rotation = node?.getAbsoluteRotation() ?? element.rotation;
 
-  const pixelX = Number.isFinite(element.x * scaleFactor) ? element.x * scaleFactor : 0;
-  const pixelY = Number.isFinite(element.y * scaleFactor) ? element.y * scaleFactor : 0;
-  const pixelW = Math.max(40, Number.isFinite(element.width * scaleFactor) ? element.width * scaleFactor : 100);
-  const pixelH = Math.max(30, Number.isFinite(element.height * scaleFactor) ? element.height * scaleFactor : 40);
+  const updateDraft = (next: Draft, selection?: SelectionOffsets) => {
+    if (JSON.stringify(next) !== JSON.stringify(draftRef.current)) {
+      past.current.push(draftRef.current);
+      if (past.current.length > 100) past.current.shift();
+      future.current = [];
+    }
+    draftRef.current = next;
+    if (selection) selectionRef.current = selection;
+    setDraft(next);
+  };
+  const readInput = () => {
+    const root = rootRef.current;
+    if (!root || composing.current) return;
+    const text = root.textContent || '';
+    const selection = getSelectionOffsets(root) || { start: text.length, end: text.length };
+    updateDraft({ text, ranges: updateRangesForTextChange(draftRef.current.ranges, draftRef.current.text, text) }, selection);
+  };
+  const commit = () => {
+    if (done.current || composing.current) return;
+    done.current = true;
+    onCommit(draftRef.current.text, draftRef.current.ranges);
+  };
+  const cancel = () => { if (!done.current) { done.current = true; onCancel(); } };
 
-  let posX = pixelX;
-  let posY = pixelY;
-  let rot = Number.isFinite(element.rotation) ? element.rotation : 0;
+  // Own the editable DOM explicitly. Never parse or inject user-supplied HTML.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || composing.current) return;
+    const fragment = document.createDocumentFragment();
+    const runs = getTextRuns(draft.text, style, draft.ranges);
+    // Legacy markup remains editable as source until it is explicitly converted.
+    const displayRuns = runs.map((run) => run.text).join('') === draft.text ? runs : [{ ...style, text: draft.text }];
+    for (const run of displayRuns) {
+      const span = document.createElement('span');
+      span.textContent = run.text;
+      Object.assign(span.style, {
+        fontFamily: resolveCssFontFamily(run.fontFamily || style.fontFamily),
+        fontSize: `${(run.fontSize || style.fontSize) * internalScale}px`,
+        fontWeight: run.fontWeight || style.fontWeight,
+        fontStyle: run.fontStyle || style.fontStyle,
+        textDecoration: run.textDecoration || style.textDecoration,
+        color: run.fill || style.fill,
+        backgroundColor: run.highlight || 'transparent',
+      });
+      fragment.appendChild(span);
+    }
+    if (!fragment.childNodes.length) fragment.appendChild(document.createTextNode(''));
+    root.replaceChildren(fragment);
+    restoreSelection(root, selectionRef.current);
+  }, [draft]);
 
-  if (textGroupNode) {
-    try {
-      const absPos = textGroupNode.getAbsolutePosition();
-      if (absPos && Number.isFinite(absPos.x) && Number.isFinite(absPos.y)) {
-        posX = absPos.x;
-        posY = absPos.y;
-      }
-      rot = Number.isFinite(textGroupNode.rotation()) ? textGroupNode.rotation() : rot;
-    } catch {}
-  }
-
-  // Safe typographic point size conversion
-  const fontPt = Number.isFinite(style.fontSize) && style.fontSize > 0 ? style.fontSize : 24;
-  const rawFontSizePx = ptToScreenPx(fontPt, unit, currentDpi, scaleFactor);
-  const fontSizePx = Math.max(1, Number.isFinite(rawFontSizePx) ? rawFontSizePx : 16);
-  const isBold = style.fontWeight === 'bold' || Number(style.fontWeight) >= 600;
-  const isItalic = style.fontStyle === 'italic';
-
-  const paddingPt = Number.isFinite(style.padding) ? style.padding : 6;
-  const rawPaddingPx = ptToScreenPx(paddingPt, unit, currentDpi, scaleFactor);
-  const paddingPx = Math.max(2, Math.min(Math.floor(pixelW / 4), Number.isFinite(rawPaddingPx) ? rawPaddingPx : 4));
-
-  const letterSpacingPx = style.letterSpacing
-    ? (convertPtToUnit(style.letterSpacing, unit, currentDpi) * scaleFactor) || 0
-    : 0;
-
-  // Focus & select all on mount without triggering parent scroll
   useEffect(() => {
-    if (textareaRef.current) {
-      try {
-        textareaRef.current.focus({ preventScroll: true });
-        textareaRef.current.select();
-      } catch {
-        textareaRef.current?.focus();
-      }
-    }
+    rootRef.current?.focus({ preventScroll: true });
+    if (rootRef.current) restoreSelection(rootRef.current, selectionRef.current);
   }, []);
 
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'auto',
-        zIndex: 50,
-      }}
-      onClick={(e) => {
-        // Clicking outside the textarea safely commits the edited text
-        if (e.target === e.currentTarget) {
-          safeCommit(val);
-        }
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          left: `${posX}px`,
-          top: `${posY}px`,
-          width: `${pixelW}px`,
-          transform: `rotate(${rot}deg)`,
-          transformOrigin: 'top left',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 51,
-        }}
-      >
-        <style>{`
-          .canvas-inline-editor-textarea::selection {
-            background-color: #2563eb !important;
-            color: #ffffff !important;
-          }
-          .canvas-inline-editor-textarea::-moz-selection {
-            background-color: #2563eb !important;
-            color: #ffffff !important;
-          }
-        `}</style>
-        <textarea
-          ref={textareaRef}
-          className="canvas-inline-editor-textarea"
-          value={val}
-          onChange={handleTextChange}
-          onKeyDown={handleKeyDown}
-          onBlur={() => safeCommit(val)}
-          style={{
-            width: '100%',
-            minHeight: `${pixelH}px`,
-            fontFamily: style.fontFamily || 'Inter',
-            fontSize: `${fontSizePx}px`,
-            fontWeight: isBold ? 'bold' : 'normal',
-            fontStyle: isItalic ? 'italic' : 'normal',
-            color: style.fill || '#f8fafc',
-            textAlign: style.align || 'center',
-            lineHeight: style.lineHeight || 1.3,
-            letterSpacing: `${letterSpacingPx}px`,
-            padding: `${paddingPx}px`,
-            background: 'rgba(15, 23, 42, 0.20)',
-            border: '2px solid var(--color-accent, #3b82f6)',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-            resize: 'vertical',
-            outline: 'none',
-            overflow: 'auto',
-            boxSizing: 'border-box',
-            caretColor: '#60a5fa',
+  const insertText = (text: string) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const selection = getSelectionOffsets(root) || selectionRef.current;
+    const previous = draftRef.current;
+    const nextText = previous.text.slice(0, selection.start) + text + previous.text.slice(selection.end);
+    const cursor = selection.start + text.length;
+    updateDraft({ text: nextText, ranges: updateRangesForTextChange(previous.ranges, previous.text, nextText) }, { start: cursor, end: cursor });
+  };
+  const format = (patch: Partial<Omit<StyledRange, 'id' | 'start' | 'end'>>) => {
+    const selection = rootRef.current && getSelectionOffsets(rootRef.current);
+    if (!selection || selection.start === selection.end) return;
+    updateDraft({ ...draftRef.current, ranges: applyStyleToRange(draftRef.current.ranges, selection.start, selection.end, patch) }, selection);
+  };
+
+  return <div style={{ position: 'absolute', inset: 0, zIndex: 50 }} onPointerDown={(event) => {
+    if (event.target === event.currentTarget) commit();
+  }}>
+    <div style={{ position: 'absolute', left: pos.x, top: pos.y, width: element.width * scaleFactor,
+      height: element.height * scaleFactor, transform: `rotate(${rotation}deg)`, transformOrigin: 'top left',
+      outline: '1px solid var(--color-accent)', background: 'rgba(15,23,42,0.08)' }}>
+      <div style={{ width, minHeight: height, height: style.autoSize === 'height' ? undefined : height,
+        transform: `scale(${visualScale})`, transformOrigin: 'top left', boxSizing: 'border-box',
+        padding: style.padding * internalScale, display: 'flex', flexDirection: 'column', overflow: 'auto',
+        justifyContent: style.verticalAlign === 'middle' ? 'safe center' : style.verticalAlign === 'bottom' ? 'safe flex-end' : 'flex-start' }}>
+        <div ref={rootRef} role="textbox" aria-label="Edit album text" aria-multiline="true" contentEditable={!element.locked}
+          suppressContentEditableWarning spellCheck={false}
+          onInput={readInput}
+          onCompositionStart={() => { composing.current = true; }}
+          onCompositionEnd={() => { composing.current = false; readInput(); }}
+          onBeforeInput={(event) => {
+            const input = event.nativeEvent as InputEvent;
+            if (!composing.current && (input.inputType === 'insertParagraph' || input.inputType === 'insertLineBreak')) {
+              event.preventDefault(); insertText('\n');
+            }
           }}
-        />
-        <div
-          style={{
-            alignSelf: 'flex-end',
-            marginTop: '4px',
-            padding: '2px 6px',
-            fontSize: '10px',
-            fontWeight: 600,
-            borderRadius: '3px',
-            background: 'rgba(15, 23, 42, 0.65)',
-            color: '#94a3b8',
-            border: '1px solid rgba(51, 65, 85, 0.6)',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
+          onPaste={(event) => { event.preventDefault(); insertText(event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n')); }}
+          onDrop={(event) => event.preventDefault()}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.nativeEvent.isComposing || composing.current) return;
+            const mod = event.ctrlKey || event.metaKey;
+            const key = event.key.toLowerCase();
+            if (key === 'escape') { event.preventDefault(); cancel(); }
+            else if (key === 'enter') { event.preventDefault(); if (mod) commit(); else insertText('\n'); }
+            else if (mod && ['b', 'i', 'u'].includes(key)) {
+              event.preventDefault();
+              format(key === 'b' ? { fontWeight: 'bold' } : key === 'i' ? { fontStyle: 'italic' } : { textDecoration: 'underline' });
+            } else if (mod && (key === 'z' || key === 'y')) {
+              event.preventDefault();
+              const redo = key === 'y' || event.shiftKey;
+              const source = redo ? future : past;
+              const destination = redo ? past : future;
+              const next = source.current.pop();
+              if (next) {
+                destination.current.push(draftRef.current);
+                draftRef.current = next;
+                selectionRef.current = { start: next.text.length, end: next.text.length };
+                setDraft(next);
+              }
+            }
           }}
-        >
-          Ctrl+Enter apply · Esc cancel
-        </div>
+          style={{ flexShrink: 0, minHeight: style.fontSize * style.lineHeight * internalScale,
+            fontFamily: resolveCssFontFamily(style.fontFamily), fontSize: style.fontSize * internalScale,
+            lineHeight: style.lineHeight, letterSpacing: style.letterSpacing * internalScale,
+            textAlign: style.align, whiteSpace: style.wordWrap === 'none' ? 'pre' : 'pre-wrap',
+            overflowWrap: 'anywhere', wordBreak: style.wordWrap === 'char' ? 'break-all' : 'normal',
+            color: style.fill, outline: 'none', caretColor: 'var(--color-accent)' }} />
+      </div>
+      <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, whiteSpace: 'nowrap', fontSize: 10,
+        color: '#cbd5e1', background: '#0f172a', padding: '3px 6px', pointerEvents: 'none' }}>
+        Ctrl+Enter apply · Esc cancel
       </div>
     </div>
-  );
+  </div>;
 }

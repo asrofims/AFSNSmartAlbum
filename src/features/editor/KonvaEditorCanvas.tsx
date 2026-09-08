@@ -28,7 +28,7 @@ import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
-import { TextNodeElement, calculateTextFitHeight, calculateTextFitDimensions } from '../../domain/text';
+import { TextNodeElement, fitTextFrame } from '../../domain/text';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -1486,32 +1486,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           if (selEl && selEl.type === 'text') {
             e.preventDefault();
             const textEl = selEl as TextNodeElement;
-            const maxTextW = currentProject ? currentProject.canvasWidth * 0.95 : 800;
-            const fitted = calculateTextFitDimensions(
-              textEl.text || ' ',
-              textEl.style || {},
-              dims.unit,
-              dims.dpi,
-              textEl.width,
-              maxTextW,
-              textEl.styledRanges
-            );
-            const deltaW = textEl.width - fitted.width;
-
-            let newX = textEl.x;
-            if (textEl.style?.align === 'center') {
-              newX = textEl.x + deltaW / 2;
-            } else if (textEl.style?.align === 'right') {
-              newX = textEl.x + deltaW;
-            }
-
-            // Keep top edge anchored at textEl.y so text NEVER jumps or shifts downwards!
-            updateTextElement(activeSpread.id, textEl.id, {
-              x: roundToHundredth(newX),
-              y: roundToHundredth(textEl.y),
-              width: fitted.width,
-              height: fitted.height,
-            });
+            if (textEl.locked) return;
+            updateTextElement(activeSpread.id, textEl.id, fitTextFrame(textEl, 'content', dims.unit, dims.dpi, currentProject?.canvasWidth));
             if (onToast) onToast('✓ Fitted frame tightly around text content');
             return;
           }
@@ -2835,7 +2811,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       openContextMenuAt(e.evt.clientX, e.evt.clientY);
                     }}
                     onElementChange={(updates, skipHistory) => updateTextElement(activeSpread.id, textEl.id, updates, skipHistory)}
-                    onDoubleClick={() => setEditingTextElementId(textEl.id)}
+                    onDoubleClick={() => { if (!textEl.locked) setEditingTextElementId(textEl.id); }}
                   />
                 );
               }
@@ -3158,7 +3134,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 // For text box: corner handles scale box and font proportionally (keepRatio: true) unless Shift is pressed.
                 // Side handles (middle-left, middle-right, top-center, bottom-center) allow free unconstrained width/height reflow.
                 if (isSingleTextSelected) {
-                  tr.keepRatio(isCorner ? !isShiftPressed : false);
+                  tr.keepRatio(isCorner);
                 } else {
                   tr.keepRatio(isCorner || selectedFrameIds.length > 1);
                 }
@@ -3398,6 +3374,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                 }
               }}
               boundBoxFunc={(oldBox, newBox) => {
+                const singleText = selectedFrameIds.length === 1 && activeSpread.elements.find((el) => el.id === selectedFrameIds[0])?.type === 'text';
+                if (singleText) return newBox.width > 0 && newBox.height > 0 ? newBox : oldBox;
                 if (newBox.width < 4 || newBox.height < 4) {
                   return oldBox;
                 }
@@ -3761,18 +3739,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             onCommit={(newText, newRanges) => {
               const currentId = editingTextElement?.id;
               if (currentId) {
-                const boxW = editingTextElement.width;
-                const fittedH = calculateTextFitHeight(
-                  newText,
-                  editingTextElement.style || {},
-                  boxW,
-                  dims.unit,
-                  dims.dpi,
-                  newRanges
-                );
                 updateTextElement(activeSpread.id, currentId, {
                   text: newText,
-                  height: fittedH,
                   ...(newRanges !== undefined ? { styledRanges: newRanges } : {}),
                 });
               }

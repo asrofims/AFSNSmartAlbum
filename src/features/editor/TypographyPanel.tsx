@@ -10,15 +10,13 @@ import {
   TEXT_PRESETS,
   TextPresetKey,
   applyTextPreset,
-  calculateTextFitDimensions,
-  calculateTextFitHeight,
+  fitTextFrame,
   DEFAULT_TEXT_STYLE,
   StyledRange,
   applyStyleToRange,
   removeStyleRange,
-  shiftRangesOnTextEdit,
+  updateRangesForTextChange,
 } from '../../domain/text';
-import { roundToHundredth } from '../../domain/editor';
 import { ColorPicker } from '../../components/ui/ColorPicker';
 
 interface TypographyPanelProps {
@@ -98,6 +96,15 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
     return { curated, system };
   }, [fontSearch, systemFonts]);
 
+  const gestureStarted = useRef(false);
+  useEffect(() => { gestureStarted.current = false; }, [element.id]);
+  const beginGesture = () => {
+    if (gestureStarted.current || element.locked) return;
+    const album = useAlbumStore.getState().currentAlbum;
+    if (album) useHistoryStore.getState().pushState(album);
+    gestureStarted.current = true;
+  };
+  const endGesture = () => { gestureStarted.current = false; };
   if (!activeSpreadId) return null;
 
   const handleApplyRangeToPanel = (patch: Partial<Omit<StyledRange, 'id' | 'start' | 'end'>>) => {
@@ -121,28 +128,8 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const style = { ...DEFAULT_TEXT_STYLE, ...(element.style || {}) };
 
   const handleUpdateStyle = (updates: Partial<typeof style>, skipHistory: boolean = false) => {
-    let nextHeight = element.height;
-    if (updates.fontSize && updates.fontSize > (style.fontSize || 24)) {
-      const fittedH = calculateTextFitHeight(
-        element.text || ' ',
-        { ...style, ...updates },
-        element.width,
-        currentProject?.canvasUnit || 'mm',
-        currentProject?.canvasDpi || 300,
-        element.styledRanges
-      );
-      if (fittedH > element.height) {
-        nextHeight = fittedH;
-      }
-    }
-
-    updateTextElement(activeSpreadId, element.id, {
-      height: nextHeight,
-      style: {
-        ...style,
-        ...updates,
-      },
-    }, skipHistory);
+    if (skipHistory) beginGesture();
+    updateTextElement(activeSpreadId, element.id, { style: { ...style, ...updates } }, skipHistory);
   };
 
   const handleApplyPreset = (presetKey: TextPresetKey) => {
@@ -162,67 +149,20 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
     }
   };
 
-  // 1. Fit Height Only (Preserve Column Width) — Ideal for Paragraphs & Captions
-  const handleFitHeightOnly = () => {
-    const fittedH = calculateTextFitHeight(
-      element.text || ' ',
-      style,
-      element.width,
-      currentProject?.canvasUnit || 'mm',
-      currentProject?.canvasDpi || 300,
-      element.styledRanges
-    );
-
-    // Keep top edge anchored at element.y so text NEVER jumps or shifts downwards!
-    updateTextElement(activeSpreadId, element.id, {
-      y: roundToHundredth(element.y),
-      height: fittedH,
-    });
-    if (onToast) {
-      onToast('✓ Fitted frame height to text (width preserved)');
-    }
+  const handleFit = (mode: 'height' | 'content') => {
+    updateTextElement(activeSpreadId, element.id, fitTextFrame(element, mode,
+      currentProject?.canvasUnit || 'mm', currentProject?.canvasDpi || 300,
+      currentProject?.canvasWidth));
   };
-
-  // 2. Fit Frame to Content (Hug Width & Height) — Ideal for Titles, Dates, Badges
-  const handleFitBothWidthAndHeight = () => {
-    const maxTextW = currentProject ? currentProject.canvasWidth * 0.95 : 800;
-    const fitted = calculateTextFitDimensions(
-      element.text || ' ',
-      style,
-      currentProject?.canvasUnit || 'mm',
-      currentProject?.canvasDpi || 300,
-      element.width,
-      maxTextW,
-      element.styledRanges
-    );
-
-    const deltaW = element.width - fitted.width;
-
-    let newX = element.x;
-    if (style.align === 'center') {
-      newX = element.x + deltaW / 2;
-    } else if (style.align === 'right') {
-      newX = element.x + deltaW;
-    }
-
-    // Keep top edge anchored at element.y so text NEVER jumps or shifts downwards!
-    updateTextElement(activeSpreadId, element.id, {
-      x: roundToHundredth(newX),
-      y: roundToHundredth(element.y),
-      width: fitted.width,
-      height: fitted.height,
-    });
-    if (onToast) {
-      onToast('✓ Fitted frame tightly around text content');
-    }
-  };
+  const handleFitHeightOnly = () => handleFit('height');
+  const handleFitBothWidthAndHeight = () => handleFit('content');
 
   const isBold = style.fontWeight === 'bold' || Number(style.fontWeight) >= 600;
   const isItalic = style.fontStyle === 'italic';
   const isUnderline = style.textDecoration === 'underline';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px 4px' }}>
+    <fieldset disabled={Boolean(element.locked)} style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px 4px', margin: 0, minWidth: 0, border: 0 }}>
       {/* 1. Header & Icon Actions Underneath */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.3px' }}>
@@ -304,6 +244,18 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
         </div>
       </div>
 
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+        Auto Size
+        <select aria-label="Text frame auto size" value={style.autoSize || 'off'}
+          onChange={(e) => handleUpdateStyle({ autoSize: e.target.value as 'off' | 'height' })}>
+          <option value="off">Off (Fixed Frame)</option>
+          <option value="height">Height Only</option>
+        </select>
+      </label>
+      <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+        Side handles resize the frame. Corner handles scale the text. A red + indicates overflow.
+      </div>
+
       {/* 2. Direct Content Input Field with Quick Rich Format Bar */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -380,25 +332,11 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
           value={element.text || ''}
           onChange={(e) => {
             const next = e.target.value;
-            const changeStart = e.target.selectionStart;
-            const prev = element.text || '';
-            const removedLen = Math.max(0, prev.length - next.length);
-            const insertedLen = Math.max(0, next.length - prev.length);
-            const nextRanges = shiftRangesOnTextEdit(element.styledRanges, changeStart, removedLen, insertedLen);
-
+            if (next === element.text) return;
+            beginGesture();
+            const nextRanges = updateRangesForTextChange(element.styledRanges, element.text || '', next);
             setEditingTextElementId(null);
-            const fittedH = calculateTextFitHeight(
-              next,
-              element.style || {},
-              element.width,
-              currentProject?.canvasUnit || 'mm',
-              currentProject?.canvasDpi || 300
-            );
-            updateTextElement(activeSpreadId, element.id, {
-              text: next,
-              styledRanges: nextRanges,
-              height: fittedH,
-            }, true);
+            updateTextElement(activeSpreadId, element.id, { text: next, styledRanges: nextRanges }, true);
           }}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
@@ -412,10 +350,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               handleApplyRangeToPanel({ textDecoration: 'underline' });
             }
           }}
-          onBlur={() => {
-            const currentAlbum = useAlbumStore.getState().currentAlbum;
-            if (currentAlbum) useHistoryStore.getState().pushState(currentAlbum);
-          }}
+          onBlur={endGesture}
           placeholder="Enter album text..."
           rows={3}
           style={{
@@ -737,14 +672,14 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
           <input
             type="range"
             min={1}
-            max={120}
-            step={1}
+            max={200}
+            step={0.1}
             value={style.fontSize || 24}
             onChange={(e) => handleUpdateStyle({ fontSize: Math.max(1, Number(e.target.value)) }, true)}
-            onPointerUp={() => {
-              const currentAlbum = useAlbumStore.getState().currentAlbum;
-              if (currentAlbum) useHistoryStore.getState().pushState(currentAlbum);
-            }}
+            onPointerUp={endGesture}
+            onPointerCancel={endGesture}
+            onBlur={endGesture}
+            onKeyUp={endGesture}
             style={{ flex: 1, cursor: 'pointer' }}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -755,7 +690,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               onChange={(e) => {
                 const raw = e.target.value;
                 if (raw === '') return;
-                const val = parseInt(raw, 10);
+                const val = parseFloat(raw);
                 if (Number.isFinite(val)) {
                   handleUpdateStyle({ fontSize: Math.max(1, Math.min(200, val)) });
                 }
@@ -1089,6 +1024,6 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
           />
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 }

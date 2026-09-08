@@ -1,5 +1,5 @@
 import { TextStyle, TextRun, resolveCssFontFamily } from './text';
-import { Unit, ptToScreenPx, convertPtToUnit } from './units';
+import { Unit, ptToScreenPx, convertPtToUnit, convertUnitToPt } from './units';
 
 export interface MeasuredToken {
   text: string;
@@ -18,6 +18,7 @@ export interface MeasuredToken {
   fontStr: string;
   x: number;
   yBaseline: number;
+  letterSpacing: number;
 }
 
 export interface RenderedLine {
@@ -37,6 +38,7 @@ export interface RichTextLayout {
   paddingPx: number;
   boxWidth: number;
   boxHeight: number;
+  overflow: boolean;
 }
 
 // Offscreen canvas context for measurement
@@ -65,9 +67,10 @@ export function layoutRichText(
   const paddingPt = Number.isFinite(baseStyle.padding) ? (baseStyle.padding as number) : 4;
   const paddingInUnit = convertPtToUnit(paddingPt, canvasUnit, dpi);
   const paddingPx = Math.max(0, paddingInUnit * scaleFactor);
-  const availableWidth = Math.max(1, boxWidth - 2 * paddingPx);
-  const availableHeight = Math.max(1, boxHeight - 2 * paddingPx);
+  const availableWidth = Math.max(0.001, boxWidth - 2 * paddingPx);
+  const availableHeight = Math.max(0, boxHeight - 2 * paddingPx);
 
+  const tracking = convertPtToUnit(baseStyle.letterSpacing || 0, canvasUnit, dpi) * scaleFactor;
   // 1. Tokenize runs into atomic words, spaces, and newlines
   const rawTokens: Array<{
     text: string;
@@ -84,7 +87,7 @@ export function layoutRichText(
   for (const run of runs) {
     const fontPt = Number.isFinite(run.fontSize) && (run.fontSize || 0) > 0 ? (run.fontSize as number) : (baseStyle.fontSize || 24);
     const rawSize = ptToScreenPx(fontPt, canvasUnit, dpi, scaleFactor);
-    const fontSizePx = Math.max(1, Number.isFinite(rawSize) ? rawSize : 16);
+    const fontSizePx = Math.max(0.001, Number.isFinite(rawSize) ? rawSize : 16);
 
     const fFamily = run.fontFamily || baseStyle.fontFamily || 'Inter';
     const fWeight = run.fontWeight || baseStyle.fontWeight || 'normal';
@@ -96,7 +99,7 @@ export function layoutRichText(
     }
 
     // Split run text into words, whitespace, and newlines
-    const parts = run.text.split(/(\n|\s+)/);
+    const parts = run.text.replace(/\r\n?/g, '\n').split(/(\n|[^\S\n]+)/);
     for (const part of parts) {
       if (!part) continue;
       const isNewline = part === '\n';
@@ -123,6 +126,8 @@ export function layoutRichText(
       } else if (!isNewline) {
         w = part.length * (fontSizePx * 0.55);
       }
+
+      if (!isNewline) w = measureTrackedText(ctx, part, fontStr, fontSizePx, tracking);
 
       rawTokens.push({
         text: part,
@@ -167,7 +172,7 @@ export function layoutRichText(
       return;
     }
 
-    // Trim trailing whitespace token width from line width calculation
+    // Ignore trailing break spaces when aligning the visible line.
     let trimmedWidth = currentLineWidth;
     const lastToken = currentLineTokens[currentLineTokens.length - 1];
     if (lastToken && lastToken.isSpace) {
@@ -189,33 +194,35 @@ export function layoutRichText(
     currentMaxLineHeight = 0;
   };
 
+  const append = (token: (typeof rawTokens)[0]) => {
+    currentLineTokens.push(token);
+    currentLineWidth += token.width + (currentLineTokens.length > 1 ? tracking : 0);
+    currentMaxAscent = Math.max(currentMaxAscent, token.ascent);
+    currentMaxDescent = Math.max(currentMaxDescent, token.descent);
+    currentMaxLineHeight = Math.max(currentMaxLineHeight, token.fontSizePx * (baseStyle.lineHeight || 1.3), token.ascent + token.descent);
+  };
   const shouldWrap = baseStyle.wordWrap !== 'none';
-
+  let endsWithNewline = false;
   for (const token of rawTokens) {
+    endsWithNewline = token.isNewline;
     if (token.isNewline) {
       pushCurrentLine();
       continue;
     }
-
-    const tokenLineH = token.fontSizePx * (baseStyle.lineHeight || 1.3);
-
-    if (shouldWrap && currentLineTokens.length > 0 && currentLineWidth + token.width > availableWidth) {
-      // Exceeds available width -> break line if not whitespace
-      if (!token.isSpace) {
-        pushCurrentLine();
-      }
+    if (shouldWrap && !token.isSpace && currentLineTokens.length > 0 && currentLineWidth + tracking + token.width > availableWidth + 1e-6) {
+      pushCurrentLine();
     }
-
-    currentLineTokens.push(token);
-    currentLineWidth += token.width;
-    currentMaxAscent = Math.max(currentMaxAscent, token.ascent);
-    currentMaxDescent = Math.max(currentMaxDescent, token.descent);
-    currentMaxLineHeight = Math.max(currentMaxLineHeight, tokenLineH);
+    if (shouldWrap && !token.isSpace && (baseStyle.wordWrap === 'char' || token.width > availableWidth)) {
+      for (const char of splitGraphemes(token.text)) {
+        const width = measureTrackedText(ctx, char, token.fontStr, token.fontSizePx, 0);
+        if (currentLineTokens.length > 0 && currentLineWidth + tracking + width > availableWidth + 1e-6) pushCurrentLine();
+        append({ ...token, text: char, width });
+      }
+    } else {
+      append(token);
+    }
   }
-
-  if (currentLineTokens.length > 0) {
-    pushCurrentLine();
-  }
+  if (currentLineTokens.length > 0 || endsWithNewline || lines.length === 0) pushCurrentLine();
 
   // 3. Compute Vertical Alignment
   let totalContentHeight = 0;
@@ -267,9 +274,10 @@ export function layoutRichText(
         fontStr: tok.fontStr,
         x: tokenX,
         yBaseline: baseline,
+        letterSpacing: tracking,
       });
 
-      tokenX += tok.width;
+      tokenX += tok.width + tracking;
     }
 
     renderedLines.push({
@@ -292,6 +300,7 @@ export function layoutRichText(
     paddingPx,
     boxWidth,
     boxHeight,
+    overflow: totalContentHeight > availableHeight + 1e-6 || lines.some((line) => line.width > availableWidth + 1e-6),
   };
 }
 
@@ -300,6 +309,9 @@ export function layoutRichText(
  */
 export function drawRichTextLayout(ctx: CanvasRenderingContext2D, layout: RichTextLayout): void {
   ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, layout.boxWidth, layout.boxHeight);
+  ctx.clip();
 
   // 1. Pass 1: Render background highlights for all tokens
   for (const line of layout.lines) {
@@ -330,7 +342,15 @@ export function drawRichTextLayout(ctx: CanvasRenderingContext2D, layout: RichTe
 
       ctx.font = tok.fontStr;
       ctx.fillStyle = tok.fill;
-      ctx.fillText(tok.text, tok.x, tok.yBaseline);
+      if (!tok.letterSpacing) {
+        ctx.fillText(tok.text, tok.x, tok.yBaseline);
+      } else {
+        let x = tok.x;
+        for (const char of splitGraphemes(tok.text)) {
+          ctx.fillText(char, x, tok.yBaseline);
+          x += ctx.measureText(char).width + tok.letterSpacing;
+        }
+      }
 
       // Text decorations
       if (tok.textDecoration === 'underline') {
@@ -357,15 +377,24 @@ export function calculateRichTextFitHeight(
   dpi: number = 300,
   scaleFactor: number = 1.0
 ): number {
-  const pixelW = convertPtToUnit(boxWidthInCanvasUnit, canvasUnit, dpi) * scaleFactor;
-  const dummyPixelH = 2000; // ample height for layout
-  const layout = layoutRichText(runs, baseStyle, pixelW, dummyPixelH, scaleFactor, canvasUnit, dpi);
+  void scaleFactor;
+  const widthPt = convertUnitToPt(boxWidthInCanvasUnit, canvasUnit, dpi);
+  const layout = layoutRichText(runs, baseStyle, widthPt, 1e7, 72, 'inch', dpi);
+  return convertPtToUnit(layout.totalHeight + 2 * layout.paddingPx, canvasUnit, dpi);
+}
 
-  const neededPixelH = layout.totalHeight + 2 * layout.paddingPx;
-  // Convert screen px back to canvasUnit
-  const pxPerCanvasUnit = convertPtToUnit(1, canvasUnit, dpi) * scaleFactor;
-  if (pxPerCanvasUnit <= 0) return boxWidthInCanvasUnit;
+export function splitGraphemes(text: string): string[] {
+  // Intl.Segmenter is present in WebView2; fallback keeps Unicode code points intact.
+  const Segmenter = (Intl as unknown as { Segmenter?: new (locale?: string, options?: { granularity: string }) => { segment: (value: string) => Iterable<{ segment: string }> } }).Segmenter;
+  return Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (item) => item.segment) : Array.from(text);
+}
 
-  const resultInUnit = neededPixelH / pxPerCanvasUnit;
-  return Math.max(10, Math.round(resultInUnit * 10) / 10);
+function measureTrackedText(ctx: CanvasRenderingContext2D, text: string, font: string, size: number, tracking: number): number {
+  const measure = (value: string) => {
+    if (ctx.measureText) { ctx.font = font; return ctx.measureText(value).width; }
+    return Array.from(value).length * size * 0.55;
+  };
+  if (!tracking) return measure(text);
+  const chars = splitGraphemes(text);
+  return Math.max(0, chars.reduce((width, char) => width + measure(char), 0) + Math.max(0, chars.length - 1) * tracking);
 }

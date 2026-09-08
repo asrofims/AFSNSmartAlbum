@@ -24,8 +24,9 @@ import {
   TextStyle,
   TextPresetKey,
   calculateTextFitDimensions,
-  DEFAULT_TEXT_STYLE,
+  updateTextNode,
 } from '../domain/text';
+import { convertUnit } from '../domain/units';
 import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import { useAlbumStore } from './albumStore';
 import { useProjectStore } from './projectStore';
@@ -452,56 +453,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const currentProject = useProjectStore.getState().currentProject;
     if (!currentAlbum || !currentProject) return '';
 
-    useHistoryStore.getState().pushState(currentAlbum);
-
-    const isCover = currentAlbum.coverSpread.id === spreadId;
-    const targetSpread = isCover
-      ? currentAlbum.coverSpread
-      : currentAlbum.spreads.find((s) => s.id === spreadId);
-
-    const pageW = currentProject.canvasWidth;
-    const pageH = currentProject.canvasHeight;
-    const gutterW = targetSpread?.gutterWidth || 0;
+    const targetSpread = getAllAlbumSpreads(currentAlbum).find((spread) => spread.id === spreadId);
+    if (!targetSpread) return '';
     const canvasUnit = currentProject.canvasUnit;
     const dpi = currentProject.canvasDpi || 300;
-
-    // Calculate snug box dimensions fitting the font and text content tightly
-    const initialText = options?.text ?? 'Add a title or story here';
-    const mergedStyle = { ...DEFAULT_TEXT_STYLE, ...(options?.style || {}) };
-    const fittedDims = calculateTextFitDimensions(
-      initialText,
-      mergedStyle,
-      canvasUnit,
-      dpi,
-      pageW * 0.8
-    );
-
-    const node = createTextNode({
-      text: initialText,
-      preset: options?.preset,
-      style: options?.style,
-      width: options?.width ?? fittedDims.width,
-      height: options?.height ?? fittedDims.height,
-      unit: canvasUnit,
-      dpi,
-    });
-
-    // Elegant positioning:
-    // If a 2-page spread: center cleanly on the right page to avoid cutting across the spine fold
-    // If cover: center horizontally on the single cover page
-    // Place at 35% from the top
-    let defaultX: number;
-    if (isCover) {
-      defaultX = Math.max(10, Math.round(((pageW - node.width) / 2) * 10) / 10);
-    } else {
-      defaultX = Math.round((pageW + gutterW + Math.max(0, (pageW - node.width) / 2)) * 10) / 10;
-    }
-    const defaultY = Math.max(10, Math.round((pageH * 0.35) * 10) / 10);
-
-    const posX = options?.x ?? defaultX;
-    const posY = options?.y ?? defaultY;
-    node.x = posX;
-    node.y = posY;
+    const pageW = currentProject.canvasWidth;
+    const pageH = currentProject.canvasHeight;
+    const gutterW = convertUnit(targetSpread.gutterWidth, targetSpread.gutterUnit, canvasUnit, dpi, 8);
+    const margin = (value: number) => convertUnit(value, currentProject.marginUnit || canvasUnit, canvasUnit, dpi, 8);
+    const left = Math.min(pageW / 3, Math.max(0, margin(targetSpread.safeAreaSpine ?? targetSpread.safeArea)));
+    const right = Math.min(pageW / 3, Math.max(0, margin(targetSpread.safeAreaOutside ?? targetSpread.safeArea)));
+    const top = Math.min(pageH / 3, Math.max(0, margin(targetSpread.safeAreaTop ?? targetSpread.safeArea)));
+    const bottom = Math.min(pageH / 3, Math.max(0, margin(targetSpread.safeAreaBottom ?? targetSpread.safeArea)));
+    const usableW = pageW - left - right;
+    const usableH = pageH - top - bottom;
+    const node = createTextNode({ ...options, unit: canvasUnit, dpi,
+      text: options?.text ?? (options?.preset ? undefined : 'Add a title or story here') });
+    const fitted = calculateTextFitDimensions(node.text, node.style, canvasUnit, dpi, options?.width ?? usableW * 0.8, usableW);
+    node.width = options?.width ?? Math.min(usableW, fitted.width);
+    node.height = options?.height ?? Math.min(usableH, fitted.height);
+    // Front/right page for a spread, or the only page for a single-page document.
+    const pageX = targetSpread.leftPage && targetSpread.rightPage ? pageW + gutterW : 0;
+    node.x = options?.x ?? pageX + left + Math.max(0, (usableW - node.width) / 2);
+    node.y = options?.y ?? top + Math.max(0, Math.min(usableH - node.height, usableH * 0.35));
+    useHistoryStore.getState().pushState(currentAlbum);
 
     if (currentAlbum.coverSpread.id === spreadId) {
       const existing = currentAlbum.coverSpread.elements || [];
@@ -544,21 +519,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum) return;
 
-    if (!skipHistory) {
-      useHistoryStore.getState().pushState(currentAlbum);
-    }
-
-    const updateFn = (elem: any): any => {
-      if (elem.id !== elementId || elem.type !== 'text') return elem;
-      const nextStyle = 'style' in updates && updates.style
-        ? { ...elem.style, ...updates.style }
-        : elem.style;
-      return {
-        ...elem,
-        ...updates,
-        style: nextStyle,
-      };
-    };
+    const spread = getAllAlbumSpreads(currentAlbum).find((item) => item.id === spreadId);
+    const original = spread?.elements.find((item) => item.id === elementId);
+    if (!original || original.type !== 'text' || original.locked) return;
+    const project = useProjectStore.getState().currentProject;
+    const next = updateTextNode(original, updates, project?.canvasUnit || 'mm', project?.canvasDpi || 300);
+    if (JSON.stringify(original) === JSON.stringify(next)) return;
+    if (!skipHistory) useHistoryStore.getState().pushState(currentAlbum);
+    const updateFn = (elem: AlbumElement): AlbumElement => elem.id === elementId ? next : elem;
 
     if (currentAlbum.coverSpread.id === spreadId) {
       const updatedCover = {

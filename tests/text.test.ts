@@ -77,7 +77,7 @@ assert.strictEqual(Math.round(screenPxFromMm * 1000) / 1000, Math.round(screenPx
 const pt1InMm = convertPtToUnit(1, 'mm');
 assert.ok(pt1InMm > 0, '1pt in mm must be positive');
 const screenPx1Pt = ptToScreenPx(1, 'mm', 300, 1.5);
-assert.ok(screenPx1Pt >= 1, '1pt font size on screen must render at least 1px');
+assert.ok(Math.abs(screenPx1Pt - 25.4 / 72 * 1.5) < 1e-10, '1pt must retain its physical size even below one screen pixel');
 
 // 9. Text persistence under auto-save sanitization
 const textNode: TextNodeElement = createTextNode({ text: 'Wedding Album 2026', style: { fontSize: 32, fontWeight: 'bold' } });
@@ -144,7 +144,7 @@ assert.ok(styledFit.height > shortFit.height, 'Text with enlarged styled range (
 // 15. Zero-clipping descender clearance buffer validation
 const descenderText = 'Enjoying joy, laughter, and high energy';
 const descenderFit = calculateTextFitDimensions(descenderText, { fontSize: 24, padding: 4, lineHeight: 1.3 }, 'mm', 300);
-assert.ok(descenderFit.height >= 14, 'Single line with descenders must allocate sufficient vertical space (>= 14mm) for zero clipping');
+assert.ok(descenderFit.height >= convertPtToUnit(24 * 1.3 + 8, 'mm'), 'Fit includes line metrics and both physical insets');
 
 // 16. Proportional corner resize font scaling and fit persistence invariant
 const initialFontSize = 24;

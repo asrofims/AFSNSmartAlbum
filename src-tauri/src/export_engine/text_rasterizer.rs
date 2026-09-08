@@ -108,9 +108,9 @@ pub struct TextRunPayload {
 }
 
 /// Global thread-safe cache of loaded fontdue Fonts: key is (family_lower, is_bold, is_italic)
-static FONT_CACHE: OnceLock<Mutex<HashMap<(String, bool, bool), Option<Arc<Font>>>>> = OnceLock::new();
+static FONT_CACHE: OnceLock<Mutex<HashMap<(String, u16, bool), Option<Arc<Font>>>>> = OnceLock::new();
 
-fn get_font_cache() -> &'static Mutex<HashMap<(String, bool, bool), Option<Arc<Font>>>> {
+fn get_font_cache() -> &'static Mutex<HashMap<(String, u16, bool), Option<Arc<Font>>>> {
     FONT_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -424,7 +424,12 @@ fn resolve_font_path(family: &str, is_bold: bool, is_italic: bool) -> Option<Pat
 
 /// Load or retrieve font from memory cache
 pub fn get_or_load_font(family: &str, is_bold: bool, is_italic: bool) -> Option<Arc<Font>> {
-    let key = (family.to_lowercase(), is_bold, is_italic);
+    load_font_weight(family, if is_bold { 700 } else { 400 }, is_italic)
+}
+
+fn load_font_weight(family: &str, weight: u16, is_italic: bool) -> Option<Arc<Font>> {
+    let is_bold = weight >= 600;
+    let key = (family.to_lowercase(), weight, is_italic);
     let cache = get_font_cache();
     {
         let guard = cache.lock().unwrap();
@@ -433,7 +438,9 @@ pub fn get_or_load_font(family: &str, is_bold: bool, is_italic: bool) -> Option<
         }
     }
 
-    let loaded = if let Some(path) = resolve_font_path(family, is_bold, is_italic) {
+    let loaded = if let Some(bytes) = super::bundled_fonts::bundled_font(family, weight, is_italic) {
+        Font::from_bytes(bytes, FontSettings::default()).ok().map(Arc::new)
+    } else if let Some(path) = resolve_font_path(family, is_bold, is_italic) {
         match fs::read(&path) {
             Ok(bytes) => {
                 match Font::from_bytes(bytes, FontSettings::default()) {
@@ -491,7 +498,7 @@ struct MeasuredToken {
     is_newline: bool,
     font_family: String,
     font_size_px: f32,
-    is_bold: bool,
+    font_weight: u16,
     is_italic: bool,
     text_decoration: String,
     fill: Rgba<u8>,
@@ -519,6 +526,9 @@ fn ranges_to_text_runs(
 ) -> Vec<TextRunPayload> {
     let chars: Vec<char> = text.chars().collect();
     let total_len = chars.len();
+    let mut utf16_offsets = Vec::with_capacity(total_len + 1);
+    utf16_offsets.push(0usize);
+    for ch in &chars { utf16_offsets.push(utf16_offsets.last().copied().unwrap_or(0) + ch.len_utf16()); }
     if total_len == 0 {
         return Vec::new();
     }
@@ -563,7 +573,7 @@ fn ranges_to_text_runs(
         let mut char_highlight = None;
 
         for r in ranges {
-            if current_char_idx >= r.start && current_char_idx < r.end {
+            if utf16_offsets[current_char_idx] >= r.start && utf16_offsets[current_char_idx] < r.end {
                 if let Some(ref f) = r.font_family { char_family = f.clone(); }
                 if let Some(s) = r.font_size { char_size = s; }
                 if let Some(ref w) = r.font_weight { char_weight = w.clone(); }
@@ -586,7 +596,7 @@ fn ranges_to_text_runs(
             let mut next_highlight = None;
 
             for r in ranges {
-                if end_char_idx >= r.start && end_char_idx < r.end {
+                if utf16_offsets[end_char_idx] >= r.start && utf16_offsets[end_char_idx] < r.end {
                     if let Some(ref f) = r.font_family { next_family = f.clone(); }
                     if let Some(s) = r.font_size { next_size = s; }
                     if let Some(ref w) = r.font_weight { next_weight = w.clone(); }
@@ -695,17 +705,18 @@ pub fn render_text_element(
     // Calculate padding in export pixels (1pt = dpi / 72.0 px)
     let dpi_f = dpi as f64;
     let pt_to_px = (dpi_f / 72.0) as f32;
-    let raw_padding_px = (base_style.padding as f32 * pt_to_px).max(2.0);
-    let padding_px = raw_padding_px.min(frame_px_w as f32 / 4.0).max(2.0);
-    let available_w = (frame_px_w as f32 - 2.0 * padding_px).max(10.0);
-    let available_h = (frame_px_h as f32 - 2.0 * padding_px).max(10.0);
+    let raw_padding_px = (base_style.padding as f32 * pt_to_px).max(0.0);
+    let padding_px = raw_padding_px;
+    let available_w = (frame_px_w as f32 - 2.0 * padding_px).max(0.001);
+    let available_h = (frame_px_h as f32 - 2.0 * padding_px).max(0.001);
 
+    let tracking = base_style.letter_spacing as f32 * pt_to_px;
     // 1. Tokenize runs into atomic words, whitespace, and newlines
     let mut raw_tokens: Vec<MeasuredToken> = Vec::new();
 
     for run in &runs {
         let font_pt = run.font_size.unwrap_or(base_style.font_size) as f32;
-        let font_size_px = (font_pt * pt_to_px).max(4.0);
+        let font_size_px = (font_pt * pt_to_px).max(0.001);
 
         let family = run.font_family.as_ref().unwrap_or(&base_style.font_family);
         let weight = run.font_weight.as_ref().unwrap_or(&base_style.font_weight);
@@ -714,10 +725,10 @@ pub fn render_text_element(
         let fill_color = parse_color(run.fill.as_ref().unwrap_or(&base_style.fill));
         let hl_color = run.highlight.as_ref().map(|h| parse_color(h));
 
-        let is_bold = weight == "bold" || weight.parse::<u32>().unwrap_or(400) >= 600;
+        let font_weight = if weight == "bold" { 700 } else { weight.parse::<u16>().unwrap_or(400) };
         let is_italic = style == "italic";
 
-        let font_opt = get_or_load_font(family, is_bold, is_italic);
+        let font_opt = load_font_weight(family, font_weight, is_italic);
 
         // Split text by lines and spaces
         let mut current_segment = String::new();
@@ -727,7 +738,7 @@ pub fn render_text_element(
             if c == '\n' {
                 if !current_segment.is_empty() {
                     let is_sp = current_segment.chars().all(|ch| ch.is_whitespace());
-                    let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px);
+                    let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px, tracking);
                     let (asc, desc) = get_font_metrics(font_opt.as_deref(), font_size_px);
                     raw_tokens.push(MeasuredToken {
                         text: current_segment.clone(),
@@ -735,7 +746,7 @@ pub fn render_text_element(
                         is_newline: false,
                         font_family: family.clone(),
                         font_size_px,
-                        is_bold,
+                        font_weight,
                         is_italic,
                         text_decoration: decor.clone(),
                         fill: fill_color,
@@ -752,7 +763,7 @@ pub fn render_text_element(
                     is_newline: true,
                     font_family: family.clone(),
                     font_size_px,
-                    is_bold,
+                    font_weight,
                     is_italic,
                     text_decoration: decor.clone(),
                     fill: fill_color,
@@ -764,7 +775,7 @@ pub fn render_text_element(
             } else if c.is_whitespace() {
                 if !current_segment.is_empty() {
                     let is_sp = current_segment.chars().all(|ch| ch.is_whitespace());
-                    let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px);
+                    let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px, tracking);
                     let (asc, desc) = get_font_metrics(font_opt.as_deref(), font_size_px);
                     raw_tokens.push(MeasuredToken {
                         text: current_segment.clone(),
@@ -772,7 +783,7 @@ pub fn render_text_element(
                         is_newline: false,
                         font_family: family.clone(),
                         font_size_px,
-                        is_bold,
+                        font_weight,
                         is_italic,
                         text_decoration: decor.clone(),
                         fill: fill_color,
@@ -793,7 +804,7 @@ pub fn render_text_element(
                         break;
                     }
                 }
-                let w = measure_text_width(&ws, font_opt.as_deref(), font_size_px);
+                let w = measure_text_width(&ws, font_opt.as_deref(), font_size_px, tracking);
                 let (asc, desc) = get_font_metrics(font_opt.as_deref(), font_size_px);
                 raw_tokens.push(MeasuredToken {
                     text: ws,
@@ -801,7 +812,7 @@ pub fn render_text_element(
                     is_newline: false,
                     font_family: family.clone(),
                     font_size_px,
-                    is_bold,
+                    font_weight,
                     is_italic,
                     text_decoration: decor.clone(),
                     fill: fill_color,
@@ -817,7 +828,7 @@ pub fn render_text_element(
 
         if !current_segment.is_empty() {
             let is_sp = current_segment.chars().all(|ch| ch.is_whitespace());
-            let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px);
+            let w = measure_text_width(&current_segment, font_opt.as_deref(), font_size_px, tracking);
             let (asc, desc) = get_font_metrics(font_opt.as_deref(), font_size_px);
             raw_tokens.push(MeasuredToken {
                 text: current_segment,
@@ -825,7 +836,7 @@ pub fn render_text_element(
                 is_newline: false,
                 font_family: family.clone(),
                 font_size_px,
-                is_bold,
+                font_weight,
                 is_italic,
                 text_decoration: decor.clone(),
                 fill: fill_color,
@@ -886,6 +897,7 @@ pub fn render_text_element(
         *max_lh = 0.0;
     };
 
+    let ends_with_newline = raw_tokens.last().map(|t| t.is_newline).unwrap_or(false);
     for tok in raw_tokens {
         if tok.is_newline {
             push_line(
@@ -902,7 +914,7 @@ pub fn render_text_element(
 
         if should_wrap
             && !current_line_tokens.is_empty()
-            && current_line_w + tok.width > available_w
+            && current_line_w + tracking + tok.width > available_w
             && !tok.is_space
         {
             push_line(
@@ -914,14 +926,14 @@ pub fn render_text_element(
             );
         }
 
-        current_line_w += tok.width;
+        current_line_w += tok.width + if current_line_tokens.is_empty() { 0.0 } else { tracking };
         current_max_asc = current_max_asc.max(tok.ascent);
         current_max_desc = current_max_desc.max(tok.descent);
         current_max_lh = current_max_lh.max(tok_lh);
         current_line_tokens.push(tok);
     }
 
-    if !current_line_tokens.is_empty() {
+    if !current_line_tokens.is_empty() || ends_with_newline {
         push_line(
             &mut current_line_tokens,
             &mut current_line_w,
@@ -966,7 +978,7 @@ pub fn render_text_element(
                     draw_filled_rect(&mut text_buffer, hl_x, hl_y, hl_w, hl_h, *hl);
                 }
             }
-            token_x += tok.width;
+            token_x += tok.width + tracking;
         }
 
         // Pass 2: Render Glyphs & Decorations
@@ -976,12 +988,16 @@ pub fn render_text_element(
                 continue;
             }
 
-            let font_opt = get_or_load_font(&tok.font_family, tok.is_bold, tok.is_italic);
+            let font_opt = load_font_weight(&tok.font_family, tok.font_weight, tok.is_italic);
 
             if !tok.is_space {
                 if let Some(ref font) = font_opt {
                     let mut pen_x = token_x;
+                    let mut previous = None;
                     for ch in tok.text.chars() {
+                        if let Some(prev) = previous {
+                            pen_x += if tracking == 0.0 { font.horizontal_kern(prev, ch, tok.font_size_px).unwrap_or(0.0) } else { tracking };
+                        }
                         let (metrics, bitmap) = font.rasterize(ch, tok.font_size_px);
                         let glyph_top_y = (baseline - metrics.ymin as f32 - metrics.height as f32).round() as i32;
                         let glyph_left_x = (pen_x + metrics.xmin as f32).round() as i32;
@@ -1009,6 +1025,7 @@ pub fn render_text_element(
                         }
 
                         pen_x += metrics.advance_width;
+                        previous = Some(ch);
                     }
                 }
 
@@ -1038,7 +1055,7 @@ pub fn render_text_element(
                 }
             }
 
-            token_x += tok.width;
+            token_x += tok.width + tracking;
         }
 
         current_top += line.max_line_height;
@@ -1126,17 +1143,17 @@ pub fn render_text_element(
 }
 
 /// Helper: Measure width of string using fontdue
-fn measure_text_width(text: &str, font: Option<&Font>, font_size_px: f32) -> f32 {
-    if let Some(font) = font {
-        let mut w = 0.0;
-        for ch in text.chars() {
-            let (metrics, _) = font.rasterize(ch, font_size_px);
-            w += metrics.advance_width;
+fn measure_text_width(text: &str, font: Option<&Font>, font_size_px: f32, tracking: f32) -> f32 {
+    let mut width = 0.0;
+    let mut previous = None;
+    for ch in text.chars() {
+        if let Some(prev) = previous {
+            width += if tracking == 0.0 { font.and_then(|f| f.horizontal_kern(prev, ch, font_size_px)).unwrap_or(0.0) } else { tracking };
         }
-        w
-    } else {
-        text.len() as f32 * (font_size_px * 0.55)
+        width += font.map(|f| f.metrics(ch, font_size_px).advance_width).unwrap_or(font_size_px * 0.55);
+        previous = Some(ch);
     }
+    width.max(0.0)
 }
 
 /// Helper: Get font line ascent & descent

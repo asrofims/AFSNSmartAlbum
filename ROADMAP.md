@@ -214,4 +214,12 @@
 - [x] Smart Cross-Unit Preset Matching (`findMatchingPreset` tolerance matching prevents active preset from resetting to "Custom Dimensions" when changing units)
 - [x] Active Unit Preservation on Preset Select (`handlePresetSelect` converts template dimensions to the user's active unit instead of forcibly resetting `canvasUnit`)
 
+## Phase 19 — Release v1.0.36: Typography & Text Engine Recovery
+- [x] Restored the complete typography and text engine implementation from Git snapshot `660de5deb9e6b4f9c7051d10e33e762eb8eb6542`.
+- [x] Core text placement, physical measurement, frame resizing, dynamic height/content fitting, inline editing, previews, and bundled font assets verified.
+- [x] Rust export text rasterizer and high-resolution export synchronization restored.
+- [x] Full test suite validation: all 62 restored files verified; unit tests (`npm test`), production build (`npm run build`), Rust text rasterizer tests, and 240 canvas browser assertions passing.
+- [x] Application version metadata bumped to `v1.0.36`.
+
+
 

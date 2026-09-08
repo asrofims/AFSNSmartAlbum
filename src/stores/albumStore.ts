@@ -148,7 +148,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   loadAlbumFromDb: async (projectId: string) => {
     const hydrateElement = (el: any): AlbumElement => {
       if (el.type === 'text') {
-        const { text, style, textRuns } = deserializeTextPayload(el.textPayload, el.fileName || el.text);
+        const { text, style, textRuns, styledRanges } = deserializeTextPayload(el.textPayload ?? serializeTextPayload(el), el.fileName || el.text);
         return {
           id: el.id,
           type: 'text',
@@ -163,6 +163,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           groupId: el.groupId || null,
           style,
           textRuns,
+          styledRanges,
         };
       }
       const [tl, tr, br, bl] = getCornerRadii(el);

@@ -1,0 +1,194 @@
+﻿[
+    {
+        "file":  "inter-400-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/inter/v20/UcCM3FwrK3iLTcvneQg7Ca725JhhKnNqk4j1ebLhAm8SrXTc2dtRipWA.ttf",
+        "family":  "Inter",
+        "sha256":  "72A6E5D274641C5BE347BC5D07E4C24FD66644C106223A3444337562353A1D84",
+        "weight":  400,
+        "style":  "italic"
+    },
+    {
+        "file":  "inter-700-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/inter/v20/UcCM3FwrK3iLTcvneQg7Ca725JhhKnNqk4j1ebLhAm8SrXTcPtxRipWA.ttf",
+        "family":  "Inter",
+        "sha256":  "FD64154C8A7F01B783FFA7DEB46524FAF1E30568ACA34E5E88A0E00D79938C52",
+        "weight":  700,
+        "style":  "italic"
+    },
+    {
+        "file":  "inter-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hjQ.ttf",
+        "family":  "Inter",
+        "sha256":  "DB2007CAC3F58427030755B0FF368CCEEF98DC503CF6D3D2AA366A4743F9749F",
+        "weight":  400,
+        "style":  "normal"
+    },
+    {
+        "file":  "inter-600-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYAZ9hjQ.ttf",
+        "family":  "Inter",
+        "sha256":  "1BFC2A55504ADD1A87771CDE89865A8B1A2CF6137E4309E9E03CFA9134786F7F",
+        "weight":  600,
+        "style":  "normal"
+    },
+    {
+        "file":  "inter-700-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYAZ9hjQ.ttf",
+        "family":  "Inter",
+        "sha256":  "16586B28B0432E68F0099445946195DC97909FF7744F764EED708B38E61CA6C9",
+        "weight":  700,
+        "style":  "normal"
+    },
+    {
+        "file":  "playfairdisplay-400-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_qiTXtHA_A.ttf",
+        "family":  "Playfair Display",
+        "sha256":  "195D25DE499C50D01769C39ED92DE2C9EBDEF736B88A8CA620DDF83190D4794F",
+        "weight":  400,
+        "style":  "italic"
+    },
+    {
+        "file":  "playfairdisplay-700-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_k-UXtHA_A.ttf",
+        "family":  "Playfair Display",
+        "sha256":  "EA85E419850D4DB534E2FFCFAA2EDB7FE1A85E13186E6DC5B569D7A83231AC8C",
+        "weight":  700,
+        "style":  "italic"
+    },
+    {
+        "file":  "playfairdisplay-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvXDXbtY.ttf",
+        "family":  "Playfair Display",
+        "sha256":  "5AA7CA7B492FD41907C4DC74E6154A3054C5CADBA2AF1C7A68A9F405127E855B",
+        "weight":  400,
+        "style":  "normal"
+    },
+    {
+        "file":  "playfairdisplay-600-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKebunDXbtY.ttf",
+        "family":  "Playfair Display",
+        "sha256":  "91908360FF31E7686E7BE282DE57B95488AB0E7601E3E092B93A016AC821647D",
+        "weight":  600,
+        "style":  "normal"
+    },
+    {
+        "file":  "playfairdisplay-700-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKeiunDXbtY.ttf",
+        "family":  "Playfair Display",
+        "sha256":  "8D9453F9B5E4564022C7409F06E7B9807DE587DCA7B99122C5DFC43AADBEA6EE",
+        "weight":  700,
+        "style":  "normal"
+    },
+    {
+        "file":  "montserrat-400-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/montserrat/v31/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jq6R9WXh0ow.ttf",
+        "family":  "Montserrat",
+        "sha256":  "4B231E17D95572EFFAE93F5D02A1BC82604E351AC01E508738FDCC23CA7585D7",
+        "weight":  400,
+        "style":  "italic"
+    },
+    {
+        "file":  "montserrat-700-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/montserrat/v31/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jq0N6WXh0ow.ttf",
+        "family":  "Montserrat",
+        "sha256":  "140ACE05DDDEE69A5CBE44C0659C2C211C639BACFE14989373FF27FF102C5E3F",
+        "weight":  700,
+        "style":  "italic"
+    },
+    {
+        "file":  "montserrat-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aX8.ttf",
+        "family":  "Montserrat",
+        "sha256":  "76C4F058AAC767F2F886D4F29393F6C38B47C7DC48F502DD9E30A273B4987E81",
+        "weight":  400,
+        "style":  "normal"
+    },
+    {
+        "file":  "montserrat-600-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCu173w5aX8.ttf",
+        "family":  "Montserrat",
+        "sha256":  "96C43EE88AF9D0379312ED086502F87F6BFEBF675A6F473770D08C6DD27F2C1F",
+        "weight":  600,
+        "style":  "normal"
+    },
+    {
+        "file":  "montserrat-700-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM73w5aX8.ttf",
+        "family":  "Montserrat",
+        "sha256":  "5A491022018FD3965DF4C071A581B055971E5BE605B6DF79D7AB03437A10234E",
+        "weight":  700,
+        "style":  "normal"
+    },
+    {
+        "file":  "cormorantgaramond-400-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd58jD-iNM5.ttf",
+        "family":  "Cormorant Garamond",
+        "sha256":  "AF8CF94DFE77D38593D767767F42DFDA732E2BD4A015963F0B918256D8A118C6",
+        "weight":  400,
+        "style":  "italic"
+    },
+    {
+        "file":  "cormorantgaramond-700-italic.ttf",
+        "source":  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd5FTf-iNM5.ttf",
+        "family":  "Cormorant Garamond",
+        "sha256":  "6C171106D6D284BDD97542275F55FEBB7F3CCD81BE708BB80BE87BFE175A7556",
+        "weight":  700,
+        "style":  "italic"
+    },
+    {
+        "file":  "cormorantgaramond-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_v86KnTOjw.ttf",
+        "family":  "Cormorant Garamond",
+        "sha256":  "20A257AD9D80130F035B53D000208F895B9515AA7C7F8F86DF45684380D66A0E",
+        "weight":  400,
+        "style":  "normal"
+    },
+    {
+        "file":  "cormorantgaramond-600-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_iE9KnTOjw.ttf",
+        "family":  "Cormorant Garamond",
+        "sha256":  "D1AF0EA1094F009574B87365CD57B3FE28EDFF002E1A261CF45AB82B8B0A2B1D",
+        "weight":  600,
+        "style":  "normal"
+    },
+    {
+        "file":  "cormorantgaramond-700-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_hg9KnTOjw.ttf",
+        "family":  "Cormorant Garamond",
+        "sha256":  "712700C9A0FBC9CEE3D1B0C9D8F7911B642B36E460456099D46A15790CA05F8B",
+        "weight":  700,
+        "style":  "normal"
+    },
+    {
+        "file":  "cinzel-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cinzel/v26/8vIU7ww63mVu7gtR-kwKxNvkNOjw-tbnfY3lCA.ttf",
+        "family":  "Cinzel",
+        "sha256":  "DC0F16DB2C5AB26B92B1268BCAABDB3F02AB5DBD7D40FD014B7E95ACA54919E3",
+        "weight":  400,
+        "style":  "normal"
+    },
+    {
+        "file":  "cinzel-600-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cinzel/v26/8vIU7ww63mVu7gtR-kwKxNvkNOjw-gjgfY3lCA.ttf",
+        "family":  "Cinzel",
+        "sha256":  "74611732B017D0A60B1DEC355AA226A6CE7C359DC5CD34E2D16C7EF46B74B9AE",
+        "weight":  600,
+        "style":  "normal"
+    },
+    {
+        "file":  "cinzel-700-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/cinzel/v26/8vIU7ww63mVu7gtR-kwKxNvkNOjw-jHgfY3lCA.ttf",
+        "family":  "Cinzel",
+        "sha256":  "F163E215FA6C0B1AF2FAFA8A4EE2909675A1F383619D2D123211BAEDE32FEF5B",
+        "weight":  700,
+        "style":  "normal"
+    },
+    {
+        "file":  "greatvibes-400-normal.ttf",
+        "source":  "https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaE.ttf",
+        "family":  "Great Vibes",
+        "sha256":  "15D4F3D18CAC438EF50F0895B3A358334CEE3E0BEDE6CAA479C5D45EF86402CD",
+        "weight":  400,
+        "style":  "normal"
+    }
+]
