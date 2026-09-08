@@ -319,6 +319,7 @@ impl Database {
                     id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
+                    margin_top, margin_bottom, margin_outside, margin_spine,
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color, file_path,
                     created_at, updated_at
@@ -327,7 +328,8 @@ impl Database {
                     ?7, ?8,
                     ?9, ?10, ?11,
                     ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18,
+                    ?16, ?17, ?18, ?19,
+                    ?20, ?21, ?22,
                     datetime('now'), datetime('now')
                 )
                 ON CONFLICT(id) DO UPDATE SET
@@ -341,6 +343,10 @@ impl Database {
                     margin_enabled = excluded.margin_enabled,
                     margin_value = excluded.margin_value,
                     margin_unit = excluded.margin_unit,
+                    margin_top = excluded.margin_top,
+                    margin_bottom = excluded.margin_bottom,
+                    margin_outside = excluded.margin_outside,
+                    margin_spine = excluded.margin_spine,
                     border_enabled = excluded.border_enabled,
                     border_width = excluded.border_width,
                     border_unit = excluded.border_unit,
@@ -361,6 +367,10 @@ impl Database {
                 p.margin_enabled as i32,
                 p.margin_value,
                 p.margin_unit,
+                p.margin_top.unwrap_or(p.margin_value),
+                p.margin_bottom.unwrap_or(p.margin_value),
+                p.margin_outside.unwrap_or(p.margin_value),
+                p.margin_spine.unwrap_or(p.margin_value),
                 p.border_enabled as i32,
                 p.border_width,
                 p.border_unit,

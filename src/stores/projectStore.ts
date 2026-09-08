@@ -2,6 +2,20 @@ import { create } from 'zustand';
 import { Project, ProjectSettings } from '../domain/project';
 import { Unit } from '../domain/units';
 
+const persistProjectMargins = async (project: Project): Promise<void> => {
+  const fallback = Number(project.marginValue ?? 0);
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('update_project_margins', {
+    id: project.id,
+    marginValue: fallback,
+    marginUnit: project.marginUnit || 'mm',
+    marginTop: Number(project.marginTop ?? fallback),
+    marginBottom: Number(project.marginBottom ?? fallback),
+    marginOutside: Number(project.marginOutside ?? fallback),
+    marginSpine: Number(project.marginSpine ?? fallback),
+  });
+};
+
 interface ProjectState {
   currentProject: Project | null;
   recentProjects: Project[];
@@ -137,6 +151,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!current) return;
     const unit = marginUnit || current.marginUnit || 'mm';
     const num = Number(marginValue);
+    if (!Number.isFinite(num) || num < 0) return;
     const updatedProject: Project = {
       ...current,
       marginUnit: unit,
@@ -163,6 +178,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentProject: updatedProject,
       recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
     }));
+
+    try {
+      await persistProjectMargins(updatedProject);
+    } catch (err) {
+      console.warn('[AFSN] update_project_margins via Tauri failed, fallback:', err);
+    }
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
+      const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
+      localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
+    } catch (err) {
+      console.warn('[AFSN] localStorage write error:', err);
+    }
   },
 
   updateProjectBleed: async (bleed: number) => {
@@ -431,6 +460,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const album = useAlbumStore.getState().currentAlbum;
     try {
       if (!album || album.projectId !== current.id) throw new Error('The active project is not ready to save.');
+      await persistProjectMargins(current);
       if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
       if (get().currentProject?.id !== current.id) return failed;
       // Unsaved projects receive database recovery checkpoints without opening a dialog.
@@ -463,6 +493,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!album || album.projectId !== current.id) throw new Error('The active project is not ready to save.');
       const { usePhotoStore } = await import('./photoStore');
       if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before using Save As.');
+      await persistProjectMargins(current);
       if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
       const { invoke } = await import('@tauri-apps/api/core');
       let saved: Project | null;
@@ -511,6 +542,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { useAlbumStore } = await import('./albumStore');
       const { usePhotoStore } = await import('./photoStore');
       if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before exporting a package.');
+      await persistProjectMargins(current);
       if (useAlbumStore.getState().currentAlbum?.projectId !== current.id || !await useAlbumStore.getState().saveAlbumToDb()) {
         throw new Error('The current project could not be saved to the recovery database.');
       }

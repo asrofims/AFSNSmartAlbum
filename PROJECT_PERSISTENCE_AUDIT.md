@@ -26,6 +26,7 @@ An AFSN document stores layout and photo references; it does not embed the origi
 | Medium | Multiple Save / Save As / autosave operations could overlap; file failures were silent. | Share a guarded save pipeline, serialize database writes, prevent conflicting open/close during saves, and show actionable errors. |
 | Medium | External file-open events bypassed unsaved-change confirmation. | Prompt Save & Open / Don't Save / Cancel before replacing a dirty active project. |
 | Medium | Cover-only documents were treated as having no album. | Accept a valid cover and an empty interior spread list when loading. |
+| High | Independent Top, Bottom, Outside, and Spine margins existed only in frontend memory; SQLite and AFSN retained the single legacy margin. | Persist all four project defaults and all four per-spread safe-area values through Tauri, SQLite migration v13, Save, Save As, package export, and AFSN reopen. |
 
 ## Validation
 
@@ -43,6 +44,5 @@ The tests exercise real native persistence and simulated I/O failures. They do n
 - If the project remains in Recent Projects or the local recovery database, open it and use Save to select a new AFSN destination. Existing extracted originals can still be referenced or relinked. Keep any original ZIP backups.
 - ZIP files are no longer directly importable. This also removes the former unchecked archive-extraction path from the application.
 - Files from older versions that never recorded folder membership cannot reconstruct that missing information automatically.
-- The AFSN payload remains version 1; the new collection membership field is optional and backward compatible.
-- This audit fixes the document lifecycle and package integrity paths above. It does not certify serialization coverage for every editor setting. In particular, per-side margins and optional project properties beyond the existing native ProjectRow/AlbumPayload schema require a separate field-by-field persistence migration; they are not added by this change.
-
+- The AFSN payload remains version 1; collection membership and the four per-side margin fields are optional and backward compatible. Older files fall back from each missing side to their stored uniform margin.
+- This audit does not certify serialization coverage for every optional editor setting. Per-side project and spread margins are now covered by the native schema and regression tests; other optional project properties still require field-by-field review.

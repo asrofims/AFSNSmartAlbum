@@ -35,7 +35,7 @@ See `PROJECT_PERSISTENCE_AUDIT.md` for regression cases and compatibility limits
 
 The local SQLite database contains structured relations:
 1. `projects`:
-   - `id`, `name`, `canvas_width`, `canvas_height`, `canvas_unit`, `canvas_dpi`, `spacing_value`, `spacing_unit`, `margin_enabled`, `margin_value`, `margin_unit`, `border_enabled`, `border_width`, `border_unit`, `border_color`, `background_color`, `created_at`, `updated_at`.
+   - `id`, `name`, `canvas_width`, `canvas_height`, `canvas_unit`, `canvas_dpi`, `spacing_value`, `spacing_unit`, `margin_enabled`, `margin_value`, `margin_unit`, `margin_top`, `margin_bottom`, `margin_outside`, `margin_spine`, `border_enabled`, `border_width`, `border_unit`, `border_color`, `background_color`, `created_at`, `updated_at`.
 2. `photos`:
    - `id`, `project_id`, `file_name`, `file_path`, `file_size`, `width`, `height`, `format`, `thumbnail_path`, `preview_path`, `orientation`, `dpi`, `color_space`, `is_favorite`, `used_count`, `is_missing`, `imported_at`.
 3. `photo_folders`:
@@ -43,7 +43,7 @@ The local SQLite database contains structured relations:
 4. `folder_photos`:
    - `folder_id`, `photo_id`, `added_at`.
 5. `spreads` & `elements`:
-   - Spread geometry and photo frame placements with crop transformation matrices.
+   - Spread geometry, independent `safe_area_top`, `safe_area_bottom`, `safe_area_outside`, and `safe_area_spine` values, plus photo/text frame placements and crop transformations.
 
 ## Photo Storage
 
@@ -60,3 +60,5 @@ PRAGMA user_version = 1;
 ```
 
 Schema changes require migrations and automated migration tests.
+
+SQLite schema version 13 adds independent project and spread margins. Existing rows and older `.afsn` files inherit their four side values from the legacy uniform margin.

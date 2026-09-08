@@ -236,6 +236,13 @@
 - [x] Full file save for Save & Continue / Save & Exit, unsaved protection for external opens, and explicit save/open errors.
 - [x] Regression tests for real ZIP extraction/edit/save/reopen, failure rollback, cancellation, and concurrent edits. Details and compatibility limits are recorded in `PROJECT_PERSISTENCE_AUDIT.md`.
 
+## Four-Sided Margin Persistence — 8 September 2026
+
+- [x] Persist Top, Bottom, Outside, and Spine project defaults through the Tauri command and SQLite project schema.
+- [x] Persist independent safe-area values on every cover and interior spread through Save, Save As, AFSN, and packaged export workflows.
+- [x] SQLite migration v13 backfills existing projects and spreads from the legacy uniform margin while older AFSN documents retain the same fallback behavior.
+- [x] Add native regression coverage for asymmetric project and spread margin round trips.
+
 
 
 

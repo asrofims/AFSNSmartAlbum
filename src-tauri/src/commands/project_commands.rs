@@ -29,6 +29,10 @@ pub struct CreateProjectRequest {
     pub margin_enabled: Option<bool>,
     pub margin_value: Option<f64>,
     pub margin_unit: Option<String>,
+    pub margin_top: Option<f64>,
+    pub margin_bottom: Option<f64>,
+    pub margin_outside: Option<f64>,
+    pub margin_spine: Option<f64>,
     pub border_enabled: bool,
     pub border_width: f64,
     pub border_unit: String,
@@ -57,6 +61,16 @@ pub fn create_project(db: State<'_, Database>, request: CreateProjectRequest) ->
     let margin_enabled = request.margin_enabled.unwrap_or(true);
     let margin_value = request.margin_value.unwrap_or(10.0);
     let margin_unit = request.margin_unit.as_deref().unwrap_or("mm");
+    let margin_top = request.margin_top.unwrap_or(margin_value);
+    let margin_bottom = request.margin_bottom.unwrap_or(margin_value);
+    let margin_outside = request.margin_outside.unwrap_or(margin_value);
+    let margin_spine = request.margin_spine.unwrap_or(margin_value);
+    if [margin_value, margin_top, margin_bottom, margin_outside, margin_spine]
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
+        return Err("Margins must be finite, non-negative numbers".to_string());
+    }
 
     db.create_project(
         &id,
@@ -70,6 +84,10 @@ pub fn create_project(db: State<'_, Database>, request: CreateProjectRequest) ->
         margin_enabled,
         margin_value,
         margin_unit,
+        margin_top,
+        margin_bottom,
+        margin_outside,
+        margin_spine,
         request.border_enabled,
         request.border_width,
         &request.border_unit,
@@ -128,6 +146,35 @@ pub fn update_project_spacing(
     log::info!("update_project_spacing: id={}, value={}, unit={}", id, spacing_value, spacing_unit);
     db.update_project_spacing(&id, spacing_value, &spacing_unit)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_project_margins(
+    db: State<'_, Database>,
+    id: String,
+    margin_value: f64,
+    margin_unit: String,
+    margin_top: f64,
+    margin_bottom: f64,
+    margin_outside: f64,
+    margin_spine: f64,
+) -> Result<(), String> {
+    if [margin_value, margin_top, margin_bottom, margin_outside, margin_spine]
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
+        return Err("Margins must be finite, non-negative numbers".to_string());
+    }
+    db.update_project_margins(
+        &id,
+        margin_value,
+        &margin_unit,
+        margin_top,
+        margin_bottom,
+        margin_outside,
+        margin_spine,
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

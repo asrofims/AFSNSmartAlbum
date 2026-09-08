@@ -19,6 +19,14 @@ pub struct ProjectRow {
     pub margin_enabled: bool,
     pub margin_value: f64,
     pub margin_unit: String,
+    #[serde(default)]
+    pub margin_top: Option<f64>,
+    #[serde(default)]
+    pub margin_bottom: Option<f64>,
+    #[serde(default)]
+    pub margin_outside: Option<f64>,
+    #[serde(default)]
+    pub margin_spine: Option<f64>,
     pub border_enabled: bool,
     pub border_width: f64,
     pub border_unit: String,
@@ -203,6 +211,14 @@ pub struct SpreadPayload {
     pub bleed: f64,
     #[serde(default)]
     pub safe_area: f64,
+    #[serde(default)]
+    pub safe_area_top: Option<f64>,
+    #[serde(default)]
+    pub safe_area_bottom: Option<f64>,
+    #[serde(default)]
+    pub safe_area_outside: Option<f64>,
+    #[serde(default)]
+    pub safe_area_spine: Option<f64>,
     #[serde(default = "default_bg_color")]
     pub background_color: String,
     #[serde(default)]
@@ -251,7 +267,7 @@ pub struct Database {
 
 impl Database {
     pub fn expected_version() -> i32 {
-        7
+        13
     }
 
     /// Initialize the database at the given path.
@@ -346,6 +362,10 @@ impl Database {
 
         if current_version < 12 {
             Self::migrate_v12(conn)?;
+        }
+
+        if current_version < 13 {
+            Self::migrate_v13(conn)?;
         }
 
         Ok(())
@@ -716,6 +736,63 @@ impl Database {
         Ok(())
     }
 
+    /// Schema version 13: Persist independent project and spread margins.
+    fn migrate_v13(conn: &Connection) -> SqliteResult<()> {
+        let project_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(projects)")?
+            .query_map([], |row| row.get(1))?
+            .filter_map(|row| row.ok())
+            .collect();
+        let spread_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(album_spreads)")?
+            .query_map([], |row| row.get(1))?
+            .filter_map(|row| row.ok())
+            .collect();
+
+        conn.execute_batch("BEGIN;")?;
+        let result = (|| -> SqliteResult<()> {
+            for column in ["margin_top", "margin_bottom", "margin_outside", "margin_spine"] {
+                if !project_columns.iter().any(|existing| existing == column) {
+                    conn.execute(&format!("ALTER TABLE projects ADD COLUMN {column} REAL"), [])?;
+                }
+            }
+            conn.execute(
+                "UPDATE projects SET
+                    margin_top = COALESCE(margin_top, margin_value),
+                    margin_bottom = COALESCE(margin_bottom, margin_value),
+                    margin_outside = COALESCE(margin_outside, margin_value),
+                    margin_spine = COALESCE(margin_spine, margin_value)",
+                [],
+            )?;
+
+            for column in ["safe_area_top", "safe_area_bottom", "safe_area_outside", "safe_area_spine"] {
+                if !spread_columns.iter().any(|existing| existing == column) {
+                    conn.execute(&format!("ALTER TABLE album_spreads ADD COLUMN {column} REAL"), [])?;
+                }
+            }
+            conn.execute(
+                "UPDATE album_spreads SET
+                    safe_area_top = COALESCE(safe_area_top, safe_area),
+                    safe_area_bottom = COALESCE(safe_area_bottom, safe_area),
+                    safe_area_outside = COALESCE(safe_area_outside, safe_area),
+                    safe_area_spine = COALESCE(safe_area_spine, safe_area)",
+                [],
+            )?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (13)", [])?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => conn.execute_batch("COMMIT;")?,
+            Err(error) => {
+                let _ = conn.execute_batch("ROLLBACK;");
+                return Err(error);
+            }
+        }
+        log::info!("Applied database migration v13");
+        Ok(())
+    }
+
     pub fn get_schema_version(&self) -> SqliteResult<i32> {
         let conn = self.conn.lock().unwrap();
         let version: i32 = conn.query_row(
@@ -771,6 +848,7 @@ impl Database {
                     id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
+                    margin_top, margin_bottom, margin_outside, margin_spine,
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color,
                     created_at, updated_at
@@ -778,6 +856,7 @@ impl Database {
                     ?1, ?2, 200.0, 200.0, 'mm', 300,
                     2.0, 'mm',
                     1, 10.0, 'mm',
+                    10.0, 10.0, 10.0, 10.0,
                     0, 0.0, 'mm', '#000000',
                     'solid', '#FFFFFF',
                     datetime('now'), datetime('now')
@@ -801,6 +880,10 @@ impl Database {
         margin_enabled: bool,
         margin_value: f64,
         margin_unit: &str,
+        margin_top: f64,
+        margin_bottom: f64,
+        margin_outside: f64,
+        margin_spine: f64,
         border_enabled: bool,
         border_width: f64,
         border_unit: &str,
@@ -814,6 +897,7 @@ impl Database {
                 id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                 spacing_value, spacing_unit,
                 margin_enabled, margin_value, margin_unit,
+                margin_top, margin_bottom, margin_outside, margin_spine,
                 border_enabled, border_width, border_unit, border_color,
                 background_type, background_color,
                 created_at, updated_at
@@ -822,13 +906,15 @@ impl Database {
                 ?7, ?8,
                 ?9, ?10, ?11,
                 ?12, ?13, ?14, ?15,
-                ?16, ?17,
+                ?16, ?17, ?18, ?19,
+                ?20, ?21,
                 datetime('now'), datetime('now')
             )",
             rusqlite::params![
                 id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                 spacing_value, spacing_unit,
                 margin_enabled as i32, margin_value, margin_unit,
+                margin_top, margin_bottom, margin_outside, margin_spine,
                 border_enabled as i32, border_width, border_unit, border_color,
                 background_type, background_color,
             ],
@@ -842,6 +928,10 @@ impl Database {
             "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
+                    COALESCE(margin_top, margin_value),
+                    COALESCE(margin_bottom, margin_value),
+                    COALESCE(margin_outside, margin_value),
+                    COALESCE(margin_spine, margin_value),
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color, file_path,
                     created_at, updated_at
@@ -851,7 +941,7 @@ impl Database {
         let mut rows = stmt.query([id])?;
         if let Some(row) = rows.next()? {
             let margin_enabled_int: i32 = row.get(8)?;
-            let border_enabled_int: i32 = row.get(11)?;
+            let border_enabled_int: i32 = row.get(15)?;
             Ok(Some(ProjectRow {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -864,15 +954,19 @@ impl Database {
                 margin_enabled: margin_enabled_int != 0,
                 margin_value: row.get(9)?,
                 margin_unit: row.get(10)?,
+                margin_top: Some(row.get(11)?),
+                margin_bottom: Some(row.get(12)?),
+                margin_outside: Some(row.get(13)?),
+                margin_spine: Some(row.get(14)?),
                 border_enabled: border_enabled_int != 0,
-                border_width: row.get(12)?,
-                border_unit: row.get(13)?,
-                border_color: row.get(14)?,
-                background_type: row.get(15)?,
-                background_color: row.get(16)?,
-                file_path: row.get(17)?,
-                created_at: row.get(18)?,
-                updated_at: row.get(19)?,
+                border_width: row.get(16)?,
+                border_unit: row.get(17)?,
+                border_color: row.get(18)?,
+                background_type: row.get(19)?,
+                background_color: row.get(20)?,
+                file_path: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             }))
         } else {
             Ok(None)
@@ -884,6 +978,37 @@ impl Database {
         conn.execute(
             "UPDATE projects SET spacing_value = ?1, spacing_unit = ?2, updated_at = datetime('now') WHERE id = ?3",
             rusqlite::params![spacing_value, spacing_unit, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_project_margins(
+        &self,
+        id: &str,
+        margin_value: f64,
+        margin_unit: &str,
+        margin_top: f64,
+        margin_bottom: f64,
+        margin_outside: f64,
+        margin_spine: f64,
+    ) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE projects SET
+                margin_value = ?1, margin_unit = ?2,
+                margin_top = ?3, margin_bottom = ?4,
+                margin_outside = ?5, margin_spine = ?6,
+                updated_at = datetime('now')
+             WHERE id = ?7",
+            rusqlite::params![
+                margin_value,
+                margin_unit,
+                margin_top,
+                margin_bottom,
+                margin_outside,
+                margin_spine,
+                id,
+            ],
         )?;
         Ok(())
     }
@@ -913,6 +1038,10 @@ impl Database {
             "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
+                    COALESCE(margin_top, margin_value),
+                    COALESCE(margin_bottom, margin_value),
+                    COALESCE(margin_outside, margin_value),
+                    COALESCE(margin_spine, margin_value),
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color, file_path,
                     created_at, updated_at
@@ -923,7 +1052,7 @@ impl Database {
 
         let rows = stmt.query_map([limit], |row| {
             let margin_enabled_int: i32 = row.get(8)?;
-            let border_enabled_int: i32 = row.get(11)?;
+            let border_enabled_int: i32 = row.get(15)?;
             Ok(ProjectRow {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -936,15 +1065,19 @@ impl Database {
                 margin_enabled: margin_enabled_int != 0,
                 margin_value: row.get(9)?,
                 margin_unit: row.get(10)?,
+                margin_top: Some(row.get(11)?),
+                margin_bottom: Some(row.get(12)?),
+                margin_outside: Some(row.get(13)?),
+                margin_spine: Some(row.get(14)?),
                 border_enabled: border_enabled_int != 0,
-                border_width: row.get(12)?,
-                border_unit: row.get(13)?,
-                border_color: row.get(14)?,
-                background_type: row.get(15)?,
-                background_color: row.get(16)?,
-                file_path: row.get(17)?,
-                created_at: row.get(18)?,
-                updated_at: row.get(19)?,
+                border_width: row.get(16)?,
+                border_unit: row.get(17)?,
+                border_color: row.get(18)?,
+                background_type: row.get(19)?,
+                background_color: row.get(20)?,
+                file_path: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             })
         })?;
 
@@ -1435,9 +1568,10 @@ impl Database {
                 "INSERT OR IGNORE INTO projects (
                     id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit, margin_enabled, margin_value, margin_unit,
+                    margin_top, margin_bottom, margin_outside, margin_spine,
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color, created_at, updated_at
-                ) VALUES (?1, 'Untitled Album', 200.0, 200.0, 'mm', 300, 2.0, 'mm', 1, 10.0, 'mm', 0, 0.0, 'mm', '#000000', 'solid', '#FFFFFF', datetime('now'), datetime('now'))",
+                ) VALUES (?1, 'Untitled Album', 200.0, 200.0, 'mm', 300, 2.0, 'mm', 1, 10.0, 'mm', 10.0, 10.0, 10.0, 10.0, 0, 0.0, 'mm', '#000000', 'solid', '#FFFFFF', datetime('now'), datetime('now'))",
                 [&album.project_id],
             )?;
         }
@@ -1456,10 +1590,11 @@ impl Database {
                 "INSERT INTO album_spreads (
                     id, project_id, spread_index, spread_type, name,
                     left_page_id, right_page_id, gutter_width, gutter_unit,
-                    bleed, safe_area, background_color, is_cover,
+                    bleed, safe_area, safe_area_top, safe_area_bottom,
+                    safe_area_outside, safe_area_spine, background_color, is_cover,
                     left_page_background_color, right_page_background_color,
                     created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, datetime('now'), datetime('now'))",
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, datetime('now'), datetime('now'))",
                 rusqlite::params![
                     spread.id,
                     project_id,
@@ -1472,6 +1607,10 @@ impl Database {
                     spread.gutter_unit,
                     spread.bleed,
                     spread.safe_area,
+                    spread.safe_area_top.unwrap_or(spread.safe_area),
+                    spread.safe_area_bottom.unwrap_or(spread.safe_area),
+                    spread.safe_area_outside.unwrap_or(spread.safe_area),
+                    spread.safe_area_spine.unwrap_or(spread.safe_area),
                     spread.background_color,
                     if is_cover { 1 } else { 0 },
                     left_bg,
@@ -1560,6 +1699,10 @@ impl Database {
             "SELECT id, name, canvas_width, canvas_height, canvas_unit, canvas_dpi,
                     spacing_value, spacing_unit,
                     margin_enabled, margin_value, margin_unit,
+                    COALESCE(margin_top, margin_value),
+                    COALESCE(margin_bottom, margin_value),
+                    COALESCE(margin_outside, margin_value),
+                    COALESCE(margin_spine, margin_value),
                     border_enabled, border_width, border_unit, border_color,
                     background_type, background_color, file_path,
                     created_at, updated_at
@@ -1568,7 +1711,7 @@ impl Database {
         let mut proj_rows = proj_stmt.query([project_id])?;
         let project = if let Some(row) = proj_rows.next()? {
             let margin_enabled_int: i32 = row.get(8)?;
-            let border_enabled_int: i32 = row.get(11)?;
+            let border_enabled_int: i32 = row.get(15)?;
             ProjectRow {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -1581,15 +1724,19 @@ impl Database {
                 margin_enabled: margin_enabled_int != 0,
                 margin_value: row.get(9)?,
                 margin_unit: row.get(10)?,
+                margin_top: Some(row.get(11)?),
+                margin_bottom: Some(row.get(12)?),
+                margin_outside: Some(row.get(13)?),
+                margin_spine: Some(row.get(14)?),
                 border_enabled: border_enabled_int != 0,
-                border_width: row.get(12)?,
-                border_unit: row.get(13)?,
-                border_color: row.get(14)?,
-                background_type: row.get(15)?,
-                background_color: row.get(16)?,
-                file_path: row.get(17)?,
-                created_at: row.get(18)?,
-                updated_at: row.get(19)?,
+                border_width: row.get(16)?,
+                border_unit: row.get(17)?,
+                border_color: row.get(18)?,
+                background_type: row.get(19)?,
+                background_color: row.get(20)?,
+                file_path: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             }
         } else {
             return Ok(None);
@@ -1599,7 +1746,12 @@ impl Database {
         let mut spread_stmt = conn.prepare(
             "SELECT id, project_id, spread_index, spread_type, name,
                     left_page_id, right_page_id, gutter_width, gutter_unit,
-                    bleed, safe_area, background_color, is_cover,
+                    bleed, safe_area,
+                    COALESCE(safe_area_top, safe_area),
+                    COALESCE(safe_area_bottom, safe_area),
+                    COALESCE(safe_area_outside, safe_area),
+                    COALESCE(safe_area_spine, safe_area),
+                    background_color, is_cover,
                     left_page_background_color, right_page_background_color,
                     created_at, updated_at
              FROM album_spreads
@@ -1622,10 +1774,10 @@ impl Database {
         )?;
 
         let spread_rows = spread_stmt.query_map([project_id], |row| {
-            let is_cover_int: i32 = row.get(12).unwrap_or(0);
-            let bg: String = row.get::<_, String>(11).unwrap_or_else(|_| "#FFFFFF".to_string());
-            let left_bg: String = row.get::<_, Option<String>>(13).ok().flatten().unwrap_or_else(|| bg.clone());
-            let right_bg: String = row.get::<_, Option<String>>(14).ok().flatten().unwrap_or_else(|| bg.clone());
+            let is_cover_int: i32 = row.get(16).unwrap_or(0);
+            let bg: String = row.get::<_, String>(15).unwrap_or_else(|_| "#FFFFFF".to_string());
+            let left_bg: String = row.get::<_, Option<String>>(17).ok().flatten().unwrap_or_else(|| bg.clone());
+            let right_bg: String = row.get::<_, Option<String>>(18).ok().flatten().unwrap_or_else(|| bg.clone());
             Ok((
                 row.get::<_, String>(0)?, // id
                 row.get::<_, String>(1).unwrap_or_default(), // project_id
@@ -1638,6 +1790,10 @@ impl Database {
                 row.get::<_, String>(8).unwrap_or_else(|_| "mm".to_string()), // gutter_unit
                 row.get::<_, f64>(9).unwrap_or(3.0),    // bleed
                 row.get::<_, f64>(10).unwrap_or(10.0),   // safe_area
+                row.get::<_, f64>(11).unwrap_or(10.0),   // safe_area_top
+                row.get::<_, f64>(12).unwrap_or(10.0),   // safe_area_bottom
+                row.get::<_, f64>(13).unwrap_or(10.0),   // safe_area_outside
+                row.get::<_, f64>(14).unwrap_or(10.0),   // safe_area_spine
                 bg,                                     // background_color
                 is_cover_int != 0,                      // is_cover
                 left_bg,                                // left_page_background_color
@@ -1649,7 +1805,7 @@ impl Database {
         let mut interior_spreads: Vec<SpreadPayload> = Vec::new();
 
         for s_res in spread_rows {
-            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, background_color, is_cover, left_bg, right_bg) = s_res?;
+            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, safe_area_top, safe_area_bottom, safe_area_outside, safe_area_spine, background_color, is_cover, left_bg, right_bg) = s_res?;
 
             // Load elements for this spread
             let elem_rows = elem_stmt.query_map([&id], |er| {
@@ -1766,6 +1922,10 @@ impl Database {
                 gutter_unit,
                 bleed,
                 safe_area,
+                safe_area_top: Some(safe_area_top),
+                safe_area_bottom: Some(safe_area_bottom),
+                safe_area_outside: Some(safe_area_outside),
+                safe_area_spine: Some(safe_area_spine),
                 background_color,
                 elements,
             };
@@ -1795,6 +1955,10 @@ impl Database {
             gutter_unit: "mm".to_string(),
             bleed: 3.0,
             safe_area: 10.0,
+            safe_area_top: Some(10.0),
+            safe_area_bottom: Some(10.0),
+            safe_area_outside: Some(10.0),
+            safe_area_spine: Some(10.0),
             background_color: "#1e293b".to_string(),
             elements: Vec::new(),
         });
@@ -1843,7 +2007,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 12);
+        assert_eq!(db.get_schema_version().unwrap(), 13);
 
         db.create_project(
             "test-id-1",
@@ -1857,6 +2021,10 @@ mod tests {
             true,
             10.0,
             "mm",
+            11.0,
+            12.0,
+            13.0,
+            14.0,
             false,
             1.0,
             "mm",
@@ -1870,6 +2038,10 @@ mod tests {
         assert_eq!(project.canvas_width, 8.0);
         assert_eq!(project.margin_enabled, true);
         assert_eq!(project.margin_value, 10.0);
+        assert_eq!(project.margin_top, Some(11.0));
+        assert_eq!(project.margin_bottom, Some(12.0));
+        assert_eq!(project.margin_outside, Some(13.0));
+        assert_eq!(project.margin_spine, Some(14.0));
         assert_eq!(project.border_enabled, false);
 
         let list = db.list_recent_projects(10).unwrap();
@@ -1997,6 +2169,10 @@ mod tests {
             gutter_unit: "inch".to_string(),
             bleed: 0.125,
             safe_area: 10.0,
+            safe_area_top: Some(11.0),
+            safe_area_bottom: Some(12.0),
+            safe_area_outside: Some(13.0),
+            safe_area_spine: Some(14.0),
             background_color: "#1e293b".to_string(),
             elements: vec![],
         };
@@ -2034,6 +2210,10 @@ mod tests {
             gutter_unit: "inch".to_string(),
             bleed: 0.125,
             safe_area: 10.0,
+            safe_area_top: Some(15.0),
+            safe_area_bottom: Some(16.0),
+            safe_area_outside: Some(17.0),
+            safe_area_spine: Some(18.0),
             background_color: "#FFFFFF".to_string(),
             elements: vec![
                 ElementPayload {
@@ -2092,6 +2272,14 @@ mod tests {
         assert_eq!(loaded_album.spreads[0].elements[0].width, 50.0);
         assert_eq!(loaded_album.spreads[0].elements[0].border_enabled, true);
         assert_eq!(loaded_album.spreads[0].elements[0].locked, Some(false));
+        assert_eq!(loaded_album.cover_spread.safe_area_top, Some(11.0));
+        assert_eq!(loaded_album.cover_spread.safe_area_bottom, Some(12.0));
+        assert_eq!(loaded_album.cover_spread.safe_area_outside, Some(13.0));
+        assert_eq!(loaded_album.cover_spread.safe_area_spine, Some(14.0));
+        assert_eq!(loaded_album.spreads[0].safe_area_top, Some(15.0));
+        assert_eq!(loaded_album.spreads[0].safe_area_bottom, Some(16.0));
+        assert_eq!(loaded_album.spreads[0].safe_area_outside, Some(17.0));
+        assert_eq!(loaded_album.spreads[0].safe_area_spine, Some(18.0));
 
         // Test Export & Import .afsn Package
         let afsn_path = temp_dir.join("test_package.afsn");
@@ -2100,7 +2288,10 @@ mod tests {
 
         let imported_pkg = db.import_project_package(afsn_path.to_str().unwrap()).expect("Failed import .afsn");
         assert_eq!(imported_pkg.project.id, "test-id-1");
-        assert_eq!(imported_pkg.album.unwrap().spreads.len(), 1);
+        assert_eq!(imported_pkg.project.margin_top, Some(11.0));
+        let imported_album = imported_pkg.album.unwrap();
+        assert_eq!(imported_album.spreads.len(), 1);
+        assert_eq!(imported_album.spreads[0].safe_area_spine, Some(18.0));
 
         // Test Export & Import Standalone Bundle .zip Package (with photos)
         let sample_img_path = temp_dir.join("sample_img.jpg");
@@ -2212,7 +2403,8 @@ mod tests {
 
         db.create_project(
             "proj-orig", "Original Album", 300.0, 300.0, "mm", 300,
-            2.0, "mm", true, 10.0, "mm", false, 0.0, "mm", "#FFFFFF", "solid", "#FFFFFF"
+            2.0, "mm", true, 10.0, "mm", 10.0, 10.0, 10.0, 10.0,
+            false, 0.0, "mm", "#FFFFFF", "solid", "#FFFFFF"
         ).unwrap();
 
         let dup = db.duplicate_project(
