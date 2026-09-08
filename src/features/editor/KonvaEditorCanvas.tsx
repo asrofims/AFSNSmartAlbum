@@ -2680,7 +2680,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       } else {
                         const otherRects = (activeSpread.elements || [])
                           .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
                         const thresholdUnits =
                           typeof snappingConfig.threshold === 'number'
@@ -2688,7 +2688,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                             : 0.1;
 
                         const snapRes = calculateSnapping(
-                          { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height },
+                          { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
                           totalSpreadPhysicalW,
                           totalSpreadPhysicalH,
                           safeAreaMargins,
@@ -2743,13 +2743,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                         const otherRects = (activeSpread.elements || [])
                           .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
                         const snapRes =
                           !snapEnabled || e.evt?.ctrlKey
                             ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
                             : calculateSnapping(
-                                { x: finalCurrentPhysX, y: finalCurrentPhysY, width: textEl.width, height: textEl.height },
+                                { x: finalCurrentPhysX, y: finalCurrentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
                                 totalSpreadPhysicalW,
                                 totalSpreadPhysicalH,
                                 safeAreaMargins,
@@ -2891,7 +2891,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     } else {
                       const otherRects = (activeSpread.elements || [])
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
                       const thresholdUnits =
                         typeof snappingConfig.threshold === 'number'
@@ -2899,7 +2899,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           : 0.1;
 
                       const snapRes = calculateSnapping(
-                        { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height },
+                        { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
                         totalSpreadPhysicalW,
                         totalSpreadPhysicalH,
                         safeAreaMargins,
@@ -2969,12 +2969,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
                       const otherRects = (activeSpread.elements || [])
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
                       const snapRes = (!snapEnabled || e.evt?.ctrlKey)
                         ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
                         : calculateSnapping(
-                            { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height },
+                            { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
                             totalSpreadPhysicalW,
                             totalSpreadPhysicalH,
                             safeAreaMargins,
@@ -3645,7 +3645,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     x={isHoriz ? midPx : crossPx}
                     y={isHoriz ? crossPx : midPx}
                   >
-                    <Label offsetX={26} offsetY={9}>
+                    <Label offsetX={isHoriz ? 26 : -8} offsetY={isHoriz ? 24 : 9}>
                       <Tag
                         fill="#082f49"
                         stroke="#06b6d4"

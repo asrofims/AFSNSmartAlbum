@@ -236,6 +236,13 @@
 - [x] Fit Frame to Content can expand a narrow column up to the page width; Fit buttons read committed text and report when the frame already fits.
 - Validation: code review, whitespace check, and TypeScript `tsc --noEmit` passed; tests and interactive verification were not run, as requested.
 
+### Inter-Object Gap Guide Accuracy — 8 September 2026
+
+- [x] Restrict gap guides to strictly facing neighbors with overlapping projections; position dimension lines in the shared overlapping span rather than pairing diagonal objects.
+- [x] Apply a 25 mm proximity threshold for displaying individual adjacent gap indicators, eliminating cluttered guides between distant objects across the canvas.
+- [x] Derive gap values from snapped geometry, remove obsolete collinear snap lines superseded by equidistant snapping, and account for rotated frame bounds.
+- [x] Position distance badges beside dimension lines to keep narrow gaps and endpoint tick marks visible.
+
 ## Project Save/Open Integrity — 8 September 2026
 - [x] Restrict editable documents to AFSN; ZIP packages are extracted before opening and never become Save/autosave targets.
 - [x] Atomic AFSN/ZIP file publication, strict asset-copy error handling, and unchanged destination files after failed writes.

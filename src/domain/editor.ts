@@ -116,6 +116,7 @@ export interface RectBounds {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
 }
 
 export const MAX_CROP_SCALE = 3.5;
@@ -759,193 +760,281 @@ export function calculateSnapping(
 
   // --- EQUAL SPACING & GAP DETECTION ---
   if (config.snapToEqualGaps) {
-    // 1. Horizontal Gaps (frames nearby in Y)
-    const yNearbyFrames = otherFrames.filter((f) => {
-      const verticalDistance = Math.max(0, Math.max(dragged.y, f.y) - Math.min(dragged.y + dragged.height, f.y + f.height));
-      return verticalDistance <= Math.max(dragged.height, f.height) * 0.5 + 25;
-    });
+    // Maximum proximity distance for displaying adjacent gap guides (25mm / 2.5cm / 1.0 inch)
+    const maxProximityGap =
+      unit === 'cm' ? 2.5 : unit === 'inch' ? 1.0 : unit === 'px' ? 300 : 25.0;
 
-  const leftFrames = yNearbyFrames.filter((f) => f.x + f.width <= dragged.x + threshold).sort((a, b) => (b.x + b.width) - (a.x + a.width));
-  const rightFrames = yNearbyFrames.filter((f) => f.x >= dragged.x + dragged.width - threshold).sort((a, b) => a.x - b.x);
+    // Visual bounds taking rotation into account
+    const draggedBounds = getFrameVisualBounds(dragged);
+    const dragOffsetX = draggedBounds.x - dragged.x;
+    const dragOffsetY = draggedBounds.y - dragged.y;
 
-  const leftNeighbor = leftFrames[0];
-  const rightNeighbor = rightFrames[0];
+    // Active visual bounds at current snapped position
+    const activeVisualDragged: RectBounds = {
+      x: snappedX + dragOffsetX,
+      y: snappedY + dragOffsetY,
+      width: draggedBounds.width,
+      height: draggedBounds.height,
+    };
 
-  if (leftNeighbor && rightNeighbor) {
-    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
-    const rightGap = rightNeighbor.x - (dragged.x + dragged.width);
+    // 1. Horizontal Gaps (strictly facing neighbors with vertical overlap)
+    const facingHorizontal = otherFrames
+      .map((f) => {
+        const bounds = getFrameVisualBounds(f);
+        const overlapStartY = Math.max(activeVisualDragged.y, bounds.y);
+        const overlapEndY = Math.min(activeVisualDragged.y + activeVisualDragged.height, bounds.y + bounds.height);
+        const overlapY = overlapEndY - overlapStartY;
+        return { bounds, overlapY, overlapStartY, overlapEndY };
+      })
+      .filter((item) => item.overlapY > 0);
 
-    if (leftGap > 0 && rightGap > 0 && Math.abs(leftGap - rightGap) <= threshold * 2) {
-      // Snap to equidistant midpoint
-      const totalSpan = rightNeighbor.x - (leftNeighbor.x + leftNeighbor.width) - dragged.width;
-      const equalGap = Math.max(0, totalSpan / 2);
-      snappedX = roundToTenth(leftNeighbor.x + leftNeighbor.width + equalGap);
+    // Nearest left neighbor: maximum (bounds.x + bounds.width)
+    const leftNeighbors = facingHorizontal
+      .filter((item) => item.bounds.x + item.bounds.width <= activeVisualDragged.x + threshold)
+      .sort((a, b) => (b.bounds.x + b.bounds.width) - (a.bounds.x + a.bounds.width));
 
-      const crossY = Math.min(dragged.y + dragged.height / 2, Math.min(leftNeighbor.y + leftNeighbor.height / 2, rightNeighbor.y + rightNeighbor.height / 2));
-      gapGuides.push(
-        {
-          type: 'horizontal',
-          start: leftNeighbor.x + leftNeighbor.width,
-          end: snappedX,
-          crossPos: crossY,
-          distance: roundToTenth(equalGap),
-          label: `${roundToTenth(equalGap)} ${unit}`,
-        },
-        {
-          type: 'horizontal',
-          start: snappedX + dragged.width,
-          end: rightNeighbor.x,
-          crossPos: crossY,
-          distance: roundToTenth(equalGap),
-          label: `${roundToTenth(equalGap)} ${unit}`,
+    // Nearest right neighbor: minimum bounds.x
+    const rightNeighbors = facingHorizontal
+      .filter((item) => item.bounds.x >= activeVisualDragged.x + activeVisualDragged.width - threshold)
+      .sort((a, b) => a.bounds.x - b.bounds.x);
+
+    const leftNeighborItem = leftNeighbors[0];
+    const rightNeighborItem = rightNeighbors[0];
+
+    if (leftNeighborItem && rightNeighborItem) {
+      const leftEdge = leftNeighborItem.bounds.x + leftNeighborItem.bounds.width;
+      const rightEdge = rightNeighborItem.bounds.x;
+      const leftGap = activeVisualDragged.x - leftEdge;
+      const rightGap = rightEdge - (activeVisualDragged.x + activeVisualDragged.width);
+
+      if (leftGap > 0 && rightGap > 0 && Math.abs(leftGap - rightGap) <= threshold * 2) {
+        // Equidistant snap!
+        const totalSpan = rightEdge - leftEdge - activeVisualDragged.width;
+        const equalGap = Math.max(0, totalSpan / 2);
+        const targetVisualX = leftEdge + equalGap;
+        snappedX = roundToTenth(targetVisualX - dragOffsetX);
+
+        const leftCrossY = (leftNeighborItem.overlapStartY + leftNeighborItem.overlapEndY) / 2;
+        const rightCrossY = (rightNeighborItem.overlapStartY + rightNeighborItem.overlapEndY) / 2;
+
+        gapGuides.push(
+          {
+            type: 'horizontal',
+            start: leftEdge,
+            end: leftEdge + equalGap,
+            crossPos: leftCrossY,
+            distance: roundToTenth(equalGap),
+            label: `${roundToTenth(equalGap)} ${unit}`,
+          },
+          {
+            type: 'horizontal',
+            start: leftEdge + equalGap + activeVisualDragged.width,
+            end: rightEdge,
+            crossPos: rightCrossY,
+            distance: roundToTenth(equalGap),
+            label: `${roundToTenth(equalGap)} ${unit}`,
+          }
+        );
+      } else {
+        const currentVisualLeft = snappedX + dragOffsetX;
+        const currentLeftGap = currentVisualLeft - leftEdge;
+        if (currentLeftGap > 0 && currentLeftGap <= maxProximityGap) {
+          const crossY = (leftNeighborItem.overlapStartY + leftNeighborItem.overlapEndY) / 2;
+          gapGuides.push({
+            type: 'horizontal',
+            start: leftEdge,
+            end: currentVisualLeft,
+            crossPos: crossY,
+            distance: roundToTenth(currentLeftGap),
+            label: `${roundToTenth(currentLeftGap)} ${unit}`,
+          });
         }
-      );
-    } else {
-      if (leftGap > 0 && leftGap <= 80) {
-        const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
+
+        const currentVisualRight = currentVisualLeft + activeVisualDragged.width;
+        const currentRightGap = rightEdge - currentVisualRight;
+        if (currentRightGap > 0 && currentRightGap <= maxProximityGap) {
+          const crossY = (rightNeighborItem.overlapStartY + rightNeighborItem.overlapEndY) / 2;
+          gapGuides.push({
+            type: 'horizontal',
+            start: currentVisualRight,
+            end: rightEdge,
+            crossPos: crossY,
+            distance: roundToTenth(currentRightGap),
+            label: `${roundToTenth(currentRightGap)} ${unit}`,
+          });
+        }
+      }
+    } else if (leftNeighborItem) {
+      const leftEdge = leftNeighborItem.bounds.x + leftNeighborItem.bounds.width;
+      const currentVisualLeft = snappedX + dragOffsetX;
+      const currentLeftGap = currentVisualLeft - leftEdge;
+      if (currentLeftGap > 0 && currentLeftGap <= maxProximityGap) {
+        const crossY = (leftNeighborItem.overlapStartY + leftNeighborItem.overlapEndY) / 2;
         gapGuides.push({
           type: 'horizontal',
-          start: leftNeighbor.x + leftNeighbor.width,
-          end: snappedX,
+          start: leftEdge,
+          end: currentVisualLeft,
           crossPos: crossY,
-          distance: roundToTenth(leftGap),
-          label: `${roundToTenth(leftGap)} ${unit}`,
+          distance: roundToTenth(currentLeftGap),
+          label: `${roundToTenth(currentLeftGap)} ${unit}`,
         });
       }
-      if (rightGap > 0 && rightGap <= 80) {
-        const crossY = Math.min(dragged.y + dragged.height / 2, rightNeighbor.y + rightNeighbor.height / 2);
+    } else if (rightNeighborItem) {
+      const rightEdge = rightNeighborItem.bounds.x;
+      const currentVisualLeft = snappedX + dragOffsetX;
+      const currentVisualRight = currentVisualLeft + activeVisualDragged.width;
+      const currentRightGap = rightEdge - currentVisualRight;
+      if (currentRightGap > 0 && currentRightGap <= maxProximityGap) {
+        const crossY = (rightNeighborItem.overlapStartY + rightNeighborItem.overlapEndY) / 2;
         gapGuides.push({
           type: 'horizontal',
-          start: snappedX + dragged.width,
-          end: rightNeighbor.x,
+          start: currentVisualRight,
+          end: rightEdge,
           crossPos: crossY,
-          distance: roundToTenth(rightGap),
-          label: `${roundToTenth(rightGap)} ${unit}`,
+          distance: roundToTenth(currentRightGap),
+          label: `${roundToTenth(currentRightGap)} ${unit}`,
         });
       }
     }
-  } else if (leftNeighbor) {
-    const leftGap = dragged.x - (leftNeighbor.x + leftNeighbor.width);
-    if (leftGap > 0 && leftGap <= 80) {
-      const crossY = Math.min(dragged.y + dragged.height / 2, leftNeighbor.y + leftNeighbor.height / 2);
-      gapGuides.push({
-        type: 'horizontal',
-        start: leftNeighbor.x + leftNeighbor.width,
-        end: snappedX,
-        crossPos: crossY,
-        distance: roundToTenth(leftGap),
-        label: `${roundToTenth(leftGap)} ${unit}`,
-      });
-    }
-  } else if (rightNeighbor) {
-    const rightGap = rightNeighbor.x - (dragged.x + dragged.width);
-    if (rightGap > 0 && rightGap <= 80) {
-      const crossY = Math.min(dragged.y + dragged.height / 2, rightNeighbor.y + rightNeighbor.height / 2);
-      gapGuides.push({
-        type: 'horizontal',
-        start: snappedX + dragged.width,
-        end: rightNeighbor.x,
-        crossPos: crossY,
-        distance: roundToTenth(rightGap),
-        label: `${roundToTenth(rightGap)} ${unit}`,
-      });
+
+    // 2. Vertical Gaps (strictly facing neighbors with horizontal overlap)
+    const facingVertical = otherFrames
+      .map((f) => {
+        const bounds = getFrameVisualBounds(f);
+        const overlapStartX = Math.max(activeVisualDragged.x, bounds.x);
+        const overlapEndX = Math.min(activeVisualDragged.x + activeVisualDragged.width, bounds.x + bounds.width);
+        const overlapX = overlapEndX - overlapStartX;
+        return { bounds, overlapX, overlapStartX, overlapEndX };
+      })
+      .filter((item) => item.overlapX > 0);
+
+    // Nearest top neighbor: maximum (bounds.y + bounds.height)
+    const topNeighbors = facingVertical
+      .filter((item) => item.bounds.y + item.bounds.height <= activeVisualDragged.y + threshold)
+      .sort((a, b) => (b.bounds.y + b.bounds.height) - (a.bounds.y + a.bounds.height));
+
+    // Nearest bottom neighbor: minimum bounds.y
+    const bottomNeighbors = facingVertical
+      .filter((item) => item.bounds.y >= activeVisualDragged.y + activeVisualDragged.height - threshold)
+      .sort((a, b) => a.bounds.y - b.bounds.y);
+
+    const topNeighborItem = topNeighbors[0];
+    const bottomNeighborItem = bottomNeighbors[0];
+
+    if (topNeighborItem && bottomNeighborItem) {
+      const topEdge = topNeighborItem.bounds.y + topNeighborItem.bounds.height;
+      const bottomEdge = bottomNeighborItem.bounds.y;
+      const topGap = activeVisualDragged.y - topEdge;
+      const bottomGap = bottomEdge - (activeVisualDragged.y + activeVisualDragged.height);
+
+      if (topGap > 0 && bottomGap > 0 && Math.abs(topGap - bottomGap) <= threshold * 2) {
+        // Equidistant snap!
+        const totalSpan = bottomEdge - topEdge - activeVisualDragged.height;
+        const equalGap = Math.max(0, totalSpan / 2);
+        const targetVisualY = topEdge + equalGap;
+        snappedY = roundToTenth(targetVisualY - dragOffsetY);
+
+        const topCrossX = (topNeighborItem.overlapStartX + topNeighborItem.overlapEndX) / 2;
+        const bottomCrossX = (bottomNeighborItem.overlapStartX + bottomNeighborItem.overlapEndX) / 2;
+
+        gapGuides.push(
+          {
+            type: 'vertical',
+            start: topEdge,
+            end: topEdge + equalGap,
+            crossPos: topCrossX,
+            distance: roundToTenth(equalGap),
+            label: `${roundToTenth(equalGap)} ${unit}`,
+          },
+          {
+            type: 'vertical',
+            start: topEdge + equalGap + activeVisualDragged.height,
+            end: bottomEdge,
+            crossPos: bottomCrossX,
+            distance: roundToTenth(equalGap),
+            label: `${roundToTenth(equalGap)} ${unit}`,
+          }
+        );
+      } else {
+        const currentVisualTop = snappedY + dragOffsetY;
+        const currentTopGap = currentVisualTop - topEdge;
+        if (currentTopGap > 0 && currentTopGap <= maxProximityGap) {
+          const crossX = (topNeighborItem.overlapStartX + topNeighborItem.overlapEndX) / 2;
+          gapGuides.push({
+            type: 'vertical',
+            start: topEdge,
+            end: currentVisualTop,
+            crossPos: crossX,
+            distance: roundToTenth(currentTopGap),
+            label: `${roundToTenth(currentTopGap)} ${unit}`,
+          });
+        }
+
+        const currentVisualBottom = currentVisualTop + activeVisualDragged.height;
+        const currentBottomGap = bottomEdge - currentVisualBottom;
+        if (currentBottomGap > 0 && currentBottomGap <= maxProximityGap) {
+          const crossX = (bottomNeighborItem.overlapStartX + bottomNeighborItem.overlapEndX) / 2;
+          gapGuides.push({
+            type: 'vertical',
+            start: currentVisualBottom,
+            end: bottomEdge,
+            crossPos: crossX,
+            distance: roundToTenth(currentBottomGap),
+            label: `${roundToTenth(currentBottomGap)} ${unit}`,
+          });
+        }
+      }
+    } else if (topNeighborItem) {
+      const topEdge = topNeighborItem.bounds.y + topNeighborItem.bounds.height;
+      const currentVisualTop = snappedY + dragOffsetY;
+      const currentTopGap = currentVisualTop - topEdge;
+      if (currentTopGap > 0 && currentTopGap <= maxProximityGap) {
+        const crossX = (topNeighborItem.overlapStartX + topNeighborItem.overlapEndX) / 2;
+        gapGuides.push({
+          type: 'vertical',
+          start: topEdge,
+          end: currentVisualTop,
+          crossPos: crossX,
+          distance: roundToTenth(currentTopGap),
+          label: `${roundToTenth(currentTopGap)} ${unit}`,
+        });
+      }
+    } else if (bottomNeighborItem) {
+      const bottomEdge = bottomNeighborItem.bounds.y;
+      const currentVisualTop = snappedY + dragOffsetY;
+      const currentVisualBottom = currentVisualTop + activeVisualDragged.height;
+      const currentBottomGap = bottomEdge - currentVisualBottom;
+      if (currentBottomGap > 0 && currentBottomGap <= maxProximityGap) {
+        const crossX = (bottomNeighborItem.overlapStartX + bottomNeighborItem.overlapEndX) / 2;
+        gapGuides.push({
+          type: 'vertical',
+          start: currentVisualBottom,
+          end: bottomEdge,
+          crossPos: crossX,
+          distance: roundToTenth(currentBottomGap),
+          label: `${roundToTenth(currentBottomGap)} ${unit}`,
+        });
+      }
     }
   }
 
-  // 2. Vertical Gaps (frames nearby in X)
-  const xNearbyFrames = otherFrames.filter((f) => {
-    const horizontalDistance = Math.max(0, Math.max(dragged.x, f.x) - Math.min(dragged.x + dragged.width, f.x + f.width));
-    return horizontalDistance <= Math.max(dragged.width, f.width) * 0.5 + 25;
+  const finalSnapLines = snapLines.filter((line) => {
+    if (line.type === 'vertical') {
+      return (
+        Math.abs(line.position - snappedX) <= 0.05 ||
+        Math.abs(line.position - (snappedX + dragged.width / 2)) <= 0.05 ||
+        Math.abs(line.position - (snappedX + dragged.width)) <= 0.05
+      );
+    } else {
+      return (
+        Math.abs(line.position - snappedY) <= 0.05 ||
+        Math.abs(line.position - (snappedY + dragged.height / 2)) <= 0.05 ||
+        Math.abs(line.position - (snappedY + dragged.height)) <= 0.05
+      );
+    }
   });
 
-  const topFrames = xNearbyFrames.filter((f) => f.y + f.height <= dragged.y + threshold).sort((a, b) => (b.y + b.height) - (a.y + a.height));
-  const bottomFrames = xNearbyFrames.filter((f) => f.y >= dragged.y + dragged.height - threshold).sort((a, b) => a.y - b.y);
-
-  const topNeighbor = topFrames[0];
-  const bottomNeighbor = bottomFrames[0];
-
-  if (topNeighbor && bottomNeighbor) {
-    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
-    const bottomGap = bottomNeighbor.y - (dragged.y + dragged.height);
-
-    if (topGap > 0 && bottomGap > 0 && Math.abs(topGap - bottomGap) <= threshold * 2) {
-      const totalSpan = bottomNeighbor.y - (topNeighbor.y + topNeighbor.height) - dragged.height;
-      const equalGap = Math.max(0, totalSpan / 2);
-      snappedY = roundToTenth(topNeighbor.y + topNeighbor.height + equalGap);
-
-      const crossX = Math.min(dragged.x + dragged.width / 2, Math.min(topNeighbor.x + topNeighbor.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2));
-      gapGuides.push(
-        {
-          type: 'vertical',
-          start: topNeighbor.y + topNeighbor.height,
-          end: snappedY,
-          crossPos: crossX,
-          distance: roundToTenth(equalGap),
-          label: `${roundToTenth(equalGap)} ${unit}`,
-        },
-        {
-          type: 'vertical',
-          start: snappedY + dragged.height,
-          end: bottomNeighbor.y,
-          crossPos: crossX,
-          distance: roundToTenth(equalGap),
-          label: `${roundToTenth(equalGap)} ${unit}`,
-        }
-      );
-    } else {
-      if (topGap > 0 && topGap <= 80) {
-        const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
-        gapGuides.push({
-          type: 'vertical',
-          start: topNeighbor.y + topNeighbor.height,
-          end: snappedY,
-          crossPos: crossX,
-          distance: roundToTenth(topGap),
-          label: `${roundToTenth(topGap)} ${unit}`,
-        });
-      }
-      if (bottomGap > 0 && bottomGap <= 80) {
-        const crossX = Math.min(dragged.x + dragged.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2);
-        gapGuides.push({
-          type: 'vertical',
-          start: snappedY + dragged.height,
-          end: bottomNeighbor.y,
-          crossPos: crossX,
-          distance: roundToTenth(bottomGap),
-          label: `${roundToTenth(bottomGap)} ${unit}`,
-        });
-      }
-    }
-  } else if (topNeighbor) {
-    const topGap = dragged.y - (topNeighbor.y + topNeighbor.height);
-    if (topGap > 0 && topGap <= 80) {
-      const crossX = Math.min(dragged.x + dragged.width / 2, topNeighbor.x + topNeighbor.width / 2);
-      gapGuides.push({
-        type: 'vertical',
-        start: topNeighbor.y + topNeighbor.height,
-        end: snappedY,
-        crossPos: crossX,
-        distance: roundToTenth(topGap),
-        label: `${roundToTenth(topGap)} ${unit}`,
-      });
-    }
-  } else if (bottomNeighbor) {
-    const bottomGap = bottomNeighbor.y - (dragged.y + dragged.height);
-    if (bottomGap > 0 && bottomGap <= 80) {
-      const crossX = Math.min(dragged.x + dragged.width / 2, bottomNeighbor.x + bottomNeighbor.width / 2);
-      gapGuides.push({
-        type: 'vertical',
-        start: snappedY + dragged.height,
-        end: bottomNeighbor.y,
-        crossPos: crossX,
-        distance: roundToTenth(bottomGap),
-        label: `${roundToTenth(bottomGap)} ${unit}`,
-      });
-    }
-  }
-}
-
-return { snappedX, snappedY, snapLines, gapGuides };
+  return { snappedX, snappedY, snapLines: finalSnapLines, gapGuides };
 }
 
 /**
