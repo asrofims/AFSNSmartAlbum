@@ -84,6 +84,14 @@ fn default_gutter_unit() -> String { "mm".to_string() }
 fn default_bg_color() -> String { "#FFFFFF".to_string() }
 fn default_bg_type() -> String { "solid".to_string() }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CornerRadiusPayload {
+    Single(f64),
+    Array([f64; 4]),
+    List(Vec<f64>),
+}
+
 /// Represents an element / photo frame on a spread.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -143,7 +151,7 @@ pub struct ElementPayload {
     #[serde(default)]
     pub corner_radius_bl: f64,
     #[serde(default)]
-    pub corner_radius: Option<f64>,
+    pub corner_radius: Option<CornerRadiusPayload>,
 }
 
 impl ElementPayload {
@@ -156,9 +164,23 @@ impl ElementPayload {
                 self.corner_radius_br.max(0.0),
                 self.corner_radius_bl.max(0.0),
             )
-        } else if let Some(r) = self.corner_radius {
-            let clamped = r.max(0.0);
-            (clamped, clamped, clamped, clamped)
+        } else if let Some(ref r) = self.corner_radius {
+            match r {
+                CornerRadiusPayload::Single(v) => {
+                    let clamped = v.max(0.0);
+                    (clamped, clamped, clamped, clamped)
+                }
+                CornerRadiusPayload::Array([tl, tr, br, bl]) => {
+                    (tl.max(0.0), tr.max(0.0), br.max(0.0), bl.max(0.0))
+                }
+                CornerRadiusPayload::List(list) => {
+                    let tl = list.get(0).copied().unwrap_or(0.0).max(0.0);
+                    let tr = list.get(1).copied().unwrap_or(0.0).max(0.0);
+                    let br = list.get(2).copied().unwrap_or(0.0).max(0.0);
+                    let bl = list.get(3).copied().unwrap_or(0.0).max(0.0);
+                    (tl, tr, br, bl)
+                }
+            }
         } else {
             (0.0, 0.0, 0.0, 0.0)
         }
@@ -2484,6 +2506,102 @@ mod tests {
 
         let orig = db.get_project("proj-orig").unwrap().unwrap();
         assert_eq!(orig.name, "Original Album");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_corner_radius_payload_deserialization_and_persistence() {
+        // 1. Test scalar cornerRadius JSON deserialization
+        let json_scalar = r#"{
+            "id": "el-1",
+            "type": "photo",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "cornerRadius": 12.5
+        }"#;
+        let elem_scalar: ElementPayload = serde_json::from_str(json_scalar).expect("Failed deserializing scalar cornerRadius");
+        assert_eq!(elem_scalar.corner_radii(), (12.5, 12.5, 12.5, 12.5));
+
+        // 2. Test array [TL, TR, BR, BL] cornerRadius JSON deserialization
+        let json_array = r#"{
+            "id": "el-2",
+            "type": "photo",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "cornerRadius": [5.0, 10.0, 15.0, 20.0]
+        }"#;
+        let elem_array: ElementPayload = serde_json::from_str(json_array).expect("Failed deserializing array cornerRadius");
+        assert_eq!(elem_array.corner_radii(), (5.0, 10.0, 15.0, 20.0));
+
+        // 3. Test independent fields with array fallback
+        let json_fields = r#"{
+            "id": "el-3",
+            "type": "photo",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "cornerRadiusTl": 8.0,
+            "cornerRadiusTr": 0.0,
+            "cornerRadiusBr": 8.0,
+            "cornerRadiusBl": 0.0,
+            "cornerRadius": [8.0, 0.0, 8.0, 0.0]
+        }"#;
+        let elem_fields: ElementPayload = serde_json::from_str(json_fields).expect("Failed deserializing non-uniform cornerRadius");
+        assert_eq!(elem_fields.corner_radii(), (8.0, 0.0, 8.0, 0.0));
+
+        // 4. Test database persistence of non-uniform corner radii
+        let temp_dir = std::env::temp_dir().join("afsn_test_db_corners");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let db = Database::init(temp_dir.join("test_corners.db")).expect("Failed to init db");
+
+        db.create_project(
+            "proj-corners", "Corner Test Album", 300.0, 300.0, "mm", 300,
+            2.0, "mm", true, 10.0, "mm", 10.0, 10.0, 10.0, 10.0,
+            false, 0.0, "mm", "#FFFFFF", "solid", "#FFFFFF"
+        ).unwrap();
+
+        let album_payload = AlbumPayload {
+            id: "album-corners".to_string(),
+            project_id: "proj-corners".to_string(),
+            total_spreads: 1,
+            total_pages: 2,
+            cover_spread: SpreadPayload {
+                id: "cover-1".to_string(),
+                spread_index: 0,
+                r#type: "cover".to_string(),
+                name: "Cover Spread".to_string(),
+                left_page: None,
+                right_page: None,
+                gutter_width: 0.0,
+                gutter_unit: "mm".to_string(),
+                bleed: 3.0,
+                safe_area: 10.0,
+                safe_area_top: Some(10.0),
+                safe_area_bottom: Some(10.0),
+                safe_area_outside: Some(10.0),
+                safe_area_spine: Some(10.0),
+                background_color: "#FFFFFF".to_string(),
+                elements: vec![elem_fields],
+            },
+            spreads: vec![],
+        };
+
+        db.save_album_structure(&album_payload).expect("Failed saving album with non-uniform corners");
+
+        let loaded = db.load_album_structure("proj-corners").expect("Failed loading album").expect("Album not found");
+        assert_eq!(loaded.cover_spread.elements.len(), 1);
+        let loaded_elem = &loaded.cover_spread.elements[0];
+        assert_eq!(loaded_elem.corner_radius_tl, 8.0);
+        assert_eq!(loaded_elem.corner_radius_tr, 0.0);
+        assert_eq!(loaded_elem.corner_radius_br, 8.0);
+        assert_eq!(loaded_elem.corner_radius_bl, 0.0);
+        assert_eq!(loaded_elem.corner_radii(), (8.0, 0.0, 8.0, 0.0));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
