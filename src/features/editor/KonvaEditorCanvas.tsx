@@ -25,6 +25,7 @@ import {
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
+import { calculateSpreadViewport } from '../../domain/viewport';
 import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
@@ -517,10 +518,11 @@ function PhotoFrameNode({
         node.scaleY(1);
 
         onFrameChange({
-          x: roundToHundredth(node.x() / scaleFactor),
-          y: roundToHundredth(node.y() / scaleFactor),
-          width: roundToHundredth(rawW),
-          height: roundToHundredth(rawH),
+          // Keep the snapped geometry when committing the transform on pointer release.
+          x: node.x() / scaleFactor,
+          y: node.y() / scaleFactor,
+          width: rawW,
+          height: rawH,
           rotation: Math.round(node.rotation()),
         });
       }}
@@ -1664,24 +1666,12 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const marginV = 100;
   const maxAvailableW = Math.max(200, (containerSize.width - marginH) * 0.92);
   const maxAvailableH = Math.max(150, (containerSize.height - marginV) * 0.92);
-  const aspect = totalSpreadPhysicalW / Math.max(0.001, totalSpreadPhysicalH);
-
-  let baseW = maxAvailableW;
-  let baseH = Math.round(baseW / aspect);
-  if (baseH > maxAvailableH) {
-    baseH = maxAvailableH;
-    baseW = Math.round(baseH * aspect);
-  }
-
-  // Zoom scale factor
   const zoomScale = zoomLevel / 100;
-  const screenSpreadW = Math.round(baseW * zoomScale);
-  const screenSpreadH = Math.round(baseH * zoomScale);
+  const { width: screenSpreadW, height: screenSpreadH, scaleFactor } = calculateSpreadViewport(
+    totalSpreadPhysicalW, totalSpreadPhysicalH, maxAvailableW, maxAvailableH, zoomScale,
+  );
 
-  // Conversion factor: multiply physical units (in canvasUnit) by this to get screen pixels
-  const scaleFactor = screenSpreadW / totalSpreadPhysicalW;
-
-  const leftPagePixelW = Math.round(screenSpreadW / 2);
+  const leftPagePixelW = singlePageW * scaleFactor;
   const rightPagePixelW = screenSpreadW - leftPagePixelW;
   const gutterPixelW = 0;
 
@@ -2620,20 +2610,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               <Group listening={false}>
                 {/* Left Page Safe Area (Blue) */}
                 <Rect
-                  x={Math.round(dims.safeMarginOutside * scaleFactor)}
-                  y={Math.round(dims.safeMarginTop * scaleFactor)}
-                  width={Math.max(1, Math.round((dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scaleFactor))}
-                  height={Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor))}
+                  x={dims.safeMarginOutside * scaleFactor}
+                  y={dims.safeMarginTop * scaleFactor}
+                  width={Math.max(0, (dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scaleFactor)}
+                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}
                   dash={[5, 4]}
                 />
                 {/* Right Page Safe Area (Blue) */}
                 <Rect
-                  x={Math.round((dims.pageWidth + dims.gutterWidth + dims.safeMarginSpine) * scaleFactor)}
-                  y={Math.round(dims.safeMarginTop * scaleFactor)}
-                  width={Math.max(1, Math.round((dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scaleFactor))}
-                  height={Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor))}
+                  x={(dims.pageWidth + dims.gutterWidth + dims.safeMarginSpine) * scaleFactor}
+                  y={dims.safeMarginTop * scaleFactor}
+                  width={Math.max(0, (dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scaleFactor)}
+                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
                   stroke="rgba(59, 130, 246, 0.65)"
                   strokeWidth={1}
                   dash={[5, 4]}
@@ -3441,7 +3431,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     { x: physicalX, y: physicalY, width: physicalW, height: physicalH },
                     totalSpreadPhysicalW,
                     totalSpreadPhysicalH,
-                    activeSpread.safeArea,
+                    safeAreaMargins,
                     gutterPhysicalW,
                     otherRects,
                     thresholdUnits,

@@ -321,3 +321,23 @@
 - [x] Enhance `calculateSnapping` to magnetically snap to the center spine / fold line on layflat albums with zero gutter width.
 - [x] Application version metadata bumped to `v1.0.45`.
 
+### Phase 28 — Release v1.0.46: Full-Bleed Adaptive Layout Variations (Edge-to-Edge)
+
+- [x] Fix persistent gap between photo frames and canvas edge in adaptive layout engine: all photo counts (1–6+) now generate **full-bleed variations** that place frames flush to the physical page edge `(0, 0)` → `(pageWidth, spreadHeight)`, with zero gap to canvas boundaries.
+- [x] Single-photo (count=1) full-bleed variations (`Right Page Full Bleed`, `Left Page Full Bleed`, `Full Bleed Panoramic Spread`) now appear as the first/highest-priority layout options, before safe-margin-confined variations.
+- [x] Multi-photo (count ≥ 2) full-bleed per-page split variations: `partitionPageBoxIntoKRects` operates on page-edge bounding boxes instead of safe-margin-inset boxes, producing layouts flush to canvas edge on all 4 sides.
+- [x] Multi-photo (count ≥ 2) full-bleed spread-wide variations: photos span the entire spread edge-to-edge as a single collage, tagged with `'full-bleed'` and `'spread'`.
+- [x] Existing safe-margin-confined variations are preserved alongside full-bleed options, giving users both edge-to-edge and margin-respecting layout choices.
+- [x] Test suite updated: safe-margin confinement test now correctly excludes full-bleed tagged variations; new tests verify full-bleed presence and canvas-edge contact for counts 1–6.
+- [x] Application version metadata bumped to `v1.0.46`.
+
+### Canvas Edge Precision Follow-Up — 9 September 2026
+
+- [x] Preserve fractional physical positions during canvas, safe-margin, and selection alignment so edge contact and relative frame spacing survive the alignment operation.
+- [x] Remove tenth-unit rounding from photo cover dimensions and crop offsets; photos now cover fractional adaptive-layout frames without exposing thin background strips.
+- [x] Use one physical-to-screen scale for the Konva sheet, frame geometry, facing-page boundary, and safe-area guides, avoiding independent pixel rounding at different zoom levels.
+- [x] Preserve exact resize-snap bounds and photo geometry on pointer release; use converted four-sided margins consistently with canvas guides instead of the raw spread margin.
+- [x] Add resize regressions for fractional bottom/corner and side snapping, stationary opposite edges, zero/asymmetric bottom margins, and viewport conversion at multiple zoom levels.
+- [x] Add strict regression assertions for fractional alignment in mm/cm/inch/print-pixel scales, photo coverage at pan/zoom limits, and adaptive layout through frame creation and viewport projection (1–12 photos).
+- [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
+

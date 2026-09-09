@@ -66,12 +66,37 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const pageHeight = project.canvasHeight;
 
   // Margin: convert from project.marginUnit (or 'mm') to project.canvasUnit
+  // Definitively respect 0: if either project or spread sets margin to 0, it evaluates to 0 (flush to canvas).
   const marginEnabled = project.marginEnabled ?? true;
-  const rawMargin = marginEnabled ? (spread?.safeArea ?? project.marginValue ?? 10) : 0;
-  const rawMarginTop = marginEnabled ? (spread?.safeAreaTop ?? project.marginTop ?? rawMargin) : 0;
-  const rawMarginBottom = marginEnabled ? (spread?.safeAreaBottom ?? project.marginBottom ?? rawMargin) : 0;
-  const rawMarginOutside = marginEnabled ? (spread?.safeAreaOutside ?? project.marginOutside ?? rawMargin) : 0;
-  const rawMarginSpine = marginEnabled ? (spread?.safeAreaSpine ?? project.marginSpine ?? rawMargin) : 0;
+  const rawMargin = !marginEnabled
+    ? 0
+    : (project.marginValue === 0 || spread?.safeArea === 0)
+    ? 0
+    : (spread?.safeArea ?? project.marginValue ?? 10);
+
+  const rawMarginTop = !marginEnabled
+    ? 0
+    : (project.marginTop === 0 || spread?.safeAreaTop === 0)
+    ? 0
+    : (spread?.safeAreaTop ?? project.marginTop ?? rawMargin);
+
+  const rawMarginBottom = !marginEnabled
+    ? 0
+    : (project.marginBottom === 0 || spread?.safeAreaBottom === 0)
+    ? 0
+    : (spread?.safeAreaBottom ?? project.marginBottom ?? rawMargin);
+
+  const rawMarginOutside = !marginEnabled
+    ? 0
+    : (project.marginOutside === 0 || spread?.safeAreaOutside === 0)
+    ? 0
+    : (spread?.safeAreaOutside ?? project.marginOutside ?? rawMargin);
+
+  const rawMarginSpine = !marginEnabled
+    ? 0
+    : (project.marginSpine === 0 || spread?.safeAreaSpine === 0)
+    ? 0
+    : (spread?.safeAreaSpine ?? project.marginSpine ?? rawMargin);
 
   const marginUnit = project.marginUnit || 'mm';
   const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { calculateSpreadViewport } from '../src/domain/viewport';
 import {
   calculateCoverDimensions,
   calculateImageOffset,
@@ -1221,5 +1223,100 @@ const leafElem = { cornerRadiusTl: 15, cornerRadiusBr: 15 };
 console.assert(hasCornerRadius(leafElem), 'leaf element should have corner radius');
 const leafRadii = getCornerRadii(leafElem);
 console.assert(leafRadii[0] === 15 && leafRadii[1] === 0 && leafRadii[2] === 15 && leafRadii[3] === 0, 'leaf radii should be [15, 0, 15, 0]');
+
+// A resize snap must retain its exact target and the opposite (stationary) edge.
+for (const factor of [1, 0.1, 1 / 25.4, 300 / 25.4]) {
+  const pageW = 420.4637 * factor;
+  const pageH = 297.0437 * factor;
+  for (const anchor of ['bottom-center', 'bottom-right', 'bottom-left', 'middle-right', 'top-center', 'middle-left']) {
+    const current = {
+      x: (anchor === 'middle-left' ? 0.12 : 47.1234) * factor,
+      y: (anchor === 'top-center' ? 0.12 : 23.4567) * factor,
+      width: (anchor === 'middle-right' ? 420.4637 - 47.1234 - 0.12 : 140.4321) * factor,
+      height: (anchor.startsWith('bottom') ? 297.0437 - 23.4567 - 0.12 : 130.1234) * factor,
+    };
+    const result = calculateResizeSnapping(current, pageW, pageH, 0, 0, [], 0.2 * factor, 'mm', anchor);
+    const snapped = result.snappedBounds;
+    assert.ok(result.snapLines.length > 0, `Resize must snap with ${anchor}`);
+    if (anchor.startsWith('bottom')) {
+      assert.ok(Math.abs(snapped.y + snapped.height - pageH) < 1e-9, 'Resize must reach the exact bottom edge');
+      assert.equal(snapped.y, current.y, 'Bottom resize must not move the top edge');
+      if (anchor !== 'bottom-center') {
+        assert.ok(Math.abs(snapped.width / snapped.height - current.width / current.height) < 1e-9);
+      }
+    } else if (anchor === 'middle-right') {
+      assert.ok(Math.abs(snapped.x + snapped.width - pageW) < 1e-9);
+      assert.equal(snapped.x, current.x);
+    } else if (anchor === 'top-center') {
+      assert.equal(snapped.y, 0);
+      assert.ok(Math.abs(snapped.y + snapped.height - current.y - current.height) < 1e-9);
+    } else {
+      assert.equal(snapped.x, 0);
+      assert.ok(Math.abs(snapped.x + snapped.width - current.x - current.width) < 1e-9);
+    }
+  }
+}
+
+// Four-sided margins are already converted into canvas units by the caller.
+for (const bottomMargin of [0, 0.3125]) {
+  const margins = { top: 0.125, bottom: bottomMargin, outside: 0.25, spine: 0.375 };
+  const target = 10.25 - bottomMargin;
+  const result = calculateResizeSnapping(
+    { x: 1.2345, y: 1.4321, width: 5.6789, height: target - 1.4321 - 0.02 },
+    16.125, 10.25, margins, 0, [], 0.03, 'inch', 'bottom-center',
+  );
+  assert.ok(Math.abs(result.snappedBounds.y + result.snappedBounds.height - target) < 1e-12);
+  assert.ok(result.snapLines.some(line => line.label === (bottomMargin === 0 ? 'Spread Bottom' : 'Safe Margin Bottom')));
+  for (const zoom of [0.67, 1, 1.37, 4]) {
+    const { scaleFactor } = calculateSpreadViewport(16.125, 10.25, 873.08, 515.2, zoom);
+    const { y, height } = result.snappedBounds;
+    // Konva stores a pixel position and dimension scale until pointer release.
+    const nodeY = y * scaleFactor;
+    const nodeHeight = 7.1234 * scaleFactor;
+    const nodeScaleY = height / 7.1234;
+    const committedBottom = nodeY / scaleFactor + nodeHeight * nodeScaleY / scaleFactor;
+    assert.ok(Math.abs(committedBottom - target) < 1e-12, 'Screen conversion must preserve the snapped edge after resize');
+  }
+}
+
+// Fractional physical dimensions must not be rounded before alignment or rendering.
+for (const [width, height] of [[420.46, 297.04], [16.125, 10.25], [297, 840]]) {
+  for (const [availableWidth, availableHeight] of [[873.08, 515.2], [511.52, 797.64]]) {
+    for (const zoom of [0.33, 0.67, 1, 1.37, 4]) {
+      const viewport = calculateSpreadViewport(width, height, availableWidth, availableHeight, zoom);
+      assert.equal(height * viewport.scaleFactor, viewport.height, 'Full-height frame and sheet must share the bottom edge at every zoom');
+      assert.equal(width * viewport.scaleFactor, viewport.width, 'Full-width frame and sheet must share the right edge at every zoom');
+      assert.ok(Math.abs(viewport.width / viewport.height - width / height) < 1e-12, 'Viewport must preserve the physical aspect ratio');
+      assert.ok(viewport.width <= availableWidth * zoom + 1e-9 && viewport.height <= availableHeight * zoom + 1e-9);
+    }
+  }
+}
+
+for (const factor of [1, 0.1, 1 / 25.4, 300 / 25.4]) {
+  const bounds = { singlePageWidth: 210.23 * factor, spreadHeight: 297.04 * factor, gutterWidth: 0, safeMargin: 0 };
+  const frame = { ...squareFrameWithWidePhoto, x: 250.1234 * factor, y: 30.2345 * factor, width: 65.4321 * factor, height: 80.1234 * factor };
+  for (const mode of ['page_edge', 'safe_margin'] as const) {
+    const right = alignFrames([frame], 'right', bounds, mode)[0].geometry;
+    const bottom = alignFrames([frame], 'bottom', bounds, mode)[0].geometry;
+    assert.ok(Math.abs(right.x! + frame.width - bounds.singlePageWidth * 2) < 1e-9, 'Right alignment must reach the exact canvas edge');
+    assert.ok(Math.abs(bottom.y! + frame.height - bounds.spreadHeight) < 1e-9, 'Bottom alignment must reach the exact canvas edge');
+    const neighbor = { ...frame, id: 'fractional-neighbor', x: frame.x + 13.4567 * factor, y: frame.y + 3.4567 * factor };
+    const updates = alignFrames([frame, neighbor], 'left', bounds, mode);
+    assert.ok(Math.abs(updates[0].geometry.x! - bounds.singlePageWidth) < 1e-9);
+    assert.ok(Math.abs(updates[1].geometry.x! - updates[0].geometry.x! - (neighbor.x - frame.x)) < 1e-9, 'Alignment must preserve exact relative spacing');
+  }
+
+  for (const aspect of [0.67, 1, 1.5]) {
+    for (const zoom of [1, 1.01, 2.37]) {
+      for (const pan of [-1, 0, 1]) {
+        const image = calculateImageOffset(frame.width, frame.height, aspect, zoom, pan, pan);
+        assert.ok(image.offsetX <= 1e-9 && image.offsetY <= 1e-9, 'Photo must cover the top and left frame edges');
+        assert.ok(image.offsetX + image.width >= frame.width - 1e-9, 'Photo must cover the right frame edge');
+        assert.ok(image.offsetY + image.height >= frame.height - 1e-9, 'Photo must cover the bottom frame edge');
+        assert.ok(Math.abs(image.width / image.height - aspect) < 1e-9, 'Cover fit must preserve the photo aspect ratio');
+      }
+    }
+  }
+}
 
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, Snapping Config Persistence, and Dynamic Per-Corner Rounded Corners tests passed successfully!');

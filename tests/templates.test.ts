@@ -104,7 +104,47 @@ function runTests() {
   if (Math.abs(dims.spacing - 0.5) > 0.001) {
     throw new Error(`Expected spacing 0.5cm, got ${dims.spacing}`);
   }
-  console.log('✓ Multi-unit dimensional converter (mm -> cm/inch/px) verified.');
+  // 4. Verify Zero Safe Margin Resolution: Project=0 overrides legacy spread=10, Spread=0 overrides project=10
+  const legacySpreadWith10: any = {
+    safeArea: 10,
+    safeAreaTop: 10,
+    safeAreaBottom: 10,
+    safeAreaOutside: 10,
+    safeAreaSpine: 10,
+  };
+  const zeroProject: Project = {
+    ...mockProject,
+    marginValue: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    marginOutside: 0,
+    marginSpine: 0,
+  };
+  const dimsProjectZero = getProjectDimensionsInCanvasUnit(zeroProject, legacySpreadWith10);
+  if (dimsProjectZero.safeMargin !== 0 || dimsProjectZero.safeMarginOutside !== 0 || dimsProjectZero.safeMarginTop !== 0) {
+    throw new Error(`Project with margin 0 must evaluate to 0, got ${dimsProjectZero.safeMargin}`);
+  }
+
+  const zeroSpread: any = {
+    safeArea: 0,
+    safeAreaTop: 0,
+    safeAreaBottom: 0,
+    safeAreaOutside: 0,
+    safeAreaSpine: 0,
+  };
+  const projectWith10: Project = {
+    ...mockProject,
+    marginValue: 10,
+    marginTop: 10,
+    marginBottom: 10,
+    marginOutside: 10,
+    marginSpine: 10,
+  };
+  const dimsSpreadZero = getProjectDimensionsInCanvasUnit(projectWith10, zeroSpread);
+  if (dimsSpreadZero.safeMargin !== 0 || dimsSpreadZero.safeMarginOutside !== 0 || dimsSpreadZero.safeMarginTop !== 0) {
+    throw new Error(`Spread with safeArea 0 must evaluate to 0, got ${dimsSpreadZero.safeMargin}`);
+  }
+  console.log('✓ Zero safe margin resolution verified (0 on either project or spread evaluates strictly to 0).');
 
   console.log('ALL SPATIAL LAYOUT TESTS PASSED SUCCESSFULLY! 🎉');
 }

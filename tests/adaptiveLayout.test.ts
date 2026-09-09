@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { calculateImageOffset } from '../src/domain/editor';
+import { calculateSpreadViewport } from '../src/domain/viewport';
 import {
   generateAdaptiveLayoutVariations,
   buildSpreadElementsFromVariation,
@@ -45,7 +48,7 @@ function runTests() {
   }
   console.log('✓ Dynamic variations generated cleanly for photo counts 1 to 12 (all rect counts exact).');
 
-  // Test 2: Verify Strict Blue Safe Margin Box Confinement
+  // Test 2: Verify Strict Blue Safe Margin Box Confinement (non full-bleed variations only)
   const sevenPhotos: AdaptivePhoto[] = Array.from({ length: 7 }, (_, i) => ({
     filePath: `img_${i}.jpg`,
     photoAspect: 1.5,
@@ -54,7 +57,10 @@ function runTests() {
 
   const { leftPageArea, rightPageArea } = getUsableAreas(baseParams);
 
-  for (const v of variations7p) {
+  // Only check safe-margin variations (full-bleed variations intentionally extend to canvas edge)
+  const safeMarginVariations = variations7p.filter((v) => !v.tags?.includes('full-bleed'));
+
+  for (const v of safeMarginVariations) {
     for (const r of v.rects) {
       // Check if rect belongs to left page or right page
       const isLeft = r.x < leftPageArea.x + leftPageArea.width + baseParams.gutterWidth / 2;
@@ -74,7 +80,7 @@ function runTests() {
       }
     }
   }
-  console.log('✓ All multi-photo rects strictly bounded inside Left & Right Blue Safe Margin Boxes.');
+  console.log('✓ Safe-margin rects strictly bounded inside Left & Right Blue Safe Margin Boxes (full-bleed excluded).');
 
   // Test 3: Single Page Partitioning (K = 1 to 6) with Flush Outer Edge Confinement
   const singleBox = { x: 10, y: 10, width: 180, height: 180 };
@@ -330,7 +336,94 @@ function runTests() {
   }
   console.log('✓ 2D Spatial Subtraction successfully carves and fills non-colliding zones around multiple complex locks.');
 
+  // Test 14: Full-Bleed Variations for Single Photo (count=1)
+  const singlePhoto: AdaptivePhoto[] = [{ photoAspect: 1.5 }];
+  const singlePhotoVariations = generateAdaptiveLayoutVariations(baseParams, singlePhoto);
+  console.assert(singlePhotoVariations.length > 0, 'Must produce variations for 1 photo');
+
+  // Verify full-bleed variations exist and have frames at canvas edge (x=0 or y=0)
+  const hasFullBleedSingle = singlePhotoVariations.some((v) =>
+    v.rects.some((r) => r.x === 0 && r.y === 0)
+  );
+  console.assert(hasFullBleedSingle, 'Single photo must have full-bleed variations starting at (0,0)');
+
+  // First variation should be full-bleed (edge-to-edge priority)
+  const firstSingleRect = singlePhotoVariations[0]?.rects[0];
+  if (firstSingleRect) {
+    // The first variation after scoring should have a rect that touches an edge
+    const touchesEdge = firstSingleRect.x === 0 || firstSingleRect.y === 0 ||
+      Math.abs(firstSingleRect.x + firstSingleRect.width - baseParams.spreadWidth) < 0.01 ||
+      Math.abs(firstSingleRect.y + firstSingleRect.height - baseParams.spreadHeight) < 0.01;
+    console.assert(touchesEdge, 'Top-scored single photo variation should touch canvas edge');
+  }
+  console.log('✓ Single photo full-bleed edge-to-edge variations verified.');
+
+  // Test 15: Full-Bleed Variations for Multi-Photo (count=2 to 6)
+  for (let n = 2; n <= 6; n++) {
+    const multiPhotos: AdaptivePhoto[] = Array.from({ length: n }, (_, i) => ({
+      photoAspect: i % 2 === 0 ? 1.5 : 0.67,
+    }));
+    const multiVariations = generateAdaptiveLayoutVariations(baseParams, multiPhotos);
+    console.assert(multiVariations.length > 0, `Must produce variations for ${n} photos`);
+
+    // Must have at least one full-bleed variation with rects touching canvas edge
+    const hasFullBleedMulti = multiVariations.some((v) =>
+      v.rects.some((r) => r.x === 0 || r.y === 0) &&
+      v.rects.some((r) =>
+        Math.abs(r.x + r.width - baseParams.spreadWidth) < 0.01 ||
+        Math.abs(r.y + r.height - baseParams.spreadHeight) < 0.01
+      )
+    );
+    console.assert(hasFullBleedMulti, `${n}-photo layout must have full-bleed variations touching canvas edges`);
+
+    // Verify full-bleed rects fill page edge (minX=0, minY=0, maxRight=pageWidth or spreadWidth)
+    const bleedVars = multiVariations.filter((v) => v.tags?.includes('full-bleed'));
+    console.assert(bleedVars.length > 0, `${n}-photo layout must have tagged full-bleed variations`);
+
+    for (const bv of bleedVars) {
+      const minX = Math.min(...bv.rects.map((r) => r.x));
+      const minY = Math.min(...bv.rects.map((r) => r.y));
+      const maxRight = Math.max(...bv.rects.map((r) => r.x + r.width));
+      const maxBottom = Math.max(...bv.rects.map((r) => r.y + r.height));
+
+      console.assert(Math.abs(minY) < 0.01, `Full-bleed ${n}p minY must be 0, got ${minY} in ${bv.id}`);
+      console.assert(
+        Math.abs(maxBottom - baseParams.spreadHeight) < 0.01,
+        `Full-bleed ${n}p maxBottom must reach spreadHeight (${baseParams.spreadHeight}), got ${maxBottom} in ${bv.id}`
+      );
+    }
+  }
+  console.log('✓ Multi-photo (2-6) full-bleed edge-to-edge variations verified.');
+
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
+}
+
+// Exercise the actual layout -> frame -> photo -> viewport path with fractional sizes.
+for (const [spreadWidth, spreadHeight, spacing] of [[420.46, 297.04, 3.125], [16.125, 10.25, 0.125]]) {
+  const params: TemplateParams = { spreadWidth, spreadHeight, spacing, isSpread: true, safeMargin: 0, gutterWidth: 0 };
+  for (const count of [1, 2, 3, 4, 5, 6, 8, 12]) {
+    const photos = Array.from({ length: count }, (_, i) => ({ photoAspect: i % 2 ? 0.67 : 1.5 }));
+    const variations = generateAdaptiveLayoutVariations(params, photos).filter(v => v.tags.includes('full-bleed'));
+    assert.ok(variations.length > 0, `Missing full-bleed variations for ${count} photos`);
+    for (const variation of variations) {
+      const frames = buildSpreadElementsFromVariation(variation, photos);
+      assert.equal(Math.min(...frames.map(f => f.y)), 0);
+      assert.ok(Math.abs(Math.max(...frames.map(f => f.y + f.height)) - spreadHeight) < 1e-8);
+      for (const frame of frames) {
+        for (const pan of [-1, 0, 1]) {
+          const image = calculateImageOffset(frame.width, frame.height, frame.photoAspect!, 1, pan, pan);
+          assert.ok(image.offsetX <= 1e-9 && image.offsetY <= 1e-9);
+          assert.ok(image.offsetX + image.width >= frame.width - 1e-9, `${variation.id}: photo leaves a right-edge gap inside the generated frame`);
+          assert.ok(image.offsetY + image.height >= frame.height - 1e-9, `${variation.id}: photo leaves a bottom-edge gap inside the generated frame`);
+        }
+      }
+      for (const zoom of [0.67, 1, 1.37]) {
+        const viewport = calculateSpreadViewport(spreadWidth, spreadHeight, 873.08, 515.2, zoom);
+        const bottom = Math.max(...frames.map(f => (f.y + f.height) * viewport.scaleFactor));
+        assert.ok(Math.abs(bottom - viewport.height) < 1e-8, `${variation.id}: generated frames must reach the displayed sheet edge`);
+      }
+    }
+  }
 }
 
 runTests();

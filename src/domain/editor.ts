@@ -188,10 +188,11 @@ export function calculateCoverDimensions(
 
   const zoom = clamp(cropScale, 1.0, MAX_CROP_SCALE);
   return {
-    baseWidth: roundToTenth(baseW),
-    baseHeight: roundToTenth(baseH),
-    width: roundToTenth(baseW * zoom),
-    height: roundToTenth(baseH * zoom),
+    // Physical precision is required: rounding down exposes the frame background.
+    baseWidth: baseW,
+    baseHeight: baseH,
+    width: baseW * zoom,
+    height: baseH * zoom,
     zoom,
   };
 }
@@ -223,8 +224,8 @@ export function calculateImageOffset(
   const offsetY = -(maxExcessY / 2) + (clampedNormY * (maxExcessY / 2));
 
   return {
-    offsetX: roundToTenth(offsetX),
-    offsetY: roundToTenth(offsetY),
+    offsetX,
+    offsetY,
     width,
     height,
     normPanX: clampedNormX,
@@ -1045,7 +1046,7 @@ export function calculateResizeSnapping(
   current: RectBounds,
   spreadWidth: number,
   spreadHeight: number,
-  safeArea: number,
+  safeArea: number | { top?: number; bottom?: number; outside?: number; spine?: number },
   gutterWidth: number,
   otherFrames: RectBounds[],
   threshold: number = 2.0,
@@ -1055,6 +1056,11 @@ export function calculateResizeSnapping(
   let { x, y, width, height } = current;
   const snapLines: SnapLine[] = [];
   const gapGuides: GapGuide[] = [];
+
+  const marginTop = typeof safeArea === 'number' ? safeArea : (safeArea.top ?? 0);
+  const marginBottom = typeof safeArea === 'number' ? safeArea : (safeArea.bottom ?? 0);
+  const marginOutside = typeof safeArea === 'number' ? safeArea : (safeArea.outside ?? 0);
+  const marginSpine = typeof safeArea === 'number' ? safeArea : (safeArea.spine ?? 0);
 
   const right = x + width;
   const bottom = y + height;
@@ -1183,12 +1189,16 @@ export function calculateResizeSnapping(
   // 2. Secondary & Edge Snapping: Safe Area Margins, Spine, Spread Boundaries, and Other Frames
   // Build Vertical Targets (X lines)
   const verticalTargets: { pos: number; label: string; start?: number; end?: number }[] = [];
-  if (safeArea > 0) {
+  if (marginOutside > 0) {
     verticalTargets.push(
-      { pos: safeArea, label: 'Safe Margin Left' },
-      { pos: spineLeft - safeArea, label: 'Safe Margin Left Inner' },
-      { pos: spineRight + safeArea, label: 'Safe Margin Right Inner' },
-      { pos: spreadWidth - safeArea, label: 'Safe Margin Right' }
+      { pos: marginOutside, label: 'Safe Margin Left' },
+      { pos: spreadWidth - marginOutside, label: 'Safe Margin Right' }
+    );
+  }
+  if (marginSpine > 0) {
+    verticalTargets.push(
+      { pos: spineLeft - marginSpine, label: 'Safe Margin Left Inner' },
+      { pos: spineRight + marginSpine, label: 'Safe Margin Right Inner' }
     );
   }
   verticalTargets.push(
@@ -1209,11 +1219,11 @@ export function calculateResizeSnapping(
 
   // Build Horizontal Targets (Y lines)
   const horizontalTargets: { pos: number; label: string; start?: number; end?: number }[] = [];
-  if (safeArea > 0) {
-    horizontalTargets.push(
-      { pos: safeArea, label: 'Safe Margin Top' },
-      { pos: spreadHeight - safeArea, label: 'Safe Margin Bottom' }
-    );
+  if (marginTop > 0) {
+    horizontalTargets.push({ pos: marginTop, label: 'Safe Margin Top' });
+  }
+  if (marginBottom > 0) {
+    horizontalTargets.push({ pos: spreadHeight - marginBottom, label: 'Safe Margin Bottom' });
   }
   horizontalTargets.push(
     { pos: 0, label: 'Spread Top' },
@@ -1367,10 +1377,11 @@ export function calculateResizeSnapping(
 
   return {
     snappedBounds: {
-      x: roundToTenth(x),
-      y: roundToTenth(y),
-      width: roundToTenth(width),
-      height: roundToTenth(height),
+      // Rounding either the origin or size moves the snapped edge off its guide.
+      x,
+      y,
+      width,
+      height,
     },
     snapLines,
     gapGuides,
@@ -1579,8 +1590,9 @@ export function alignFrames(
     for (const entity of entities) {
       for (const f of entity.frames) {
         const geometry: Partial<PhotoFrameElement> = {};
-        if (applyX) geometry.x = roundToTenth(f.x + deltaX);
-        if (applyY) geometry.y = roundToTenth(f.y + deltaY);
+        // Keep the rigid translation exact, including fractional page edges and gaps.
+        if (applyX) geometry.x = f.x + deltaX;
+        if (applyY) geometry.y = f.y + deltaY;
         updates.push({ id: f.id, geometry });
       }
     }
@@ -1633,8 +1645,8 @@ export function alignFrames(
 
     for (const f of entity.frames) {
       const geometry: Partial<PhotoFrameElement> = {};
-      if (applyX) geometry.x = roundToTenth(f.x + deltaX);
-      if (applyY) geometry.y = roundToTenth(f.y + deltaY);
+      if (applyX) geometry.x = f.x + deltaX;
+      if (applyY) geometry.y = f.y + deltaY;
       updates.push({ id: f.id, geometry });
     }
   }

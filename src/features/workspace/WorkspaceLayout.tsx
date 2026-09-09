@@ -2835,7 +2835,7 @@ export function WorkspaceLayout() {
                           value={activeSpread?.safeArea ?? (currentProject.marginValue ?? 10)}
                           onChange={(val) => {
                             updateSafeArea(val, 'all');
-                            updateProjectMargin(val, currentProject.marginUnit, 'all');
+                            updateProjectMargin(val, currentProject.canvasUnit, 'all');
                           }}
                           min={0}
                           max={999}
@@ -2856,7 +2856,7 @@ export function WorkspaceLayout() {
                           value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop ?? 10)}
                           onChange={(val) => {
                             updateSafeArea(val, 'top');
-                            updateProjectMargin(val, currentProject.marginUnit, 'top');
+                            updateProjectMargin(val, currentProject.canvasUnit, 'top');
                           }}
                           min={0}
                           max={999}
@@ -2875,7 +2875,7 @@ export function WorkspaceLayout() {
                           value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom ?? 10)}
                           onChange={(val) => {
                             updateSafeArea(val, 'bottom');
-                            updateProjectMargin(val, currentProject.marginUnit, 'bottom');
+                            updateProjectMargin(val, currentProject.canvasUnit, 'bottom');
                           }}
                           min={0}
                           max={999}
@@ -2894,7 +2894,7 @@ export function WorkspaceLayout() {
                           value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside ?? 10)}
                           onChange={(val) => {
                             updateSafeArea(val, 'outside');
-                            updateProjectMargin(val, currentProject.marginUnit, 'outside');
+                            updateProjectMargin(val, currentProject.canvasUnit, 'outside');
                           }}
                           min={0}
                           max={999}
@@ -2913,7 +2913,7 @@ export function WorkspaceLayout() {
                           value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine ?? 10)}
                           onChange={(val) => {
                             updateSafeArea(val, 'spine');
-                            updateProjectMargin(val, currentProject.marginUnit, 'spine');
+                            updateProjectMargin(val, currentProject.canvasUnit, 'spine');
                           }}
                           min={0}
                           max={999}
