@@ -1231,15 +1231,28 @@ export function WorkspaceLayout() {
                       {/* Alignments Grid */}
                       <div style={{ marginBottom: '10px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                          Alignment
+                          Align to Canvas Edge
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left to Canvas Edge">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right to Canvas Edge">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top to Canvas Edge">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom to Canvas Edge">⤓ Bottom</button>
+                        </div>
+
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Align to Safe Margin</span>
+                          <span style={{ fontSize: '9px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: 500 }}>Blue Guides</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom">⤓ Bottom</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left to Blue Safe Margin">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right to Blue Safe Margin">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top to Blue Safe Margin">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
                         </div>
                       </div>
 
@@ -2289,19 +2302,31 @@ export function WorkspaceLayout() {
                         </button>
                       </div>
 
-                      {/* Safe Margin Alignment Grid for Single Frame */}
+                      {/* Alignment Grids for Single Frame */}
                       <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                          Align to Canvas Edge
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left to Canvas Edge">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right to Canvas Edge">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top to Canvas Edge">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom to Canvas Edge">⤓ Bottom</button>
+                        </div>
+
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span>Align to Safe Margin</span>
                           <span style={{ fontSize: '9px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: 500 }}>Blue Guides</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left')} title="Align Left to Blue Safe Margin">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right')} title="Align Right to Blue Safe Margin">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top')} title="Align Top to Blue Safe Margin">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left to Blue Safe Margin">⇤ Left</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right to Blue Safe Margin">⇥ Right</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top to Blue Safe Margin">⤒ Top</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
+                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
                         </div>
                       </div>
                     </div>

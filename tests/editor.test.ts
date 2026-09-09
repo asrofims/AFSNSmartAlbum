@@ -668,6 +668,37 @@ const grUpdatedX = new Map(groupAlignRightRes.map((u) => [u.id, u.geometry.x!]))
 console.assert(grUpdatedX.get('gl1') === 100, `Group GL1 should move to x=100, got ${grUpdatedX.get('gl1')}`);
 console.assert(grUpdatedX.get('gl2') === 150, `Group GL2 should move to x=150 (right edge at 190mm), got ${grUpdatedX.get('gl2')}`);
 
+// 12.3 Canvas / Page Edge Alignment (targetMode: 'page_edge')
+const edgeBounds: SafeMarginBounds = {
+  ...testSafeMarginBounds,
+  targetMode: 'page_edge',
+};
+
+// Single Frame to Canvas Edge: Left page (w=200, h=300), frame w=80, h=60
+const edgeAlignLeftRes = alignFrames([singleLeftFrame], 'left', edgeBounds);
+console.assert(edgeAlignLeftRes[0].geometry.x === 0, `Single frame should align flush to Canvas Left (0), got ${edgeAlignLeftRes[0].geometry.x}`);
+
+const edgeAlignRightRes = alignFrames([singleLeftFrame], 'right', edgeBounds);
+console.assert(edgeAlignRightRes[0].geometry.x === 120, `Single frame should align flush to Canvas Right of Left Page (120), got ${edgeAlignRightRes[0].geometry.x}`);
+
+const edgeAlignTopRes = alignFrames([singleLeftFrame], 'top', edgeBounds);
+console.assert(edgeAlignTopRes[0].geometry.y === 0, `Single frame should align flush to Canvas Top (0), got ${edgeAlignTopRes[0].geometry.y}`);
+
+const edgeAlignBottomRes = alignFrames([singleLeftFrame], 'bottom', edgeBounds);
+console.assert(edgeAlignBottomRes[0].geometry.y === 240, `Single frame should align flush to Canvas Bottom (240), got ${edgeAlignBottomRes[0].geometry.y}`);
+
+// Multi-Frame Selection to Canvas Edge (GL1 at x=20, w=40; GL2 at x=70, w=40; composite bbox x=20..110)
+const multiEdgeAlignLeftRes = alignFrames(groupLeftOnly, 'left', edgeBounds);
+const multiEdgeLeftX = new Map(multiEdgeAlignLeftRes.map((u) => [u.id, u.geometry.x!]));
+console.assert(multiEdgeLeftX.get('gl1') === 0, `Multi-frame GL1 should move to Canvas Left (0), got ${multiEdgeLeftX.get('gl1')}`);
+console.assert(multiEdgeLeftX.get('gl2') === 50, `Multi-frame GL2 should preserve relative gap (50), got ${multiEdgeLeftX.get('gl2')}`);
+
+const multiEdgeAlignRightRes = alignFrames(groupLeftOnly, 'right', edgeBounds);
+const multiEdgeRightX = new Map(multiEdgeAlignRightRes.map((u) => [u.id, u.geometry.x!]));
+// Composite bbox width = 90, left page width = 200 => deltaX = 200 - 110 = 90 => gl1 at 20+90=110, gl2 at 70+90=160 (right edge at 200)
+console.assert(multiEdgeRightX.get('gl1') === 110, `Multi-frame GL1 should move to 110, got ${multiEdgeRightX.get('gl1')}`);
+console.assert(multiEdgeRightX.get('gl2') === 160, `Multi-frame GL2 right edge at 200, got ${multiEdgeRightX.get('gl2')}`);
+
 // 13. Test Safe Margin Snapping During Frame Resize (calculateResizeSnapping)
 // 13.1 Drag left handle towards Left Blue Safe Margin (x = 10.8mm -> snaps to 10mm)
 const resizeLeftRes = calculateResizeSnapping(

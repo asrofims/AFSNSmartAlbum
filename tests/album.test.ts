@@ -9,6 +9,9 @@ import {
   getAllAlbumSpreads,
   mergeFramePhotoAsset,
   syncAlbumPhotoAssets,
+  isElementDesignEqual,
+  isSpreadDesignEqual,
+  isAlbumDesignEqual,
 } from '../src/domain/album';
 import { type PhotoFrameElement, applyFixedGap } from '../src/domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
@@ -415,6 +418,80 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   const sDims = getProjectDimensionsInCanvasUnit(seamlessSpineProject, sSpread1);
   console.assert(sDims.safeMarginSpine === 0, `Seamless dims safeMarginSpine should be 0, got ${sDims.safeMarginSpine}`);
   console.assert(sDims.safeMarginOutside === 25, `Seamless dims safeMarginOutside should be 25, got ${sDims.safeMarginOutside}`);
+
+  // Test marginEnabled: false sets all margins to 0
+  const marginDisabledProject: Project = {
+    ...mockProject,
+    id: 'test-proj-margin-disabled',
+    marginEnabled: false,
+    marginValue: 15,
+    marginTop: 15,
+    marginBottom: 15,
+    marginOutside: 20,
+    marginSpine: 10,
+  };
+  const marginDisabledAlbum = createInitialAlbum(marginDisabledProject);
+  console.assert(marginDisabledAlbum.spreads[0].safeArea === 0, 'marginDisabled album spread safeArea should be 0');
+  console.assert(marginDisabledAlbum.spreads[0].safeAreaTop === 0, 'marginDisabled album spread safeAreaTop should be 0');
+  console.assert(marginDisabledAlbum.spreads[0].safeAreaOutside === 0, 'marginDisabled album spread safeAreaOutside should be 0');
+
+  const marginDisabledDims = getProjectDimensionsInCanvasUnit(marginDisabledProject, marginDisabledAlbum.spreads[0]);
+  console.assert(marginDisabledDims.safeMargin === 0, 'marginDisabledDims safeMargin should be 0');
+  console.assert(marginDisabledDims.safeMarginTop === 0, 'marginDisabledDims safeMarginTop should be 0');
+  console.assert(marginDisabledDims.safeMarginOutside === 0, 'marginDisabledDims safeMarginOutside should be 0');
+
+  // Test isElementDesignEqual, isSpreadDesignEqual, isAlbumDesignEqual
+  const elemA: PhotoFrameElement = {
+    id: 'el-1',
+    type: 'photo',
+    photoId: 'p-1',
+    filePath: '/path/1.jpg',
+    previewPath: '/cache/preview1.jpg',
+    thumbnailPath: '/cache/thumb1.jpg',
+    fileName: '1.jpg',
+    x: 10,
+    y: 10,
+    width: 100,
+    height: 80,
+    rotation: 0,
+    zIndex: 1,
+    cropScale: 1.0,
+    cropX: 0,
+    cropY: 0,
+    cropRotation: 0,
+    borderEnabled: false,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    opacity: 1,
+  };
+
+  // Clone with identical design but different runtime preview/thumbnail paths
+  const elemACacheUpdated: PhotoFrameElement = {
+    ...elemA,
+    previewPath: '/cache/preview1_updated.jpg',
+    thumbnailPath: '/cache/thumb1_updated.jpg',
+  };
+
+  console.assert(isElementDesignEqual(elemA, elemACacheUpdated) === true, 'Cache path change must be treated as design-equal');
+
+  const elemAGeometryChanged: PhotoFrameElement = { ...elemA, x: 15 };
+  console.assert(isElementDesignEqual(elemA, elemAGeometryChanged) === false, 'X coordinate change must not be design-equal');
+
+  const elemACropChanged: PhotoFrameElement = { ...elemA, cropScale: 1.5 };
+  console.assert(isElementDesignEqual(elemA, elemACropChanged) === false, 'Crop scale change must not be design-equal');
+
+  const albumBase = createInitialAlbum(mockProject);
+  albumBase.spreads[0].elements = [elemA];
+
+  const albumCacheOnly = JSON.parse(JSON.stringify(albumBase));
+  albumCacheOnly.spreads[0].elements[0].previewPath = '/new/cache.jpg';
+  albumCacheOnly.spreads[0].elements[0].thumbnailPath = '/new/thumb.jpg';
+
+  console.assert(isAlbumDesignEqual(albumBase, albumCacheOnly) === true, 'Album design equality must ignore thumbnail/preview cache paths');
+
+  const albumDesignChanged = JSON.parse(JSON.stringify(albumBase));
+  albumDesignChanged.spreads[0].elements[0].width = 120;
+  console.assert(isAlbumDesignEqual(albumBase, albumDesignChanged) === false, 'Album design equality must detect geometry change');
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, and in-place non-shuffling photo gap adjustment)!');
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, and in-place non-shuffling photo gap adjustment)!');

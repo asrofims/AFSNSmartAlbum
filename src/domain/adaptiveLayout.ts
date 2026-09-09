@@ -1,4 +1,4 @@
-import { RectBounds, TemplateParams, getUsableAreas, fitInsideBoxCentered, round4 } from './templates';
+import { RectBounds, TemplateParams, getUsableAreas, round4 } from './templates';
 import { PhotoFrameElement } from './editor';
 
 export type PhotoOrientation = 'landscape' | 'portrait' | 'square';
@@ -207,28 +207,27 @@ export function partitionPageBoxIntoKRects(
 ): RectBounds[] {
   if (count <= 0) return [];
   if (count === 1) {
-    const v = variantIndex % 3;
-    if (v === 0) return [{ ...box }];
-    if (v === 1) return [fitInsideBoxCentered(box, 1.5, 0.92)];
-    return [fitInsideBoxCentered(box, 1.5, 0.82)];
+    return [{ ...box }];
   }
 
   if (count === 2) {
     const v = variantIndex % 6;
     if (v === 0) {
       // Horizontal 2-Stack (Top & Bottom)
-      const h = round4((box.height - spacing) / 2);
+      const topH = round4((box.height - spacing) / 2);
+      const botH = round4(box.height - spacing - topH);
       return [
-        { x: box.x, y: box.y, width: box.width, height: h },
-        { x: box.x, y: round4(box.y + h + spacing), width: box.width, height: h },
+        { x: box.x, y: box.y, width: box.width, height: topH },
+        { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
       ];
     }
     if (v === 1) {
       // Vertical 2-Split (Left & Right columns)
-      const w = round4((box.width - spacing) / 2);
+      const leftW = round4((box.width - spacing) / 2);
+      const rightW = round4(box.width - spacing - leftW);
       return [
-        { x: box.x, y: box.y, width: w, height: box.height },
-        { x: round4(box.x + w + spacing), y: box.y, width: w, height: box.height },
+        { x: box.x, y: box.y, width: leftW, height: box.height },
+        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
       ];
     }
     if (v === 2) {
@@ -273,21 +272,23 @@ export function partitionPageBoxIntoKRects(
       // 1 Top Landscape Hero + 2 Bottom Portrait Columns (great for 1L+2P)
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
-      const colW = round4((box.width - spacing) / 2);
+      const colW1 = round4((box.width - spacing) / 2);
+      const colW2 = round4(box.width - spacing - colW1);
       return [
         { x: box.x, y: box.y, width: box.width, height: topH },
-        { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
-        { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
+        { x: box.x, y: round4(box.y + topH + spacing), width: colW1, height: botH },
+        { x: round4(box.x + colW1 + spacing), y: round4(box.y + topH + spacing), width: colW2, height: botH },
       ];
     }
     if (v === 1) {
       // 2 Top Portrait Columns + 1 Bottom Landscape Hero (great for 1L+2P)
       const topH = round4((box.height - spacing) / 2);
       const botH = round4(box.height - spacing - topH);
-      const colW = round4((box.width - spacing) / 2);
+      const colW1 = round4((box.width - spacing) / 2);
+      const colW2 = round4(box.width - spacing - colW1);
       return [
-        { x: box.x, y: box.y, width: colW, height: topH },
-        { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: topH },
+        { x: box.x, y: box.y, width: colW1, height: topH },
+        { x: round4(box.x + colW1 + spacing), y: box.y, width: colW2, height: topH },
         { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
       ];
     }
@@ -295,61 +296,67 @@ export function partitionPageBoxIntoKRects(
       // 1 Left Portrait Hero + 2 Right Landscape Stacks (great for 1P+2L)
       const leftW = round4((box.width - spacing) / 2);
       const rightW = round4(box.width - spacing - leftW);
-      const stackH = round4((box.height - spacing) / 2);
+      const stackH1 = round4((box.height - spacing) / 2);
+      const stackH2 = round4(box.height - spacing - stackH1);
       return [
         { x: box.x, y: box.y, width: leftW, height: box.height },
-        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH },
-        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH + spacing), width: rightW, height: stackH },
+        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH1 },
+        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH1 + spacing), width: rightW, height: stackH2 },
       ];
     }
     if (v === 3) {
       // 2 Left Landscape Stacks + 1 Right Portrait Hero (great for 1P+2L)
       const leftW = round4((box.width - spacing) / 2);
       const rightW = round4(box.width - spacing - leftW);
-      const stackH = round4((box.height - spacing) / 2);
+      const stackH1 = round4((box.height - spacing) / 2);
+      const stackH2 = round4(box.height - spacing - stackH1);
       return [
-        { x: box.x, y: box.y, width: leftW, height: stackH },
-        { x: box.x, y: round4(box.y + stackH + spacing), width: leftW, height: stackH },
+        { x: box.x, y: box.y, width: leftW, height: stackH1 },
+        { x: box.x, y: round4(box.y + stackH1 + spacing), width: leftW, height: stackH2 },
         { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
       ];
     }
     if (v === 4) {
       // 3 Vertical Columns (Triptych - great for 3P)
       const colW = round4((box.width - spacing * 2) / 3);
+      const colW3 = round4(box.width - spacing * 2 - colW * 2);
       return [
         { x: box.x, y: box.y, width: colW, height: box.height },
         { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: box.height },
-        { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: box.height },
+        { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW3, height: box.height },
       ];
     }
     if (v === 5) {
       // 3 Horizontal Rows (great for 3L)
       const rowH = round4((box.height - spacing * 2) / 3);
+      const rowH3 = round4(box.height - spacing * 2 - rowH * 2);
       return [
         { x: box.x, y: box.y, width: box.width, height: rowH },
         { x: box.x, y: round4(box.y + rowH + spacing), width: box.width, height: rowH },
-        { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH },
+        { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH3 },
       ];
     }
     if (v === 6) {
       // 1 Big Left Hero (60%) + 2 Right Stacks
       const leftW = round4((box.width - spacing) * 0.60);
       const rightW = round4(box.width - spacing - leftW);
-      const stackH = round4((box.height - spacing) / 2);
+      const stackH1 = round4((box.height - spacing) / 2);
+      const stackH2 = round4(box.height - spacing - stackH1);
       return [
         { x: box.x, y: box.y, width: leftW, height: box.height },
-        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH },
-        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH + spacing), width: rightW, height: stackH },
+        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH1 },
+        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH1 + spacing), width: rightW, height: stackH2 },
       ];
     }
     // 1 Big Top Hero (60%) + 2 Bottom Columns
     const topH = round4((box.height - spacing) * 0.60);
     const botH = round4(box.height - spacing - topH);
-    const colW = round4((box.width - spacing) / 2);
+    const colW1 = round4((box.width - spacing) / 2);
+    const colW2 = round4(box.width - spacing - colW1);
     return [
       { x: box.x, y: box.y, width: box.width, height: topH },
-      { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
-      { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
+      { x: box.x, y: round4(box.y + topH + spacing), width: colW1, height: botH },
+      { x: round4(box.x + colW1 + spacing), y: round4(box.y + topH + spacing), width: colW2, height: botH },
     ];
   }
 
@@ -361,90 +368,120 @@ export function partitionPageBoxIntoKRects(
       const h = round4((box.height - spacing) / 2);
       const x2 = round4(box.x + w + spacing);
       const y2 = round4(box.y + h + spacing);
+      const w2 = round4(box.x + box.width - x2);
+      const h2 = round4(box.y + box.height - y2);
       return [
         { x: box.x, y: box.y, width: w, height: h },
-        { x: x2, y: box.y, width: w, height: h },
-        { x: box.x, y: y2, width: w, height: h },
-        { x: x2, y: y2, width: w, height: h },
+        { x: x2, y: box.y, width: w2, height: h },
+        { x: box.x, y: y2, width: w, height: h2 },
+        { x: x2, y: y2, width: w2, height: h2 },
       ];
     }
     if (v === 1) {
       // 1 Top Banner + 3 Bottom Columns (great for 1L+3P)
       const topH = round4((box.height - spacing) * 0.48);
-      const botH = round4(box.height - spacing - topH);
+      const yBot = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - yBot);
       const colW = round4((box.width - spacing * 2) / 3);
+      const xCol2 = round4(box.x + colW + spacing);
+      const xCol3 = round4(box.x + (colW + spacing) * 2);
+      const colW3 = round4(box.x + box.width - xCol3);
       return [
         { x: box.x, y: box.y, width: box.width, height: topH },
-        { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
-        { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
-        { x: round4(box.x + (colW + spacing) * 2), y: round4(box.y + topH + spacing), width: colW, height: botH },
+        { x: box.x, y: yBot, width: colW, height: botH },
+        { x: xCol2, y: yBot, width: colW, height: botH },
+        { x: xCol3, y: yBot, width: colW3, height: botH },
       ];
     }
     if (v === 2) {
       // 3 Top Columns + 1 Bottom Banner (great for 1L+3P)
       const topH = round4((box.height - spacing) * 0.52);
-      const botH = round4(box.height - spacing - topH);
+      const yBot = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - yBot);
       const colW = round4((box.width - spacing * 2) / 3);
+      const xCol2 = round4(box.x + colW + spacing);
+      const xCol3 = round4(box.x + (colW + spacing) * 2);
+      const colW3 = round4(box.x + box.width - xCol3);
       return [
         { x: box.x, y: box.y, width: colW, height: topH },
-        { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: topH },
-        { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: topH },
-        { x: box.x, y: round4(box.y + topH + spacing), width: box.width, height: botH },
+        { x: xCol2, y: box.y, width: colW, height: topH },
+        { x: xCol3, y: box.y, width: colW3, height: topH },
+        { x: box.x, y: yBot, width: box.width, height: botH },
       ];
     }
     if (v === 3) {
       // 1 Left Tower + 3 Right Stacks (great for 1P+3L)
       const leftW = round4((box.width - spacing) * 0.48);
-      const rightW = round4(box.width - spacing - leftW);
+      const xR = round4(box.x + leftW + spacing);
+      const rightW = round4(box.x + box.width - xR);
       const stackH = round4((box.height - spacing * 2) / 3);
+      const yStack2 = round4(box.y + stackH + spacing);
+      const yStack3 = round4(box.y + (stackH + spacing) * 2);
+      const stackH3 = round4(box.y + box.height - yStack3);
       return [
         { x: box.x, y: box.y, width: leftW, height: box.height },
-        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: stackH },
-        { x: round4(box.x + leftW + spacing), y: round4(box.y + stackH + spacing), width: rightW, height: stackH },
-        { x: round4(box.x + leftW + spacing), y: round4(box.y + (stackH + spacing) * 2), width: rightW, height: stackH },
+        { x: xR, y: box.y, width: rightW, height: stackH },
+        { x: xR, y: yStack2, width: rightW, height: stackH },
+        { x: xR, y: yStack3, width: rightW, height: stackH3 },
       ];
     }
     if (v === 4) {
       // 3 Left Stacks + 1 Right Tower (great for 1P+3L)
       const leftW = round4((box.width - spacing) * 0.52);
-      const rightW = round4(box.width - spacing - leftW);
+      const xR = round4(box.x + leftW + spacing);
+      const rightW = round4(box.x + box.width - xR);
       const stackH = round4((box.height - spacing * 2) / 3);
+      const yStack2 = round4(box.y + stackH + spacing);
+      const yStack3 = round4(box.y + (stackH + spacing) * 2);
+      const stackH3 = round4(box.y + box.height - yStack3);
       return [
         { x: box.x, y: box.y, width: leftW, height: stackH },
-        { x: box.x, y: round4(box.y + stackH + spacing), width: leftW, height: stackH },
-        { x: box.x, y: round4(box.y + (stackH + spacing) * 2), width: leftW, height: stackH },
-        { x: round4(box.x + leftW + spacing), y: box.y, width: rightW, height: box.height },
+        { x: box.x, y: yStack2, width: leftW, height: stackH },
+        { x: box.x, y: yStack3, width: leftW, height: stackH3 },
+        { x: xR, y: box.y, width: rightW, height: box.height },
       ];
     }
     if (v === 5) {
       // 4 Vertical Columns (great for 4P)
       const colW = round4((box.width - spacing * 3) / 4);
+      const x2 = round4(box.x + colW + spacing);
+      const x3 = round4(box.x + (colW + spacing) * 2);
+      const x4 = round4(box.x + (colW + spacing) * 3);
+      const colW4 = round4(box.x + box.width - x4);
       return [
         { x: box.x, y: box.y, width: colW, height: box.height },
-        { x: round4(box.x + colW + spacing), y: box.y, width: colW, height: box.height },
-        { x: round4(box.x + (colW + spacing) * 2), y: box.y, width: colW, height: box.height },
-        { x: round4(box.x + (colW + spacing) * 3), y: box.y, width: colW, height: box.height },
+        { x: x2, y: box.y, width: colW, height: box.height },
+        { x: x3, y: box.y, width: colW, height: box.height },
+        { x: x4, y: box.y, width: colW4, height: box.height },
       ];
     }
     if (v === 6) {
       // 4 Horizontal Rows (great for 4L)
       const rowH = round4((box.height - spacing * 3) / 4);
+      const y2 = round4(box.y + rowH + spacing);
+      const y3 = round4(box.y + (rowH + spacing) * 2);
+      const y4 = round4(box.y + (rowH + spacing) * 3);
+      const rowH4 = round4(box.y + box.height - y4);
       return [
         { x: box.x, y: box.y, width: box.width, height: rowH },
-        { x: box.x, y: round4(box.y + rowH + spacing), width: box.width, height: rowH },
-        { x: box.x, y: round4(box.y + (rowH + spacing) * 2), width: box.width, height: rowH },
-        { x: box.x, y: round4(box.y + (rowH + spacing) * 3), width: box.width, height: rowH },
+        { x: box.x, y: y2, width: box.width, height: rowH },
+        { x: box.x, y: y3, width: box.width, height: rowH },
+        { x: box.x, y: y4, width: box.width, height: rowH4 },
       ];
     }
     // 2-Row Asymmetric (1 Top Full + 3 Bottom)
     const topH = round4((box.height - spacing) * 0.58);
-    const botH = round4(box.height - spacing - topH);
+    const yBot = round4(box.y + topH + spacing);
+    const botH = round4(box.y + box.height - yBot);
     const colW = round4((box.width - spacing * 2) / 3);
+    const xCol2 = round4(box.x + colW + spacing);
+    const xCol3 = round4(box.x + (colW + spacing) * 2);
+    const colW3 = round4(box.x + box.width - xCol3);
     return [
       { x: box.x, y: box.y, width: box.width, height: topH },
-      { x: box.x, y: round4(box.y + topH + spacing), width: colW, height: botH },
-      { x: round4(box.x + colW + spacing), y: round4(box.y + topH + spacing), width: colW, height: botH },
-      { x: round4(box.x + (colW + spacing) * 2), y: round4(box.y + topH + spacing), width: colW, height: botH },
+      { x: box.x, y: yBot, width: colW, height: botH },
+      { x: xCol2, y: yBot, width: colW, height: botH },
+      { x: xCol3, y: yBot, width: colW3, height: botH },
     ];
   }
 
@@ -453,92 +490,118 @@ export function partitionPageBoxIntoKRects(
     if (v === 0) {
       // 2 Top + 3 Bottom Mosaic
       const topH = round4((box.height - spacing) / 2);
-      const botH = round4(box.height - spacing - topH);
-      const topW = round4((box.width - spacing) / 2);
-      const botW = round4((box.width - spacing * 2) / 3);
       const y2 = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - y2);
+      const topW = round4((box.width - spacing) / 2);
+      const xTop2 = round4(box.x + topW + spacing);
+      const topW2 = round4(box.x + box.width - xTop2);
+      const botW = round4((box.width - spacing * 2) / 3);
+      const xBot2 = round4(box.x + botW + spacing);
+      const xBot3 = round4(box.x + (botW + spacing) * 2);
+      const botW3 = round4(box.x + box.width - xBot3);
       return [
         { x: box.x, y: box.y, width: topW, height: topH },
-        { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
+        { x: xTop2, y: box.y, width: topW2, height: topH },
         { x: box.x, y: y2, width: botW, height: botH },
-        { x: round4(box.x + botW + spacing), y: y2, width: botW, height: botH },
-        { x: round4(box.x + (botW + spacing) * 2), y: y2, width: botW, height: botH },
+        { x: xBot2, y: y2, width: botW, height: botH },
+        { x: xBot3, y: y2, width: botW3, height: botH },
       ];
     }
     if (v === 1) {
       // 3 Top + 2 Bottom Mosaic
       const topH = round4((box.height - spacing) / 2);
-      const botH = round4(box.height - spacing - topH);
-      const topW = round4((box.width - spacing * 2) / 3);
-      const botW = round4((box.width - spacing) / 2);
       const y2 = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - y2);
+      const topW = round4((box.width - spacing * 2) / 3);
+      const xTop2 = round4(box.x + topW + spacing);
+      const xTop3 = round4(box.x + (topW + spacing) * 2);
+      const topW3 = round4(box.x + box.width - xTop3);
+      const botW = round4((box.width - spacing) / 2);
+      const xBot2 = round4(box.x + botW + spacing);
+      const botW2 = round4(box.x + box.width - xBot2);
       return [
         { x: box.x, y: box.y, width: topW, height: topH },
-        { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
-        { x: round4(box.x + (topW + spacing) * 2), y: box.y, width: topW, height: topH },
+        { x: xTop2, y: box.y, width: topW, height: topH },
+        { x: xTop3, y: box.y, width: topW3, height: topH },
         { x: box.x, y: y2, width: botW, height: botH },
-        { x: round4(box.x + botW + spacing), y: y2, width: botW, height: botH },
+        { x: xBot2, y: y2, width: botW2, height: botH },
       ];
     }
     if (v === 2) {
       // 1 Left Hero (40%) + 4 Right Grid (2x2)
       const leftW = round4((box.width - spacing) * 0.40);
-      const rightW = round4(box.width - spacing - leftW);
-      const halfH = round4((box.height - spacing) / 2);
-      const halfW = round4((rightW - spacing) / 2);
       const xR = round4(box.x + leftW + spacing);
+      const rightW = round4(box.x + box.width - xR);
+      const halfH = round4((box.height - spacing) / 2);
       const y2 = round4(box.y + halfH + spacing);
+      const halfH2 = round4(box.y + box.height - y2);
+      const halfW = round4((rightW - spacing) / 2);
+      const xR2 = round4(xR + halfW + spacing);
+      const halfW2 = round4(box.x + box.width - xR2);
       return [
         { x: box.x, y: box.y, width: leftW, height: box.height },
         { x: xR, y: box.y, width: halfW, height: halfH },
-        { x: round4(xR + halfW + spacing), y: box.y, width: halfW, height: halfH },
-        { x: xR, y: y2, width: halfW, height: halfH },
-        { x: round4(xR + halfW + spacing), y: y2, width: halfW, height: halfH },
+        { x: xR2, y: box.y, width: halfW2, height: halfH },
+        { x: xR, y: y2, width: halfW, height: halfH2 },
+        { x: xR2, y: y2, width: halfW2, height: halfH2 },
       ];
     }
     if (v === 3) {
       // 4 Left Grid (2x2) + 1 Right Hero (40%) (Mirrored)
       const rightW = round4((box.width - spacing) * 0.40);
       const leftW = round4(box.width - spacing - rightW);
-      const halfH = round4((box.height - spacing) / 2);
-      const halfW = round4((leftW - spacing) / 2);
       const xR = round4(box.x + leftW + spacing);
+      const rightW2 = round4(box.x + box.width - xR);
+      const halfH = round4((box.height - spacing) / 2);
       const y2 = round4(box.y + halfH + spacing);
+      const halfH2 = round4(box.y + box.height - y2);
+      const halfW = round4((leftW - spacing) / 2);
+      const xL2 = round4(box.x + halfW + spacing);
+      const halfW2 = round4(box.x + leftW - xL2);
       return [
         { x: box.x, y: box.y, width: halfW, height: halfH },
-        { x: round4(box.x + halfW + spacing), y: box.y, width: halfW, height: halfH },
-        { x: box.x, y: y2, width: halfW, height: halfH },
-        { x: round4(box.x + halfW + spacing), y: y2, width: halfW, height: halfH },
-        { x: xR, y: box.y, width: rightW, height: box.height },
+        { x: xL2, y: box.y, width: halfW2, height: halfH },
+        { x: box.x, y: y2, width: halfW, height: halfH2 },
+        { x: xL2, y: y2, width: halfW2, height: halfH2 },
+        { x: xR, y: box.y, width: rightW2, height: box.height },
       ];
     }
     if (v === 4) {
       // 1 Top Hero (40%) + 4 Bottom Grid (2x2)
       const topH = round4((box.height - spacing) * 0.40);
-      const botH = round4(box.height - spacing - topH);
-      const halfW = round4((box.width - spacing) / 2);
-      const halfH = round4((botH - spacing) / 2);
       const yB = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - yB);
+      const halfW = round4((box.width - spacing) / 2);
+      const x2 = round4(box.x + halfW + spacing);
+      const halfW2 = round4(box.x + box.width - x2);
+      const halfH = round4((botH - spacing) / 2);
+      const yB2 = round4(yB + halfH + spacing);
+      const halfH2 = round4(box.y + box.height - yB2);
       return [
         { x: box.x, y: box.y, width: box.width, height: topH },
         { x: box.x, y: yB, width: halfW, height: halfH },
-        { x: round4(box.x + halfW + spacing), y: yB, width: halfW, height: halfH },
-        { x: box.x, y: round4(yB + halfH + spacing), width: halfW, height: halfH },
-        { x: round4(box.x + halfW + spacing), y: round4(yB + halfH + spacing), width: halfW, height: halfH },
+        { x: x2, y: yB, width: halfW2, height: halfH },
+        { x: box.x, y: yB2, width: halfW, height: halfH2 },
+        { x: x2, y: yB2, width: halfW2, height: halfH2 },
       ];
     }
     // 4 Top Grid (2x2) + 1 Bottom Hero (40%)
     const botH = round4((box.height - spacing) * 0.40);
     const topH = round4(box.height - spacing - botH);
-    const halfW = round4((box.width - spacing) / 2);
-    const halfH = round4((topH - spacing) / 2);
     const yB = round4(box.y + topH + spacing);
+    const botH2 = round4(box.y + box.height - yB);
+    const halfW = round4((box.width - spacing) / 2);
+    const x2 = round4(box.x + halfW + spacing);
+    const halfW2 = round4(box.x + box.width - x2);
+    const halfH = round4((topH - spacing) / 2);
+    const yT2 = round4(box.y + halfH + spacing);
+    const halfH2 = round4(box.y + topH - yT2);
     return [
       { x: box.x, y: box.y, width: halfW, height: halfH },
-      { x: round4(box.x + halfW + spacing), y: box.y, width: halfW, height: halfH },
-      { x: box.x, y: round4(box.y + halfH + spacing), width: halfW, height: halfH },
-      { x: round4(box.x + halfW + spacing), y: round4(box.y + halfH + spacing), width: halfW, height: halfH },
-      { x: box.x, y: yB, width: box.width, height: botH },
+      { x: x2, y: box.y, width: halfW2, height: halfH },
+      { x: box.x, y: yT2, width: halfW, height: halfH2 },
+      { x: x2, y: yT2, width: halfW2, height: halfH2 },
+      { x: box.x, y: yB, width: box.width, height: botH2 },
     ];
   }
 
@@ -547,100 +610,130 @@ export function partitionPageBoxIntoKRects(
     if (v === 0) {
       // 2x3 Grid (2 rows, 3 columns)
       const w = round4((box.width - spacing * 2) / 3);
+      const x2 = round4(box.x + w + spacing);
+      const x3 = round4(box.x + (w + spacing) * 2);
+      const w3 = round4(box.x + box.width - x3);
       const h = round4((box.height - spacing) / 2);
       const y2 = round4(box.y + h + spacing);
+      const h2 = round4(box.y + box.height - y2);
       return [
         { x: box.x, y: box.y, width: w, height: h },
-        { x: round4(box.x + w + spacing), y: box.y, width: w, height: h },
-        { x: round4(box.x + (w + spacing) * 2), y: box.y, width: w, height: h },
-        { x: box.x, y: y2, width: w, height: h },
-        { x: round4(box.x + w + spacing), y: y2, width: w, height: h },
-        { x: round4(box.x + (w + spacing) * 2), y: y2, width: w, height: h },
+        { x: x2, y: box.y, width: w, height: h },
+        { x: x3, y: box.y, width: w3, height: h },
+        { x: box.x, y: y2, width: w, height: h2 },
+        { x: x2, y: y2, width: w, height: h2 },
+        { x: x3, y: y2, width: w3, height: h2 },
       ];
     }
     if (v === 1) {
       // 3x2 Grid (3 rows, 2 columns)
       const w = round4((box.width - spacing) / 2);
+      const x2 = round4(box.x + w + spacing);
+      const w2 = round4(box.x + box.width - x2);
       const h = round4((box.height - spacing * 2) / 3);
+      const y2 = round4(box.y + h + spacing);
+      const y3 = round4(box.y + (h + spacing) * 2);
+      const h3 = round4(box.y + box.height - y3);
       return [
         { x: box.x, y: box.y, width: w, height: h },
-        { x: round4(box.x + w + spacing), y: box.y, width: w, height: h },
-        { x: box.x, y: round4(box.y + h + spacing), width: w, height: h },
-        { x: round4(box.x + w + spacing), y: round4(box.y + h + spacing), width: w, height: h },
-        { x: box.x, y: round4(box.y + (h + spacing) * 2), width: w, height: h },
-        { x: round4(box.x + w + spacing), y: round4(box.y + (h + spacing) * 2), width: w, height: h },
+        { x: x2, y: box.y, width: w2, height: h },
+        { x: box.x, y: y2, width: w, height: h },
+        { x: x2, y: y2, width: w2, height: h },
+        { x: box.x, y: y3, width: w, height: h3 },
+        { x: x2, y: y3, width: w2, height: h3 },
       ];
     }
     if (v === 2) {
       // 1 Top Wide (35%) + 2 Mid (30%) + 3 Bot (35%)
       const topH = round4((box.height - spacing * 2) * 0.35);
       const midH = round4((box.height - spacing * 2) * 0.30);
-      const botH = round4(box.height - spacing * 2 - topH - midH);
-      const midW = round4((box.width - spacing) / 2);
-      const botW = round4((box.width - spacing * 2) / 3);
       const yMid = round4(box.y + topH + spacing);
       const yBot = round4(yMid + midH + spacing);
+      const botH = round4(box.y + box.height - yBot);
+      const midW = round4((box.width - spacing) / 2);
+      const xMid2 = round4(box.x + midW + spacing);
+      const midW2 = round4(box.x + box.width - xMid2);
+      const botW = round4((box.width - spacing * 2) / 3);
+      const xBot2 = round4(box.x + botW + spacing);
+      const xBot3 = round4(box.x + (botW + spacing) * 2);
+      const botW3 = round4(box.x + box.width - xBot3);
       return [
         { x: box.x, y: box.y, width: box.width, height: topH },
         { x: box.x, y: yMid, width: midW, height: midH },
-        { x: round4(box.x + midW + spacing), y: yMid, width: midW, height: midH },
+        { x: xMid2, y: yMid, width: midW2, height: midH },
         { x: box.x, y: yBot, width: botW, height: botH },
-        { x: round4(box.x + botW + spacing), y: yBot, width: botW, height: botH },
-        { x: round4(box.x + (botW + spacing) * 2), y: yBot, width: botW, height: botH },
+        { x: xBot2, y: yBot, width: botW, height: botH },
+        { x: xBot3, y: yBot, width: botW3, height: botH },
       ];
     }
     if (v === 3) {
       // 1 Left Tower (38%) + 5 Mosaic right (2 top, 3 bot)
       const leftW = round4((box.width - spacing) * 0.38);
-      const rightW = round4(box.width - spacing - leftW);
-      const topH = round4((box.height - spacing) / 2);
-      const botH = round4(box.height - spacing - topH);
-      const topW = round4((rightW - spacing) / 2);
-      const botW = round4((rightW - spacing * 2) / 3);
       const xR = round4(box.x + leftW + spacing);
+      const rightW = round4(box.x + box.width - xR);
+      const topH = round4((box.height - spacing) / 2);
       const yB = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - yB);
+      const topW = round4((rightW - spacing) / 2);
+      const xTop2 = round4(xR + topW + spacing);
+      const topW2 = round4(box.x + box.width - xTop2);
+      const botW = round4((rightW - spacing * 2) / 3);
+      const xBot2 = round4(xR + botW + spacing);
+      const xBot3 = round4(xR + (botW + spacing) * 2);
+      const botW3 = round4(box.x + box.width - xBot3);
       return [
         { x: box.x, y: box.y, width: leftW, height: box.height },
         { x: xR, y: box.y, width: topW, height: topH },
-        { x: round4(xR + topW + spacing), y: box.y, width: topW, height: topH },
+        { x: xTop2, y: box.y, width: topW2, height: topH },
         { x: xR, y: yB, width: botW, height: botH },
-        { x: round4(xR + botW + spacing), y: yB, width: botW, height: botH },
-        { x: round4(xR + (botW + spacing) * 2), y: yB, width: botW, height: botH },
+        { x: xBot2, y: yB, width: botW, height: botH },
+        { x: xBot3, y: yB, width: botW3, height: botH },
       ];
     }
     if (v === 4) {
       // 5 Mosaic left (2 top, 3 bot) + 1 Right Tower (38%) (Mirrored)
       const rightW = round4((box.width - spacing) * 0.38);
       const leftW = round4(box.width - spacing - rightW);
-      const topH = round4((box.height - spacing) / 2);
-      const botH = round4(box.height - spacing - topH);
-      const topW = round4((leftW - spacing) / 2);
-      const botW = round4((leftW - spacing * 2) / 3);
       const xR = round4(box.x + leftW + spacing);
+      const rightW2 = round4(box.x + box.width - xR);
+      const topH = round4((box.height - spacing) / 2);
       const yB = round4(box.y + topH + spacing);
+      const botH = round4(box.y + box.height - yB);
+      const topW = round4((leftW - spacing) / 2);
+      const xTop2 = round4(box.x + topW + spacing);
+      const topW2 = round4(box.x + leftW - xTop2);
+      const botW = round4((leftW - spacing * 2) / 3);
+      const xBot2 = round4(box.x + botW + spacing);
+      const xBot3 = round4(box.x + (botW + spacing) * 2);
+      const botW3 = round4(box.x + leftW - xBot3);
       return [
         { x: box.x, y: box.y, width: topW, height: topH },
-        { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
+        { x: xTop2, y: box.y, width: topW2, height: topH },
         { x: box.x, y: yB, width: botW, height: botH },
-        { x: round4(box.x + botW + spacing), y: yB, width: botW, height: botH },
-        { x: round4(box.x + (botW + spacing) * 2), y: yB, width: botW, height: botH },
-        { x: xR, y: box.y, width: rightW, height: box.height },
+        { x: xBot2, y: yB, width: botW, height: botH },
+        { x: xBot3, y: yB, width: botW3, height: botH },
+        { x: xR, y: box.y, width: rightW2, height: box.height },
       ];
     }
     // 3 Top (35%) + 2 Mid (30%) + 1 Bot Wide (35%)
     const topH = round4((box.height - spacing * 2) * 0.35);
     const midH = round4((box.height - spacing * 2) * 0.30);
-    const botH = round4(box.height - spacing * 2 - topH - midH);
-    const topW = round4((box.width - spacing * 2) / 3);
-    const midW = round4((box.width - spacing) / 2);
     const yMid = round4(box.y + topH + spacing);
     const yBot = round4(yMid + midH + spacing);
+    const botH = round4(box.y + box.height - yBot);
+    const topW = round4((box.width - spacing * 2) / 3);
+    const xTop2 = round4(box.x + topW + spacing);
+    const xTop3 = round4(box.x + (topW + spacing) * 2);
+    const topW3 = round4(box.x + box.width - xTop3);
+    const midW = round4((box.width - spacing) / 2);
+    const xMid2 = round4(box.x + midW + spacing);
+    const midW2 = round4(box.x + box.width - xMid2);
     return [
       { x: box.x, y: box.y, width: topW, height: topH },
-      { x: round4(box.x + topW + spacing), y: box.y, width: topW, height: topH },
-      { x: round4(box.x + (topW + spacing) * 2), y: box.y, width: topW, height: topH },
+      { x: xTop2, y: box.y, width: topW, height: topH },
+      { x: xTop3, y: box.y, width: topW3, height: topH },
       { x: box.x, y: yMid, width: midW, height: midH },
-      { x: round4(box.x + midW + spacing), y: yMid, width: midW, height: midH },
+      { x: xMid2, y: yMid, width: midW2, height: midH },
       { x: box.x, y: yBot, width: box.width, height: botH },
     ];
   }
@@ -1055,36 +1148,43 @@ export function generateAdaptiveLayoutVariations(
   const variations: AdaptiveLayoutVariation[] = [];
 
   if (count === 1) {
-    // 1 Photo options: Right Hero, Left Hero, Full Bleed, Fine-Art
-    const aspect = photos[0]?.photoAspect || 1.5;
+    // 1 Photo options: Clean heroes filling designated zones flush to boundaries
+    const pageWidth = round4((params.spreadWidth - params.gutterWidth) / 2);
     variations.push(
       {
-        id: '1g_right_page_fit',
-        name: 'Right Page Hero (Centered inside Safe Zone)',
-        description: 'Centered horizontally & vertically inside the right page blue safe margin box.',
-        rects: [fitInsideBoxCentered(rightPageArea, aspect, 1.0)],
-        tags: ['safe', 'hero', 'right', 'centered'],
-      },
-      {
-        id: '1g_left_page_fit',
-        name: 'Left Page Hero (Centered inside Safe Zone)',
-        description: 'Centered horizontally & vertically inside the left page blue safe margin box.',
-        rects: [fitInsideBoxCentered(leftPageArea, aspect, 1.0)],
-        tags: ['safe', 'hero', 'left', 'centered'],
-      },
-      {
         id: '1g_right_page_fill',
-        name: 'Right Page Full Safe Box',
-        description: 'Fills the entire right page safe margin box cleanly.',
+        name: 'Right Page Safe Zone Hero',
+        description: 'Fills the right page safe margin box cleanly.',
         rects: [{ ...rightPageArea }],
-        tags: ['safe', 'hero', 'fill'],
+        tags: ['safe', 'hero', 'right', 'fill'],
       },
       {
         id: '1g_left_page_fill',
-        name: 'Left Page Full Safe Box',
-        description: 'Fills the entire left page safe margin box cleanly.',
+        name: 'Left Page Safe Zone Hero',
+        description: 'Fills the left page safe margin box cleanly.',
         rects: [{ ...leftPageArea }],
-        tags: ['safe', 'hero', 'fill'],
+        tags: ['safe', 'hero', 'left', 'fill'],
+      },
+      {
+        id: '1g_spread_center_fill',
+        name: 'Center Spread Hero',
+        description: 'Fills the full spread safe margin area cleanly.',
+        rects: [{ ...spreadArea }],
+        tags: ['safe', 'hero', 'spread', 'fill'],
+      },
+      {
+        id: '1g_right_page_bleed',
+        name: 'Right Page Full Bleed',
+        description: 'Edge-to-edge full right page hero.',
+        rects: [{ x: round4(pageWidth + params.gutterWidth), y: 0, width: round4(pageWidth), height: round4(params.spreadHeight) }],
+        tags: ['hero', 'right', 'full-bleed'],
+      },
+      {
+        id: '1g_left_page_bleed',
+        name: 'Left Page Full Bleed',
+        description: 'Edge-to-edge full left page hero.',
+        rects: [{ x: 0, y: 0, width: round4(pageWidth), height: round4(params.spreadHeight) }],
+        tags: ['hero', 'left', 'full-bleed'],
       },
       {
         id: '1g_full_bleed_panorama',
@@ -1118,8 +1218,8 @@ export function generateAdaptiveLayoutVariations(
 
   // For each split pair, create varied layout permutations
   splitPairs.forEach(({ nLeft, nRight }) => {
-    const leftVariants = nLeft === 1 ? 2 : nLeft === 2 ? 4 : nLeft === 3 ? 6 : nLeft === 4 ? 6 : 4;
-    const rightVariants = nRight === 1 ? 2 : nRight === 2 ? 4 : nRight === 3 ? 6 : nRight === 4 ? 6 : 4;
+    const leftVariants = nLeft === 1 ? 1 : nLeft === 2 ? 4 : nLeft === 3 ? 6 : nLeft === 4 ? 6 : 4;
+    const rightVariants = nRight === 1 ? 1 : nRight === 2 ? 4 : nRight === 3 ? 6 : nRight === 4 ? 6 : 4;
 
     const maxCombos = Math.min(8, leftVariants * rightVariants);
     for (let c = 0; c < maxCombos; c++) {

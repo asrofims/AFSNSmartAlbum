@@ -27,6 +27,9 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
   const activeSpread = useMemo(() => {
     if (!currentAlbum || !activeSpreadId) return null;
+    if (currentAlbum.coverSpread && currentAlbum.coverSpread.id === activeSpreadId) {
+      return currentAlbum.coverSpread;
+    }
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
@@ -57,15 +60,21 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
   // Dynamic Adaptive Variations calculated specifically for the current spread's photos
   const adaptiveVariations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
+    const isCover = currentAlbum?.coverSpread?.id === activeSpread.id;
+    const isSpread = !isCover;
     const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
-    const spreadWidth = dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadWidth = isCover
+      ? (activeSpread.leftPage ? activeSpread.leftPage.width : dims.pageWidth) +
+        (activeSpread.rightPage ? activeSpread.rightPage.width : 0) +
+        dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
     const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
-        isSpread: true,
+        isSpread,
         safeMargin: dims.safeMargin,
         safeMarginTop: dims.safeMarginTop,
         safeMarginBottom: dims.safeMarginBottom,
@@ -77,7 +86,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
       },
       photos
     );
-  }, [currentProject, activeSpread, photos, lockedElements]);
+  }, [currentProject, currentAlbum, activeSpread, photos, lockedElements]);
 
   const currentActiveIndex =
     activeSpread && spreadLayoutIndices[activeSpread.id] !== undefined

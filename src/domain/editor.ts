@@ -525,7 +525,7 @@ export function calculateSnapping(
             { pos: spineLeft, label: 'Left Page Inner Edge', kind: 'edge' as const },
             { pos: spineRight, label: 'Right Page Inner Edge', kind: 'edge' as const },
           ]
-        : []),
+        : [{ pos: spineCenter, label: 'Center Fold / Page Edge', kind: 'edge' as const }]),
       { pos: spreadWidth, label: 'Spread Right Edge', kind: 'edge' }
     );
   }
@@ -1462,62 +1462,87 @@ export interface SafeMarginBounds {
   spreadHeight: number;
   gutterWidth: number;
   safeMargin: number;
+  safeMarginTop?: number;
+  safeMarginBottom?: number;
+  safeMarginOutside?: number;
+  safeMarginSpine?: number;
+  targetMode?: 'safe_margin' | 'page_edge' | 'selection';
 }
 
 /**
  * Calculates batch alignment updates for selected frames.
- * - When 2+ independent entities are selected: Aligns entities relative to their composite bounding box.
- * - When a single entity (single standalone frame OR single group) is selected:
- *   Aligns the entity to the active page's Blue Safe Margin Box (or spread safe margins if spanning both pages).
+ * - When targetMode is 'page_edge': Aligns frames flush against canvas/page boundaries (0, pageWidth, spreadWidth, spreadHeight).
+ * - When targetMode is 'safe_margin' (or single entity with margins enabled): Aligns against the Blue Safe Margin box.
+ * - When 2+ independent entities are selected and targetMode is 'selection': Aligns entities relative to their composite bounding box.
  * Groups of frames are always treated as single rigid entities, preserving their internal relative layout.
  */
 export function alignFrames(
   frames: PhotoFrameElement[],
   alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom',
-  safeMarginBounds?: SafeMarginBounds
+  safeMarginBounds?: SafeMarginBounds,
+  targetModeOverride?: 'safe_margin' | 'page_edge' | 'selection'
 ): { id: string; geometry: Partial<PhotoFrameElement> }[] {
   const entities = clusterFramesIntoEntities(frames);
   if (entities.length === 0) return [];
 
   const updates: { id: string; geometry: Partial<PhotoFrameElement> }[] = [];
 
-  // SINGLE ENTITY (Single Frame OR Single Group): Align against Blue Safe Margin Box
-  if (entities.length === 1 && safeMarginBounds) {
-    const entity = entities[0];
-    if (!entity) return [];
+  const targetMode = targetModeOverride ?? safeMarginBounds?.targetMode ?? (
+    safeMarginBounds && safeMarginBounds.safeMargin === 0 ? 'page_edge' : undefined
+  );
+
+  // When aligning relative to page/canvas edge or safe margin:
+  const isPageTargeted = Boolean(
+    safeMarginBounds && (entities.length === 1 || targetMode === 'page_edge' || targetMode === 'safe_margin')
+  );
+
+  if (isPageTargeted && safeMarginBounds) {
     const { singlePageWidth, spreadHeight, gutterWidth, safeMargin } = safeMarginBounds;
     const totalSpreadWidth = singlePageWidth * 2 + gutterWidth;
     const spineLeft = singlePageWidth;
     const spineRight = singlePageWidth + gutterWidth;
     const spineCenter = singlePageWidth + gutterWidth / 2;
 
-    const entityCenterX = entity.x + entity.width / 2;
-    const spansBothPages = entity.x < spineLeft && entity.x + entity.width > spineRight;
+    const isPageEdge = targetMode === 'page_edge' || safeMargin === 0;
+
+    const mTop = isPageEdge ? 0 : (safeMarginBounds.safeMarginTop ?? safeMargin);
+    const mBottom = isPageEdge ? 0 : (safeMarginBounds.safeMarginBottom ?? safeMargin);
+    const mOutside = isPageEdge ? 0 : (safeMarginBounds.safeMarginOutside ?? safeMargin);
+    const mSpine = isPageEdge ? 0 : (safeMarginBounds.safeMarginSpine ?? safeMargin);
+
+    const minSelX = Math.min(...entities.map((e) => e.x));
+    const maxSelX = Math.max(...entities.map((e) => e.x + e.width));
+    const minSelY = Math.min(...entities.map((e) => e.y));
+    const maxSelY = Math.max(...entities.map((e) => e.y + e.height));
+    const selW = maxSelX - minSelX;
+    const selH = maxSelY - minSelY;
+    const selCenterX = minSelX + selW / 2;
+
+    const spansBothPages = minSelX < spineLeft && maxSelX > spineRight;
 
     let refMinX: number;
     let refMaxX: number;
     let refCenterX: number;
 
     if (spansBothPages) {
-      // Panoramic / Full Spread Safe Margin Box
-      refMinX = safeMargin;
-      refMaxX = totalSpreadWidth - safeMargin;
+      refMinX = mOutside;
+      refMaxX = totalSpreadWidth - mOutside;
       refCenterX = totalSpreadWidth / 2;
-    } else if (entityCenterX < spineCenter) {
-      // Left Page Blue Safe Margin Box
-      refMinX = safeMargin;
-      refMaxX = singlePageWidth - safeMargin;
+    } else if (selCenterX < spineCenter) {
+      // Left Page
+      refMinX = mOutside;
+      refMaxX = singlePageWidth - mSpine;
       refCenterX = (refMinX + refMaxX) / 2;
     } else {
-      // Right Page Blue Safe Margin Box
-      refMinX = singlePageWidth + gutterWidth + safeMargin;
-      refMaxX = totalSpreadWidth - safeMargin;
+      // Right Page
+      refMinX = singlePageWidth + gutterWidth + mSpine;
+      refMaxX = totalSpreadWidth - mOutside;
       refCenterX = (refMinX + refMaxX) / 2;
     }
 
-    const refMinY = safeMargin;
-    const refMaxY = spreadHeight - safeMargin;
-    const refMiddleY = spreadHeight / 2;
+    const refMinY = mTop;
+    const refMaxY = spreadHeight - mBottom;
+    const refMiddleY = (refMinY + refMaxY) / 2;
 
     let deltaX = 0;
     let deltaY = 0;
@@ -1526,36 +1551,38 @@ export function alignFrames(
 
     switch (alignment) {
       case 'left':
-        deltaX = refMinX - entity.x;
+        deltaX = refMinX - minSelX;
         applyX = true;
         break;
       case 'center':
-        deltaX = refCenterX - entity.width / 2 - entity.x;
+        deltaX = refCenterX - selW / 2 - minSelX;
         applyX = true;
         break;
       case 'right':
-        deltaX = refMaxX - entity.width - entity.x;
+        deltaX = refMaxX - selW - minSelX;
         applyX = true;
         break;
       case 'top':
-        deltaY = refMinY - entity.y;
+        deltaY = refMinY - minSelY;
         applyY = true;
         break;
       case 'middle':
-        deltaY = refMiddleY - entity.height / 2 - entity.y;
+        deltaY = refMiddleY - selH / 2 - minSelY;
         applyY = true;
         break;
       case 'bottom':
-        deltaY = refMaxY - entity.height - entity.y;
+        deltaY = refMaxY - selH - minSelY;
         applyY = true;
         break;
     }
 
-    for (const f of entity.frames) {
-      const geometry: Partial<PhotoFrameElement> = {};
-      if (applyX) geometry.x = roundToTenth(f.x + deltaX);
-      if (applyY) geometry.y = roundToTenth(f.y + deltaY);
-      updates.push({ id: f.id, geometry });
+    for (const entity of entities) {
+      for (const f of entity.frames) {
+        const geometry: Partial<PhotoFrameElement> = {};
+        if (applyX) geometry.x = roundToTenth(f.x + deltaX);
+        if (applyY) geometry.y = roundToTenth(f.y + deltaY);
+        updates.push({ id: f.id, geometry });
+      }
     }
 
     return updates;

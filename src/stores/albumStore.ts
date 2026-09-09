@@ -12,6 +12,7 @@ import {
   moveAlbumSpread,
   getAllAlbumSpreads,
   syncAlbumPhotoAssets,
+  isAlbumDesignEqual,
   AlbumElement,
 } from '../domain/album';
 import {
@@ -125,9 +126,10 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const { album: syncedAlbum, changed } = syncAlbumPhotoAssets(currentAlbum, photos);
     if (!changed) return false;
 
+    const currentSaveStatus = get().saveStatus;
     set({
       currentAlbum: syncedAlbum,
-      saveStatus: options.persist ? 'saving' : 'unsaved',
+      saveStatus: options.persist ? 'saving' : currentSaveStatus,
     });
 
     if (options.persist) {
@@ -379,7 +381,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       await invoke('save_album_structure', { album: sanitizedAlbum });
       // Update local storage crash recovery snapshot
       try {
-        if (get().currentAlbum === currentAlbum) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+        if (isAlbumDesignEqual(get().currentAlbum, currentAlbum)) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
           projectId: sanitizedAlbum.projectId,
           savedAt: new Date().toISOString(),
           album: sanitizedAlbum,
@@ -388,21 +390,23 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
       // This is a recovery checkpoint, not confirmation that the .afsn file saved.
       // Never replace edits made while the native write was in flight.
-      if (get().currentAlbum === currentAlbum) {
-        set({ saveStatus: previousStatus === 'saved' ? 'saved' : 'unsaved' });
+      if (isAlbumDesignEqual(get().currentAlbum, currentAlbum)) {
+        if (get().saveStatus !== 'saved') {
+          set({ saveStatus: previousStatus === 'saved' ? 'saved' : 'unsaved' });
+        }
       }
       return true;
     } catch (err) {
       console.error('Failed to save album to SQLite DB:', err);
       // Fallback: save to localStorage snapshot so data is never lost
       try {
-        if (get().currentAlbum === currentAlbum) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
+        if (isAlbumDesignEqual(get().currentAlbum, currentAlbum)) localStorage.setItem(`afsn_snapshot_${sanitizedAlbum.projectId}`, JSON.stringify({
           projectId: sanitizedAlbum.projectId,
           savedAt: new Date().toISOString(),
           album: sanitizedAlbum,
         }));
       } catch {}
-      if (get().currentAlbum === currentAlbum) set({ saveStatus: 'unsaved' });
+      if (isAlbumDesignEqual(get().currentAlbum, currentAlbum)) set({ saveStatus: 'unsaved' });
       return false;
     }
   }),

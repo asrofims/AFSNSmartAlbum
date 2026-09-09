@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Project, ProjectSettings } from '../domain/project';
 import { Unit } from '../domain/units';
+import { isAlbumDesignEqual } from '../domain/album';
 import { usePhotoStore } from './photoStore';
 
 const persistProjectMargins = async (project: Project): Promise<void> => {
@@ -524,7 +525,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       } else {
         await invoke('export_afsn_package', { projectId: current.id, targetPath: workingPath });
       }
-      if (get().currentProject?.id === current.id && useAlbumStore.getState().currentAlbum === album) {
+      if (get().currentProject?.id === current.id && isAlbumDesignEqual(useAlbumStore.getState().currentAlbum, album)) {
         useAlbumStore.setState({ saveStatus: 'saved', lastSavedAt: new Date().toLocaleTimeString() });
       }
       return { success: true, filePath: savedPath, isSaveAs: !exists };
@@ -579,7 +580,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         await usePhotoStore.getState().loadFolders(saved.id);
         if (!await useAlbumStore.getState().loadAlbumFromDb(saved.id)) throw new Error('The saved copy could not be loaded.');
       }
-      if (saved.id !== current.id || useAlbumStore.getState().currentAlbum === album) {
+      if (saved.id !== current.id || isAlbumDesignEqual(useAlbumStore.getState().currentAlbum, album)) {
         useAlbumStore.setState({ saveStatus: 'saved', lastSavedAt: new Date().toLocaleTimeString() });
       }
       return saved.filePath || null;

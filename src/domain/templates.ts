@@ -66,11 +66,12 @@ export function getProjectDimensionsInCanvasUnit(project: Project, spread?: Spre
   const pageHeight = project.canvasHeight;
 
   // Margin: convert from project.marginUnit (or 'mm') to project.canvasUnit
-  const rawMargin = spread?.safeArea ?? project.marginValue ?? 10;
-  const rawMarginTop = spread?.safeAreaTop ?? project.marginTop ?? rawMargin;
-  const rawMarginBottom = spread?.safeAreaBottom ?? project.marginBottom ?? rawMargin;
-  const rawMarginOutside = spread?.safeAreaOutside ?? project.marginOutside ?? rawMargin;
-  const rawMarginSpine = spread?.safeAreaSpine ?? project.marginSpine ?? rawMargin;
+  const marginEnabled = project.marginEnabled ?? true;
+  const rawMargin = marginEnabled ? (spread?.safeArea ?? project.marginValue ?? 10) : 0;
+  const rawMarginTop = marginEnabled ? (spread?.safeAreaTop ?? project.marginTop ?? rawMargin) : 0;
+  const rawMarginBottom = marginEnabled ? (spread?.safeAreaBottom ?? project.marginBottom ?? rawMargin) : 0;
+  const rawMarginOutside = marginEnabled ? (spread?.safeAreaOutside ?? project.marginOutside ?? rawMargin) : 0;
+  const rawMarginSpine = marginEnabled ? (spread?.safeAreaSpine ?? project.marginSpine ?? rawMargin) : 0;
 
   const marginUnit = project.marginUnit || 'mm';
   const safeMargin = round4(convertUnit(rawMargin, marginUnit, unit, dpi, 4));

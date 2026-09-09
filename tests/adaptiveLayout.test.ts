@@ -76,15 +76,40 @@ function runTests() {
   }
   console.log('✓ All multi-photo rects strictly bounded inside Left & Right Blue Safe Margin Boxes.');
 
-  // Test 3: Single Page Partitioning (K = 1 to 6)
+  // Test 3: Single Page Partitioning (K = 1 to 6) with Flush Outer Edge Confinement
   const singleBox = { x: 10, y: 10, width: 180, height: 180 };
   for (let k = 1; k <= 6; k++) {
-    const rects = partitionPageBoxIntoKRects(singleBox, k, 4, 0);
-    if (rects.length !== k) {
-      throw new Error(`partitionPageBoxIntoKRects returned ${rects.length} for K=${k}`);
+    for (let variant = 0; variant < 10; variant++) {
+      const rects = partitionPageBoxIntoKRects(singleBox, k, 4, variant);
+      if (rects.length !== k) {
+        throw new Error(`partitionPageBoxIntoKRects returned ${rects.length} for K=${k}`);
+      }
+      // Check zero gap at perimeter
+      const minX = Math.min(...rects.map((r) => r.x));
+      const minY = Math.min(...rects.map((r) => r.y));
+      const maxRight = Math.max(...rects.map((r) => r.x + r.width));
+      const maxBottom = Math.max(...rects.map((r) => r.y + r.height));
+
+      if (Math.abs(minX - singleBox.x) > 0.001) {
+        throw new Error(`K=${k} variant=${variant} minX (${minX}) does not match box.x (${singleBox.x})`);
+      }
+      if (Math.abs(minY - singleBox.y) > 0.001) {
+        throw new Error(`K=${k} variant=${variant} minY (${minY}) does not match box.y (${singleBox.y})`);
+      }
+      if (Math.abs(maxRight - (singleBox.x + singleBox.width)) > 0.001) {
+        throw new Error(`K=${k} variant=${variant} maxRight (${maxRight}) does not reach box right edge (${singleBox.x + singleBox.width})`);
+      }
+      if (Math.abs(maxBottom - (singleBox.y + singleBox.height)) > 0.001) {
+        throw new Error(`K=${k} variant=${variant} maxBottom (${maxBottom}) does not reach box bottom edge (${singleBox.y + singleBox.height})`);
+      }
     }
   }
-  console.log('✓ Single page geometric box partitioning validated for K = 1..6.');
+  // K=1 must fill 100% of the box
+  const k1Rect = partitionPageBoxIntoKRects(singleBox, 1, 4, 0)[0];
+  if (k1Rect.x !== 10 || k1Rect.y !== 10 || k1Rect.width !== 180 || k1Rect.height !== 180) {
+    throw new Error(`K=1 rect must be flush with singleBox, got ${JSON.stringify(k1Rect)}`);
+  }
+  console.log('✓ Single page geometric box partitioning validated for K = 1..6 (flush outer edges, zero perimeter gap).');
 
   // Test 5: Shuffle photo randomized rotation
   const elements = buildSpreadElementsFromVariation(variations7p[0], sevenPhotos);

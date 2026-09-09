@@ -310,3 +310,14 @@
 - [x] Restore full diversity of geometric templates (1 to 12+ photos, diptychs, triptychs, multi-row, collages, and grids).
 - [x] Application version metadata bumped to `v1.0.44`.
 
+### Phase 27 — Release v1.0.45: Adaptive Layout Edge Confinement, Canvas Edge Alignment & Save Status Synchronization
+
+- [x] Fix canvas edge measurement and perimeter gaps in adaptive layout engine: `getProjectDimensionsInCanvasUnit` now respects `project.marginEnabled` (margins evaluate to 0 when disabled), allowing layouts to expand cleanly to canvas boundaries.
+- [x] Eliminate sub-pixel / sub-millimeter perimeter gaps in `partitionPageBoxIntoKRects` by absorbing fractional column and row dimensions into terminal partitions, guaranteeing 0 gap against page boundaries.
+- [x] Partition Count 1 now produces full-bleed flush rectangles filling 100% of the usable box.
+- [x] Add dual alignment modes: **Align to Canvas Edge** (`targetMode: 'page_edge'`) and **Align to Safe Margin** (`targetMode: 'safe_margin'`) in Single-Frame Inspector, Multi-Selection Inspector, and Canvas Right-Click context menus.
+- [x] Multi-selection alignment to canvas edges moves the composite bounding box flush to the target edge while preserving exact internal relative spacing and gaps.
+- [x] Fix toolbar Save button staying orange after save: implement `isAlbumDesignEqual` / `isSpreadDesignEqual` / `isElementDesignEqual` to distinguish runtime thumbnail/preview cache updates from user design edits, preventing background asset generation from resetting `saveStatus` to `unsaved`.
+- [x] Enhance `calculateSnapping` to magnetically snap to the center spine / fold line on layflat albums with zero gutter width.
+- [x] Application version metadata bumped to `v1.0.45`.
+

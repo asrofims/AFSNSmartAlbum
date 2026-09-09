@@ -121,7 +121,8 @@ export interface EditorState {
   // Batch Alignment & Distribution
   alignSelectedFrames: (
     spreadId: string,
-    alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
+    alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom',
+    targetMode?: 'safe_margin' | 'page_edge' | 'selection'
   ) => void;
   distributeSelectedFrames: (
     spreadId: string,
@@ -1659,7 +1660,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  alignSelectedFrames: (spreadId, alignment) => {
+  alignSelectedFrames: (spreadId, alignment, targetMode) => {
     const { selectedFrameIds, batchUpdateFrames } = get();
     const { currentAlbum } = useAlbumStore.getState();
     const currentProject = useProjectStore.getState().currentProject;
@@ -1684,10 +1685,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         spreadHeight: dims.pageHeight,
         gutterWidth: dims.gutterWidth,
         safeMargin: dims.safeMargin,
+        safeMarginTop: dims.safeMarginTop,
+        safeMarginBottom: dims.safeMarginBottom,
+        safeMarginOutside: dims.safeMarginOutside,
+        safeMarginSpine: dims.safeMarginSpine,
+        targetMode: targetMode ?? (dims.safeMargin === 0 ? 'page_edge' : undefined),
       };
     }
 
-    const updates = alignFrames(selectedFrames, alignment, safeMarginBounds);
+    const updates = alignFrames(selectedFrames, alignment, safeMarginBounds, targetMode);
     if (updates.length > 0) {
       batchUpdateFrames(spreadId, updates);
     }

@@ -1,6 +1,6 @@
 import type { Project } from './project';
 import type { Unit } from './units';
-import type { PhotoFrameElement } from './editor';
+import { getCornerRadii, type PhotoFrameElement } from './editor';
 import type { TextNodeElement } from './text';
 import type { Photo } from './photo';
 
@@ -155,11 +155,12 @@ export function createInitialAlbum(project: Project): Album {
   const unit = project.canvasUnit;
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
-  const marginVal = project.marginValue ?? 10;
-  const safeAreaTop = project.marginTop ?? marginVal;
-  const safeAreaBottom = project.marginBottom ?? marginVal;
-  const safeAreaOutside = project.marginOutside ?? marginVal;
-  const safeAreaSpine = project.marginSpine ?? marginVal;
+  const marginEnabled = project.marginEnabled ?? true;
+  const marginVal = marginEnabled ? (project.marginValue ?? 10) : 0;
+  const safeAreaTop = marginEnabled ? (project.marginTop ?? marginVal) : 0;
+  const safeAreaBottom = marginEnabled ? (project.marginBottom ?? marginVal) : 0;
+  const safeAreaOutside = marginEnabled ? (project.marginOutside ?? marginVal) : 0;
+  const safeAreaSpine = marginEnabled ? (project.marginSpine ?? marginVal) : 0;
   const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0; // Standard 3mm bleed
   const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
 
@@ -285,11 +286,12 @@ export function createInteriorSpread(
   const unit = project.canvasUnit;
   const pageW = project.canvasWidth;
   const pageH = project.canvasHeight;
-  const marginVal = project.marginValue ?? 10;
-  const safeAreaTop = project.marginTop ?? marginVal;
-  const safeAreaBottom = project.marginBottom ?? marginVal;
-  const safeAreaOutside = project.marginOutside ?? marginVal;
-  const safeAreaSpine = project.marginSpine ?? marginVal;
+  const marginEnabled = project.marginEnabled ?? true;
+  const marginVal = marginEnabled ? (project.marginValue ?? 10) : 0;
+  const safeAreaTop = marginEnabled ? (project.marginTop ?? marginVal) : 0;
+  const safeAreaBottom = marginEnabled ? (project.marginBottom ?? marginVal) : 0;
+  const safeAreaOutside = marginEnabled ? (project.marginOutside ?? marginVal) : 0;
+  const safeAreaSpine = marginEnabled ? (project.marginSpine ?? marginVal) : 0;
 
   // New spread creation baseline: strictly follows the master project creation settings
   const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
@@ -509,3 +511,110 @@ export function moveAlbumSpread(
 export function getAllAlbumSpreads(album: Album): Spread[] {
   return album.spreads;
 }
+
+/**
+ * Checks whether two album elements have identical design and layout properties,
+ * intentionally ignoring runtime cache paths (previewPath, thumbnailPath).
+ */
+export function isElementDesignEqual(a?: AlbumElement | null, b?: AlbumElement | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.id !== b.id || a.type !== b.type) return false;
+  if (
+    a.x !== b.x ||
+    a.y !== b.y ||
+    a.width !== b.width ||
+    a.height !== b.height ||
+    (a.rotation || 0) !== (b.rotation || 0) ||
+    a.zIndex !== b.zIndex ||
+    Boolean(a.locked) !== Boolean(b.locked) ||
+    (a.groupId || null) !== (b.groupId || null)
+  ) {
+    return false;
+  }
+
+  if (a.type === 'photo' && b.type === 'photo') {
+    const pA = a as PhotoFrameElement;
+    const pB = b as PhotoFrameElement;
+    if (pA.photoId !== pB.photoId) return false;
+    if (pA.filePath !== pB.filePath) return false;
+    if (pA.fileName !== pB.fileName) return false;
+    if (
+      pA.cropX !== pB.cropX ||
+      pA.cropY !== pB.cropY ||
+      pA.cropScale !== pB.cropScale ||
+      (pA.cropRotation || 0) !== (pB.cropRotation || 0)
+    ) {
+      return false;
+    }
+    if (
+      Boolean(pA.borderEnabled) !== Boolean(pB.borderEnabled) ||
+      (pA.borderWidth || 0) !== (pB.borderWidth || 0) ||
+      (pA.borderColor || '') !== (pB.borderColor || '')
+    ) {
+      return false;
+    }
+    if ((pA.opacity ?? 1) !== (pB.opacity ?? 1)) return false;
+    if ((pA.photoAspect || 0) !== (pB.photoAspect || 0)) return false;
+    const [tlA, trA, brA, blA] = getCornerRadii(pA);
+    const [tlB, trB, brB, blB] = getCornerRadii(pB);
+    if (tlA !== tlB || trA !== trB || brA !== brB || blA !== blB) return false;
+    return true;
+  }
+
+  if (a.type === 'text' && b.type === 'text') {
+    const tA = a as TextNodeElement;
+    const tB = b as TextNodeElement;
+    if (tA.text !== tB.text) return false;
+    if (JSON.stringify(tA.style || {}) !== JSON.stringify(tB.style || {})) return false;
+    if (JSON.stringify(tA.textRuns || []) !== JSON.stringify(tB.textRuns || [])) return false;
+    if (JSON.stringify(tA.styledRanges || []) !== JSON.stringify(tB.styledRanges || [])) return false;
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether two spreads have identical design layout, structure, and elements.
+ */
+export function isSpreadDesignEqual(sA?: Spread | null, sB?: Spread | null): boolean {
+  if (sA === sB) return true;
+  if (!sA || !sB) return false;
+  if (sA.id !== sB.id || sA.spreadIndex !== sB.spreadIndex) return false;
+  if (sA.gutterWidth !== sB.gutterWidth || (sA.backgroundColor || '') !== (sB.backgroundColor || '')) return false;
+  if (sA.photoInset !== sB.photoInset || sA.spacingValue !== sB.spacingValue) return false;
+  const elsA = sA.elements || [];
+  const elsB = sB.elements || [];
+  if (elsA.length !== elsB.length) return false;
+  for (let i = 0; i < elsA.length; i++) {
+    if (!isElementDesignEqual(elsA[i], elsB[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Compares two albums for design and layout equality.
+ * Preserves true dirty/clean state by ignoring background thumbnail/preview cache path changes.
+ */
+export function isAlbumDesignEqual(a?: Album | null, b?: Album | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (
+    a.id !== b.id ||
+    a.projectId !== b.projectId ||
+    a.totalPages !== b.totalPages ||
+    a.totalSpreads !== b.totalSpreads
+  ) {
+    return false;
+  }
+  if (!isSpreadDesignEqual(a.coverSpread, b.coverSpread)) return false;
+  const spreadsA = a.spreads || [];
+  const spreadsB = b.spreads || [];
+  if (spreadsA.length !== spreadsB.length) return false;
+  for (let i = 0; i < spreadsA.length; i++) {
+    if (!isSpreadDesignEqual(spreadsA[i], spreadsB[i])) return false;
+  }
+  return true;
+}
+
