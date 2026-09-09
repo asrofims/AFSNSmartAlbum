@@ -4,9 +4,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import {
   generateAdaptiveLayoutVariations,
-  AdaptivePhoto,
+  getAdaptivePhotos,
 } from '../../domain/adaptiveLayout';
 import { PhotoFrameElement } from '../../domain/editor';
+import { usePhotoStore } from '../../stores/photoStore';
 import styles from './TemplatesPanel.module.css';
 
 interface TemplatesPanelProps {
@@ -27,6 +28,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
 
   const activeSpread = useMemo(() => {
     if (!currentAlbum || !activeSpreadId) return null;
+    if (currentAlbum.coverSpread.id === activeSpreadId) return currentAlbum.coverSpread;
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
@@ -40,17 +42,10 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
     return activeSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
   }, [activeSpread]);
 
-  const photos: AdaptivePhoto[] = useMemo(() => {
-    return unlockedElements.map((el) => ({
-      id: el.id,
-      photoId: el.photoId,
-      filePath: el.filePath,
-      fileName: el.fileName,
-      previewPath: el.previewPath,
-      thumbnailPath: el.thumbnailPath,
-      photoAspect: el.photoAspect,
-    }));
-  }, [unlockedElements]);
+  const libraryPhotos = usePhotoStore((s) => s.photos);
+  const photos = useMemo(() => getAdaptivePhotos(unlockedElements, libraryPhotos), [unlockedElements, libraryPhotos]);
+  const textElements = useMemo(() => activeSpread?.elements.filter((el) => el.type === 'text') ?? [], [activeSpread]);
+  const isCover = activeSpread?.id === currentAlbum?.coverSpread.id;
 
   const currentPhotoCount = photos.length;
 
@@ -58,14 +53,16 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
   const adaptiveVariations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
     const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
-    const spreadWidth = dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadWidth = isCover
+      ? (activeSpread.leftPage?.width ?? dims.pageWidth) + (activeSpread.rightPage?.width ?? 0) + dims.gutterWidth
+      : dims.pageWidth * 2 + dims.gutterWidth;
     const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
-        isSpread: true,
+        isSpread: !isCover,
         safeMargin: dims.safeMargin,
         safeMarginTop: dims.safeMarginTop,
         safeMarginBottom: dims.safeMarginBottom,
@@ -74,10 +71,11 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
         lockedElements,
+        obstacles: textElements,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos, lockedElements]);
+  }, [currentProject, activeSpread, photos, lockedElements, textElements, isCover]);
 
   const currentActiveIndex =
     activeSpread && spreadLayoutIndices[activeSpread.id] !== undefined
@@ -181,13 +179,14 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
                   {variation.score !== undefined && (
                     <span
                       className={styles.tagPill}
+                      title={`Composition Score: ${variation.score}/100. Estimated average crop: ${Math.round((variation.cropPenalty || 0) * 100)}%. Largest estimated crop: ${Math.round((variation.worstCropPenalty || 0) * 100)}%.`}
                       style={{
                         background: variation.score >= 85 ? 'rgba(52,211,153,0.2)' : variation.score >= 70 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)',
                         color: variation.score >= 85 ? '#34d399' : variation.score >= 70 ? '#fbbf24' : '#94a3b8',
                         fontWeight: 600,
                       }}
                     >
-                      ⭐ {variation.score}%
+                      {variation.score}/100
                     </span>
                   )}
                   {isCurrent && (
@@ -212,7 +211,7 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
           </p>
           <p>
             {currentPhotoCount > 0
-              ? 'The remaining free space around locked frames is too constrained to fit all unlocked photos. Try unlocking a frame or resizing locked frames.'
+              ? 'No layout meets the photo size, spacing, margin, and crop limits. Try fewer photos, more available space, or moving text and locked frames.'
               : 'Drag photos from the tray onto the canvas to generate Smart Layout variations automatically.'}
           </p>
         </div>

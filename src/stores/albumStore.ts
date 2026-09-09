@@ -22,7 +22,7 @@ import {
 } from '../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
 import {
-  AdaptivePhoto,
+  getAdaptivePhotos,
   generateAdaptiveLayoutVariations,
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
@@ -30,6 +30,7 @@ import {
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
 import { useProjectStore } from './projectStore';
+import { usePhotoStore } from './photoStore';
 import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
@@ -1099,15 +1100,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     // If all photo elements are locked, no changes can be made
     if (unlockedElements.length === 0) return;
 
-    const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
-      id: el.id,
-      photoId: el.photoId,
-      filePath: el.filePath,
-      fileName: el.fileName,
-      previewPath: el.previewPath,
-      thumbnailPath: el.thumbnailPath,
-      photoAspect: el.photoAspect,
-    }));
+    const unlockedPhotos = getAdaptivePhotos(unlockedElements, usePhotoStore.getState().photos);
 
     const isSpread = !isCover;
     const dims = getProjectDimensionsInCanvasUnit(project, targetSpread);
@@ -1131,13 +1124,14 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
         lockedElements,
+        obstacles: textElements,
       },
       unlockedPhotos
     );
 
     if (variations.length === 0) return;
 
-    const currentIndex = spreadLayoutIndices[spreadId] || 0;
+    const currentIndex = spreadLayoutIndices[spreadId] ?? (direction === 'next' ? -1 : 0);
     const nextIndex =
       direction === 'next'
         ? (currentIndex + 1) % variations.length
@@ -1241,15 +1235,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     // If all photo elements are locked, no changes can be made
     if (unlockedElements.length === 0) return;
 
-    const unlockedPhotos: AdaptivePhoto[] = unlockedElements.map((el) => ({
-      id: el.id,
-      photoId: el.photoId,
-      filePath: el.filePath,
-      fileName: el.fileName,
-      previewPath: el.previewPath,
-      thumbnailPath: el.thumbnailPath,
-      photoAspect: el.photoAspect,
-    }));
+    const unlockedPhotos = getAdaptivePhotos(unlockedElements, usePhotoStore.getState().photos);
 
     const isSpread = !isCover;
     const dims = getProjectDimensionsInCanvasUnit(project, targetSpread);
@@ -1273,6 +1259,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
         lockedElements,
+        obstacles: textElements,
       },
       unlockedPhotos
     );

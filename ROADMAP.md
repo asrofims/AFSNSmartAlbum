@@ -84,6 +84,10 @@
 - [x] 1-Click Layout Apply with Photo Preservation & Undo/Redo integration
 - [x] Mini-SVG Wireframe Preview Cards & Right Inspector Templates Tab
 - [x] Frame Aspect Ratio Smart Fitting & Gap Preserving Solver
+- [x] Strengthen user-invoked adaptive layouts on the active spread: reject invalid geometry, preserve clearance around text/rotated locked photos, and enforce a maximum per-photo crop estimate.
+- [x] Rank adaptive compositions using average/worst crop, alignment, page balance including locked photos, whitespace, and library favorite prominence; share metadata across preview and application.
+- [x] Add bounded ratio-aware frame refinement while preserving slicing topology, page boundaries, and internal photo spacing. See `ADAPTIVE_LAYOUT_NOTES.md` for parameters and limits.
+- [ ] Manually verify adaptive layout composition on covers/spreads, mixed photo ratios, favorites, rotated obstacles, and constrained margins/spacing. Automated tests deferred at user request; TypeScript compilation checked.
 
 ## Phase 7 — Auto Layout Engine (Skipped)
 - [x] Auto Layout generation & photo distribution skipped per project requirements

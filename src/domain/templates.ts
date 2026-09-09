@@ -31,6 +31,8 @@ export interface TemplateParams {
     photoAspect?: number;
   }>;
   lockedElements?: PhotoFrameElement[];
+  /** Preserved objects, such as text, that adaptive photo placement must avoid. */
+  obstacles?: Array<RectBounds & { rotation?: number }>;
 }
 
 export function round4(n: number): number {

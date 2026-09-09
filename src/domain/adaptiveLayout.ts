@@ -1,5 +1,6 @@
 import { RectBounds, TemplateParams, getUsableAreas, fitInsideBoxCentered, round4 } from './templates';
 import { PhotoFrameElement } from './editor';
+import type { Photo } from './photo';
 
 export type PhotoOrientation = 'landscape' | 'portrait' | 'square';
 
@@ -21,11 +22,32 @@ export interface AdaptiveLayoutVariation {
   description: string;
   rects: RectBounds[];
   tags: string[];
-  score?: number; // 0 - 100% composite visual match score
+  score?: number; // 0-100 composition score, not a crop-retention percentage
   cropPenalty?: number; // 0.0 (no crop) to 1.0 (heavy crop)
+  worstCropPenalty?: number;
   fingerprint?: string; // e.g. "1L+2P"
   photoAssignments?: number[]; // Mapping of photo[i] -> rect[j]
 }
+
+/** One source of photo metadata for previews, keyboard cycling, and application. */
+export function getAdaptivePhotos(elements: PhotoFrameElement[], library: Photo[]): AdaptivePhoto[] {
+  const byId = new Map(library.map((photo) => [photo.id, photo]));
+  return elements.map((element) => {
+    const source = element.photoId ? byId.get(element.photoId) : undefined;
+    return {
+      id: element.id, photoId: element.photoId, filePath: element.filePath,
+      fileName: element.fileName, previewPath: element.previewPath, thumbnailPath: element.thumbnailPath,
+      photoAspect: source && source.width > 0 && source.height > 0 ? source.width / source.height : element.photoAspect,
+      isFavorite: source?.isFavorite ?? false,
+    };
+  });
+}
+
+const photoAspect = (photo: AdaptivePhoto | undefined) =>
+  Number.isFinite(photo?.photoAspect) && photo!.photoAspect! > 0 ? photo!.photoAspect! : 1.5;
+const heroWeight = (photo: AdaptivePhoto | undefined) =>
+  photo?.isFavorite ? 1 : Number.isFinite(photo?.rating) && photo!.rating! >= 4 ? Math.min(1, photo!.rating! / 5) : 0;
+const maxAdaptiveCropLoss = 0.65;
 
 /**
  * Classifies a photo aspect ratio into landscape, portrait, or square.
@@ -44,7 +66,7 @@ export function getPhotosFingerprint(photos: AdaptivePhoto[]): string {
   let p = 0;
   let s = 0;
   for (const ph of photos) {
-    const ori = getPhotoOrientation(ph.photoAspect || 1.5);
+    const ori = getPhotoOrientation(photoAspect(ph));
     if (ori === 'landscape') l++;
     else if (ori === 'portrait') p++;
     else s++;
@@ -61,7 +83,7 @@ export function getPhotosFingerprint(photos: AdaptivePhoto[]): string {
  * Returns a value between 0.0 (exact aspect match, zero crop) and 1.0 (severe crop).
  */
 export function calculateCropPenalty(photoAspect: number, slotAspect: number): number {
-  if (!photoAspect || !slotAspect || photoAspect <= 0 || slotAspect <= 0) return 0.5;
+  if (!Number.isFinite(photoAspect) || !Number.isFinite(slotAspect) || photoAspect <= 0 || slotAspect <= 0) return 1;
   const ratio = Math.min(photoAspect / slotAspect, slotAspect / photoAspect);
   return Math.max(0, Math.min(1, 1 - ratio));
 }
@@ -79,7 +101,7 @@ export function findOptimalPhotoSlotMapping(
   if (n === 1) {
     const firstPhoto = photos[0];
     const firstSlot = slots[0];
-    const pAspect = firstPhoto?.photoAspect || 1.5;
+    const pAspect = photoAspect(firstPhoto);
     const sAspect = firstSlot ? firstSlot.width / firstSlot.height : 1.5;
     const penalty = calculateCropPenalty(pAspect, sAspect);
     const score = Math.round((1 - penalty) * 100);
@@ -95,24 +117,17 @@ export function findOptimalPhotoSlotMapping(
   for (let p = 0; p < n; p++) {
     const row: number[] = [];
     const photo = photos[p];
-    const pAspect = photo?.photoAspect || 1.5;
-    const isHeroPhoto = Boolean(
-      (photo?.rating && photo.rating >= 4) ||
-      photo?.isFavorite ||
-      p === 0
-    );
+    const pAspect = photoAspect(photo);
 
     for (let s = 0; s < n; s++) {
       const slot = slots[s];
       const sAspect = slot ? slot.width / slot.height : 1.5;
-      let penalty = calculateCropPenalty(pAspect, sAspect);
+      const crop = calculateCropPenalty(pAspect, sAspect);
 
-      // If photo is a preferred hero and slot is the largest slot, award a bonus (lower cost)
+      // Prominence is a separate assignment cost; never alter reported crop loss.
       const slotArea = slotAreas[s] ?? 0;
-      if (isHeroPhoto && maxSlotArea > 0 && slotArea >= maxSlotArea * 0.9) {
-        penalty = Math.max(0, penalty * 0.7);
-      }
-      row.push(penalty);
+      const prominenceCost = maxSlotArea > 0 ? heroWeight(photo) * 0.18 * (1 - slotArea / maxSlotArea) : 0;
+      row.push(crop + 0.5 * crop * crop + prominenceCost + (crop > maxAdaptiveCropLoss ? 10 : 0));
     }
     costMatrix.push(row);
   }
@@ -146,7 +161,8 @@ export function findOptimalPhotoSlotMapping(
 
     permute(0, 0);
 
-    const avgPenalty = n > 0 ? bestCost / n : 0;
+    const avgPenalty = bestMapping.reduce((sum, slotIndex, p) => sum + calculateCropPenalty(
+      photoAspect(photos[p]), slots[slotIndex]!.width / slots[slotIndex]!.height), 0) / n;
     const score = Math.round(Math.max(0, Math.min(100, (1 - avgPenalty) * 100)));
 
     return { mapping: bestMapping, score, avgCropPenalty: avgPenalty };
@@ -155,7 +171,6 @@ export function findOptimalPhotoSlotMapping(
   // Fast greedy matching for high photo counts (n >= 8)
   const slotAssigned = new Array<boolean>(n).fill(false);
   const greedyMapping = new Array<number>(n).fill(0);
-  let totalCost = 0;
 
   const candidates: Array<{ p: number; s: number; cost: number }> = [];
   for (let p = 0; p < n; p++) {
@@ -172,7 +187,6 @@ export function findOptimalPhotoSlotMapping(
       photoAssigned[c.p] = true;
       slotAssigned[c.s] = true;
       greedyMapping[c.p] = c.s;
-      totalCost += c.cost;
     }
   }
 
@@ -183,14 +197,14 @@ export function findOptimalPhotoSlotMapping(
         if (!slotAssigned[s]) {
           slotAssigned[s] = true;
           greedyMapping[p] = s;
-          totalCost += costMatrix[p]?.[s] ?? 0;
           break;
         }
       }
     }
   }
 
-  const avgPenalty = n > 0 ? totalCost / n : 0;
+  const avgPenalty = greedyMapping.reduce((sum, slotIndex, p) => sum + calculateCropPenalty(
+    photoAspect(photos[p]), slots[slotIndex]!.width / slots[slotIndex]!.height), 0) / n;
   const score = Math.round(Math.max(0, Math.min(100, (1 - avgPenalty) * 100)));
   return { mapping: greedyMapping, score, avgCropPenalty: avgPenalty };
 }
@@ -710,10 +724,10 @@ function rectsIntersect(
  */
 function computeFreePageSubBoxes(
   pageArea: RectBounds,
-  lockedFrames: PhotoFrameElement[],
+  lockedFrames: RectBounds[],
   spacing: number
 ): RectBounds[] {
-  const intersectingLocked = lockedFrames.filter((f) => rectsIntersect(f, pageArea));
+  const intersectingLocked = lockedFrames.filter((f) => !separated(f, pageArea, spacing));
   if (intersectingLocked.length === 0) {
     return [{ ...pageArea }];
   }
@@ -726,7 +740,7 @@ function computeFreePageSubBoxes(
     const nextBoxes: RectBounds[] = [];
 
     for (const box of candidateBoxes) {
-      if (!rectsIntersect(box, locked)) {
+      if (separated(box, locked, spacing)) {
         // Box is completely unaffected by this locked frame
         nextBoxes.push(box);
         continue;
@@ -823,43 +837,189 @@ function computeFreePageSubBoxes(
   return maximalBoxes.sort((a, b) => b.width * b.height - a.width * a.height);
 }
 
+// Coordinates rotate around the element's top-left origin, as on the editor canvas.
+function obstacleBounds(rect: RectBounds & { rotation?: number }): RectBounds {
+  const radians = (rect.rotation || 0) * Math.PI / 180;
+  const cos = Math.cos(radians), sin = Math.sin(radians);
+  const corners = [[0, 0], [rect.width, 0], [0, rect.height], [rect.width, rect.height]];
+  const xs = corners.map(([x, y]) => rect.x + x! * cos - y! * sin);
+  const ys = corners.map(([x, y]) => rect.y + x! * sin + y! * cos);
+  return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+}
+
+const boundsOf = (rects: RectBounds[]): RectBounds => {
+  const x = Math.min(...rects.map((r) => r.x)), y = Math.min(...rects.map((r) => r.y));
+  return { x, y, width: Math.max(...rects.map((r) => r.x + r.width)) - x, height: Math.max(...rects.map((r) => r.y + r.height)) - y };
+};
+const validRect = (r: RectBounds) => [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width > 0 && r.height > 0;
+const geometryTolerance = 0.0003; // Accounts for round4 publication, not a physical spacing allowance.
+const contains = (box: RectBounds, r: RectBounds) => r.x >= box.x - geometryTolerance && r.y >= box.y - geometryTolerance &&
+  r.x + r.width <= box.x + box.width + geometryTolerance && r.y + r.height <= box.y + box.height + geometryTolerance;
+const separated = (a: RectBounds, b: RectBounds, gap: number) =>
+  a.x + a.width + gap <= b.x + geometryTolerance || b.x + b.width + gap <= a.x + geometryTolerance ||
+  a.y + a.height + gap <= b.y + geometryTolerance || b.y + b.height + gap <= a.y + geometryTolerance;
+
+interface RatioTree {
+  box: RectBounds;
+  aspect: number;
+  slot?: number;
+  vertical?: boolean;
+  children?: [RatioTree, RatioTree];
+}
+
+/** Refit only complete slicing patterns. Preserve the topology and every internal gap. */
+function ratioAwareRects(rects: RectBounds[], aspects: number[], areas: RectBounds[], gap: number, blend: number): RectBounds[] {
+  const result = rects.map((r) => ({ ...r }));
+  function build(indices: number[]): RatioTree | null {
+    const box = boundsOf(indices.map((i) => rects[i]!));
+    if (indices.length === 1) return { box, aspect: aspects[indices[0]!]!, slot: indices[0] };
+    for (const vertical of [true, false]) {
+      for (const index of indices) {
+        const rect = rects[index]!;
+        const cut = vertical ? rect.x + rect.width : rect.y + rect.height;
+        const first = indices.filter((i) => (vertical ? rects[i]!.x + rects[i]!.width : rects[i]!.y + rects[i]!.height) <= cut + geometryTolerance);
+        const second = indices.filter((i) => (vertical ? rects[i]!.x : rects[i]!.y) >= cut + gap - geometryTolerance && !first.includes(i));
+        if (!first.length || !second.length || first.length + second.length !== indices.length) continue;
+        const a = boundsOf(first.map((i) => rects[i]!)), b = boundsOf(second.map((i) => rects[i]!));
+        const close = (a: number, b: number) => Math.abs(a - b) <= geometryTolerance;
+        const tiles = vertical
+          ? close(a.y, b.y) && close(a.height, b.height) && close(b.x - a.x - a.width, gap)
+          : close(a.x, b.x) && close(a.width, b.width) && close(b.y - a.y - a.height, gap);
+        if (!tiles) continue;
+        const left = build(first), right = build(second);
+        if (left && right) return { box, vertical, children: [left, right],
+          aspect: vertical ? left.aspect + right.aspect : 1 / (1 / left.aspect + 1 / right.aspect) };
+      }
+    }
+    return null;
+  }
+  function place(node: RatioTree, box: RectBounds) {
+    if (!node.children) {
+      result[node.slot!] = { x: round4(box.x), y: round4(box.y), width: round4(box.width), height: round4(box.height) };
+      return;
+    }
+    const [a, b] = node.children;
+    const vertical = node.vertical!;
+    const available = (vertical ? box.width : box.height) - gap;
+    const original = (vertical ? a.box.width : a.box.height) / ((vertical ? node.box.width : node.box.height) - gap);
+    const desired = vertical ? a.aspect / (a.aspect + b.aspect) : b.aspect / (a.aspect + b.aspect);
+    const firstSize = available * (original * (1 - blend) + desired * blend);
+    place(a, { ...box, ...(vertical ? { width: firstSize } : { height: firstSize }) });
+    place(b, { ...box, ...(vertical ? { x: box.x + firstSize + gap, width: available - firstSize } : { y: box.y + firstSize + gap, height: available - firstSize }) });
+  }
+  for (const area of areas) {
+    const indices = rects.flatMap((r, i) => contains(area, r) ? [i] : []);
+    if (!indices.length) continue;
+    const tree = build(indices);
+    if (!tree) continue;
+    if (indices.length === 1) {
+      result[indices[0]!] = fitInsideBoxCentered(tree.box, tree.aspect, 1);
+    } else {
+      place(tree, tree.box);
+    }
+  }
+  return result;
+}
+
+function compositionScore(rects: RectBounds[], photos: AdaptivePhoto[], mapping: number[], areas: RectBounds[], isSpread: boolean, preserved: RectBounds[]) {
+  const crops = mapping.map((slot, p) => calculateCropPenalty(photoAspect(photos[p]), rects[slot]!.width / rects[slot]!.height));
+  const averageCrop = crops.reduce((sum, crop) => sum + crop, 0) / crops.length;
+  const worstCrop = Math.max(...crops);
+  const maxArea = Math.max(...rects.map((r) => r.width * r.height));
+  const heroes = photos.map((p, i) => ({ weight: heroWeight(p), slot: rects[mapping[i]!]! })).filter((p) => p.weight > 0);
+  const heroPenalty = heroes.length ? heroes.reduce((sum, p) => sum + p.weight * (1 - p.slot.width * p.slot.height / maxArea), 0) / heroes.reduce((sum, p) => sum + p.weight, 0) : 0;
+  let edges = 0, alignedEdges = 0;
+  const allPhotos = [...rects, ...preserved];
+  const pageAreas = areas.map((area) => {
+    const onPage = allPhotos.filter((r) => contains(area, r));
+    for (const rect of onPage) {
+      const coordinates = [rect.x, rect.x + rect.width, rect.y, rect.y + rect.height];
+      coordinates.forEach((edge, index) => {
+        edges++;
+        const boundary = index < 2 ? [area.x, area.x + area.width] : [area.y, area.y + area.height];
+        if (boundary.some((value) => Math.abs(value - edge) <= geometryTolerance) || onPage.some((other) => other !== rect &&
+          (index < 2 ? [other.x, other.x + other.width] : [other.y, other.y + other.height]).some((value) => Math.abs(value - edge) <= geometryTolerance))) alignedEdges++;
+      });
+    }
+    return allPhotos.reduce((sum, r) => sum + Math.max(0, Math.min(r.x + r.width, area.x + area.width) - Math.max(r.x, area.x)) *
+      Math.max(0, Math.min(r.y + r.height, area.y + area.height) - Math.max(r.y, area.y)), 0);
+  });
+  const balancePenalty = isSpread && allPhotos.length > 1 ? Math.abs((pageAreas[0] || 0) - (pageAreas[1] || 0)) / Math.max(1e-9, pageAreas.reduce((a, b) => a + b, 0)) : 0;
+  const occupied = pageAreas.reduce((sum, area) => sum + area, 0);
+  const available = areas.reduce((sum, r) => sum + r.width * r.height, 0);
+  const whitespacePenalty = Math.max(0, 0.55 - occupied / available) / 0.55;
+  const alignmentPenalty = allPhotos.length > 1 && edges ? 1 - alignedEdges / edges : 0;
+  const penalty = 0.38 * averageCrop + 0.25 * worstCrop + 0.12 * alignmentPenalty + 0.10 * balancePenalty + 0.05 * whitespacePenalty + 0.10 * heroPenalty;
+  return { score: Math.round(100 * Math.max(0, 1 - penalty)), averageCrop, worstCrop };
+}
+
 export function generateAdaptiveLayoutVariations(
   params: TemplateParams,
   photos: AdaptivePhoto[] = []
 ): AdaptiveLayoutVariation[] {
   const count = photos.length;
   if (count === 0) return [];
+  if (![params.spreadWidth, params.spreadHeight, params.spacing, params.gutterWidth, params.safeMargin,
+    params.safeMarginTop ?? params.safeMargin, params.safeMarginBottom ?? params.safeMargin,
+    params.safeMarginOutside ?? params.safeMargin, params.safeMarginSpine ?? params.safeMargin].every((n) => Number.isFinite(n) && n >= 0) ||
+    params.spreadWidth <= 0 || params.spreadHeight <= 0) return [];
 
   const { leftPageArea, rightPageArea, spreadArea } = getUsableAreas(params);
   const spacing = params.spacing;
   const isCover = !params.isSpread;
   const fingerprint = getPhotosFingerprint(photos);
-  const locked = params.lockedElements || [];
+  const obstacles = [...(params.lockedElements || []), ...(params.obstacles || [])];
+  if (obstacles.some((r) => !validRect(r) || !Number.isFinite(r.rotation ?? 0))) return [];
+  const locked = obstacles.map(obstacleBounds);
+  const preservedPhotos = (params.lockedElements || []).map(obstacleBounds);
+  const areas = isCover ? [spreadArea] : [leftPageArea, rightPageArea];
+  const canvas = { x: 0, y: 0, width: params.spreadWidth, height: params.spreadHeight };
+  const minSide = Math.max(spacing * 1.5, Math.min(areas[0]!.width, areas[0]!.height) * 0.05);
+
+  const validVariation = (v: AdaptiveLayoutVariation) => {
+    if (v.rects.length !== count) return false;
+    const fullBleed = count === 1 && v.tags.includes('full-bleed');
+    return v.rects.every((r, index) => validRect(r) && r.width >= minSide && r.height >= minSide && contains(canvas, r) &&
+      (fullBleed || areas.some((area) => contains(area, r))) && locked.every((l) => separated(r, l, spacing)) &&
+      v.rects.slice(index + 1).every((other) => separated(r, other, spacing)));
+  };
 
   // Helper to score, filter collisions, and enrich raw variations
   const scoreAndSortVariations = (rawVariations: AdaptiveLayoutVariation[]): AdaptiveLayoutVariation[] => {
-    // Mathematical guarantee: Exclude any variation where any rect intersects or covers a locked frame
-    const nonColliding = locked.length > 0
-      ? rawVariations.filter((v) =>
-          v.rects.every((r) => locked.every((l) => !rectsIntersect(r, l)))
-        )
-      : rawVariations;
-
-    const sourceVariations = nonColliding.length > 0 ? nonColliding : rawVariations;
-
-    const enriched = sourceVariations.map((v) => {
+    const seen = new Set<string>();
+    const evaluate = (v: AdaptiveLayoutVariation): AdaptiveLayoutVariation | null => {
+      if (!validVariation(v)) return null;
+      const key = v.rects.map((r) => [r.x, r.y, r.width, r.height].map(round4).join(',')).join(';');
+      if (seen.has(key)) return null;
+      seen.add(key);
       const matchRes = findOptimalPhotoSlotMapping(photos, v.rects);
+      const composition = compositionScore(v.rects, photos, matchRes.mapping, areas, params.isSpread, preservedPhotos);
       return {
         ...v,
-        score: matchRes.score,
-        cropPenalty: matchRes.avgCropPenalty,
+        score: composition.score,
+        cropPenalty: composition.averageCrop,
+        worstCropPenalty: composition.worstCrop,
         fingerprint,
         photoAssignments: matchRes.mapping,
       };
-    });
-
-    // Sort descending by match score
-    return enriched.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    };
+    const enriched = rawVariations.map(evaluate).filter((v): v is AdaptiveLayoutVariation => v !== null);
+    enriched.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    // Bound extra optimization work; retain every valid original composition as a choice.
+    for (const base of enriched.slice(0, 32)) {
+      if (base.tags.includes('full-bleed')) continue;
+      const aspects = base.rects.map(() => 1.5);
+      base.photoAssignments!.forEach((slot, p) => { aspects[slot] = photoAspect(photos[p]); });
+      for (const blend of [0.6, 1]) {
+        const variation = evaluate({ ...base, id: `${base.id}_ratio_${blend}`, name: `${base.name} — ${blend === 1 ? 'Natural' : 'Balanced'} Ratio Fit`,
+          description: 'Frame proportions adapt to photo ratios while preserving aligned edges and photo spacing.',
+          rects: ratioAwareRects(base.rects, aspects, areas, spacing, blend), tags: [...base.tags, 'ratio-fit'] });
+        if (variation) enriched.push(variation);
+      }
+    }
+    // No unsafe fallback: leave the current spread unchanged when nothing qualifies.
+    return enriched.filter((v) => (v.worstCropPenalty ?? 1) <= maxAdaptiveCropLoss)
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (a.worstCropPenalty ?? 0) - (b.worstCropPenalty ?? 0) || a.id.localeCompare(b.id));
   };
 
   // If there are locked frames, we place unlocked photos in all valid unoccupied surrounding zones
