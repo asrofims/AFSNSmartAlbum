@@ -14,9 +14,9 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './PageNavigator.module.css';
 
-function safeConvertFileSrc(filePath: string): string {
+function safeConvertFileSrc(filePath: string, version = ''): string {
   try {
-    return convertFileSrc(filePath);
+    return `${convertFileSrc(filePath)}?v=${encodeURIComponent(version)}`;
   } catch {
     return filePath;
   }
@@ -187,7 +187,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
             {imgSrc && (
               <img
                 key={`${photoEl.id}_${imgSrc}_${photoMeta?.updatedAt || ''}_${photoEl.cropScale || 1}_${photoEl.cropX || 0}_${photoEl.cropY || 0}_${cropRot}`}
-                src={safeConvertFileSrc(imgSrc)}
+                src={safeConvertFileSrc(imgSrc, photoMeta?.updatedAt)}
                 alt=""
                 style={{
                   position: 'absolute',
@@ -270,6 +270,7 @@ export function PageNavigator() {
   // Keyboard navigation & multi-selection shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       // Ignore if in input
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target as HTMLElement)?.isContentEditable) return;

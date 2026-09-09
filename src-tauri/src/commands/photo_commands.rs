@@ -6,11 +6,11 @@ use tauri::async_runtime::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
-use crate::asset_cache::cleanup_orphaned_photo_assets;
+use crate::asset_cache::{PHOTO_ASSET_JOB, cleanup_removed_photo_assets};
 use crate::db::{Database, PhotoFolderRow, PhotoRow};
 use crate::photo_engine::{
     extract_embedded_thumbnail, extract_photo_metadata, generate_photo_preview, process_photo,
-    scan_directory, trim_process_memory, SUPPORTED_EXTENSIONS,
+    scan_directory, thumbnail_for_preview, trim_process_memory, SUPPORTED_EXTENSIONS,
 };
 
 #[derive(Clone, Default)]
@@ -18,6 +18,7 @@ pub struct ImportState {
     pub cancel_flag: Arc<AtomicBool>,
     pub is_busy: Arc<Mutex<()>>,
     pub active_project_id: Arc<std::sync::Mutex<Option<String>>>,
+    pub generation: Arc<AtomicUsize>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -39,10 +40,8 @@ pub struct PhotoPreviewReadyPayload {
     pub preview_path: String,
 }
 
-fn get_cache_dir(app: &AppHandle) -> PathBuf {
-    app.path()
-        .app_cache_dir()
-        .unwrap_or_else(|_| std::env::temp_dir().join("afsn_cache"))
+fn get_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path().app_cache_dir().map_err(|e| format!("Cannot access the image cache: {}", e))
 }
 
 #[tauri::command]
@@ -87,7 +86,7 @@ pub async fn select_and_import_folder(
         Some(dir_path) => {
             let paths: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&dir_path))
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())??;
             import_paths_internal(app, project_id, paths, folder_id).await
         }
         None => {
@@ -159,7 +158,7 @@ pub async fn pick_photo_folder_dialog(window: tauri::Window) -> Result<Option<Ve
         Some(dir_path) => {
             let paths: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&dir_path))
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())??;
             Ok(Some(paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect()))
         }
         None => Ok(None),
@@ -168,6 +167,7 @@ pub async fn pick_photo_folder_dialog(window: tauri::Window) -> Result<Option<Ve
 
 #[tauri::command]
 pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> {
+    state.generation.fetch_add(1, Ordering::SeqCst);
     state.cancel_flag.store(true, Ordering::SeqCst);
     if let Ok(mut guard) = state.active_project_id.lock() {
         *guard = None;
@@ -177,459 +177,220 @@ pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> 
 }
 
 async fn import_paths_internal(
-    app: AppHandle,
-    project_id: String,
-    paths: Vec<PathBuf>,
-    folder_id: Option<String>,
+    app: AppHandle, project_id: String, paths: Vec<PathBuf>, folder_id: Option<String>,
 ) -> Result<Vec<PhotoRow>, String> {
-    if paths.is_empty() {
-        let db = app.state::<Database>();
-        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
+    let state = app.state::<ImportState>();
+    let generation = state.generation.load(Ordering::SeqCst);
+    let _busy = state.is_busy.lock().await;
+    if state.generation.load(Ordering::SeqCst) != generation {
+        return app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string());
     }
+    state.cancel_flag.store(false, Ordering::SeqCst);
+    *state.active_project_id.lock().map_err(|e| e.to_string())? = Some(project_id.clone());
+    let worker_app = app.clone();
+    let worker_project = project_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let state = worker_app.state::<ImportState>();
+        if state.generation.load(Ordering::SeqCst) != generation {
+            return worker_app.state::<Database>().get_photos_for_project(&worker_project).map_err(|e| e.to_string());
+        }
+        import_paths_blocking(&worker_app, &worker_project, paths, folder_id, &state.cancel_flag)
+    }).await.map_err(|e| e.to_string()).and_then(|result| result);
+    *state.active_project_id.lock().map_err(|e| e.to_string())? = None;
+    result
+}
 
-    let import_state = app.state::<ImportState>();
-    // Acquire sequential queue lock to prevent concurrent import conflicts
-    let _busy_guard = import_state.is_busy.lock().await;
+fn path_identity(path: &Path) -> String {
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let value = path.to_string_lossy().replace('\\', "/");
+    #[cfg(windows)]
+    { value.trim_start_matches("//?/").to_lowercase() }
+    #[cfg(not(windows))]
+    { value }
+}
 
-    import_state.cancel_flag.store(false, Ordering::SeqCst);
-    if let Ok(mut guard) = import_state.active_project_id.lock() {
-        *guard = Some(project_id.clone());
-    }
-    let cancel_flag = import_state.cancel_flag.clone();
-
+fn import_paths_blocking(
+    app: &AppHandle, project_id: &str, paths: Vec<PathBuf>, folder_id: Option<String>,
+    cancel: &AtomicBool,
+) -> Result<Vec<PhotoRow>, String> {
     let db = app.state::<Database>();
-    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
-
-    let existing_photos = db.get_photos_for_project(&project_id).unwrap_or_default();
-
-    // Deduplicate input paths while preserving order
-    let mut seen_paths = std::collections::HashSet::new();
-    let unique_paths: Vec<PathBuf> = paths
-        .into_iter()
-        .filter(|p| seen_paths.insert(p.clone()))
-        .collect();
-
-    let total_selected = unique_paths.len();
-    let mut to_import: Vec<PathBuf> = Vec::new();
-    let mut already_existing_count = 0;
-
-    for p in unique_paths {
-        let path_str = p.to_string_lossy().to_string();
-        let file_name = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-
-        // If file already exists with both healthy thumbnail & canvas preview, skip;
-        // otherwise allow seamless re-importing / healing if previously cancelled or interrupted.
-        let already_healthy = existing_photos.iter().any(|ep| {
-            (ep.file_path == path_str || ep.file_name.eq_ignore_ascii_case(&file_name))
-                && !ep.is_missing
-                && ep.thumbnail_path.as_ref().map(|tp| Path::new(tp).exists()).unwrap_or(false)
-                && ep.preview_path.as_ref().map(|pp| Path::new(pp).exists()).unwrap_or(false)
+    if db.get_project(project_id).map_err(|e| e.to_string())?.is_none() {
+        return Err("The import project no longer exists.".to_string());
+    }
+    let existing = db.get_photos_for_project(project_id).map_err(|e| e.to_string())?;
+    let by_path: std::collections::HashMap<String, PhotoRow> = existing.into_iter()
+        .map(|photo| (path_identity(Path::new(&photo.file_path)), photo)).collect();
+    if let Some(folder) = folder_id.as_deref() {
+        if !db.get_folders_for_project(project_id).map_err(|e| e.to_string())?.iter().any(|f| f.id == folder) {
+            return Err("The target folder no longer belongs to this project.".to_string());
+        }
+    }
+    let cache_dir = get_cache_dir(app)?;
+    let mut seen = std::collections::HashSet::new();
+    let mut selected = Vec::new();
+    for path in paths {
+        if cancel.load(Ordering::SeqCst) { break; }
+        let candidates = if path.is_dir() { scan_directory(&path)? } else { vec![path] };
+        for path in candidates {
+            if seen.insert(path_identity(&path)) { selected.push(path); }
+        }
+    }
+    let total = selected.len();
+    let mut failures = Vec::<serde_json::Value>::new();
+    let mut rows = Vec::new();
+    let mut process = Vec::new();
+    let mut existing_ids = Vec::new();
+    for path in selected {
+        if cancel.load(Ordering::SeqCst) { break; }
+        let meta = match extract_photo_metadata(&path) {
+            Ok(meta) => meta,
+            Err(error) => {
+                failures.push(serde_json::json!({"file": path.to_string_lossy(), "message": error, "phase": "registration"}));
+                continue;
+            }
+        };
+        if let Some(photo) = by_path.get(&path_identity(&path)) {
+            existing_ids.push(photo.id.clone());
+            // Re-import refreshes the same source, including externally edited images.
+            process.push((photo.id.clone(), path, meta));
+            continue;
+        }
+        let id = Uuid::new_v4().to_string();
+        let thumbnail = extract_embedded_thumbnail(&path, &cache_dir, &id);
+        rows.push(PhotoRow {
+            id: id.clone(), project_id: project_id.to_string(), file_path: meta.file_path.clone(),
+            file_name: meta.file_name.clone(), file_size: meta.file_size, width: meta.width, height: meta.height,
+            format: meta.format.clone(), thumbnail_path: thumbnail, thumbnail_base64: None, preview_path: None,
+            is_favorite: false, used_count: 0, is_missing: false, created_at: chrono_now(), updated_at: chrono_now(),
         });
-
-        if !already_healthy {
-            to_import.push(p);
-        } else {
-            already_existing_count += 1;
-        }
+        process.push((id, path, meta));
     }
-
-    let total = to_import.len();
-    if total == 0 {
-        let _ = app.emit(
-            "photo-import-complete",
-            serde_json::json!({
-                "projectId": project_id,
-                "total": total_selected,
-                "imported": 0,
-                "existing": already_existing_count,
-                "relinked": 0,
-                "cancelled": false
-            }),
-        );
-        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
+    // Publish UI items only after registration has committed successfully.
+    if let Err(error) = db.add_photos_batch(&rows, folder_id.as_deref()) {
+        cleanup_removed_photo_assets(&cache_dir, &rows.iter().map(|row| row.id.clone()).collect::<Vec<_>>());
+        return Err(format!("Photo registration failed: {}", error));
     }
-
-    // -------------------------------------------------------------
-    // PHASE 1: INSTANT REGISTRATION (< 5ms total)
-    // Extract metadata & embedded EXIF thumbnails (< 0.2ms), batch-insert
-    // to DB, and immediately return registered photos so UI responds instantaneously!
-    // -------------------------------------------------------------
-    let cache_dir = get_cache_dir(&app);
-    let mut new_rows: Vec<PhotoRow> = Vec::with_capacity(total);
-    let mut to_process: Vec<(String, PathBuf)> = Vec::with_capacity(total);
-    let mut relink_ids: Vec<String> = Vec::new();
-
-    for path in to_import {
-        if cancel_flag.load(Ordering::Relaxed) {
-            log::info!("Photo import cancelled during Phase 1 metadata extraction");
-            break;
-        }
-
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("photo")
-            .to_string();
-
-        let existing_match = existing_photos.iter().find(|ep| ep.file_name.eq_ignore_ascii_case(&file_name));
-        let photo_id = match existing_match {
-            Some(ep) => ep.id.clone(),
-            None => Uuid::new_v4().to_string(),
-        };
-
-        if let Ok(meta) = extract_photo_metadata(&path) {
-            // Instant first-look: extract embedded camera EXIF thumbnail (< 0.2ms)
-            let instant_thumb = extract_embedded_thumbnail(&path, &cache_dir, &photo_id);
-
-            let row = PhotoRow {
-                id: photo_id.clone(),
-                project_id: project_id.clone(),
-                file_path: meta.file_path,
-                file_name: meta.file_name,
-                file_size: meta.file_size,
-                width: meta.width,
-                height: meta.height,
-                format: meta.format,
-                thumbnail_path: instant_thumb,
-                thumbnail_base64: None,
-                preview_path: None,
-                is_favorite: false,
-                used_count: 0,
-                is_missing: false,
-                created_at: chrono_now(),
-                updated_at: chrono_now(),
-            };
-
-            if existing_match.is_some() {
-                let _ = db.relink_photo(&photo_id, &row.file_path);
-                if let Some(tp) = &row.thumbnail_path {
-                    let _ = db.update_photo_thumbnail(&photo_id, tp);
-                }
-                relink_ids.push(photo_id.clone());
-            } else {
-                new_rows.push(row.clone());
-            }
-
-            let _ = app.emit("photo-imported", &row);
-            to_process.push((photo_id, path));
-        }
+    if let Some(folder) = folder_id.as_deref() {
+        db.add_photos_to_folder(folder, &existing_ids).map_err(|e| e.to_string())?;
     }
-
-    let _new_rows_count = new_rows.len();
-    let relink_count = relink_ids.len();
-
-    if !new_rows.is_empty() {
-        let _ = db.add_photos_batch(&new_rows, folder_id.as_deref());
-    }
-
-    if let Some(fid) = &folder_id {
-        if !relink_ids.is_empty() {
-            let _ = db.add_photos_to_folder(fid, &relink_ids);
-        }
-    }
-
-    // If cancelled during Phase 1, exit early without spawning background preview pool
-    if cancel_flag.load(Ordering::Relaxed) {
-        log::info!("Photo import was cancelled during Phase 1; purging newly inserted records");
-        let new_ids: Vec<String> = new_rows.iter().map(|r| r.id.clone()).collect();
-        if !new_ids.is_empty() {
-            let _ = db.batch_delete_photos(&new_ids);
-            let thumbs_dir = cache_dir.join("thumbnails");
-            for id in &new_ids {
-                let _ = std::fs::remove_file(thumbs_dir.join(format!("{}.jpg", id)));
-            }
-        }
-        if let Ok(mut guard) = import_state.active_project_id.lock() {
-            if let Some(ref current_pid) = *guard {
-                if current_pid == &project_id {
-                    *guard = None;
+    for row in &rows { let _ = app.emit("photo-imported", row); }
+    let completed = std::sync::Mutex::new(std::collections::HashSet::<String>::new());
+    let preview_failures = std::sync::Mutex::new(Vec::<serde_json::Value>::new());
+    let counter = AtomicUsize::new(0);
+    let count = process.len();
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().map_err(|e| e.to_string())?;
+    pool.install(|| {
+        process.par_iter().for_each(|(id, path, meta)| {
+            if cancel.load(Ordering::SeqCst) { return; }
+            let result = (|| {
+                let preview = generate_photo_preview(path, &cache_dir, id, cancel)?;
+                if cancel.load(Ordering::SeqCst) { return Err("Cancelled".to_string()); }
+                let thumbnail = thumbnail_for_preview(&cache_dir, id, &preview)?;
+                db.update_photo_source(id, meta, &thumbnail, &preview).map_err(|e| e.to_string())?;
+                completed.lock().unwrap().insert(id.clone());
+                let _ = app.emit("photo-preview-ready", PhotoPreviewReadyPayload {
+                    project_id: project_id.to_string(), id: id.clone(), thumbnail_path: thumbnail, preview_path: preview,
+                });
+                Ok::<(), String>(())
+            })();
+            if let Err(error) = result {
+                if !cancel.load(Ordering::SeqCst) {
+                    preview_failures.lock().unwrap().push(serde_json::json!({
+                        "file": path.to_string_lossy(), "message": error, "phase": "preview"
+                    }));
                 }
             }
-        }
-        let purged_count = new_ids.len();
-        let _ = app.emit(
-            "photo-import-complete",
-            serde_json::json!({
-                "projectId": project_id,
-                "total": total_selected,
-                "imported": 0,
-                "existing": already_existing_count,
-                "relinked": relink_count,
-                "cancelled": true,
-                "purged": purged_count
-            }),
-        );
-        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
-    }
-
-    // -------------------------------------------------------------
-    // PHASE 2: NON-BLOCKING BACKGROUND CANVAS PREVIEW GENERATION
-    // Spawn background worker with bounded 2-thread Rayon pool.
-    // Generates 1500px high-DPI canvas working preview & 320px thumbs.
-    // -------------------------------------------------------------
-    let app_bg = app.clone();
-    let cancel_bg = cancel_flag.clone();
-    let total_bg = to_process.len();
-    let counter_bg = Arc::new(AtomicUsize::new(0));
-    let project_id_bg = project_id.clone();
-    let newly_added_ids: std::collections::HashSet<String> = new_rows.iter().map(|r| r.id.clone()).collect();
-    let completed_ids = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
-    let completed_ids_bg = completed_ids.clone();
-
-    let _ = app.emit(
-        "photo-import-progress",
-        ImportProgressPayload {
-            project_id: project_id.clone(),
-            current: 0,
-            total: total_bg,
-            current_file: "Starting progressive canvas cache generation...".to_string(),
-            percent: 0,
-        },
-    );
-
-    let num_threads = std::cmp::min(2, std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2));
-
-    let bg_result = tauri::async_runtime::spawn_blocking(move || {
-        let pool = match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
-            Ok(p) => p,
-            Err(e) => {
-                log::error!("Failed to build thread pool for preview generation: {}", e);
-                return;
-            }
-        };
-
-        pool.install(|| {
-            to_process.into_par_iter().for_each(|(photo_id, file_path)| {
-                if cancel_bg.load(Ordering::Relaxed) {
-                    return;
-                }
-
-                let file_name = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("photo")
-                    .to_string();
-
-                match generate_photo_preview(&file_path, &cache_dir, &photo_id, &cancel_bg) {
-                    Ok(preview_path) => {
-                        if cancel_bg.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        let thumbs_dir = cache_dir.join("thumbnails");
-                        let thumb_file = thumbs_dir.join(format!("{}.jpg", photo_id));
-                        let thumb_path_str = if thumb_file.exists() {
-                            thumb_file.to_string_lossy().to_string()
-                        } else {
-                            preview_path.clone()
-                        };
-
-                        let db_bg = app_bg.state::<Database>();
-                        let _ = db_bg.update_photo_thumbnail(&photo_id, &thumb_path_str);
-                        let _ = db_bg.update_photo_preview(&photo_id, &preview_path);
-
-                        completed_ids_bg.lock().unwrap().push(photo_id.clone());
-
-                        let curr = counter_bg.fetch_add(1, Ordering::SeqCst) + 1;
-                        let percent = ((curr as f64 / total_bg as f64) * 100.0).min(100.0) as u8;
-
-                        if curr % 25 == 0 {
-                            trim_process_memory();
-                        }
-
-                        let _ = app_bg.emit(
-                            "photo-preview-ready",
-                            PhotoPreviewReadyPayload {
-                                project_id: project_id_bg.clone(),
-                                id: photo_id.clone(),
-                                thumbnail_path: thumb_path_str,
-                                preview_path: preview_path.clone(),
-                            },
-                        );
-
-                        let _ = app_bg.emit(
-                            "photo-import-progress",
-                            ImportProgressPayload {
-                                project_id: project_id_bg.clone(),
-                                current: curr,
-                                total: total_bg,
-                                current_file: file_name,
-                                percent,
-                            },
-                        );
-                    }
-                    Err(e) => {
-                        log::warn!("Preview generation skipped/failed for {:?}: {}", file_path, e);
-                        let curr = counter_bg.fetch_add(1, Ordering::SeqCst) + 1;
-                        let percent = ((curr as f64 / total_bg as f64) * 100.0).min(100.0) as u8;
-                        let _ = app_bg.emit(
-                            "photo-import-progress",
-                            ImportProgressPayload {
-                                project_id: project_id_bg.clone(),
-                                current: curr,
-                                total: total_bg,
-                                current_file: format!("Skipped: {}", file_name),
-                                percent,
-                            },
-                        );
-                    }
-                }
+            let current = counter.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = app.emit("photo-import-progress", ImportProgressPayload {
+                project_id: project_id.to_string(), current, total: count,
+                current_file: meta.file_name.clone(), percent: (current * 100 / count.max(1)) as u8,
             });
         });
-
-        // Reclaim memory immediately after preview generation finishes
-        trim_process_memory();
-
-        let is_cancelled = cancel_bg.load(Ordering::Relaxed);
-        let finished_ids: std::collections::HashSet<String> = completed_ids.lock().unwrap().iter().cloned().collect();
-        let mut purged_count = 0;
-
-        if is_cancelled {
-            let uncompleted_ids: Vec<String> = newly_added_ids
-                .iter()
-                .filter(|id| !finished_ids.contains(*id))
-                .cloned()
-                .collect();
-
-            if !uncompleted_ids.is_empty() {
-                log::info!("Import cancelled. Purging {} uncompleted photo rows from SQLite and cache...", uncompleted_ids.len());
-                let db_bg = app_bg.state::<Database>();
-                let _ = db_bg.batch_delete_photos(&uncompleted_ids);
-
-                let thumbs_dir = cache_dir.join("thumbnails");
-                for id in &uncompleted_ids {
-                    let _ = std::fs::remove_file(thumbs_dir.join(format!("{}.jpg", id)));
-                }
-                purged_count = uncompleted_ids.len();
-            }
-        }
-
-        if let Ok(mut guard) = app_bg.state::<ImportState>().active_project_id.lock() {
-            if let Some(ref current_pid) = *guard {
-                if current_pid == &project_id_bg {
-                    *guard = None;
-                }
-            }
-        }
-
-        let completed_new_count = finished_ids
-            .iter()
-            .filter(|id| newly_added_ids.contains(*id))
-            .count();
-        let completed_relink_count = finished_ids.len().saturating_sub(completed_new_count);
-
-        let _ = app_bg.emit(
-            "photo-import-complete",
-            serde_json::json!({
-                "projectId": project_id_bg,
-                "total": total_selected,
-                "imported": completed_new_count,
-                "existing": already_existing_count,
-                "relinked": completed_relink_count,
-                "cancelled": is_cancelled,
-                "purged": purged_count
-            }),
-        );
-    })
-    .await;
-
-    if let Err(e) = bg_result {
-        log::error!("Preview generation spawn_blocking failed: {}", e);
+    });
+    let cancelled = cancel.load(Ordering::SeqCst);
+    let mut purged = Vec::new();
+    if cancelled {
+        let completed = completed.lock().unwrap();
+        let pending: Vec<String> = rows.iter().filter(|row| !completed.contains(&row.id)).map(|row| row.id.clone()).collect();
+        purged = db.remove_photo_records(Some(project_id), &pending).map_err(|e| e.to_string())?;
+        for warning in cleanup_removed_photo_assets(&cache_dir, &purged) { log::warn!("{}", warning); }
     }
-
-    // Return to frontend with all current project photos!
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+    let preview_failures = preview_failures.into_inner().map_err(|e| e.to_string())?;
+    let failed = failures.len();
+    let preview_failed = preview_failures.len();
+    failures.extend(preview_failures);
+    let _ = app.emit("photo-import-complete", serde_json::json!({
+        "projectId": project_id, "total": total, "imported": rows.len() - purged.len(),
+        "existing": existing_ids.len(), "relinked": 0, "cancelled": cancelled, "purged": purged.len(),
+        "failed": failed, "previewFailed": preview_failed, "failures": failures
+    }));
+    trim_process_memory();
+    db.get_photos_for_project(project_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn get_project_photos(
+    app: AppHandle,
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<Vec<PhotoRow>, String> {
-    let _ = db.ensure_project_exists(&project_id, "Untitled Album");
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn generate_missing_previews(
-    app: AppHandle,
-    project_id: String,
-) -> Result<Vec<PhotoRow>, String> {
-    let db = app.state::<Database>();
     let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-    let photos_needing_preview: Vec<PhotoRow> = photos
-        .into_iter()
-        .filter(|photo| {
-            let is_thumb_missing = photo.thumbnail_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
-            let is_preview_missing = photo.preview_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
-            !photo.is_missing
-                && Path::new(&photo.file_path).exists()
-                && (is_thumb_missing || is_preview_missing)
-        })
-        .collect();
-
-    if photos_needing_preview.is_empty() {
-        return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
-    }
-
-    let cache_dir = get_cache_dir(&app);
-    let app_clone = app.clone();
-
-    // PHASE 1: INSTANT EXIF THUMBNAIL RECOVERY (< 5ms total)
-    // If thumbnails were deleted from disk, quickly restore embedded EXIF thumbs if available
-    for photo in &photos_needing_preview {
-        let is_thumb_missing = photo.thumbnail_path.as_ref().map(|path| !Path::new(path).exists()).unwrap_or(true);
-        if is_thumb_missing {
-            if let Some(instant_thumb) = extract_embedded_thumbnail(Path::new(&photo.file_path), &cache_dir, &photo.id) {
-                let _ = db.update_photo_thumbnail(&photo.id, &instant_thumb);
-                let _ = app.emit(
-                    "photo-preview-ready",
-                    PhotoPreviewReadyPayload {
-                        project_id: photo.project_id.clone(),
-                        id: photo.id.clone(),
-                        thumbnail_path: instant_thumb,
-                        preview_path: photo.preview_path.clone().unwrap_or_default(),
-                    },
-                );
+    // Portable projects may have previews outside the application cache. Grant only
+    // their explicitly referenced, bounded image files, never an entire source folder.
+    let scope = app.asset_protocol_scope();
+    for photo in &photos {
+        for path in [&photo.thumbnail_path, &photo.preview_path].into_iter().flatten() {
+            if image::image_dimensions(path).map(|(w, h)| w.max(h) <= crate::photo_engine::CANVAS_PREVIEW_MAX_SIZE).unwrap_or(false) {
+                scope.allow_file(path).map_err(|e| e.to_string())?;
             }
         }
     }
+    Ok(photos)
+}
 
-    // PHASE 2: BACKGROUND RESIZING WORKER (Runs progressively without blocking)
+#[tauri::command]
+pub async fn generate_missing_previews(app: AppHandle, project_id: String) -> Result<Vec<PhotoRow>, String> {
+    let photos = app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+    let generation = app.state::<ImportState>().generation.load(Ordering::SeqCst);
+    let current_photos = photos.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let db_thread = app_clone.state::<Database>();
-        let cancel_flag = app_clone.state::<ImportState>().cancel_flag.clone();
-        for photo in photos_needing_preview {
-            if cancel_flag.load(Ordering::Relaxed) {
-                log::info!("generate_missing_previews cancelled");
-                break;
-            }
-            if let Ok(processed) = process_photo(Path::new(&photo.file_path), &cache_dir, &photo.id) {
-                if cancel_flag.load(Ordering::Relaxed) {
-                    break;
-                }
-                let thumb_path_str = processed.thumbnail_path.clone().unwrap_or_default();
-                if let Some(thumbnail_path) = &processed.thumbnail_path {
-                    let _ = db_thread.update_photo_thumbnail(&photo.id, thumbnail_path);
-                }
-                if let Some(preview_path) = &processed.preview_path {
-                    let _ = db_thread.update_photo_preview(&photo.id, preview_path);
-                }
-                let _ = app_clone.emit(
-                    "photo-preview-ready",
-                    PhotoPreviewReadyPayload {
-                        project_id: photo.project_id.clone(),
-                        id: photo.id.clone(),
-                        thumbnail_path: if thumb_path_str.is_empty() { processed.preview_path.clone().unwrap_or_default() } else { thumb_path_str },
-                        preview_path: processed.preview_path.unwrap_or_default(),
-                    },
-                );
+        for candidate in photos {
+            let Ok(_assets) = PHOTO_ASSET_JOB.lock() else { return; };
+            if app.state::<ImportState>().generation.load(Ordering::SeqCst) != generation { return; }
+            let db = app.state::<Database>();
+            let Ok(Some(photo)) = db.get_photo(&candidate.id) else { continue; };
+            if photo.is_missing || !Path::new(&photo.file_path).is_file() { continue; }
+            let healthy = photo.thumbnail_path.as_ref().map(|p| image::image_dimensions(p)
+                .map(|(w, h)| w.max(h) <= crate::photo_engine::FILMSTRIP_THUMBNAIL_MAX_SIZE).unwrap_or(false)).unwrap_or(false)
+                && photo.preview_path.as_ref().map(|p| image::image_dimensions(p)
+                    .map(|(w, h)| w.max(h) <= crate::photo_engine::CANVAS_PREVIEW_MAX_SIZE).unwrap_or(false)).unwrap_or(false);
+            if healthy { continue; }
+            if let Err(error) = refresh_photo_assets(&app, &photo) {
+                log::warn!("Preview recovery failed for {}: {}", photo.file_name, error);
+                let _ = app.emit("photo-processing-error", serde_json::json!({
+                    "projectId": photo.project_id, "message": format!("Preview recovery failed for {}: {}", photo.file_name, error)
+                }));
             }
         }
         trim_process_memory();
     });
+    Ok(current_photos)
+}
 
+// Caller holds PHOTO_ASSET_JOB, covering source validation, publication, and database update.
+fn refresh_photo_assets(app: &AppHandle, photo: &PhotoRow) -> Result<PhotoRow, String> {
+    let path = Path::new(&photo.file_path);
+    let meta = extract_photo_metadata(path)?;
+    let processed = process_photo(path, &get_cache_dir(app)?, &photo.id)?;
+    let thumbnail = processed.thumbnail_path.ok_or("Thumbnail generation failed")?;
+    let preview = processed.preview_path.ok_or("Preview generation failed")?;
     let db = app.state::<Database>();
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+    db.update_photo_source(&photo.id, &meta, &thumbnail, &preview).map_err(|e| e.to_string())?;
+    let _ = app.emit("photo-preview-ready", PhotoPreviewReadyPayload {
+        project_id: photo.project_id.clone(), id: photo.id.clone(), thumbnail_path: thumbnail, preview_path: preview,
+    });
+    db.get_photo(&photo.id).map_err(|e| e.to_string())?.ok_or("Photo was removed".to_string())
 }
 
 #[tauri::command]
@@ -642,14 +403,8 @@ pub fn toggle_photo_favorite(
 }
 
 #[tauri::command]
-pub fn remove_photo(
-    app: AppHandle,
-    db: State<'_, Database>,
-    photo_id: String,
-) -> Result<(), String> {
-    db.delete_photo(&photo_id).map_err(|e| e.to_string())?;
-    cleanup_orphaned_photo_assets(&app, &db)?;
-    Ok(())
+pub async fn remove_photo(app: AppHandle, project_id: String, photo_id: String) -> Result<PhotoRemovalResult, String> {
+    batch_delete_photos(app, project_id, vec![photo_id]).await
 }
 
 #[tauri::command]
@@ -669,119 +424,81 @@ pub fn check_missing_photos(
 }
 
 #[tauri::command]
-pub async fn regenerate_single_thumbnail(
-    app: AppHandle,
-    photo_id: String,
-) -> Result<PhotoRow, String> {
-    let db = app.state::<Database>();
-    let photo = db
-        .get_photo(&photo_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Photo not found: {}", photo_id))?;
-
-    let file_path = PathBuf::from(&photo.file_path);
-    if !file_path.exists() {
-        let _ = db.update_photo_missing(&photo_id, true);
-        return Err(format!("Source photo file does not exist on disk: {:?}", file_path));
-    }
-
-    let cache_dir = get_cache_dir(&app);
-    let app_clone = app.clone();
-    let photo_id_clone = photo_id.clone();
-
+pub async fn regenerate_single_thumbnail(app: AppHandle, photo_id: String) -> Result<PhotoRow, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let processed = process_photo(&file_path, &cache_dir, &photo_id_clone)?;
-        let thumb_path = processed.thumbnail_path.ok_or_else(|| "Failed to generate thumbnail".to_string())?;
-        
-        let db_thread = app_clone.state::<Database>();
-        let _ = db_thread.update_photo_thumbnail(&photo_id_clone, &thumb_path);
-        if let Some(preview_path) = processed.preview_path {
-            let _ = db_thread.update_photo_preview(&photo_id_clone, &preview_path);
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let photo = db.get_photo(&photo_id).map_err(|e| e.to_string())?.ok_or("Photo was removed")?;
+        if !Path::new(&photo.file_path).is_file() {
+            db.update_photo_missing(&photo_id, true).map_err(|e| e.to_string())?;
+            return Err("The original photo is missing. Locate it before rebuilding the preview.".to_string());
         }
-        let _ = db_thread.update_photo_missing(&photo_id_clone, false);
-        db_thread
-            .get_photo(&photo_id_clone)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| format!("Photo not found after regeneration: {}", photo_id_clone))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        refresh_photo_assets(&app, &photo)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelinkResult {
+    photos: Vec<PhotoRow>,
+    failures: Vec<String>,
 }
 
 #[tauri::command]
-pub async fn relink_folder(
-    app: AppHandle,
-    project_id: String,
-) -> Result<Vec<PhotoRow>, String> {
-    let folder: Option<PathBuf> = tauri::async_runtime::spawn_blocking(|| {
-        rfd::FileDialog::new()
-            .set_title("Select Folder Containing Missing Photos")
-            .pick_folder()
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let folder_path = match folder {
-        Some(f) => f,
-        None => {
-            let db = app.state::<Database>();
-            return db.get_photos_for_project(&project_id).map_err(|e| e.to_string());
-        }
+pub async fn relink_folder(app: AppHandle, project_id: String) -> Result<RelinkResult, String> {
+    let folder = tauri::async_runtime::spawn_blocking(|| rfd::FileDialog::new()
+        .set_title("Select Folder Containing Missing Photos").pick_folder()).await.map_err(|e| e.to_string())?;
+    let Some(folder) = folder else {
+        return Ok(RelinkResult { photos: app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures: vec![] });
     };
-
-    let cache_dir = get_cache_dir(&app);
-    let db = app.state::<Database>();
-    let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-    let candidates: Vec<PathBuf> = tauri::async_runtime::spawn_blocking(move || scan_directory(&folder_path))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let app_clone = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let db_thread = app_clone.state::<Database>();
-        for photo in photos {
-            let is_currently_missing = !Path::new(&photo.file_path).exists() || photo.is_missing;
-            if is_currently_missing {
-                if let Some(matching) = candidates.iter().find(|c| {
-                    c.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|n| n.eq_ignore_ascii_case(&photo.file_name))
-                        .unwrap_or(false)
-                }) {
-                    let new_path = matching.to_string_lossy().to_string();
-                    let _ = db_thread.relink_photo(&photo.id, &new_path);
-
-                    if let Ok(processed) = process_photo(matching, &cache_dir, &photo.id) {
-                        if let Some(tp) = processed.thumbnail_path {
-                            let _ = db_thread.update_photo_thumbnail(&photo.id, &tp);
-                        }
-                        if let Some(pp) = processed.preview_path {
-                            let _ = db_thread.update_photo_preview(&photo.id, &pp);
-                        }
-                    }
-                    log::info!("Relinked photo {} to {:?}", photo.file_name, new_path);
-                }
+        let candidates = scan_directory(&folder)?;
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+        let mut failures = Vec::new();
+        for mut photo in photos {
+            if Path::new(&photo.file_path).is_file() && !photo.is_missing { continue; }
+            // Filename narrows the search; size and oriented dimensions validate candidates.
+            let matches: Vec<_> = candidates.iter().filter(|p| p.file_name().and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case(&photo.file_name)).unwrap_or(false))
+                .filter(|p| extract_photo_metadata(p).map(|m| m.file_size == photo.file_size
+                    && m.width == photo.width && m.height == photo.height).unwrap_or(false)).collect();
+            if matches.len() != 1 {
+                failures.push(format!("{}: {} compatible matches found. Select a folder containing one matching original.", photo.file_name, matches.len()));
+                continue;
+            }
+            photo.file_path = matches[0].to_string_lossy().to_string();
+            if let Err(error) = refresh_photo_assets(&app, &photo) {
+                failures.push(format!("{}: {}", photo.file_name, error));
             }
         }
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let db = app.state::<Database>();
-    db.get_photos_for_project(&project_id).map_err(|e| e.to_string())
+        Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures })
+    }).await.map_err(|e| e.to_string())?
 }
 
 // --- Batch Operations Commands ---
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoRemovalResult {
+    removed_ids: Vec<String>,
+    warnings: Vec<String>,
+}
+
 #[tauri::command]
-pub fn batch_delete_photos(
-    app: AppHandle,
-    db: State<'_, Database>,
-    photo_ids: Vec<String>,
-) -> Result<(), String> {
-    db.batch_delete_photos(&photo_ids).map_err(|e| e.to_string())?;
-    cleanup_orphaned_photo_assets(&app, &db)?;
-    Ok(())
+pub async fn batch_delete_photos(app: AppHandle, project_id: String, photo_ids: Vec<String>) -> Result<PhotoRemovalResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let removed_ids = db.remove_photo_records(Some(&project_id), &photo_ids).map_err(|e| e.to_string())?;
+        // Cache failures do not turn an already committed removal into a failed delete.
+        let warnings = match get_cache_dir(&app) {
+            Ok(cache) => cleanup_removed_photo_assets(&cache, &removed_ids),
+            Err(error) => vec![error],
+        };
+        Ok(PhotoRemovalResult { removed_ids, warnings })
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

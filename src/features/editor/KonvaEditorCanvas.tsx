@@ -128,6 +128,7 @@ function PhotoFrameNode({
   isShiftPressed?: boolean;
 }) {
   // Strict guard: NEVER load raw full-resolution camera original (filePath).
+  const assetVersion = usePhotoStore((state) => state.photos.find((photo) => photo.id === frame.photoId)?.updatedAt || '');
   // Only generated thumbnails/previews in cache are permitted.
   const isCachePath = (p?: string | null) => {
     if (!p) return false;
@@ -137,7 +138,7 @@ function PhotoFrameNode({
   const safeThumb = isCachePath(frame.thumbnailPath) ? frame.thumbnailPath : null;
   const safePreview = isCachePath(frame.previewPath) ? frame.previewPath : null;
   const imgPath = !frame.isMissing ? (safePreview || safeThumb || null) : null;
-  const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}` : null;
+  const cacheKey = frame.photoId && imgPath ? `${frame.photoId}::${imgPath}::${assetVersion}` : null;
   const cachedCandidate = cacheKey ? getCachedPhotoImage(cacheKey) : null;
   const cachedImg = cachedCandidate && cachedCandidate.naturalWidth > 0 ? cachedCandidate : null;
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(cachedImg);
@@ -176,7 +177,7 @@ function PhotoFrameNode({
       return;
     }
 
-    const currentCacheKey = `${frame.photoId}::${imgPath}`;
+    const currentCacheKey = `${frame.photoId}::${imgPath}::${assetVersion}`;
 
     // Check cache first – if already loaded, use immediately
     const cached = getCachedPhotoImage(currentCacheKey);
@@ -188,7 +189,7 @@ function PhotoFrameNode({
     let isMounted = true;
     const img = new window.Image();
     img.crossOrigin = 'Anonymous';
-    img.src = convertFileSrc(imgPath);
+    img.src = `${convertFileSrc(imgPath)}?v=${encodeURIComponent(assetVersion)}`;
     img.onload = () => {
       if (!isMounted) return;
       setCachedPhotoImage(currentCacheKey, img);
@@ -213,7 +214,7 @@ function PhotoFrameNode({
     return () => {
       isMounted = false;
     };
-  }, [frame.photoId, frame.previewPath, frame.thumbnailPath, frame.isMissing]);
+  }, [frame.photoId, frame.previewPath, frame.thumbnailPath, frame.isMissing, assetVersion]);
 
   // Convert physical geometry (mm/cm) to screen pixels (px)
   const pixelX = frame.x * scaleFactor;
@@ -1443,7 +1444,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       if (!activeSpread) return;
 
       // Do not process canvas keyboard shortcuts if a modal/dialog is open
-      const isModalOpen = Boolean(document.querySelector('[role="dialog"]') || document.querySelector('.modal'));
+      const isModalOpen = Boolean(document.querySelector('[role="dialog"], [role="alertdialog"]') || document.querySelector('.modal'));
       if (isModalOpen) return;
 
       // If focus is inside the spread drawer, let the drawer handle the Delete key!

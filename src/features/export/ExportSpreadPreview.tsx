@@ -10,9 +10,9 @@ import { calculateExportPixels } from '../../domain/units';
 import { usePhotoStore } from '../../stores/photoStore';
 import styles from './ExportSpreadPreview.module.css';
 
-function safeConvertFileSrc(filePath: string): string {
+function safeConvertFileSrc(filePath: string, version = ''): string {
   try {
-    return convertFileSrc(filePath);
+    return `${convertFileSrc(filePath)}?v=${encodeURIComponent(version)}`;
   } catch {
     return filePath;
   }
@@ -374,7 +374,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const safeThumb = isCachePath(hydrated.thumbnailPath) ? hydrated.thumbnailPath : null;
             const safePreview = isCachePath(hydrated.previewPath) ? hydrated.previewPath : null;
             const imgSrc = (hydrated.photoId && !hydrated.isMissing)
-              ? (safePreview || safeThumb || hydrated.filePath || null)
+              ? (safePreview || safeThumb || null)
               : null;
 
             const photoAspect = getPhotoAspect(hydrated);
@@ -428,7 +428,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               >
                 {imgSrc ? (
                   <img
-                    src={safeConvertFileSrc(imgSrc)}
+                    src={safeConvertFileSrc(imgSrc, photoEl.photoId ? photoById.get(photoEl.photoId)?.updatedAt : '')}
                     alt=""
                     style={{
                       position: 'absolute',

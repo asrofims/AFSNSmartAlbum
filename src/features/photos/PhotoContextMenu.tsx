@@ -252,7 +252,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
         }}
       >
         <span className={styles.menuIcon}>🗑</span>
-        <span>{isMulti ? `Delete ${count} Photos` : 'Delete Photo'}</span>
+        <span>{isMulti ? `Remove ${count} Photos from Library` : 'Remove from Library'}</span>
       </button>
     </div>,
     document.body

@@ -26,10 +26,13 @@ pub struct ProcessedPhoto {
 }
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"];
-/// Working image for Canvas editor: 1500 px max dimension (lightweight, high-DPI crisp, ~300KB RAM/disk)
+/// Working image for the canvas: 1500 px maximum dimension. Decoded memory depends on pixel format.
 pub const CANVAS_PREVIEW_MAX_SIZE: u32 = 1500;
-/// First-look thumbnail for Filmstrip and Spread: 320 px max dimension (~40KB)
+/// Filmstrip and spread thumbnail: 320 px maximum dimension.
 pub const FILMSTRIP_THUMBNAIL_MAX_SIZE: u32 = 320;
+// Keep only one original bitmap in the decode/resize stage. Encoding small
+// derivatives still runs concurrently in the import pool.
+static ORIGINAL_DECODE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn is_supported_image(path: &Path) -> bool {
     path.extension()
@@ -38,31 +41,46 @@ pub fn is_supported_image(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn scan_directory(dir_path: &Path) -> Vec<PathBuf> {
+pub fn scan_directory(dir_path: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
-    if let Ok(entries) = fs::read_dir(dir_path) {
-        for entry in entries.flatten() {
+    let mut pending = vec![dir_path.to_path_buf()];
+    let mut visited = std::collections::HashSet::new();
+    while let Some(directory) = pending.pop() {
+        let canonical = fs::canonicalize(&directory).map_err(|e| format!("Cannot access {}: {}", directory.display(), e))?;
+        if !visited.insert(canonical) { continue; }
+        let entries = fs::read_dir(&directory).map_err(|e| format!("Cannot read {}: {}", directory.display(), e))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            if path.is_dir() {
-                files.extend(scan_directory(&path));
-            } else if is_supported_image(&path) {
+            let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+            if metadata.file_type().is_symlink() { continue; }
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                if metadata.file_attributes() & 0x400 != 0 { continue; } // Junction/reparse point
+            }
+            if metadata.is_dir() {
+                pending.push(path);
+            } else if metadata.is_file() && is_supported_image(&path) {
                 files.push(path);
+            }
+            if files.len() + pending.len() + visited.len() > 100_000 {
+                return Err("This folder is too large to scan at once. Import smaller subfolders.".to_string());
             }
         }
     }
-    files
+    files.sort();
+    Ok(files)
 }
 
-/// Instant header-only metadata extraction (reads first ~100 bytes of file).
-/// Completes within < 0.5ms per photo without decoding bitmap data into RAM.
+/// Read dimensions and EXIF metadata without decoding the original bitmap.
 pub fn extract_photo_metadata(file_path: &Path) -> Result<PhotoMetadata, String> {
-    if !file_path.exists() {
-        return Err(format!("File does not exist: {:?}", file_path));
+    if !file_path.is_file() || !is_supported_image(file_path) {
+        return Err(format!("Not a supported image file: {}", file_path.display()));
     }
 
     let file_size = fs::metadata(file_path)
-        .map(|m| m.len() as i64)
-        .unwrap_or(0);
+        .map_err(|e| e.to_string())?.len() as i64;
 
     let file_name = file_path
         .file_name()
@@ -77,20 +95,11 @@ pub fn extract_photo_metadata(file_path: &Path) -> Result<PhotoMetadata, String>
         .to_lowercase();
 
     // Fast header-only dimension check
-    let (mut width, mut height) = match image::image_dimensions(file_path) {
-        Ok(dims) => dims,
-        Err(_) => {
-            if let Ok(reader) = image::ImageReader::open(file_path) {
-                if let Ok(dims) = reader.into_dimensions() {
-                    dims
-                } else {
-                    (1920, 1080)
-                }
-            } else {
-                (1920, 1080)
-            }
-        }
-    };
+    let (mut width, mut height) = image::image_dimensions(file_path)
+        .map_err(|e| format!("Cannot read image dimensions for {}: {}", file_path.display(), e))?;
+    if width == 0 || height == 0 || u64::from(width) * u64::from(height) > 100_000_000 {
+        return Err("Image dimensions exceed the supported 100 megapixel working limit.".to_string());
+    }
 
     let orientation = crate::export_engine::get_image_exif_orientation(file_path);
     if matches!(orientation, 5..=8) {
@@ -162,9 +171,9 @@ fn parse_ifd1_thumbnail_offset_and_len(tiff: &[u8]) -> Option<(usize, usize)> {
     }
 }
 
-/// Instant embedded EXIF thumbnail extraction (< 0.2ms).
-/// Directly copies pre-rendered camera thumbnail from JPEG APP1 without bitmap decoding.
+/// Decode only the embedded JPEG thumbnail, normalize orientation, and publish a bounded first look.
 pub fn extract_embedded_thumbnail(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Option<String> {
+    crate::asset_cache::validate_cache_id(photo_id).ok()?;
     use std::io::Read;
     let mut file = fs::File::open(file_path).ok()?;
     let mut buffer = vec![0u8; 131072]; // Read first 128KB header
@@ -184,7 +193,8 @@ pub fn extract_embedded_thumbnail(file_path: &Path, cache_dir: &Path, photo_id: 
             break;
         }
         let length = u16::from_be_bytes([buffer[cursor + 2], buffer[cursor + 3]]) as usize;
-        if marker == 0xE1 && cursor + 4 + length <= buffer.len() {
+        if length < 2 || cursor + 2 + length > buffer.len() { break; }
+        if marker == 0xE1 {
             let app1_data = &buffer[cursor + 4 .. cursor + 2 + length];
             if app1_data.len() > 14 && &app1_data[0..6] == b"Exif\0\0" {
                 let tiff_data = &app1_data[6..];
@@ -192,12 +202,21 @@ pub fn extract_embedded_thumbnail(file_path: &Path, cache_dir: &Path, photo_id: 
                     if offset + len <= tiff_data.len() {
                         let thumb_bytes = &tiff_data[offset .. offset + len];
                         if thumb_bytes.len() >= 4 && thumb_bytes[0] == 0xFF && thumb_bytes[1] == 0xD8 {
-                            let thumbs_dir = cache_dir.join("thumbnails");
-                            let _ = fs::create_dir_all(&thumbs_dir);
+                            let thumbs_dir = crate::asset_cache::prepare_cache_directory(cache_dir, "thumbnails").ok()?;
                             let target_path = thumbs_dir.join(format!("{}.jpg", photo_id));
-                            if fs::write(&target_path, thumb_bytes).is_ok() {
+                            let temporary = thumbs_dir.join(format!("{}.tmp", photo_id));
+                            let mut reader = image::ImageReader::new(std::io::Cursor::new(thumb_bytes)).with_guessed_format().ok()?;
+                            let mut limits = image::Limits::default();
+                            limits.max_alloc = Some(16 * 1024 * 1024);
+                            reader.limits(limits);
+                            let mut thumbnail = reader.decode().ok()?;
+                            let orientation = crate::export_engine::get_image_exif_orientation(file_path);
+                            if orientation > 1 { thumbnail = crate::export_engine::apply_exif_orientation(thumbnail, orientation); }
+                            let thumbnail = thumbnail.resize(FILMSTRIP_THUMBNAIL_MAX_SIZE, FILMSTRIP_THUMBNAIL_MAX_SIZE, image::imageops::FilterType::Triangle);
+                            if thumbnail.save_with_format(&temporary, ImageFormat::Jpeg).is_ok() && fs::rename(&temporary, &target_path).is_ok() {
                                 return Some(target_path.to_string_lossy().to_string());
                             }
+                            let _ = fs::remove_file(&temporary);
                         }
                     }
                 }
@@ -217,6 +236,8 @@ pub fn generate_photo_preview(
     is_cancelled: &std::sync::atomic::AtomicBool,
 ) -> Result<String, String> {
     use std::sync::atomic::Ordering;
+    crate::asset_cache::validate_cache_id(photo_id)?;
+    extract_photo_metadata(file_path)?;
 
     if is_cancelled.load(Ordering::Relaxed) {
         return Err("Cancelled".to_string());
@@ -243,12 +264,17 @@ pub fn generate_photo_preview(
         ("jpg", ImageFormat::Jpeg)
     };
 
-    let previews_dir = cache_dir.join("previews");
-    let _ = fs::create_dir_all(&previews_dir);
+    let previews_dir = crate::asset_cache::prepare_cache_directory(cache_dir, "previews")?;
     let preview_file_path = previews_dir.join(format!("{}.{}", photo_id, ext));
     let tmp_file_path = previews_dir.join(format!("{}.tmp", photo_id));
 
-    let mut img = image::open(file_path).map_err(|e| format!("Failed to open image: {}", e))?;
+    let decode_guard = ORIGINAL_DECODE.lock().map_err(|_| "Image decoder is unavailable".to_string())?;
+    if is_cancelled.load(Ordering::Relaxed) { return Err("Cancelled".to_string()); }
+    let mut reader = image::ImageReader::open(file_path).map_err(|e| e.to_string())?;
+    let mut limits = image::Limits::default();
+    limits.max_alloc = Some(512 * 1024 * 1024);
+    reader.limits(limits);
+    let mut img = reader.decode().map_err(|e| format!("Failed to decode image within memory limits: {}", e))?;
     let orientation = crate::export_engine::get_image_exif_orientation(file_path);
     if orientation > 1 {
         img = crate::export_engine::apply_exif_orientation(img, orientation);
@@ -267,23 +293,26 @@ pub fn generate_photo_preview(
 
     // Instantly drop full-resolution uncompressed source bitmap from RAM immediately!
     drop(img);
+    drop(decode_guard);
 
-    // Also generate 320px thumbnail if missing
-    let thumbs_dir = cache_dir.join("thumbnails");
+    // Always replace the thumbnail after decoding; embedded/stale previews are only a first look.
+    let thumbs_dir = crate::asset_cache::prepare_cache_directory(cache_dir, "thumbnails")?;
     let thumb_file_path = thumbs_dir.join(format!("{}.{}", photo_id, ext));
-    if !thumb_file_path.exists() {
-        let _ = fs::create_dir_all(&thumbs_dir);
+    {
+        fs::create_dir_all(&thumbs_dir).map_err(|e| e.to_string())?;
         let thumb_resized = resized.resize(
             FILMSTRIP_THUMBNAIL_MAX_SIZE,
             FILMSTRIP_THUMBNAIL_MAX_SIZE,
             image::imageops::FilterType::Triangle,
         );
         let thumb_tmp_path = thumbs_dir.join(format!("{}.tmp", photo_id));
-        if thumb_resized.save_with_format(&thumb_tmp_path, target_format).is_ok() {
-            let _ = fs::rename(&thumb_tmp_path, &thumb_file_path);
-        }
-        let _ = fs::remove_file(&thumb_tmp_path); // Clean up if rename didn't happen
+        let result = thumb_resized.save_with_format(&thumb_tmp_path, target_format)
+            .map_err(|e| e.to_string()).and_then(|_| fs::rename(&thumb_tmp_path, &thumb_file_path).map_err(|e| e.to_string()));
+        let _ = fs::remove_file(&thumb_tmp_path);
+        result?;
     }
+
+    if is_cancelled.load(Ordering::Relaxed) { return Err("Cancelled".to_string()); }
 
     // Atomic write for canvas preview: write to .tmp then atomic rename
     if let Err(e) = resized.save_with_format(&tmp_file_path, target_format) {
@@ -302,19 +331,9 @@ pub fn generate_photo_preview(
 /// Single Universal Compressed Preview Engine (Full synchronous helper for single-item healing/relinking):
 pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Result<ProcessedPhoto, String> {
     let meta = extract_photo_metadata(file_path)?;
-    let thumb = extract_embedded_thumbnail(file_path, cache_dir, photo_id);
     let dummy_cancel = std::sync::atomic::AtomicBool::new(false);
-    let preview_path_str = generate_photo_preview(file_path, cache_dir, photo_id, &dummy_cancel).ok();
-
-    let thumbs_dir = cache_dir.join("thumbnails");
-    let fallback_thumb = thumbs_dir.join(format!("{}.jpg", photo_id));
-    let final_thumb = thumb.or_else(|| {
-        if fallback_thumb.exists() {
-            Some(fallback_thumb.to_string_lossy().to_string())
-        } else {
-            preview_path_str.clone()
-        }
-    });
+    let preview_path_str = generate_photo_preview(file_path, cache_dir, photo_id, &dummy_cancel)?;
+    let final_thumb = thumbnail_for_preview(cache_dir, photo_id, &preview_path_str)?;
 
     Ok(ProcessedPhoto {
         file_path: meta.file_path,
@@ -323,10 +342,18 @@ pub fn process_photo(file_path: &Path, cache_dir: &Path, photo_id: &str) -> Resu
         width: meta.width,
         height: meta.height,
         format: meta.format,
-        thumbnail_path: final_thumb,
-        preview_path: preview_path_str,
+        thumbnail_path: Some(final_thumb),
+        preview_path: Some(preview_path_str),
         thumbnail_base64: None,
     })
+}
+
+pub fn thumbnail_for_preview(cache_dir: &Path, photo_id: &str, preview: &str) -> Result<String, String> {
+    crate::asset_cache::validate_cache_id(photo_id)?;
+    let extension = Path::new(preview).extension().and_then(|e| e.to_str()).ok_or("Invalid preview format")?;
+    let path = cache_dir.join("thumbnails").join(format!("{}.{}", photo_id, extension));
+    if !path.is_file() { return Err("The thumbnail could not be generated.".to_string()); }
+    Ok(path.to_string_lossy().to_string())
 }
 
 /// Forcefully trims and returns unused virtual memory pages from the process working set back to the OS.

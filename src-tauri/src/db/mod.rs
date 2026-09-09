@@ -1293,11 +1293,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn delete_photo(&self, photo_id: &str) -> SqliteResult<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM photos WHERE id = ?1", [photo_id])?;
-        Ok(())
-    }
 
     pub fn update_photo_missing(&self, photo_id: &str, is_missing: bool) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
@@ -1308,15 +1303,8 @@ impl Database {
         Ok(())
     }
 
-    pub fn update_photo_thumbnail(&self, photo_id: &str, thumbnail_path: &str) -> SqliteResult<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE photos SET thumbnail_path = ?1, updated_at = datetime('now') WHERE id = ?2",
-            rusqlite::params![thumbnail_path, photo_id],
-        )?;
-        Ok(())
-    }
 
+    #[cfg(test)]
     pub fn update_photo_preview(&self, photo_id: &str, preview_path: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -1326,14 +1314,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn relink_photo(&self, photo_id: &str, new_path: &str) -> SqliteResult<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE photos SET file_path = ?1, is_missing = 0, updated_at = datetime('now') WHERE id = ?2",
-            rusqlite::params![new_path, photo_id],
-        )?;
-        Ok(())
-    }
 
     #[allow(dead_code)]
     pub fn check_photo_exists_in_project(&self, project_id: &str, file_path: &str) -> SqliteResult<bool> {
@@ -1348,15 +1328,47 @@ impl Database {
 
     // --- Batch Photo Operations ---
 
+    #[cfg(test)]
     pub fn batch_delete_photos(&self, photo_ids: &[String]) -> SqliteResult<()> {
-        if photo_ids.is_empty() {
-            return Ok(());
+        self.remove_photo_records(None, photo_ids).map(|_| ())
+    }
+
+    pub fn remove_photo_records(&self, project_id: Option<&str>, photo_ids: &[String]) -> SqliteResult<Vec<String>> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let mut removed = Vec::new();
+        for id in photo_ids {
+            let owner = tx.query_row("SELECT project_id FROM photos WHERE id = ?1", [id], |row| row.get::<_, String>(0));
+            match owner {
+                Err(rusqlite::Error::QueryReturnedNoRows) => continue,
+                Err(error) => return Err(error),
+                Ok(owner) if project_id.map(|p| p != owner).unwrap_or(false) => {
+                    return Err(rusqlite::Error::InvalidParameterName("Photo does not belong to this project".into()));
+                }
+                Ok(_) => {}
+            }
+            tx.execute(
+                "UPDATE spread_elements SET photo_id = NULL, file_path = '', file_name = '',
+                 thumbnail_path = '', preview_path = '', photo_aspect = 1, original_width = 0,
+                 original_height = 0, crop_x = 0, crop_y = 0, crop_scale = 1, crop_rotation = 0,
+                 updated_at = datetime('now') WHERE photo_id = ?1", [id])?;
+            tx.execute("DELETE FROM photos WHERE id = ?1", [id])?;
+            removed.push(id.clone());
         }
+        tx.commit()?;
+        Ok(removed)
+    }
+
+    pub fn update_photo_source(&self, id: &str, meta: &crate::photo_engine::PhotoMetadata,
+        thumbnail: &str, preview: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
-        let placeholders: Vec<String> = photo_ids.iter().map(|_| "?".to_string()).collect();
-        let query = format!("DELETE FROM photos WHERE id IN ({})", placeholders.join(","));
-        let params: Vec<&dyn rusqlite::ToSql> = photo_ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
-        conn.execute(&query, rusqlite::params_from_iter(params))?;
+        let count = conn.execute(
+            "UPDATE photos SET file_path = ?2, file_name = ?3, file_size = ?4, width = ?5, height = ?6,
+             format = ?7, thumbnail_path = ?8, preview_path = ?9, is_missing = 0,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?1",
+            rusqlite::params![id, meta.file_path, meta.file_name, meta.file_size, meta.width, meta.height,
+                meta.format, thumbnail, preview])?;
+        if count != 1 { return Err(rusqlite::Error::QueryReturnedNoRows); }
         Ok(())
     }
 
@@ -1620,6 +1632,28 @@ impl Database {
             )?;
 
             for elem in &spread.elements {
+                let mut elem = elem.clone();
+                if elem.r#type == "photo" {
+                    if let Some(id) = &elem.photo_id {
+                        let live = tx.query_row("SELECT EXISTS(SELECT 1 FROM photos WHERE id = ?1 AND project_id = ?2)",
+                            rusqlite::params![id, project_id], |row| row.get::<_, bool>(0))?;
+                        // A delayed autosave/Undo must not resurrect a removed library reference.
+                        if !live {
+                            elem.photo_id = None;
+                            elem.file_path.clear();
+                            elem.file_name.clear();
+                            elem.thumbnail_path = None;
+                            elem.preview_path = None;
+                            elem.photo_aspect = 1.0;
+                            elem.original_width = None;
+                            elem.original_height = None;
+                            elem.crop_x = 0.0;
+                            elem.crop_y = 0.0;
+                            elem.crop_scale = 1.0;
+                            elem.crop_rotation = Some(0.0);
+                        }
+                    }
+                }
                 let radii = elem.corner_radii();
                 tx.execute(
                     "INSERT INTO spread_elements (

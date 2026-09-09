@@ -1,8 +1,8 @@
 use serde::Deserialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, Manager};
 use uuid::Uuid;
 
-use crate::asset_cache::cleanup_orphaned_photo_assets;
+use crate::asset_cache::{PHOTO_ASSET_JOB, cleanup_removed_photo_assets};
 use crate::db::{AlbumPayload, Database, ProjectPackagePayload, ProjectRow};
 
 #[derive(Default)]
@@ -121,19 +121,33 @@ pub fn list_recent_projects(db: State<'_, Database>, limit: Option<i32>) -> Resu
 }
 
 #[tauri::command]
-pub fn delete_project(app: AppHandle, db: State<'_, Database>, id: String) -> Result<(), String> {
-    log::info!("delete_project: {}", id);
-    db.delete_project(&id).map_err(|e| e.to_string())?;
-    cleanup_orphaned_photo_assets(&app, &db)?;
-    Ok(())
+pub async fn delete_project(app: AppHandle, id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let ids = db.get_photos_for_project(&id).map_err(|e| e.to_string())?.into_iter().map(|p| p.id).collect::<Vec<_>>();
+        db.delete_project(&id).map_err(|e| e.to_string())?;
+        if let Ok(cache) = app.path().app_cache_dir() {
+            for warning in cleanup_removed_photo_assets(&cache, &ids) { log::warn!("{}", warning); }
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn clear_recent_projects(app: AppHandle, db: State<'_, Database>) -> Result<(), String> {
-    log::info!("clear_recent_projects");
-    db.clear_recent_projects().map_err(|e| e.to_string())?;
-    cleanup_orphaned_photo_assets(&app, &db)?;
-    Ok(())
+pub async fn clear_recent_projects(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let ids = db.get_photo_ids().map_err(|e| e.to_string())?;
+        db.clear_recent_projects().map_err(|e| e.to_string())?;
+        let live = db.get_photo_ids().map_err(|e| e.to_string())?.into_iter().collect::<std::collections::HashSet<_>>();
+        let removed = ids.into_iter().filter(|id| !live.contains(id)).collect::<Vec<_>>();
+        if let Ok(cache) = app.path().app_cache_dir() {
+            for warning in cleanup_removed_photo_assets(&cache, &removed) { log::warn!("{}", warning); }
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

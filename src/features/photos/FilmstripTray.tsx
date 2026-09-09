@@ -46,13 +46,12 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     cancelImport,
     cancelAllImports,
     toggleFavorite,
-    removePhoto,
+    removePhotos,
     checkMissing,
     setupListeners,
     selectPhoto,
     selectAll,
     clearSelection,
-    batchDeleteSelected,
     batchToggleFavoritesSelected,
     addPhotosToFolder,
     movePhotosToFolder,
@@ -115,6 +114,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       // Ignore if click is inside dialogs, context menus, or modals
       if (
         target.closest('[role="dialog"]') ||
+        target.closest('[role="alertdialog"]') ||
         target.closest('.modal') ||
         target.closest('[data-context-menu]')
       ) {
@@ -337,14 +337,10 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
   // Execute Photo Deletion after ConfirmDialog
   const handleConfirmPhotoDelete = async () => {
-    if (!photoToDelete) return;
+    if (!photoToDelete || !currentProject) return;
     setIsDeletingPhoto(true);
     try {
-      if (photoToDelete.ids.length === 1 && photoToDelete.ids[0]) {
-        await removePhoto(photoToDelete.ids[0]);
-      } else {
-        await batchDeleteSelected(currentProject.id);
-      }
+      await removePhotos(currentProject.id, photoToDelete.ids);
       setPhotoToDelete(null);
     } catch (err) {
       console.error('Delete photo error:', err);
@@ -370,7 +366,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       aria-label="Photo Library Filmstrip"
     >
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
-      <BatchActionBar />
+      <BatchActionBar onRequestDelete={(ids, name) => setPhotoToDelete({ ids, name })} />
 
       {/* Top Header Bar */}
       <div className={styles.header}>

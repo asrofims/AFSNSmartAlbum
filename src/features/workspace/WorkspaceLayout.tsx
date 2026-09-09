@@ -195,6 +195,7 @@ export function WorkspaceLayout() {
   const [pendingImportCancelAction, setPendingImportCancelAction] = useState<(() => void | Promise<void>) | null>(null);
 
   const confirmSafeAction = useCallback((action: () => void | Promise<void>) => {
+    if (usePhotoStore.getState().isRemoving) return;
     if (useProjectStore.getState().isSaving || useProjectStore.getState().isLoading) return;
     if (usePhotoStore.getState().isImporting) {
       setPendingImportCancelAction(() => action);
@@ -216,6 +217,14 @@ export function WorkspaceLayout() {
   // Surface photo import notices (success, duplicate, cancel, relink) as floating toasts
   const importNotice = usePhotoStore((s) => s.importNotice);
   const dismissImportNotice = usePhotoStore((s) => s.dismissImportNotice);
+  const removalNotice = usePhotoStore((s) => s.removalNotice);
+  const dismissRemovalNotice = usePhotoStore((s) => s.dismissRemovalNotice);
+  useEffect(() => {
+    if (removalNotice) {
+      showToast(removalNotice, 7000);
+      dismissRemovalNotice();
+    }
+  }, [removalNotice, dismissRemovalNotice, showToast]);
 
   useEffect(() => {
     if (importNotice) {

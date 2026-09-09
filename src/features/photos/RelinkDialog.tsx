@@ -10,6 +10,8 @@ export function RelinkDialog() {
   const relinkFolder = usePhotoStore((s) => s.relinkFolder);
   const photos = usePhotoStore((s) => s.photos);
   const currentProject = useProjectStore((s) => s.currentProject);
+  const isRelinking = usePhotoStore((s) => s.isRelinking);
+  const error = usePhotoStore((s) => s.error);
 
   const missingPhotos = photos.filter((p) => p.isMissing);
 
@@ -18,7 +20,7 @@ export function RelinkDialog() {
   return (
     <Dialog
       isOpen={isRelinkOpen}
-      onClose={closeRelink}
+      onClose={() => { if (!isRelinking) closeRelink(); }}
       title="Relink Missing Photos"
       width={520}
       closeOnOverlayClick={false}
@@ -29,7 +31,7 @@ export function RelinkDialog() {
             The original files for <strong>{missingPhotos.length}</strong> photo(s) could not be found at their original locations.
           </p>
           <p className={styles.subtext}>
-            Please select the folder where these photos are now located. AFSNSmartAlbum will automatically reconnect matching files by filename and rebuild their thumbnails.
+            Select the folder containing the original photos. Files are matched by name, file size, and dimensions. Ambiguous matches are left unchanged.
           </p>
         </div>
 
@@ -44,12 +46,15 @@ export function RelinkDialog() {
           ))}
         </div>
 
+        {error && <p role="alert" style={{ whiteSpace: 'pre-wrap' }}>{error}</p>}
+        {isRelinking && <p role="status">Relinking photos and rebuilding previews...</p>}
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={closeRelink}>
+          <Button variant="secondary" onClick={closeRelink} disabled={isRelinking}>
             Cancel
           </Button>
           <Button
             variant="primary"
+            disabled={isRelinking}
             onClick={() => relinkFolder(currentProject.id)}
           >
             Locate Folder & Relink

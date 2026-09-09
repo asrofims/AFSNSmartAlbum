@@ -34,7 +34,7 @@ import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
 import type { Photo } from '../domain/photo';
 
 let databaseWriteQueue: Promise<unknown> = Promise.resolve();
-function persistInOrder(write: () => Promise<boolean>): Promise<boolean> {
+export function persistInOrder<T>(write: () => Promise<T>): Promise<T> {
   const result = databaseWriteQueue.then(write, write);
   databaseWriteQueue = result.catch(() => false);
   return result;

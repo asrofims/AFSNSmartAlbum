@@ -17,6 +17,8 @@ export interface ConfirmDialogProps {
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  loadingText?: string;
+  error?: string | null;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -33,6 +35,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
   isLoading = false,
+  loadingText = 'Processing...',
+  error,
 }) => {
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -93,7 +97,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   };
 
   return createPortal(
-    <div className={styles.overlay} onClick={onCancel}>
+    <div className={styles.overlay} onClick={() => { if (!isLoading) onCancel(); }}>
       <div
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
@@ -101,6 +105,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-desc"
+        aria-busy={isLoading}
       >
         <div className={styles.contentRow}>
           {renderIcon()}
@@ -108,6 +113,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <h3 id="confirm-title" className={styles.title}>{title}</h3>
             <p id="confirm-desc" className={styles.message}>{message}</p>
             {detail && <div className={styles.detailBox}>{detail}</div>}
+            {isLoading && <p role="status" aria-live="polite">{loadingText}</p>}
+            {error && <p role="alert">{error}</p>}
           </div>
         </div>
 
@@ -137,7 +144,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={onConfirm}
             disabled={isLoading}
           >
-            {isLoading ? 'Processing...' : confirmText}
+            {isLoading ? loadingText : confirmText}
           </Button>
         </div>
       </div>

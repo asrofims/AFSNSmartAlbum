@@ -4,6 +4,62 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+// All image jobs and cache cleanup take this lock before database/file work.
+// A batch may use its own bounded worker pool while holding the job lock.
+pub static PHOTO_ASSET_JOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn is_link_directory(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else { return false; };
+    if metadata.file_type().is_symlink() { return true; }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        return metadata.file_attributes() & 0x400 != 0;
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+pub fn prepare_cache_directory(cache_dir: &Path, folder: &str) -> Result<PathBuf, String> {
+    let directory = cache_dir.join(folder);
+    if is_link_directory(cache_dir) || is_link_directory(&directory) {
+        return Err("The image cache must not be a symbolic link or junction.".to_string());
+    }
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    Ok(directory)
+}
+
+pub fn validate_cache_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_') {
+        return Err("Invalid photo cache identifier".to_string());
+    }
+    Ok(())
+}
+
+/// Caller holds PHOTO_ASSET_JOB. Only generated names for removed IDs are touched.
+pub fn cleanup_removed_photo_assets(cache_dir: &Path, ids: &[String]) -> Vec<String> {
+    let mut warnings = Vec::new();
+    for id in ids {
+        if let Err(error) = validate_cache_id(id) { warnings.push(error); continue; }
+        for folder in ["thumbnails", "previews"] {
+            let directory = cache_dir.join(folder);
+            if is_link_directory(cache_dir) || is_link_directory(&directory) {
+                warnings.push("Cache directory is a symbolic link; cleanup was skipped.".to_string());
+                continue;
+            }
+            for extension in ["jpg", "jpeg", "png", "webp", "tmp"] {
+                let path = directory.join(format!("{}.{}", id, extension));
+                if let Err(error) = fs::remove_file(&path) {
+                    if error.kind() != std::io::ErrorKind::NotFound {
+                        warnings.push(format!("Cache cleanup deferred for {}: {}", path.display(), error));
+                    }
+                }
+            }
+        }
+    }
+    warnings
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct CacheCleanupReport {
     pub removed_files: usize,
@@ -14,6 +70,7 @@ pub fn cleanup_orphaned_photo_assets(
     app: &AppHandle,
     db: &Database,
 ) -> Result<CacheCleanupReport, String> {
+    let _job = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo cache worker is unavailable".to_string())?;
     let cache_dir = app
         .path()
         .app_cache_dir()
@@ -38,6 +95,9 @@ pub fn cleanup_asset_directories(
 
     for directory in directories {
         if !directory.exists() {
+            continue;
+        }
+        if is_link_directory(directory) || directory.parent().map(is_link_directory).unwrap_or(true) {
             continue;
         }
 

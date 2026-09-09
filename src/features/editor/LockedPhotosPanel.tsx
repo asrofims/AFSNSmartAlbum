@@ -48,9 +48,8 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
   const getPhotoPreviewSrc = (photoId?: string | null, fallbackThumbnail?: string | null) => {
     if (photoId) {
       const p = photos.find((item) => item.id === photoId);
-      if (p?.thumbnailPath) return convertFileSrc(p.thumbnailPath);
-      if (p?.previewPath) return convertFileSrc(p.previewPath);
-      if (p?.filePath) return convertFileSrc(p.filePath);
+      if (p?.thumbnailPath) return `${convertFileSrc(p.thumbnailPath)}?v=${encodeURIComponent(p.updatedAt || '')}`;
+      if (p?.previewPath) return `${convertFileSrc(p.previewPath)}?v=${encodeURIComponent(p.updatedAt || '')}`;
     }
     if (fallbackThumbnail) return convertFileSrc(fallbackThumbnail);
     return '';

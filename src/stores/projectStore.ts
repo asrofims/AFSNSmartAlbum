@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Project, ProjectSettings } from '../domain/project';
 import { Unit } from '../domain/units';
+import { usePhotoStore } from './photoStore';
 
 const persistProjectMargins = async (project: Project): Promise<void> => {
   const fallback = Number(project.marginValue ?? 0);
@@ -247,7 +248,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   closeProject: async () => {
-    if (get().isSaving || get().isLoading) return;
+    if (get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return;
     // 1. Terminate any active or queued photo imports immediately
     try {
       const { usePhotoStore } = await import('./photoStore');
@@ -304,6 +305,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createNewProject: async (settings: ProjectSettings): Promise<Project> => {
+    if (usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) {
+      throw new Error('Wait for the current photo operation to finish before creating a project.');
+    }
     // Terminate any existing import tasks before creating a new project
     try {
       const { usePhotoStore } = await import('./photoStore');
@@ -396,7 +400,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   openProjectById: async (id: string) => {
-    if (get().isSaving || get().isLoading) return;
+    if (get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return;
     let hasUnsavedRecovery = false;
     try { hasUnsavedRecovery = localStorage.getItem(`afsn_dirty_${id}`) === '1'; } catch {}
     // Terminate any existing import tasks before switching projects
@@ -455,7 +459,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   saveProject: async (options = {}) => {
     const current = get().currentProject;
     const failed = { success: false, filePath: null, isSaveAs: false };
-    if (!current || get().isSaving || get().isLoading) return failed;
+    if (usePhotoStore.getState().isImporting || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return failed;
+    if (!current || get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return failed;
     // Old database entries may still point at a ZIP opened by a previous release.
     const workingPath = current.filePath && /\.afsn$/i.test(current.filePath) ? current.filePath : null;
     if (!workingPath && !options.automatic) {
@@ -509,7 +514,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   exportProjectAsAfsn: async () => {
     const current = get().currentProject;
-    if (!current || get().isSaving || get().isLoading) return null;
+    if (!current || get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return null;
     set({ isSaving: true, error: null });
     const { useAlbumStore } = await import('./albumStore');
     const album = useAlbumStore.getState().currentAlbum;
@@ -560,7 +565,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   exportCompleteProjectPackageWithPhotos: async () => {
     const current = get().currentProject;
-    if (!current || get().isSaving || get().isLoading) return null;
+    if (!current || get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return null;
     set({ isSaving: true, error: null });
     try {
       const { useAlbumStore } = await import('./albumStore');
@@ -581,7 +586,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   importProjectFromAfsn: async (): Promise<boolean> => {
-    if (get().isSaving || get().isLoading) return false;
+    if (get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return false;
     set({ isLoading: true, error: null });
     try {
       const { usePhotoStore } = await import('./photoStore');
@@ -618,7 +623,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   openProjectFromFile: async (filePath: string): Promise<boolean> => {
-    if (get().isSaving || get().isLoading) return false;
+    if (get().isSaving || get().isLoading || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking) return false;
     if (!/\.afsn$/i.test(filePath)) {
       set({ error: 'Open .afsn project files only. Extract ZIP packages first, then open project.afsn inside the extracted folder.' });
       return false;

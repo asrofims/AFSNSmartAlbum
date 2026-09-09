@@ -10,6 +10,7 @@ import { ExitWarningModal } from './features/workspace/ExitWarningModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './stores/projectStore';
 import { useAlbumStore } from './stores/albumStore';
+import { usePhotoStore } from './stores/photoStore';
 import { useAppStore } from './stores/appStore';
 import { isTauri } from './utils/platform';
 import { checkForAppUpdates } from './services/updateService';
@@ -140,7 +141,7 @@ export default function App() {
       import('@tauri-apps/api/core').then(({ invoke }) => {
         const project = useProjectStore.getState().currentProject;
         const saveStatus = useAlbumStore.getState().saveStatus;
-        const isUnsaved = Boolean(project && (saveStatus !== 'saved' || useProjectStore.getState().isSaving));
+        const isUnsaved = Boolean(project && (saveStatus !== 'saved' || useProjectStore.getState().isSaving || usePhotoStore.getState().isRemoving || usePhotoStore.getState().isRelinking));
         invoke('set_unsaved_status', { unsaved: isUnsaved }).catch(() => {});
       });
     };
@@ -148,12 +149,16 @@ export default function App() {
     syncUnsavedStatus();
     const unsubAlbum = useAlbumStore.subscribe(syncUnsavedStatus);
     const unsubProject = useProjectStore.subscribe(syncUnsavedStatus);
+    const unsubPhotos = usePhotoStore.subscribe((state, previous) => {
+      if (state.isRemoving !== previous.isRemoving || state.isRelinking !== previous.isRelinking) syncUnsavedStatus();
+    });
 
     return () => {
       if (unlistenFn) unlistenFn();
       if (unlistenCloseWarning) unlistenCloseWarning();
       unsubAlbum();
       unsubProject();
+      unsubPhotos();
     };
   }, []);
 

@@ -5,14 +5,16 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { isTauri } from '../../utils/platform';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAlbumStore } from '../../stores/albumStore';
+import { usePhotoStore } from '../../stores/photoStore';
 
 export function ExitWarningModal() {
   const { isExitWarningOpen, closeExitWarning } = useAppStore();
   const [isClosing, setIsClosing] = useState(false);
   const isSaving = useProjectStore((s) => s.isSaving);
+  const isPhotoBusy = usePhotoStore((s) => s.isRemoving || s.isRelinking);
 
   const handleForceExit = async () => {
-    if (isClosing || useProjectStore.getState().isSaving) return;
+    if (isClosing || useProjectStore.getState().isSaving || isPhotoBusy) return;
     setIsClosing(true);
     closeExitWarning();
 
@@ -47,7 +49,8 @@ export function ExitWarningModal() {
       }}
       onSecondary={handleForceExit}
       secondaryText="Exit Without Saving"
-      isLoading={isSaving || isClosing}
+      isLoading={isSaving || isClosing || isPhotoBusy}
+      loadingText={isPhotoBusy ? 'Finishing photo operation...' : 'Processing...'}
       onCancel={() => {
         setIsClosing(false);
         closeExitWarning();

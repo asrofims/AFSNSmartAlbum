@@ -43,6 +43,9 @@ export interface ImportNotice {
   relinked: number;
   cancelled?: boolean;
   purged?: number;
+  failed?: number;
+  previewFailed?: number;
+  failures?: { file: string; message: string; phase: string }[];
 }
 
 export type PhotoFilter = 'all' | 'unused' | 'used' | 'favorites';
@@ -134,6 +137,9 @@ export function getRangeSelection(
  * Formats an ImportNotice into a concise, professional desktop toast notification message.
  */
 export function formatImportNoticeToast(notice: ImportNotice): string {
+  if ((notice.failed || 0) + (notice.previewFailed || 0) > 0) {
+    return `${notice.cancelled ? 'Import cancelled.' : 'Import finished.'} ${notice.imported} photos added; ${notice.existing} already in the library. ${notice.failed || 0} files could not be imported; ${notice.previewFailed || 0} previews could not be generated. See the photo library error details.`;
+  }
   if (notice.cancelled) {
     if (notice.imported > 0) {
       const keptPlural = notice.imported === 1 ? 'photo' : 'photos';

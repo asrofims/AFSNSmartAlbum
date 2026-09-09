@@ -271,3 +271,13 @@
 - [x] Relax layout engine word-wrap and overflow detection tolerance to `0.05 pt` in `richTextRenderer.ts`, eliminating false rewraps and false red `+` overflow badges caused by unit conversion float drift.
 - [x] Route multi-frame updates for text elements through `updateTextNode` in `batchUpdateFrames` to guarantee clean style normalization and height auto-sizing.
 - [x] Application version metadata bumped to `v1.0.39`.
+
+## Photo Lifecycle Audit Follow-up — 9 September 2026
+
+- [x] Audit import, thumbnail/preview generation, and library removal; record evidence and priorities in `PHOTO_LIFECYCLE_AUDIT.md`. Existing TypeScript suite and 26 Rust tests pass; isolated store probes confirm removal consistency defects. No runtime fixes are included in this audit.
+- [x] Preserve confirmed removal IDs across dialog interactions and provide reliable busy, success, and error feedback (F1/F7).
+- [x] Coordinate transactional photo/frame removal, project dirty state, and Undo/Redo asset validity (F2/F3).
+- [x] Replace filename-only duplicate/relink identity checks and propagate import/processing failures accurately (F4/F5).
+- [x] Coordinate cache writers with cleanup; separate committed library removal from deferred cache maintenance (F6).
+- [x] Return correct thumbnail paths for all formats, invalidate stale caches, and isolate recovery cancellation per job (F8/F9).
+- [x] Harden image/EXIF validation, recursive folder scanning, memory limits, and asset filesystem scope; add integration and failure-path coverage (F10).

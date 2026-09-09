@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import styles from './BatchActionBar.module.css';
 
-export function BatchActionBar() {
+export function BatchActionBar({ onRequestDelete }: { onRequestDelete: (ids: string[], name: string) => void }) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     selectedPhotoIds,
@@ -12,7 +11,6 @@ export function BatchActionBar() {
     activeFolderId,
     photos,
     clearSelection,
-    batchDeleteSelected,
     batchToggleFavoritesSelected,
     addPhotosToFolder,
     movePhotosToFolder,
@@ -22,8 +20,6 @@ export function BatchActionBar() {
 
   const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false);
   const [folderAction, setFolderAction] = useState<'move' | 'copy'>('copy');
-  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Show batch toolbar when 2 or more photos are selected (Lightroom style)
   if (!currentProject || selectedPhotoIds.length < 2) return null;
@@ -31,18 +27,6 @@ export function BatchActionBar() {
   const count = selectedPhotoIds.length;
   const selectedPhotos = photos.filter((p) => selectedPhotoIds.includes(p.id));
   const allFav = selectedPhotos.length > 0 && selectedPhotos.every((p) => p.isFavorite);
-
-  const handleConfirmBatchDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await batchDeleteSelected(currentProject.id);
-      setIsConfirmDeleteOpen(false);
-    } catch (err) {
-      console.error('Batch delete error:', err);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleToggleFav = async () => {
     await batchToggleFavoritesSelected(!allFav);
@@ -167,27 +151,14 @@ export function BatchActionBar() {
           <button
             type="button"
             className={`${styles.actionBtn} ${styles.deleteBtn}`}
-            onClick={() => setIsConfirmDeleteOpen(true)}
-            title="Delete selected photos (Del)"
+            onClick={() => onRequestDelete([...selectedPhotoIds], `${count} photos`)}
+            title="Remove selected photos from the library (Del)"
           >
-            🗑 Delete ({count})
+            🗑 Remove ({count})
           </button>
         </div>
       </div>
 
-      {/* Modern Confirm Dialog for Batch Photo Deletion */}
-      <ConfirmDialog
-        isOpen={isConfirmDeleteOpen}
-        title={`Delete ${count} Selected Photos?`}
-        message={`Are you sure you want to delete ${count} photos from the project library?`}
-        detail="The photos will be removed from your album project. The original image files on your drive will remain intact."
-        confirmText={`Delete ${count} Photos`}
-        cancelText="Cancel"
-        variant="danger"
-        isLoading={isDeleting}
-        onConfirm={handleConfirmBatchDelete}
-        onCancel={() => setIsConfirmDeleteOpen(false)}
-      />
     </>
   );
 }

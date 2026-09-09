@@ -1,5 +1,43 @@
 import { create } from 'zustand';
 import { Photo, PhotoFolder, ImportProgress, ImportNotice, PhotoFilter, PhotoSortBy, getRangeSelection } from '../domain/photo';
+import { detachRemovedAlbumPhotos, detachRemovedPhotos } from '../domain/photoRemoval';
+
+interface PhotoRemovalResult { removedIds: string[]; warnings: string[] }
+
+async function markLibraryChanged(projectId: string): Promise<void> {
+  const { useAlbumStore } = await import('./albumStore');
+  const album = useAlbumStore.getState().currentAlbum;
+  if (album?.projectId === projectId) {
+    // A new reference also prevents an in-flight file save from marking newer library edits saved.
+    useAlbumStore.setState({ currentAlbum: { ...album }, saveStatus: 'unsaved' });
+    try { localStorage.setItem(`afsn_dirty_${projectId}`, '1'); } catch {}
+  }
+}
+
+async function reconcileRemovedPhotos(projectId: string, photoIds: string[]): Promise<void> {
+  if (!photoIds.length) return;
+  const { useAlbumStore } = await import('./albumStore');
+  const { useHistoryStore } = await import('./historyStore');
+  const { useEditorStore } = await import('./editorStore');
+  const album = useAlbumStore.getState().currentAlbum;
+  if (album?.projectId !== projectId) return;
+  const ids = new Set(photoIds);
+  useAlbumStore.setState({ currentAlbum: detachRemovedAlbumPhotos(album, ids), saveStatus: 'unsaved' });
+  // Preserve unrelated undo steps, but never resurrect a permanently removed library asset.
+  useHistoryStore.setState((s) => ({
+    past: s.past.map((a) => a.projectId === projectId ? detachRemovedAlbumPhotos(a, ids) : a),
+    future: s.future.map((a) => a.projectId === projectId ? detachRemovedAlbumPhotos(a, ids) : a),
+  }));
+  useEditorStore.setState((s) => ({ clipboardFrames: detachRemovedPhotos(s.clipboardFrames, ids), editingCropFrameId: null }));
+  usePhotoStore.setState((s) => ({
+    photos: s.photos.filter((p) => !ids.has(p.id)),
+    selectedPhotoIds: s.selectedPhotoIds.filter((id) => !ids.has(id)),
+    clipboardPhotoIds: s.clipboardPhotoIds.filter((id) => !ids.has(id)),
+    lastSelectedPhotoId: s.lastSelectedPhotoId && !ids.has(s.lastSelectedPhotoId) ? s.lastSelectedPhotoId : null,
+    folderPhotoIds: Object.fromEntries(Object.entries(s.folderPhotoIds).map(([id, members]) => [id, members.filter((member) => !ids.has(member))])),
+    folders: s.folders.map((folder) => ({ ...folder, photoCount: (s.folderPhotoIds[folder.id] || []).filter((id) => !ids.has(id)).length })),
+  }));
+}
 
 async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promise<void> {
   if (!Array.isArray(photos) || photos.length === 0) return;
@@ -37,6 +75,10 @@ interface PhotoState {
   isBrowsing: boolean;
   isImporting: boolean;
   isCancelling: boolean;
+  isRemoving: boolean;
+  isRelinking: boolean;
+  removalNotice: string | null;
+  dismissRemovalNotice: () => void;
   importProgress: ImportProgress | null;
   importNotice: ImportNotice | null;
   importQueue: ImportTask[];
@@ -60,6 +102,7 @@ interface PhotoState {
   dismissImportNotice: () => void;
   toggleFavorite: (photoId: string) => Promise<void>;
   removePhoto: (photoId: string) => Promise<void>;
+  removePhotos: (projectId: string, photoIds: string[]) => Promise<PhotoRemovalResult>;
   checkMissing: (projectId: string) => Promise<void>;
   healThumbnail: (photoId: string) => Promise<string | null>;
   relinkFolder: (projectId: string) => Promise<void>;
@@ -102,6 +145,8 @@ interface PhotoState {
 let activeListenersCount = 0;
 let unlistenFn: (() => void) | null = null;
 let setupPromise: Promise<() => void> | null = null;
+let photoLoadEpoch = 0;
+const thumbnailHeals = new Map<string, Promise<string | null>>();
 
 export const usePhotoStore = create<PhotoState>((set, get) => ({
   photos: [],
@@ -119,6 +164,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   isBrowsing: false,
   isImporting: false,
   isCancelling: false,
+  isRemoving: false,
+  isRelinking: false,
+  removalNotice: null,
+  dismissRemovalNotice: () => set({ removalNotice: null }),
   importProgress: null,
   importNotice: null,
   importQueue: [],
@@ -179,10 +228,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         const unlistenItem = await listen<Photo>('photo-imported', (event) => {
           const item = event.payload;
           if (!isCurrentProject(item.projectId)) return;
+          photoLoadEpoch += 1;
+          void markLibraryChanged(item.projectId);
           set((s) => {
             const nextPhotos = s.photos.some((p) => p.id === item.id) ? s.photos : [...s.photos, item];
             const nextFolderPhotoIds = { ...s.folderPhotoIds };
-            const targetFolderId = s.currentImportTask?.folderId || s.activeFolderId;
+            const targetFolderId = s.currentImportTask ? s.currentImportTask.folderId : null;
             if (targetFolderId) {
               const currentFolderIds = nextFolderPhotoIds[targetFolderId] || [];
               if (!currentFolderIds.includes(item.id)) {
@@ -201,9 +252,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
               const { id, thumbnailPath, previewPath } = event.payload;
               set((s) => {
                 const nextPhotos = s.photos.map((p) =>
-                  p.id === id ? { ...p, thumbnailPath, previewPath } : p
+                  p.id === id ? { ...p, thumbnailPath, previewPath, updatedAt: String(Date.now()) } : p
                 );
-                void syncAlbumFramePhotoAssets(nextPhotos, false);
+                const updated = nextPhotos.find((photo) => photo.id === id);
+                if (updated) void syncAlbumFramePhotoAssets([updated], false);
                 return { photos: nextPhotos };
               });
             }
@@ -218,7 +270,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
             if (payload) {
               if (payload.cancelled) {
                 set({ importNotice: payload });
-              } else if (payload.existing > 0 || payload.relinked > 0 || (payload.total > 0 && payload.imported > 0)) {
+              } else if (payload.total > 0) {
                 set((s) => {
                   // Only accumulate if part of an ongoing multi-batch import queue session
                   const isOngoingQueueSession = s.isImporting || s.importQueue.length > 0;
@@ -236,16 +288,26 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
                       imported: currentNotice.imported + payload.imported,
                       existing: currentNotice.existing + payload.existing,
                       relinked: currentNotice.relinked + payload.relinked,
+                      failed: (currentNotice.failed || 0) + (payload.failed || 0),
+                      previewFailed: (currentNotice.previewFailed || 0) + (payload.previewFailed || 0),
+                      failures: [...(currentNotice.failures || []), ...(payload.failures || [])],
                       cancelled: false,
                     },
                   };
                 });
               }
+              if (payload.failures?.length) {
+                set({ error: payload.failures.map((failure) => `${failure.file}: ${failure.message}`).join('\n') });
+              }
             }
           }
         );
 
+        const unlistenError = await listen<{ projectId: string; message: string }>('photo-processing-error', (event) => {
+          if (isCurrentProject(event.payload.projectId)) set({ error: event.payload.message });
+        });
         const unlistenAll = () => {
+          unlistenError();
           unlistenProgress();
           unlistenItem();
           unlistenPreview();
@@ -276,9 +338,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   loadPhotos: async (projectId: string) => {
+    const epoch = ++photoLoadEpoch;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
+      const { useProjectStore } = await import('./projectStore');
       const photos = await invoke<Photo[]>('get_project_photos', { projectId });
+      if (epoch !== photoLoadEpoch || useProjectStore.getState().currentProject?.id !== projectId) return;
+      const liveIds = new Set((photos || []).map((photo) => photo.id));
+      await reconcileRemovedPhotos(projectId, get().photos.filter((photo) => photo.projectId === projectId && !liveIds.has(photo.id)).map((photo) => photo.id));
       set({ photos: photos || [], error: null });
       await get().loadFolders(projectId);
       await get().checkMissing(projectId);
@@ -287,12 +354,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       // Existing projects receive previews in the background without delaying the initial photo library load.
       void (async () => {
         try {
-          const refreshedPhotos = await invoke<Photo[]>('generate_missing_previews', { projectId });
-          const isCurrentProject = get().photos.some((photo) => photo.projectId === projectId);
-          if (!isCurrentProject || !Array.isArray(refreshedPhotos)) return;
-
-          set({ photos: refreshedPhotos });
-          await syncAlbumFramePhotoAssets(refreshedPhotos);
+          // Preview events merge by ID; never replace the library with a stale recovery snapshot.
+          await invoke('generate_missing_previews', { projectId });
         } catch (err) {
           console.warn('[AFSN] generate_missing_previews error:', err);
         }
@@ -304,6 +367,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   enqueueImport: (projectId: string, paths: string[], folderId: string | null, label: string) => {
     if (!paths || paths.length === 0) return;
+    if (get().isRemoving || get().isRelinking) { set({ error: 'Wait for the current photo operation to finish before importing.' }); return; }
+    photoLoadEpoch += 1;
     const task: ImportTask = {
       id: crypto.randomUUID(),
       projectId,
@@ -332,6 +397,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   executeImportTask: async (task: ImportTask) => {
     try {
+      const { useProjectStore } = await import('./projectStore');
+      const project = useProjectStore.getState();
+      if (project.currentProject?.id !== task.projectId || project.isSaving || project.isLoading) {
+        throw new Error('The project is busy or has changed. Import the photos again when it is ready.');
+      }
       const { invoke } = await import('@tauri-apps/api/core');
       const updatedPhotos = await invoke<Photo[]>('import_file_paths', {
         projectId: task.projectId,
@@ -339,17 +409,26 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         folderId: task.folderId,
       });
 
-      const { useProjectStore } = await import('./projectStore');
       const currentProj = useProjectStore.getState().currentProject;
       if (currentProj && currentProj.id === task.projectId && Array.isArray(updatedPhotos)) {
+        const liveIds = new Set(updatedPhotos.map((p) => p.id));
+        await reconcileRemovedPhotos(task.projectId, get().photos.filter((p) => p.projectId === task.projectId && !liveIds.has(p.id)).map((p) => p.id));
         set({ photos: updatedPhotos });
+        await markLibraryChanged(task.projectId);
+        await syncAlbumFramePhotoAssets(updatedPhotos);
         await get().loadFolders(task.projectId);
       }
     } catch (err) {
       console.error('[AFSN] executeImportTask error:', err);
-      set({ error: String(err) });
+      const { useProjectStore } = await import('./projectStore');
+      if (useProjectStore.getState().currentProject?.id === task.projectId) {
+        await get().loadPhotos(task.projectId);
+        await markLibraryChanged(task.projectId);
+        set({ error: String(err) });
+      }
     } finally {
       const { useProjectStore } = await import('./projectStore');
+      if (get().currentImportTask?.id !== task.id) return;
       const currentProj = useProjectStore.getState().currentProject;
       if (currentProj && currentProj.id === task.projectId) {
         set({ isCancelling: false });
@@ -380,7 +459,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       return;
     }
 
-    const queue = get().importQueue;
+    const queue = get().importQueue.filter((task) => task.projectId === currentProj.id);
     if (queue.length > 0) {
       const nextTask = queue[0];
       if (nextTask) {
@@ -523,70 +602,43 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   removePhoto: async (photoId: string) => {
-    set((s) => ({
-      photos: s.photos.filter((p) => p.id !== photoId),
-      selectedPhotoIds: s.selectedPhotoIds.filter((id) => id !== photoId),
-      lastSelectedPhotoId: s.lastSelectedPhotoId === photoId ? null : s.lastSelectedPhotoId,
-    }));
+    const photo = get().photos.find((p) => p.id === photoId);
+    if (photo) await get().removePhotos(photo.projectId, [photoId]);
+  },
 
-    // Instantly remove / clear photo from all canvas spread frames
+  removePhotos: async (projectId, photoIds) => {
+    if (get().isRemoving) throw new Error('Photo removal is already in progress.');
+    if (get().isImporting || get().isRelinking) throw new Error('Wait for the current photo operation to finish before removing photos.');
+    const ids = [...new Set(photoIds)];
+    if (!ids.length) throw new Error('No photos were selected for removal.');
+    set({ isRemoving: true, removalNotice: null, error: null });
+    photoLoadEpoch += 1;
     try {
-      const { useAlbumStore } = await import('./albumStore');
-      const { currentAlbum, saveAlbumToDb } = useAlbumStore.getState();
-      if (currentAlbum) {
-        let modified = false;
-
-        const updateElements = (elements: any[]) =>
-          elements.map((el) => {
-            if (el.photoId === photoId) {
-              modified = true;
-              return {
-                ...el,
-                photoId: null,
-                filePath: '',
-                previewPath: '',
-                thumbnailPath: '',
-                fileName: '',
-                crop: undefined,
-                cropScale: 1.0,
-                cropX: 0,
-                cropY: 0,
-                photoAspect: undefined,
-              };
-            }
-            return el;
-          });
-
-        const updatedCover = {
-          ...currentAlbum.coverSpread,
-          elements: updateElements(currentAlbum.coverSpread.elements || []),
-        };
-
-        const updatedSpreads = currentAlbum.spreads.map((spread) => ({
-          ...spread,
-          elements: updateElements(spread.elements || []),
-        }));
-
-        if (modified) {
-          useAlbumStore.setState({
-            currentAlbum: {
-              ...currentAlbum,
-              coverSpread: updatedCover,
-              spreads: updatedSpreads,
-            },
-          });
-          saveAlbumToDb();
-        }
+      const { useProjectStore } = await import('./projectStore');
+      const project = useProjectStore.getState();
+      if (project.currentProject?.id !== projectId || project.isSaving || project.isLoading) {
+        throw new Error('Wait for the current project operation to finish before removing photos.');
       }
-    } catch (e) {
-      console.error('[AFSN] Error clearing photo from canvas:', e);
-    }
-
-    try {
       const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('remove_photo', { photoId });
-    } catch (err) {
-      console.error('[AFSN] remove_photo error:', err);
+      const { persistInOrder, useAlbumStore } = await import('./albumStore');
+      const result = await persistInOrder(async () => {
+        const removed = await invoke<PhotoRemovalResult>('batch_delete_photos', { projectId, photoIds: ids });
+        await reconcileRemovedPhotos(projectId, ids);
+        await markLibraryChanged(projectId);
+        return removed;
+      });
+      // The database removal has committed. Checkpoint failure is a separate warning.
+      if (!await useAlbumStore.getState().saveAlbumToDb()) {
+        result.warnings.push('The library was updated, but the recovery checkpoint could not be saved. Save the project again.');
+      }
+      const count = result.removedIds.length;
+      set({ removalNotice: `${count} ${count === 1 ? 'photo removed' : 'photos removed'} from the library. Original files were kept.${result.warnings.length ? ' Some cache or recovery work is pending. ' + result.warnings.join(' ') : ''}` });
+      return result;
+    } catch (error) {
+      set({ error: String(error) });
+      throw error;
+    } finally {
+      set({ isRemoving: false });
     }
   },
 
@@ -595,8 +647,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const { invoke } = await import('@tauri-apps/api/core');
       const updatedPhotos = await invoke<Photo[]>('check_missing_photos', { projectId });
       if (Array.isArray(updatedPhotos)) {
-        set({ photos: updatedPhotos });
-        await syncAlbumFramePhotoAssets(updatedPhotos);
+        const byId = new Map(updatedPhotos.map((photo) => [photo.id, photo]));
+        set((s) => ({ photos: s.photos.map((photo) => photo.projectId === projectId && byId.has(photo.id)
+          ? { ...photo, isMissing: byId.get(photo.id)!.isMissing } : photo) }));
+        await syncAlbumFramePhotoAssets(get().photos);
       }
     } catch (err) {
       console.warn('[AFSN] check_missing_photos error:', err);
@@ -604,6 +658,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   healThumbnail: async (photoId: string) => {
+    const pending = thumbnailHeals.get(photoId);
+    if (pending) return pending;
+    const operation = (async () => {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const regeneratedPhoto = await invoke<Photo>('regenerate_single_thumbnail', { photoId });
@@ -622,18 +679,28 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       console.warn(`[AFSN] healThumbnail error for ${photoId}:`, err);
       return null;
     }
+    })();
+    thumbnailHeals.set(photoId, operation);
+    try { return await operation; } finally { thumbnailHeals.delete(photoId); }
   },
 
   relinkFolder: async (projectId: string) => {
+    if (get().isRelinking || get().isRemoving || get().isImporting) return;
+    set({ isRelinking: true, error: null });
+    photoLoadEpoch += 1;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const updatedPhotos = await invoke<Photo[]>('relink_folder', { projectId });
-      if (Array.isArray(updatedPhotos)) {
-        set({ photos: updatedPhotos, isRelinkOpen: false });
-        await syncAlbumFramePhotoAssets(updatedPhotos);
-      }
+      const { useProjectStore } = await import('./projectStore');
+      if (useProjectStore.getState().isSaving || useProjectStore.getState().isLoading) throw new Error('The project is busy. Try relinking again when it is ready.');
+      const result = await invoke<{ photos: Photo[]; failures: string[] }>('relink_folder', { projectId });
+      if (useProjectStore.getState().currentProject?.id !== projectId) return;
+      set({ photos: result.photos, isRelinkOpen: result.failures.length > 0, error: result.failures.length ? result.failures.join('\n') : null });
+      await markLibraryChanged(projectId);
+      await syncAlbumFramePhotoAssets(result.photos);
     } catch (err) {
-      console.error('[AFSN] relink_folder error:', err);
+      set({ error: String(err) });
+    } finally {
+      set({ isRelinking: false });
     }
   },
 
@@ -683,78 +750,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   // Batch actions
   batchDeleteSelected: async (projectId: string) => {
-    const { selectedPhotoIds, photos } = get();
-    if (selectedPhotoIds.length === 0) return;
-
-    const deletedSet = new Set(selectedPhotoIds);
-
-    set({
-      photos: photos.filter((p) => !deletedSet.has(p.id)),
-      selectedPhotoIds: [],
-      lastSelectedPhotoId: null,
-    });
-
-    // Instantly remove / clear all deleted photos from canvas spreads
-    try {
-      const { useAlbumStore } = await import('./albumStore');
-      const { currentAlbum, saveAlbumToDb } = useAlbumStore.getState();
-      if (currentAlbum) {
-        let modified = false;
-
-        const updateElements = (elements: any[]) =>
-          elements.map((el) => {
-            if (el.photoId && deletedSet.has(el.photoId)) {
-              modified = true;
-              return {
-                ...el,
-                photoId: null,
-                filePath: '',
-                previewPath: '',
-                thumbnailPath: '',
-                fileName: '',
-                crop: undefined,
-                cropScale: 1.0,
-                cropX: 0,
-                cropY: 0,
-                photoAspect: undefined,
-              };
-            }
-            return el;
-          });
-
-        const updatedCover = {
-          ...currentAlbum.coverSpread,
-          elements: updateElements(currentAlbum.coverSpread.elements || []),
-        };
-
-        const updatedSpreads = currentAlbum.spreads.map((spread) => ({
-          ...spread,
-          elements: updateElements(spread.elements || []),
-        }));
-
-        if (modified) {
-          useAlbumStore.setState({
-            currentAlbum: {
-              ...currentAlbum,
-              coverSpread: updatedCover,
-              spreads: updatedSpreads,
-            },
-          });
-          saveAlbumToDb();
-        }
-      }
-    } catch (e) {
-      console.error('[AFSN] Error clearing batch deleted photos from canvas:', e);
-    }
-
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('batch_delete_photos', { photoIds: selectedPhotoIds });
-      await get().loadFolders(projectId);
-    } catch (err) {
-      console.error('[AFSN] batch_delete_photos error:', err);
-      await get().loadPhotos(projectId);
-    }
+    await get().removePhotos(projectId, [...get().selectedPhotoIds]);
   },
 
   batchToggleFavoritesSelected: async (isFavorite: boolean) => {
@@ -777,6 +773,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   // Folder actions
   loadFolders: async (projectId: string) => {
+    const epoch = photoLoadEpoch;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const folders = await invoke<PhotoFolder[]>('get_photo_folders', { projectId });
@@ -791,7 +788,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
             folderMap[f.id] = [];
           }
         }
-        set({ folders, folderPhotoIds: folderMap });
+        const { useProjectStore } = await import('./projectStore');
+        if (epoch === photoLoadEpoch && useProjectStore.getState().currentProject?.id === projectId) {
+          set({ folders, folderPhotoIds: folderMap });
+        }
       }
     } catch (err) {
       console.warn('[AFSN] loadFolders error:', err);
