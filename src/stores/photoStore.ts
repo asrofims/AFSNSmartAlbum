@@ -5,12 +5,56 @@ import { detachRemovedAlbumPhotos, detachRemovedPhotos } from '../domain/photoRe
 interface PhotoRemovalResult { removedIds: string[]; warnings: string[] }
 
 async function markLibraryChanged(projectId: string): Promise<void> {
+  // Preserve the recovery marker even if the user switched projects during the write.
+  try { localStorage.setItem(`afsn_dirty_${projectId}`, '1'); } catch {}
   const { useAlbumStore } = await import('./albumStore');
   const album = useAlbumStore.getState().currentAlbum;
   if (album?.projectId === projectId) {
     // A new reference also prevents an in-flight file save from marking newer library edits saved.
     useAlbumStore.setState({ currentAlbum: { ...album }, saveStatus: 'unsaved' });
-    try { localStorage.setItem(`afsn_dirty_${projectId}`, '1'); } catch {}
+  }
+}
+
+async function persistLibraryChange<T = void>(
+  projectId: string,
+  command: string,
+  args: Record<string, unknown> | (() => Record<string, unknown>),
+  apply?: (args: Record<string, unknown>) => void,
+): Promise<T> {
+  const { persistInOrder } = await import('./albumStore');
+  const { useProjectStore } = await import('./projectStore');
+  try {
+    return await persistInOrder(async () => {
+      const project = useProjectStore.getState();
+      const photos = usePhotoStore.getState();
+      if (project.currentProject?.id !== projectId || project.isSaving || project.isLoading || photos.isRemoving || photos.isRelinking) {
+        throw new Error('The project is busy or has changed. Try the library action again when it is ready.');
+      }
+      usePhotoStore.setState({ error: null });
+      const { invoke } = await import('@tauri-apps/api/core');
+      const parameters = typeof args === 'function' ? args() : args;
+      for (const key of ['folderId', 'fromFolderId', 'toFolderId']) {
+        const id = parameters[key];
+        if (typeof id === 'string' && !photos.folders.some((folder) => folder.id === id && folder.projectId === projectId)) {
+          throw new Error('This collection is no longer available in the current project.');
+        }
+      }
+      const photoIds = parameters.photoIds;
+      if (Array.isArray(photoIds)) {
+        const liveIds = new Set(photos.photos.filter((photo) => photo.projectId === projectId).map((photo) => photo.id));
+        if (photoIds.some((id) => !liveIds.has(id))) {
+          throw new Error('Some selected photos are no longer available in the current project.');
+        }
+      }
+      photoLoadEpoch += 1;
+      const result = await invoke<T>(command, parameters);
+      apply?.(parameters);
+      await markLibraryChanged(projectId);
+      return result;
+    });
+  } catch (error) {
+    usePhotoStore.setState({ error: `Library update failed: ${String(error)}` });
+    throw error;
   }
 }
 
@@ -587,15 +631,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   toggleFavorite: async (photoId: string) => {
     const current = get().photos.find((p) => p.id === photoId);
     if (!current) return;
-    const nextVal = !current.isFavorite;
-
-    set((s) => ({
-      photos: s.photos.map((p) => (p.id === photoId ? { ...p, isFavorite: nextVal } : p)),
-    }));
-
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('toggle_photo_favorite', { photoId, isFavorite: nextVal });
+      await persistLibraryChange(current.projectId, 'toggle_photo_favorite', () => {
+        const photo = get().photos.find((p) => p.id === photoId);
+        if (!photo) throw new Error('This photo is no longer in the library.');
+        return { photoId, isFavorite: !photo.isFavorite };
+      }, ({ isFavorite }) => {
+        set((s) => ({ photos: s.photos.map((p) => p.id === photoId ? { ...p, isFavorite: Boolean(isFavorite) } : p) }));
+      });
     } catch (err) {
       console.error('[AFSN] toggle_photo_favorite error:', err);
     }
@@ -754,18 +797,16 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   batchToggleFavoritesSelected: async (isFavorite: boolean) => {
-    const { selectedPhotoIds } = get();
+    const selectedPhotoIds = [...get().selectedPhotoIds];
     if (selectedPhotoIds.length === 0) return;
-
-    set((s) => ({
-      photos: s.photos.map((p) =>
-        selectedPhotoIds.includes(p.id) ? { ...p, isFavorite } : p
-      ),
-    }));
+    const selected = get().photos.filter((p) => selectedPhotoIds.includes(p.id));
+    const projectId = selected[0]?.projectId;
+    if (!projectId || selected.some((p) => p.projectId !== projectId)) return;
 
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('batch_toggle_favorites', { photoIds: selectedPhotoIds, isFavorite });
+      await persistLibraryChange(projectId, 'batch_toggle_favorites', { photoIds: selected.map((p) => p.id), isFavorite }, () => {
+        set((s) => ({ photos: s.photos.map((p) => selectedPhotoIds.includes(p.id) ? { ...p, isFavorite } : p) }));
+      });
     } catch (err) {
       console.error('[AFSN] batch_toggle_favorites error:', err);
     }
@@ -781,12 +822,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
       if (Array.isArray(folders)) {
         for (const f of folders) {
-          try {
-            const fPhotos = await invoke<Photo[]>('get_photos_for_folder', { folderId: f.id });
-            folderMap[f.id] = (fPhotos || []).map((p) => p.id);
-          } catch (e) {
-            folderMap[f.id] = [];
-          }
+          const fPhotos = await invoke<Photo[]>('get_photos_for_folder', { folderId: f.id });
+          folderMap[f.id] = (fPhotos || []).map((p) => p.id);
         }
         const { useProjectStore } = await import('./projectStore');
         if (epoch === photoLoadEpoch && useProjectStore.getState().currentProject?.id === projectId) {
@@ -795,14 +832,19 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       }
     } catch (err) {
       console.warn('[AFSN] loadFolders error:', err);
+      const { useProjectStore } = await import('./projectStore');
+      if (epoch === photoLoadEpoch && useProjectStore.getState().currentProject?.id === projectId) {
+        set({ error: `Collections could not be refreshed. Reopen the project to reload them. ${String(err)}` });
+      }
     }
   },
 
   createFolder: async (projectId: string, name: string) => {
     if (!name.trim()) return null;
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const newFolder = await invoke<PhotoFolder>('create_photo_folder', { projectId, name: name.trim() });
+      const newFolder = await persistLibraryChange<PhotoFolder>(projectId, 'create_photo_folder', { projectId, name: name.trim() });
+      const { useProjectStore } = await import('./projectStore');
+      if (useProjectStore.getState().currentProject?.id !== projectId) return newFolder;
       if (newFolder) {
         set((s) => ({
           folders: [...s.folders, newFolder],
@@ -824,8 +866,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   renameFolder: async (projectId: string, folderId: string, name: string) => {
     if (!name.trim()) return;
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('rename_photo_folder', { folderId, name: name.trim() });
+      await persistLibraryChange(projectId, 'rename_photo_folder', { folderId, name: name.trim() });
+      const { useProjectStore } = await import('./projectStore');
+      if (useProjectStore.getState().currentProject?.id !== projectId) return;
       set((s) => ({
         folders: s.folders.map((f) => (f.id === folderId ? { ...f, name: name.trim() } : f)),
         isFolderDialogOpen: false,
@@ -840,8 +883,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   deleteFolder: async (projectId: string, folderId: string) => {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('delete_photo_folder', { folderId });
+      await persistLibraryChange(projectId, 'delete_photo_folder', { folderId });
       set((s) => {
         const nextFolderPhotoIds = { ...s.folderPhotoIds };
         delete nextFolderPhotoIds[folderId];
@@ -854,6 +896,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] delete_photo_folder error:', err);
+      throw err;
     }
   },
 
@@ -864,8 +907,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   addPhotosToFolder: async (projectId: string, folderId: string, photoIds: string[]) => {
     if (photoIds.length === 0) return;
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('add_photos_to_folder', { folderId, photoIds });
+      await persistLibraryChange(projectId, 'add_photos_to_folder', { folderId, photoIds: [...photoIds] });
       await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] add_photos_to_folder error:', err);
@@ -875,8 +917,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   removePhotosFromFolder: async (projectId: string, folderId: string, photoIds: string[]) => {
     if (photoIds.length === 0) return;
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('remove_photos_from_folder', { folderId, photoIds });
+      await persistLibraryChange(projectId, 'remove_photos_from_folder', { folderId, photoIds: [...photoIds] });
       await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] remove_photos_from_folder error:', err);
@@ -886,8 +927,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   movePhotosToFolder: async (projectId: string, fromFolderId: string, toFolderId: string, photoIds: string[]) => {
     if (photoIds.length === 0) return;
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('move_photos_between_folders', { fromFolderId, toFolderId, photoIds });
+      await persistLibraryChange(projectId, 'move_photos_between_folders', { fromFolderId, toFolderId, photoIds: [...photoIds] });
       await get().loadFolders(projectId);
     } catch (err) {
       console.error('[AFSN] move_photos_between_folders error:', err);

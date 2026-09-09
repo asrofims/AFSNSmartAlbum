@@ -63,7 +63,7 @@ export function FolderDialog() {
   return (
     <Dialog
       isOpen={isFolderDialogOpen}
-      onClose={closeFolderDialog}
+      onClose={() => { if (!isSubmitting) closeFolderDialog(); }}
       title={title}
       width={420}
       closeOnOverlayClick={false}

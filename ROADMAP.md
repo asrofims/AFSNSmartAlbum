@@ -282,5 +282,11 @@
 - [x] Replace filename-only duplicate/relink identity checks and propagate import/processing failures accurately (F4/F5).
 - [x] Coordinate cache writers with cleanup; separate committed library removal from deferred cache maintenance (F6).
 - [x] Return correct thumbnail paths for all formats, invalidate stale caches, and isolate recovery cancellation per job (F8/F9).
-- [x] Harden image/EXIF validation, recursive folder scanning, memory limits, and asset filesystem scope; add integration and failure-path coverage (F10).
+- [x] Implement image/EXIF validation, recursive folder scanning limits, decoder memory limits, and restricted asset filesystem scope (F10).
 - [x] Application version metadata bumped to `v1.0.40`.
+
+### Phase 23 — Release v1.0.41: Photo Collection Consistency & Transactional Membership
+
+- [x] Complete photo/collection removal dialog feedback and project snapshots, modal shortcut guards, committed favorite updates, and dirty-state tracking for collection changes.
+- [x] Make collection membership additions and moves transactional, reject cross-project membership, and surface library errors without replacing failed collection reads with empty results.
+- [x] Application version metadata bumped to `v1.0.41`.

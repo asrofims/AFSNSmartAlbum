@@ -336,6 +336,7 @@ export function WorkspaceLayout() {
   // Global Keyboard Shortcuts for App
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       // Ignore when typing inside input / textarea / select / contentEditable
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {

@@ -8,7 +8,18 @@ Fondasi arsitektur sudah tepat untuk aplikasi album desktop: foto asli direferen
 
 Pada jalur penghapusan library yang diperiksa, aplikasi menghapus record dan cache aplikasi; tidak memanggil penghapusan terhadap `photo.filePath` asli. Ini perlindungan yang baik. Namun, keamanan file asli tidak sama dengan keamanan isi dan status penyimpanan proyek.
 
-Audit ini tidak mengubah perilaku aplikasi. Daftar perbaikan di bawah belum diimplementasikan.
+Temuan F1–F10 di bawah adalah catatan kondisi sebelum perbaikan, bukan status kode terbaru. Implementasi inti tersedia dalam commit `6d7f7f4`; kelanjutan integrasi UI dan koleksi dijelaskan berikut ini.
+
+## Status implementasi lanjutan — 9 September 2026
+
+- Dialog hapus menyimpan snapshot ID proyek dan foto; indikator menyebut jumlah foto yang sedang dihapus, dan kegagalan tetap terlihat di dalam dialog. Jalur hapus koleksi memakai ID proyek milik koleksi dan mempertahankan dialog ketika gagal.
+- Shortcut global workspace dan filmstrip diabaikan ketika dialog terbuka. Page Navigator sudah memiliki perlindungan ini sehingga tidak diubah lagi.
+- Perubahan favorit diterapkan ke tampilan setelah database berhasil. Favorit dan perubahan koleksi memakai antrean persistence, memvalidasi proyek aktif, dan menandai data proyek belum disimpan; marker pemulihan tetap dicatat bila proyek sudah berganti selama operasi.
+- Penambahan anggota koleksi dan pemindahan antar koleksi memakai transaksi backend, meneruskan kegagalan, dan menolak pencampuran proyek. Kegagalan membaca anggota koleksi tidak lagi mengganti daftar sebelumnya dengan daftar kosong.
+- Error library ditampilkan dalam panel yang dapat ditutup pengguna. Toast hasil impor dan hapus tetap dipakai. Permintaan load folder/check-missing yang duplikat dari Filmstrip dihapus karena `loadPhotos` sudah menjalankannya.
+- Dokumentasi ROADMAP disesuaikan untuk memisahkan implementasi dari verifikasi yang belum dilakukan.
+- Pemeriksaan statis TypeScript (`npx tsc --noEmit`) dan Rust (`cargo check --lib`) berhasil. Tes otomatis, pengujian UI, stress test, dan simulasi kegagalan runtime untuk kelanjutan ini tidak dijalankan sesuai permintaan pengguna. Hasil tes pada bagian bukti berikut berasal dari audit awal sebelum implementasi.
+- Verifikasi lanjutan yang masih diperlukan: hapus satu/banyak foto, kegagalan database/cache, impor dan pembatalan batch, relink ambigu, simpan/buka ulang favorit dan koleksi, serta penggunaan memori pada koleksi besar. Ini bukan klaim bahwa seluruh risiko input/konkurensi sudah tertutup.
 
 ## Cakupan dan bukti
 

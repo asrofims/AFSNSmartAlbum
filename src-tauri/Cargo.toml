@@ -1,6 +1,6 @@
 [package]
 name = "afsn-smart-album"
-version = "1.0.40"
+version = "1.0.41"
 description = "Professional Photo Album Layout Software"
 authors = ["Afsunmedia - Asrofims"]
 license = "Proprietary"

@@ -38,8 +38,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     importProgress,
     importQueue,
     currentImportTask,
+    error: libraryError,
     loadPhotos,
-    loadFolders,
     importFiles,
     importFolder,
     importPaths,
@@ -47,7 +47,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     cancelAllImports,
     toggleFavorite,
     removePhotos,
-    checkMissing,
     setupListeners,
     selectPhoto,
     selectAll,
@@ -83,8 +82,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   }>({ isOpen: false, x: 0, y: 0, photo: null });
 
   // Single / Target Photo Deletion Confirm State
-  const [photoToDelete, setPhotoToDelete] = useState<{ ids: string[]; name: string } | null>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<{ projectId: string; ids: string[]; name: string } | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const requestPhotoDelete = (ids: string[], name: string) => {
+    if (!currentProject || usePhotoStore.getState().isRemoving) return;
+    setDeleteError(null);
+    setPhotoToDelete({ projectId: currentProject.id, ids: [...ids], name });
+  };
 
   // Set up real-time Tauri event streaming
   useEffect(() => {
@@ -139,10 +144,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   useEffect(() => {
     if (currentProject) {
       loadPhotos(currentProject.id);
-      loadFolders(currentProject.id);
-      checkMissing(currentProject.id);
     }
-  }, [currentProject?.id, loadPhotos, loadFolders, checkMissing]);
+  }, [currentProject?.id, loadPhotos]);
 
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
 
@@ -174,6 +177,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!currentProject) return;
+      if (e.defaultPrevented || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
 
       // Ignore if typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -204,12 +209,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           if (targetPhotos.length > 0) {
             const firstPhoto = targetPhotos[0];
             setPhotoToDelete({
-              ids: selectedPhotoIds,
+              projectId: currentProject.id,
+              ids: [...selectedPhotoIds],
               name:
                 selectedPhotoIds.length === 1 && firstPhoto
                   ? firstPhoto.fileName
                   : `${selectedPhotoIds.length} photos`,
             });
+            setDeleteError(null);
           }
         }
       } else if (e.key === 'Escape') {
@@ -337,13 +344,14 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
   // Execute Photo Deletion after ConfirmDialog
   const handleConfirmPhotoDelete = async () => {
-    if (!photoToDelete || !currentProject) return;
+    if (!photoToDelete || isDeletingPhoto) return;
     setIsDeletingPhoto(true);
+    setDeleteError(null);
     try {
-      await removePhotos(currentProject.id, photoToDelete.ids);
+      await removePhotos(photoToDelete.projectId, photoToDelete.ids);
       setPhotoToDelete(null);
     } catch (err) {
-      console.error('Delete photo error:', err);
+      setDeleteError(String(err));
     } finally {
       setIsDeletingPhoto(false);
     }
@@ -366,7 +374,13 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       aria-label="Photo Library Filmstrip"
     >
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
-      <BatchActionBar onRequestDelete={(ids, name) => setPhotoToDelete({ ids, name })} />
+      <BatchActionBar onRequestDelete={requestPhotoDelete} />
+      {libraryError && (
+        <div className={styles.libraryError}>
+          <span role="alert">{libraryError}</span>
+          <Button variant="ghost" size="sm" onClick={() => usePhotoStore.setState({ error: null })} aria-label="Dismiss photo library error">Dismiss</Button>
+        </div>
+      )}
 
       {/* Top Header Bar */}
       <div className={styles.header}>
@@ -728,7 +742,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           onAddToFolder={(fId, pIds) => addPhotosToFolder(currentProject.id, fId, pIds)}
           onMoveToFolder={(fromId, toId, pIds) => movePhotosToFolder(currentProject.id, fromId, toId, pIds)}
           onRemoveFromFolder={(fId, pIds) => removePhotosFromFolder(currentProject.id, fId, pIds)}
-          onRequestDelete={(ids, name) => setPhotoToDelete({ ids, name })}
+          onRequestDelete={requestPhotoDelete}
           onSelectAll={() => selectAll(sortedPhotos)}
         />
       )}
@@ -747,6 +761,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
         cancelText="Cancel"
         variant="danger"
         isLoading={isDeletingPhoto}
+        loadingText={`Removing ${photoToDelete?.ids.length ?? 0} ${(photoToDelete?.ids.length ?? 0) === 1 ? 'photo' : 'photos'}...`}
+        error={deleteError}
         onConfirm={handleConfirmPhotoDelete}
         onCancel={() => setPhotoToDelete(null)}
       />

@@ -30,6 +30,7 @@ export function FolderTabs() {
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<PhotoFolder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,17 +91,19 @@ export function FolderTabs() {
   const handleDeleteRequest = (e: React.MouseEvent, folder: PhotoFolder) => {
     e.stopPropagation();
     setMenuAnchor(null);
+    setDeleteError(null);
     setFolderToDelete(folder);
   };
 
   const handleConfirmDelete = async () => {
-    if (!folderToDelete) return;
+    if (!folderToDelete || isDeleting) return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await deleteFolder(currentProject.id, folderToDelete.id);
+      await deleteFolder(folderToDelete.projectId, folderToDelete.id);
       setFolderToDelete(null);
     } catch (err) {
-      console.error('Delete folder error:', err);
+      setDeleteError(String(err));
     } finally {
       setIsDeleting(false);
     }
@@ -259,6 +262,8 @@ export function FolderTabs() {
         cancelText="Keep Folder"
         variant="danger"
         isLoading={isDeleting}
+        loadingText="Removing collection..."
+        error={deleteError}
         onConfirm={handleConfirmDelete}
         onCancel={() => setFolderToDelete(null)}
       />

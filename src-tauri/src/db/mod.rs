@@ -1482,13 +1482,24 @@ impl Database {
         if photo_ids.is_empty() {
             return Ok(());
         }
-        let conn = self.conn.lock().unwrap();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        Self::add_folder_members(&tx, folder_id, photo_ids)?;
+        tx.commit()
+    }
+
+    fn add_folder_members(conn: &Connection, folder_id: &str, photo_ids: &[String]) -> SqliteResult<()> {
+        let project_id: String = conn.query_row("SELECT project_id FROM photo_folders WHERE id = ?1", [folder_id], |row| row.get(0))?;
         for photo_id in photo_ids {
-            let _ = conn.execute(
+            let photo_project: String = conn.query_row("SELECT project_id FROM photos WHERE id = ?1", [photo_id], |row| row.get(0))?;
+            if photo_project != project_id {
+                return Err(rusqlite::Error::InvalidParameterName("Photos and collections must belong to the same project.".to_string()));
+            }
+            conn.execute(
                 "INSERT OR IGNORE INTO photo_folder_members (folder_id, photo_id, created_at)
                  VALUES (?1, ?2, datetime('now'))",
                 rusqlite::params![folder_id, photo_id],
-            );
+            )?;
         }
         Ok(())
     }
@@ -1521,9 +1532,19 @@ impl Database {
         if photo_ids.is_empty() {
             return Ok(());
         }
-        self.remove_photos_from_folder(from_folder_id, photo_ids)?;
-        self.add_photos_to_folder(to_folder_id, photo_ids)?;
-        Ok(())
+        if from_folder_id == to_folder_id { return Ok(()); }
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let source_project: String = tx.query_row("SELECT project_id FROM photo_folders WHERE id = ?1", [from_folder_id], |r| r.get(0))?;
+        let target_project: String = tx.query_row("SELECT project_id FROM photo_folders WHERE id = ?1", [to_folder_id], |r| r.get(0))?;
+        if source_project != target_project {
+            return Err(rusqlite::Error::InvalidParameterName("Collections must belong to the same project.".to_string()));
+        }
+        Self::add_folder_members(&tx, to_folder_id, photo_ids)?;
+        for photo_id in photo_ids {
+            tx.execute("DELETE FROM photo_folder_members WHERE folder_id = ?1 AND photo_id = ?2", rusqlite::params![from_folder_id, photo_id])?;
+        }
+        tx.commit()
     }
 
     pub fn get_photos_for_folder(&self, folder_id: &str) -> SqliteResult<Vec<PhotoRow>> {
