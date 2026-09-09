@@ -250,6 +250,40 @@
   background-color: rgba(255, 255, 255, 0.12);
 }
 
+.lockToggleIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.lockToggleIconBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.lockToggleIconBtnActive {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fbbf24;
+}
+
+.lockToggleIconBtnActive:hover {
+  background: rgba(245, 158, 11, 0.26);
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
 .colorSwatchSmall {
   display: inline-block;
   width: 12px;

@@ -294,3 +294,10 @@
 - [x] Complete photo/collection removal dialog feedback and project snapshots, modal shortcut guards, committed favorite updates, and dirty-state tracking for collection changes.
 - [x] Make collection membership additions and moves transactional, reject cross-project membership, and surface library errors without replacing failed collection reads with empty results.
 - [x] Application version metadata bumped to `v1.0.41`.
+
+### Phase 24 — Release v1.0.42: Compact Icon-Only Lock Controls & UI Space Optimization
+
+- [x] Streamline Multi-Selection, Selected Text Box, and Selected Photo Frame lock controls in the right Properties panel.
+- [x] Replace text-heavy labels with compact 24×24 px icon-only SVG buttons to eliminate horizontal header overcrowding.
+- [x] Replace emoji lock/unlock glyphs with crisp, accessible vector SVG paths and informative tooltips.
+- [x] Application version metadata bumped to `v1.0.42`.

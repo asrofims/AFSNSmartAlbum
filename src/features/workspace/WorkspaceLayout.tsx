@@ -1139,28 +1139,25 @@ export function WorkspaceLayout() {
                             <span>Multi-Selection ({selectedFrameIds.length} Frames)</span>
                             <button
                               type="button"
+                              className={`${styles.lockToggleIconBtn} ${isAllLocked ? styles.lockToggleIconBtnActive : ''}`}
                               onClick={() => {
                                 toggleLockSelectedFrames(activeSpread.id);
                                 showToast(hasUnlocked ? `🔒 Locked ${selectedFrameIds.length} frames` : `🔓 Unlocked ${selectedFrameIds.length} frames`);
                               }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                borderRadius: '4px',
-                                background: isAllLocked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
-                                border: isAllLocked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                                color: isAllLocked ? '#fbbf24' : 'var(--color-text-secondary)',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                              }}
-                              title={hasUnlocked ? 'Lock selected frames (Ctrl+L)' : 'Unlock selected frames (Alt+L)'}
+                              title={hasUnlocked ? `Lock ${selectedFrameIds.length} selected frames (Ctrl+L)` : `Unlock ${selectedFrameIds.length} selected frames (Alt+L)`}
+                              aria-label={hasUnlocked ? 'Lock selected frames' : 'Unlock selected frames'}
                             >
-                              <span>{isAllLocked ? '🔒' : '🔓'}</span>
-                              <span>{isAllLocked ? 'Locked' : hasUnlocked ? 'Lock' : 'Unlock'}</span>
+                              {isAllLocked ? (
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                              ) : (
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                </svg>
+                              )}
                             </button>
                           </div>
                         );
@@ -1456,28 +1453,25 @@ export function WorkspaceLayout() {
                         <span>Selected Text Box</span>
                         <button
                           type="button"
+                          className={`${styles.lockToggleIconBtn} ${selectedFrame.locked ? styles.lockToggleIconBtnActive : ''}`}
                           onClick={() => {
                             toggleLockSelectedFrames(activeSpread.id);
                             showToast(selectedFrame.locked ? '🔓 Text unlocked' : '🔒 Text locked');
                           }}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 8px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            borderRadius: '4px',
-                            background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
-                            border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                            color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
                           title={selectedFrame.locked ? 'Unlock Text (Alt+L)' : 'Lock Text (Ctrl+L)'}
+                          aria-label={selectedFrame.locked ? 'Unlock Text' : 'Lock Text'}
                         >
-                          <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
-                          <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
+                          {selectedFrame.locked ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                              <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                            </svg>
+                          )}
                         </button>
                       </div>
 
@@ -1503,28 +1497,25 @@ export function WorkspaceLayout() {
                       <span>Selected Photo Frame</span>
                       <button
                         type="button"
+                        className={`${styles.lockToggleIconBtn} ${selectedFrame.locked ? styles.lockToggleIconBtnActive : ''}`}
                         onClick={() => {
                           toggleLockSelectedFrames(activeSpread.id);
                           showToast(selectedFrame.locked ? '🔓 Photo unlocked' : '🔒 Photo locked');
                         }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          borderRadius: '4px',
-                          background: selectedFrame.locked ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.06)',
-                          border: selectedFrame.locked ? '1px solid #f59e0b' : '1px solid var(--color-border)',
-                          color: selectedFrame.locked ? '#fbbf24' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
                         title={selectedFrame.locked ? 'Unlock Photo (Alt+L)' : 'Lock Photo (Ctrl+L)'}
+                        aria-label={selectedFrame.locked ? 'Unlock Photo' : 'Lock Photo'}
                       >
-                        <span>{selectedFrame.locked ? '🔒' : '🔓'}</span>
-                        <span>{selectedFrame.locked ? 'Locked' : 'Lock'}</span>
+                        {selectedFrame.locked ? (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                        ) : (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                          </svg>
+                        )}
                       </button>
                     </div>
 
