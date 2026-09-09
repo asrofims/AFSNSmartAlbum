@@ -190,6 +190,11 @@ export function WelcomeScreen() {
                       </span>
                     </div>
                     <div className={styles.itemRight}>
+                      {!proj.filePath && (
+                        <span className={styles.missingBadge} title="Local recovery data. Open this project and use Save As to create a project file.">
+                          Not Saved to File
+                        </span>
+                      )}
                       {missingProjectIds.has(proj.id) && (
                         <span className={styles.missingBadge} title="Original .afsn file was not found on disk">
                           Missing File

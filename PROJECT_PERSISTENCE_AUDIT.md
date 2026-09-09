@@ -38,6 +38,18 @@ An AFSN document stores layout and photo references; it does not embed the origi
 
 The tests exercise real native persistence and simulated I/O failures. They do not simulate sudden power loss or automate the operating system's file picker.
 
+## Save destination ownership correction — 2026-09-09
+
+- Normal Save validates both the project's bound path and the document identity currently on disk. A missing, unreadable, or replaced document cannot be silently reclaimed through Save/autosave.
+- Explicit Save As can replace the selected destination after the native save dialog confirmation. Its database transaction transfers that destination to the saved project and detaches other projects pointing to the same resolved location. Their photo and album recovery records remain intact. Failed file publication rolls back the database changes.
+- SQLite migration v14 records the on-disk document identity separately from the local project identity, allowing independently copied/imported files to save correctly before their first identity rewrite. Reopening a known copy reuses its local project identity.
+- Loading Recent Projects or fetching a project reconciles legacy associations against readable on-disk identities. Mismatched entries lose their save path and remain available as recovery data. Missing/offline files retain their path; normal Save still refuses them. Older copies with remapped IDs but no identity record are conservatively detached and require Save As.
+- The frontend refreshes native project paths after save/open/rename operations, persists the repaired recent list, and labels entries without a destination `Not Saved to File`. Native project lookup failures no longer open a stale localStorage snapshot.
+- File-changing project commands are serialized within the application process, including rename. Identity checks do not provide an operating-system lock against other processes modifying a document concurrently, or detect edits that retain the same document ID.
+- Filesystem publication and SQLite commit cannot form a single cross-resource transaction. If publication succeeds but SQLite commit fails, the operation reports failure; identity validation prevents the displaced project from silently overwriting the published file afterward.
+- The test runs documented above predate this correction. Automated and manual tests for this correction were not run at the user's request; manual verification remains pending in ROADMAP.md.
+- Static verification passed: `npx tsc --noEmit` and `cargo check --lib`. These checks do not verify runtime save/replace behavior.
+
 ## Compatibility and recovery limits
 
 - These changes prevent future ZIP overwrites. They cannot reconstruct photo bytes already removed when an older release overwrote an archive.

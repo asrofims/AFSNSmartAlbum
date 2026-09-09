@@ -63,7 +63,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const clean = name.trim();
     if (!clean) return;
     const current = get().currentProject;
-    if (!current) return;
+    if (!current || get().isSaving || get().isLoading) return;
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
@@ -76,7 +76,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         const updatedProject: Project = {
           ...current,
           name: updatedRow.name,
-          filePath: updatedRow.filePath ?? current.filePath,
+          filePath: updatedRow.filePath ?? null,
           updatedAt: updatedRow.updatedAt || new Date().toISOString(),
         };
 
@@ -84,12 +84,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           currentProject: updatedProject,
           recentProjects: state.recentProjects.map((p) => (p.id === current.id ? updatedProject : p)),
         }));
+        if (current.filePath && !updatedProject.filePath) {
+          const { useAlbumStore } = await import('./albumStore');
+          useAlbumStore.getState().setSaveStatus('unsaved');
+        }
 
         try {
           const existing = JSON.parse(localStorage.getItem('afsn_recent_projects') || '[]');
           const updatedRecents = existing.map((p: Project) => (p.id === current.id ? updatedProject : p));
           localStorage.setItem('afsn_recent_projects', JSON.stringify(updatedRecents));
         } catch {}
+        await get().loadRecentProjects();
         return;
       }
     } catch (err: any) {
@@ -287,11 +292,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { invoke } = await import('@tauri-apps/api/core');
       const projects = await invoke<Project[]>('list_recent_projects', { limit: 10 });
       if (Array.isArray(projects)) {
-        set({ recentProjects: projects, error: null });
+        set({ recentProjects: projects });
+        try { localStorage.setItem('afsn_recent_projects', JSON.stringify(projects)); } catch {}
+        const current = get().currentProject;
+        if (current) {
+          const latest = projects.find((p) => p.id === current.id)
+            ?? await invoke<Project | null>('get_project', { id: current.id });
+          if (latest && get().currentProject?.id === current.id) {
+            set((state) => ({ currentProject: { ...state.currentProject!, filePath: latest.filePath ?? null } }));
+            if (current.filePath && !latest.filePath) {
+              const { useAlbumStore } = await import('./albumStore');
+              useAlbumStore.getState().setSaveStatus('unsaved');
+            }
+          }
+        }
         return;
       }
     } catch (err) {
       console.warn('[AFSN] Could not load recent projects from Tauri, checking localStorage:', err);
+      if ('__TAURI_INTERNALS__' in window) return;
     }
 
     try {
@@ -417,9 +436,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project = await invoke<Project | null>('get_project', { id });
     } catch (err) {
       console.warn('[AFSN] get_project via Tauri failed, checking state/localStorage:', err);
+      if ('__TAURI_INTERNALS__' in window) {
+        set({ isLoading: false, error: `Open failed: ${String(err)}` });
+        return;
+      }
     }
 
-    if (!project) {
+    if (!project && !('__TAURI_INTERNALS__' in window)) {
       project = get().recentProjects.find((p) => p.id === id) || null;
     }
 
@@ -448,6 +471,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           } catch { /* Keep recovery data unsaved if the file cannot be verified. */ }
         }
         if (hasUnsavedRecovery || !hasProjectFile) useAlbumStore.getState().setSaveStatus('unsaved');
+        if (!project.filePath) {
+          set({ error: 'This project is available as recovery data. Use Save As to save it to a project file.' });
+        }
+        await get().loadRecentProjects();
       } catch (e) {
         console.error('[AFSN] Failed to load album/photos on openProjectById:', e);
       }
@@ -508,6 +535,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       return failed;
     } finally {
+      // Successful autosave need not scan every recent document on each checkpoint.
+      if (!options.automatic || get().error) await get().loadRecentProjects();
       set({ isSaving: false });
     }
   },
@@ -559,6 +588,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       set({ error: `Save As failed: ${String(error)}` });
       return null;
     } finally {
+      await get().loadRecentProjects();
       set({ isSaving: false });
     }
   },
@@ -617,6 +647,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       console.error('[AFSN] import_afsn_with_dialog failed:', err);
       set({ error: `Open failed: ${String(err)}` });
     } finally {
+      await get().loadRecentProjects();
       set({ isLoading: false });
     }
     return false;
@@ -659,6 +690,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       console.error('[AFSN] openProjectFromFile failed:', err);
       set({ error: `Open failed: ${String(err)}` });
     } finally {
+      await get().loadRecentProjects();
       set({ isLoading: false });
     }
     return false;

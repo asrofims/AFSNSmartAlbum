@@ -59,10 +59,64 @@ fn atomic_write(
 }
 
 fn same_path(a: &str, b: &str) -> bool {
-    match (fs::canonicalize(a), fs::canonicalize(b)) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => a == b,
+    fn normalized(value: &str) -> PathBuf {
+        let path = Path::new(value);
+        fs::canonicalize(path).unwrap_or_else(|_| {
+            let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+            match (fs::canonicalize(parent), path.file_name()) {
+                (Ok(parent), Some(name)) => parent.join(name),
+                _ => path.to_path_buf(),
+            }
+        })
     }
+    let (a, b) = (normalized(a), normalized(b));
+    if cfg!(windows) {
+        a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy())
+    } else { a == b }
+}
+
+fn document_id(path: &Path) -> SqliteResult<String> {
+    #[derive(Deserialize)]
+    struct Identity { id: String }
+    #[derive(Deserialize)]
+    struct Header { project: Identity }
+    let header: Header = serde_json::from_reader(std::io::BufReader::new(
+        File::open(path).map_err(package_error)?
+    )).map_err(package_error)?;
+    if header.project.id.is_empty() {
+        return Err(package_error("The project file has no valid identity. Use Save As to choose a destination."));
+    }
+    Ok(header.project.id)
+}
+
+fn detach_file(conn: &Connection, id: &str) -> SqliteResult<()> {
+    // Keep all recovery content, including photos and album layouts.
+    conn.execute("UPDATE projects SET file_path = NULL WHERE id = ?1", [id])?;
+    conn.execute("DELETE FROM project_file_identity WHERE project_id = ?1", [id])?;
+    Ok(())
+}
+
+fn claim_file(conn: &Connection, owner: &str, path: &str, identity: &str) -> SqliteResult<()> {
+    let paths = conn.prepare("SELECT id, file_path FROM projects WHERE id != ?1 AND file_path IS NOT NULL")?
+        .query_map([owner], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+        .collect::<SqliteResult<Vec<_>>>()?;
+    for (id, other_path) in paths {
+        if same_path(path, &other_path) { detach_file(conn, &id)?; }
+    }
+    conn.execute("INSERT INTO project_file_identity (project_id, document_id) VALUES (?1, ?2)
+        ON CONFLICT(project_id) DO UPDATE SET document_id = excluded.document_id", [owner, identity])?;
+    Ok(())
+}
+
+fn validate_file_owner(conn: &Connection, project_id: &str, path: &str) -> SqliteResult<()> {
+    let (bound_path, expected): (Option<String>, String) = conn.query_row(
+        "SELECT p.file_path, COALESCE(f.document_id, p.id) FROM projects p
+         LEFT JOIN project_file_identity f ON f.project_id = p.id WHERE p.id = ?1",
+        [project_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    if !bound_path.is_some_and(|p| same_path(&p, path)) || document_id(Path::new(path))? != expected {
+        return Err(package_error("This file belongs to another project or has been replaced. Your recovery data is safe. Use Save As to choose a destination."));
+    }
+    Ok(())
 }
 
 fn remap_identity(package: &mut ProjectPackagePayload, id: &str) {
@@ -118,6 +172,33 @@ fn remap_identity(package: &mut ProjectPackagePayload, id: &str) {
 }
 
 impl Database {
+    pub fn validate_project_file(&self, project_id: &str, path: &str) -> SqliteResult<()> {
+        validate_file_owner(&self.conn.lock().unwrap(), project_id, path)
+    }
+
+    /// Repair legacy/shared destinations without deleting recoverable projects.
+    pub fn reconcile_project_files(&self) -> SqliteResult<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let entries = tx.prepare("SELECT p.id, p.file_path, COALESCE(f.document_id, p.id)
+            FROM projects p LEFT JOIN project_file_identity f ON f.project_id = p.id
+            WHERE p.file_path IS NOT NULL ORDER BY p.id")?
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?
+            .collect::<SqliteResult<Vec<_>>>()?;
+        let mut owners: Vec<String> = Vec::new();
+        for (id, path, expected) in entries {
+            // Missing/offline files retain their location; Save still validates them.
+            if let Ok(actual) = document_id(Path::new(&path)) {
+                if actual != expected || owners.iter().any(|p| same_path(p, &path)) {
+                    detach_file(&tx, &id)?;
+                } else {
+                    owners.push(path);
+                }
+            }
+        }
+        tx.commit()
+    }
+
     fn project_package(&self, project_id: &str) -> SqliteResult<ProjectPackagePayload> {
         let project = self
             .get_project(project_id)?
@@ -145,6 +226,15 @@ impl Database {
     }
 
     pub fn export_project_package(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
+        self.write_project_package(project_id, target_path, false)
+    }
+
+    /// Only call after the user has selected/confirmed the destination in Save As.
+    pub fn export_project_package_as(&self, project_id: &str, target_path: &str) -> SqliteResult<()> {
+        self.write_project_package(project_id, target_path, true)
+    }
+
+    fn write_project_package(&self, project_id: &str, target_path: &str, replace: bool) -> SqliteResult<()> {
         let path = Path::new(target_path);
         require_extension(path, "afsn")?;
         let mut package = self.project_package(project_id)?;
@@ -153,8 +243,16 @@ impl Database {
             package.project.name = stem.to_string();
         }
         let json = serde_json::to_vec_pretty(&package).map_err(package_error)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        if !replace && path.try_exists().map_err(package_error)? {
+            validate_file_owner(&tx, project_id, target_path)?;
+        }
+        claim_file(&tx, project_id, target_path, project_id)?;
+        tx.execute("UPDATE projects SET name = ?1, file_path = ?2, updated_at = datetime('now') WHERE id = ?3",
+            rusqlite::params![package.project.name, target_path, project_id])?;
         atomic_write(path, |file| file.write_all(&json).map_err(package_error))?;
-        self.update_project_name_and_path(project_id, &package.project.name, Some(target_path))?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -292,7 +390,20 @@ impl Database {
                 }
             }
         }
-        if let Some(existing) = self.get_project(&package.project.id)? {
+        let file_identity = package.project.id.clone();
+        // Reopening a copied document must reuse its local identity until its first Save.
+        let known_copy = {
+            let conn = self.conn.lock().unwrap();
+            let entries = conn.prepare("SELECT p.id, p.file_path FROM projects p
+                JOIN project_file_identity f ON f.project_id = p.id
+                WHERE f.document_id = ?1 AND p.file_path IS NOT NULL")?
+                .query_map([&file_identity], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+                .collect::<SqliteResult<Vec<_>>>()?;
+            entries.into_iter().find(|(_, p)| same_path(p, source_path)).map(|(id, _)| id)
+        };
+        if let Some(id) = known_copy.filter(|id| id != &package.project.id) {
+            remap_identity(&mut package, &id);
+        } else if let Some(existing) = self.get_project(&package.project.id)? {
             if !existing
                 .file_path
                 .as_deref()
@@ -305,12 +416,16 @@ impl Database {
         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
             package.project.name = stem.to_string();
         }
-        self.store_project_package(&package)?;
+        self.store_project_package_with_identity(&package, Some(&file_identity))?;
         Ok(package)
     }
 
     /// Import the whole project or leave the prior database state untouched.
     fn store_project_package(&self, package: &ProjectPackagePayload) -> SqliteResult<()> {
+        self.store_project_package_with_identity(package, None)
+    }
+
+    fn store_project_package_with_identity(&self, package: &ProjectPackagePayload, file_identity: Option<&str>) -> SqliteResult<()> {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
         let p = &package.project;
@@ -380,6 +495,9 @@ impl Database {
                 p.file_path,
             ],
         )?;
+        if let (Some(path), Some(identity)) = (&p.file_path, file_identity) {
+            claim_file(&tx, &p.id, path, identity)?;
+        }
         tx.execute("DELETE FROM album_spreads WHERE project_id = ?1", [&p.id])?;
         tx.execute("DELETE FROM photo_folders WHERE project_id = ?1", [&p.id])?;
         tx.execute("DELETE FROM photos WHERE project_id = ?1", [&p.id])?;
@@ -440,14 +558,14 @@ impl Database {
             .as_deref()
             .is_some_and(|p| same_path(p, target_path))
         {
-            self.export_project_package(source_id, target_path)?;
+            self.export_project_package_as(source_id, target_path)?;
             return self
                 .get_project(source_id)?
                 .ok_or(rusqlite::Error::QueryReturnedNoRows);
         }
         let id = uuid::Uuid::new_v4().to_string();
         self.duplicate_project(source_id, &id, &source.name, "")?;
-        if let Err(error) = self.export_project_package(&id, target_path) {
+        if let Err(error) = self.export_project_package_as(&id, target_path) {
             self.delete_project(&id)?;
             return Err(error);
         }

@@ -5,6 +5,28 @@ use uuid::Uuid;
 use crate::asset_cache::{PHOTO_ASSET_JOB, cleanup_removed_photo_assets};
 use crate::db::{AlbumPayload, Database, ProjectPackagePayload, ProjectRow};
 
+// Serialize file identity checks and publication across all windows in this process.
+static PROJECT_FILE_JOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn project_file_job() -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    PROJECT_FILE_JOB.lock().map_err(|_| "The project file worker is unavailable.".to_string())
+}
+
+fn normalize_save_destination(mut path: std::path::PathBuf) -> Option<std::path::PathBuf> {
+    if path.extension().is_none() {
+        path.set_extension("afsn");
+        // The native picker may have confirmed the name without the appended extension.
+        if path.exists() && rfd::MessageDialog::new()
+            .set_title("Replace Project File")
+            .set_description(format!("A file already exists at {}. Replace it?", path.display()))
+            .set_buttons(rfd::MessageButtons::YesNo)
+            .show() != rfd::MessageDialogResult::Yes {
+            return None;
+        }
+    }
+    Some(path)
+}
+
 #[derive(Default)]
 pub struct LaunchState {
     pub pending_open_file: std::sync::Mutex<Option<String>>,
@@ -111,11 +133,15 @@ pub fn create_project(db: State<'_, Database>, request: CreateProjectRequest) ->
 
 #[tauri::command]
 pub fn get_project(db: State<'_, Database>, id: String) -> Result<Option<ProjectRow>, String> {
+    let _file_job = project_file_job()?;
+    db.reconcile_project_files().map_err(|e| e.to_string())?;
     db.get_project(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn list_recent_projects(db: State<'_, Database>, limit: Option<i32>) -> Result<Vec<ProjectRow>, String> {
+    let _file_job = project_file_job()?;
+    db.reconcile_project_files().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
     db.list_recent_projects(limit).map_err(|e| e.to_string())
 }
@@ -197,6 +223,8 @@ pub fn update_project_name(
     id: String,
     name: String,
 ) -> Result<ProjectRow, String> {
+    let _file_job = project_file_job()?;
+    db.reconcile_project_files().map_err(|e| e.to_string())?;
     let clean_name = name.trim();
     if clean_name.is_empty() {
         return Err("Project name cannot be empty".to_string());
@@ -212,6 +240,7 @@ pub fn update_project_name(
     if let Some(ref old_path_str) = existing_proj.file_path {
         let old_path = std::path::Path::new(old_path_str);
         if old_path.exists() && old_path.extension().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("afsn")) {
+            db.validate_project_file(&id, old_path_str).map_err(|e| e.to_string())?;
             let parent_dir = old_path.parent().unwrap_or_else(|| std::path::Path::new(""));
             let safe_file_stem = clean_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
             let target_file_name = format!("{}.afsn", safe_file_stem);
@@ -263,6 +292,10 @@ pub fn update_project_name_and_path(
     name: String,
     file_path: Option<String>,
 ) -> Result<(), String> {
+    let _file_job = project_file_job()?;
+    if let Some(path) = file_path.as_deref() {
+        db.validate_project_file(&id, path).map_err(|e| e.to_string())?;
+    }
     let clean_name = name.trim();
     if clean_name.is_empty() {
         return Err("Project name cannot be empty".to_string());
@@ -304,6 +337,9 @@ pub fn export_afsn_package(
     project_id: String,
     target_path: String,
 ) -> Result<(), String> {
+    let _file_job = project_file_job()?;
+    // Normal Save must never recreate a missing file or reclaim a replaced file.
+    db.validate_project_file(&project_id, &target_path).map_err(|e| e.to_string())?;
     log::info!("export_afsn_package: project_id={}, target_path={}", project_id, target_path);
     db.export_project_package(&project_id, &target_path)
         .map_err(|e| {
@@ -317,6 +353,7 @@ pub fn import_afsn_package(
     db: State<'_, Database>,
     source_path: String,
 ) -> Result<ProjectPackagePayload, String> {
+    let _file_job = project_file_job()?;
     log::info!("import_afsn_package: source_path={}", source_path);
     db.import_project_package(&source_path)
         .map_err(|e| {
@@ -338,6 +375,7 @@ pub async fn export_afsn_with_dialog(
             .set_file_name(&format!("{}.afsn", default_name))
             .add_filter("AFSNSmartAlbum Package (*.afsn)", &["afsn"])
             .save_file()
+            .and_then(normalize_save_destination)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -348,7 +386,8 @@ pub async fn export_afsn_with_dialog(
         }
         let path_str = path.to_string_lossy().to_string();
         // The writer assigns the path only after the new file is fully written.
-        db.export_project_package(&project_id, &path_str)
+        let _file_job = project_file_job()?;
+        db.export_project_package_as(&project_id, &path_str)
             .map_err(|e| {
                 log::error!("Failed export_project_package: {:?}", e);
                 e.to_string()
@@ -372,6 +411,7 @@ pub async fn save_project_as_with_dialog(
             .set_file_name(&format!("{}.afsn", default_name))
             .add_filter("AFSNSmartAlbum Package (*.afsn)", &["afsn"])
             .save_file()
+            .and_then(normalize_save_destination)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -381,6 +421,7 @@ pub async fn save_project_as_with_dialog(
             path.set_extension("afsn");
         }
         let path_str = path.to_string_lossy().to_string();
+        let _file_job = project_file_job()?;
         let new_proj = db.save_project_as(&project_id, &path_str).map_err(|e| e.to_string())?;
 
         Ok(Some(new_proj))
@@ -439,6 +480,7 @@ pub async fn import_afsn_with_dialog(
 
     if let Some(path) = file_path {
         let path_str = path.to_string_lossy().to_string();
+        let _file_job = project_file_job()?;
         let package = db.import_project_package(&path_str)
             .map_err(|e| e.to_string())?;
         Ok(Some(package))
@@ -455,6 +497,10 @@ pub fn duplicate_project(
     new_name: String,
     new_file_path: String,
 ) -> Result<ProjectRow, String> {
+    let _file_job = project_file_job()?;
+    if !new_file_path.is_empty() {
+        return Err("Use Save As to assign a file to a duplicated project.".to_string());
+    }
     log::info!("duplicate_project: source_id={}, new_id={}, new_name={}", source_id, new_id, new_name);
     db.duplicate_project(&source_id, &new_id, &new_name, &new_file_path)
         .map_err(|e| {

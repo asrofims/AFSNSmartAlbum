@@ -267,7 +267,7 @@ pub struct Database {
 
 impl Database {
     pub fn expected_version() -> i32 {
-        13
+        14
     }
 
     /// Initialize the database at the given path.
@@ -366,6 +366,17 @@ impl Database {
 
         if current_version < 13 {
             Self::migrate_v13(conn)?;
+        }
+        if current_version < 14 {
+            conn.execute_batch(
+                "BEGIN;
+                 CREATE TABLE project_file_identity (
+                     project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                     document_id TEXT NOT NULL
+                 );
+                 INSERT INTO schema_version (version) VALUES (14);
+                 COMMIT;"
+            )?;
         }
 
         Ok(())
@@ -2042,7 +2053,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = Database::init(temp_dir.join("test.db")).expect("Failed to init DB");
 
-        assert_eq!(db.get_schema_version().unwrap(), 13);
+        assert_eq!(db.get_schema_version().unwrap(), Database::expected_version());
 
         db.create_project(
             "test-id-1",

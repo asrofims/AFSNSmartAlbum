@@ -75,6 +75,8 @@
 - [x] Modern 2-Column Split-Hero Welcome Screen with Visual Hero Artwork
 - [x] Custom Application Branding (`logosmartalbumafsn2.png`) & File Association
 - [x] Project Migration & Schema Versioning
+- [x] Exclusive `.afsn` save ownership, file identity validation, and recovery preservation when Save As replaces another project's file (SQLite v14).
+- [ ] Manual verification of same-destination Save As, displaced Recent Projects, copied-file reopen, cancellation, and failed save after the ownership fix (automated tests deferred at user request).
 
 ## Phase 6 — Templates & Layout Generator
 - [x] Layout Preset Library (23+ Curated Presets: 1-8+ photos, diptychs, triptychs, grids, collages)
