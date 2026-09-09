@@ -84,10 +84,6 @@
 - [x] 1-Click Layout Apply with Photo Preservation & Undo/Redo integration
 - [x] Mini-SVG Wireframe Preview Cards & Right Inspector Templates Tab
 - [x] Frame Aspect Ratio Smart Fitting & Gap Preserving Solver
-- [x] Strengthen user-invoked adaptive layouts on the active spread: reject invalid geometry, preserve clearance around text/rotated locked photos, and enforce a maximum per-photo crop estimate.
-- [x] Rank adaptive compositions using average/worst crop, alignment, page balance including locked photos, whitespace, and library favorite prominence; share metadata across preview and application.
-- [x] Add bounded ratio-aware frame refinement while preserving slicing topology, page boundaries, and internal photo spacing. See `ADAPTIVE_LAYOUT_NOTES.md` for parameters and limits.
-- [ ] Manually verify adaptive layout composition on covers/spreads, mixed photo ratios, favorites, rotated obstacles, and constrained margins/spacing. Automated tests deferred at user request; TypeScript compilation checked.
 
 ## Phase 7 — Auto Layout Engine (Skipped)
 - [x] Auto Layout generation & photo distribution skipped per project requirements
@@ -301,3 +297,16 @@
 - [x] Replace text-heavy labels with compact 24×24 px icon-only SVG buttons to eliminate horizontal header overcrowding.
 - [x] Replace emoji lock/unlock glyphs with crisp, accessible vector SVG paths and informative tooltips.
 - [x] Application version metadata bumped to `v1.0.42`.
+
+### Phase 25 — Release v1.0.43: Non-Uniform Corner Radius Save Fix & 4-Corner Inspector Redesign
+
+- [x] Fix SQLite save error when photo frames have independent (non-uniform) per-corner radii using `CornerRadiusPayload` serde untagged enum.
+- [x] Redesign right inspector Corner Radius panel into a sleek 2x2 physical grid with dynamic vector corner glyph indicators and canvas unit suffix.
+- [x] Application version metadata bumped to `v1.0.43`.
+
+### Phase 26 — Release v1.0.44: Adaptive Layout Engine Restoration & Full Template Variety
+
+- [x] Revert experimental adaptive layout constraints and ratio-warping transformations back to the rich, stable `edf0c62` baseline.
+- [x] Restore full diversity of geometric templates (1 to 12+ photos, diptychs, triptychs, multi-row, collages, and grids).
+- [x] Application version metadata bumped to `v1.0.44`.
+

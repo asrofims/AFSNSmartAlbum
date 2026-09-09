@@ -4,10 +4,9 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useEditorStore } from '../../stores/editorStore';
 import {
   generateAdaptiveLayoutVariations,
-  getAdaptivePhotos,
+  AdaptivePhoto,
 } from '../../domain/adaptiveLayout';
 import { PhotoFrameElement } from '../../domain/editor';
-import { usePhotoStore } from '../../stores/photoStore';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import styles from './LayoutCycleHUD.module.css';
 
@@ -25,7 +24,6 @@ export function LayoutCycleHUD() {
 
   const activeSpread = useMemo(() => {
     if (!currentAlbum || !activeSpreadId) return null;
-    if (currentAlbum.coverSpread.id === activeSpreadId) return currentAlbum.coverSpread;
     return currentAlbum.spreads.find((s) => s.id === activeSpreadId) || currentAlbum.spreads[0] || null;
   }, [currentAlbum, activeSpreadId]);
 
@@ -39,24 +37,29 @@ export function LayoutCycleHUD() {
     return activeSpread.elements.filter((el): el is PhotoFrameElement => el.type === 'photo' && Boolean(el.locked));
   }, [activeSpread]);
 
-  const libraryPhotos = usePhotoStore((s) => s.photos);
-  const photos = useMemo(() => getAdaptivePhotos(unlockedElements, libraryPhotos), [unlockedElements, libraryPhotos]);
-  const textElements = useMemo(() => activeSpread?.elements.filter((el) => el.type === 'text') ?? [], [activeSpread]);
-  const isCover = activeSpread?.id === currentAlbum?.coverSpread.id;
+  const photos: AdaptivePhoto[] = useMemo(() => {
+    return unlockedElements.map((el) => ({
+      id: el.id,
+      photoId: el.photoId,
+      filePath: el.filePath,
+      fileName: el.fileName,
+      previewPath: el.previewPath,
+      thumbnailPath: el.thumbnailPath,
+      photoAspect: el.photoAspect,
+    }));
+  }, [unlockedElements]);
 
   const variations = useMemo(() => {
     if (!currentProject || !activeSpread || photos.length === 0) return [];
     const dims = getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
-    const spreadWidth = isCover
-      ? (activeSpread.leftPage?.width ?? dims.pageWidth) + (activeSpread.rightPage?.width ?? 0) + dims.gutterWidth
-      : dims.pageWidth * 2 + dims.gutterWidth;
+    const spreadWidth = dims.pageWidth * 2 + dims.gutterWidth;
     const spreadHeight = dims.pageHeight;
 
     return generateAdaptiveLayoutVariations(
       {
         spreadWidth,
         spreadHeight,
-        isSpread: !isCover,
+        isSpread: true,
         safeMargin: dims.safeMargin,
         safeMarginTop: dims.safeMarginTop,
         safeMarginBottom: dims.safeMarginBottom,
@@ -65,11 +68,10 @@ export function LayoutCycleHUD() {
         gutterWidth: dims.gutterWidth,
         spacing: dims.spacing,
         lockedElements,
-        obstacles: textElements,
       },
       photos
     );
-  }, [currentProject, activeSpread, photos, lockedElements, textElements, isCover]);
+  }, [currentProject, activeSpread, photos, lockedElements]);
 
   const currentIndex = (activeSpread && spreadLayoutIndices[activeSpread.id]) ?? 0;
   const safeIndex = variations.length > 0 ? currentIndex % variations.length : 0;
@@ -93,7 +95,6 @@ export function LayoutCycleHUD() {
   // Global Keyboard Navigation (Space for Next, Shift+Space for Prev, S for Shuffle)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       // Don't trigger if user is typing in an input or dialog, or in crop mode
       if (editingCropFrameId) return;
       const target = e.target as HTMLElement;
@@ -167,9 +168,9 @@ export function LayoutCycleHUD() {
                 alignItems: 'center',
                 gap: '3px',
               }}
-              title={`Composition Score: ${currentVariation.score}/100\nEstimated Average Crop: ${Math.round((currentVariation.cropPenalty || 0) * 100)}%\nLargest Estimated Crop: ${Math.round((currentVariation.worstCropPenalty || 0) * 100)}%`}
+              title={`Layout Aspect-Ratio Match: ${currentVariation.score}%\nEstimated Crop Penalty: ${Math.round((currentVariation.cropPenalty || 0) * 100)}%\nFingerprint: ${currentVariation.fingerprint || 'Auto'}`}
             >
-              {currentVariation.score}/100
+              ⭐ {currentVariation.score}%
             </span>
           )}
           <span className={styles.layoutName} title={currentVariation.description}>
