@@ -3,7 +3,10 @@ import { mockIPC, clearMocks } from '@tauri-apps/api/mocks';
 import { useProjectStore } from '../src/stores/projectStore';
 import { useAlbumStore } from '../src/stores/albumStore';
 import { usePhotoStore } from '../src/stores/photoStore';
+import { useEditorStore } from '../src/stores/editorStore';
 import { createInitialAlbum } from '../src/domain/album';
+import { buildSpreadElementsFromVariation } from '../src/domain/adaptiveLayout';
+import type { Photo } from '../src/domain/photo';
 import type { Project } from '../src/domain/project';
 
 (globalThis as any).window = {};
@@ -89,6 +92,64 @@ assert.equal(calls.filter((c) => c === 'export_afsn_package').length, 1);
 reset();
 assert.equal((await useProjectStore.getState().saveProject()).success, true);
 assert.equal(useAlbumStore.getState().saveStatus, 'saved');
+
+// Refreshing generated photo assets after a file save must not dirty the design.
+const cachedPhoto: Photo = {
+  id: 'cached-photo', projectId: project.id, filePath: 'C:/photos/photo.jpg', fileName: 'photo.jpg',
+  width: 3000, height: 2000, fileSize: 1234, format: 'jpeg', isFavorite: false,
+  usedCount: 1, isMissing: false, createdAt: '', updatedAt: '',
+  previewPath: 'C:/cache/preview.jpg', thumbnailPath: 'C:/cache/thumb.jpg',
+};
+const resetWithPhoto = () => {
+  reset();
+  const album = useAlbumStore.getState().currentAlbum!;
+  const elements = buildSpreadElementsFromVariation({ id: 'test', name: 'Test', description: '', tags: [],
+    rects: [{ x: 10, y: 10, width: 120, height: 80 }] },
+    [{ photoId: cachedPhoto.id, filePath: cachedPhoto.filePath, fileName: cachedPhoto.fileName, photoAspect: 1.5 }]);
+  useAlbumStore.setState({ currentAlbum: { ...album, coverSpread: { ...album.coverSpread, elements } } });
+};
+resetWithPhoto();
+assert.equal((await useProjectStore.getState().saveProject()).success, true);
+const fileSavedAt = useAlbumStore.getState().lastSavedAt;
+assert.equal(await useAlbumStore.getState().syncPhotoAssets([cachedPhoto], { persist: true }), true);
+assert.equal(useAlbumStore.getState().saveStatus, 'saved', 'Cache refresh must preserve a successful file save');
+assert.equal(useAlbumStore.getState().lastSavedAt, fileSavedAt);
+assert.equal(useAlbumStore.getState().currentAlbum!.coverSpread.elements[0].previewPath, cachedPhoto.previewPath);
+
+// Multiple cache writes queued behind one another must keep the saved status.
+const cacheStarted = deferred(), cacheRelease = deferred();
+native = async (command) => {
+  if (command === 'save_album_structure') { cacheStarted.resolve(); await cacheRelease.promise; }
+  return true;
+};
+const firstRefresh = useAlbumStore.getState().syncPhotoAssets([{ ...cachedPhoto, previewPath: 'C:/cache/preview-2.jpg' }], { persist: true });
+await cacheStarted.promise;
+const secondRefresh = useAlbumStore.getState().syncPhotoAssets([{ ...cachedPhoto, previewPath: 'C:/cache/preview-3.jpg' }], { persist: true });
+cacheRelease.resolve();
+assert.deepEqual(await Promise.all([firstRefresh, secondRefresh]), [true, true]);
+assert.equal(useAlbumStore.getState().saveStatus, 'saved');
+assert.equal(useAlbumStore.getState().currentAlbum!.coverSpread.elements[0].previewPath, 'C:/cache/preview-3.jpg');
+
+// Cache refreshes cannot mark pre-existing or concurrent frame edits as saved.
+for (const editDuringWrite of [false, true]) {
+  resetWithPhoto();
+  if (editDuringWrite) assert.equal((await useProjectStore.getState().saveProject()).success, true);
+  const started = deferred(), release = deferred();
+  native = async (command) => {
+    if (command === 'save_album_structure') { started.resolve(); await release.promise; }
+    return true;
+  };
+  const refresh = useAlbumStore.getState().syncPhotoAssets([cachedPhoto], { persist: true });
+  await started.promise;
+  if (editDuringWrite) {
+    const cover = useAlbumStore.getState().currentAlbum!.coverSpread;
+    useEditorStore.getState().updateFrameGeometry(cover.id, cover.elements[0].id, { x: 25 });
+  }
+  release.resolve();
+  assert.equal(await refresh, true);
+  assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+  if (editDuringWrite) assert.equal(useAlbumStore.getState().currentAlbum!.coverSpread.elements[0].x, 25);
+}
 
 // Recovery checkpoint failures cannot rewind state after switching projects.
 reset();

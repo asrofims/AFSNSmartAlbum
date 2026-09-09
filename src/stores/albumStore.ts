@@ -126,11 +126,9 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     const { album: syncedAlbum, changed } = syncAlbumPhotoAssets(currentAlbum, photos);
     if (!changed) return false;
 
-    const currentSaveStatus = get().saveStatus;
-    set({
-      currentAlbum: syncedAlbum,
-      saveStatus: options.persist ? 'saving' : currentSaveStatus,
-    });
+    // Let the queued checkpoint capture the real saved/unsaved state before it
+    // sets 'saving'. Pre-setting it here makes a cache refresh look like an edit.
+    set({ currentAlbum: syncedAlbum });
 
     if (options.persist) {
       return saveAlbumToDb();

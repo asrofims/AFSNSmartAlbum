@@ -341,3 +341,11 @@
 - [x] Add strict regression assertions for fractional alignment in mm/cm/inch/print-pixel scales, photo coverage at pan/zoom limits, and adaptive layout through frame creation and viewport projection (1–12 photos).
 - [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
 
+### Save Status After Photo Cache Refresh — 9 September 2026
+
+- [x] Preserve the prior document save status when synchronizing generated photo assets; let the queued database checkpoint manage its own saving transition so a successful file save does not become unsaved after cache refresh.
+- [x] Reproduce and cover post-save preview refresh, sequential queued cache writes, existing unsaved edits, and frame edits made during a background checkpoint.
+- [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
+- [x] Application version metadata bumped to `v1.0.47`.
+
+
