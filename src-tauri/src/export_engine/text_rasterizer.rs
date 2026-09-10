@@ -705,7 +705,7 @@ pub fn render_text_element(
 
     let rotation_deg = elem.rotation % 360.0;
     let is_rotated = rotation_deg.abs() >= 0.01;
-    let ss: f32 = if is_rotated { 2.0 } else { 1.0 };
+    let ss: f32 = if is_rotated { 4.0 } else { 1.0 };
 
     let buf_w = (frame_px_w as f32 * ss).round().max(1.0) as u32;
     let buf_h = (frame_px_h as f32 * ss).round().max(1.0) as u32;
