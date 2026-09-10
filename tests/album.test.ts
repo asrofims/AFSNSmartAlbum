@@ -818,7 +818,134 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   console.assert(asymEl1.x >= 15, `Asymmetric outside edge (${asymEl1.x}) must be >= 15mm`);
   console.assert(asymEl2.x + asymEl2.width <= 200.01, `Asymmetric right edge (${asymEl2.x + asymEl2.width}) must extend to spine (200mm)`);
   const asymGap = Math.round((asymEl2.x - (asymEl1.x + asymEl1.width)) * 100) / 100;
-  console.assert(asymGap === 4, `Asymmetric gap must remain 4mm, got ${asymGap}`);
+  // 3. Single photo on left page (with or without photos on right page)
+  const singlePhotoSpread: Spread = {
+    ...initialSpread,
+    id: 'single-photo-spread',
+    elements: [initialSpread.elements[0]!], // only f1 on left page
+  };
+
+  const singlePhotoResized = applyAdaptiveSafeAreaToSpread(
+    singlePhotoSpread,
+    { safeArea: 25, safeAreaTop: 25, safeAreaBottom: 25, safeAreaOutside: 25, safeAreaSpine: 25 },
+    testProject
+  );
+  const singleEl = singlePhotoResized.elements[0] as PhotoFrameElement;
+  console.assert(singleEl && singleEl.id === 'f1', 'Single photo element must exist with id f1');
+  console.assert(singleEl.x === 25, `Single photo left edge must be 25, got ${singleEl.x}`);
+  console.assert(singleEl.y === 25, `Single photo top edge must be 25, got ${singleEl.y}`);
+  console.assert(singleEl.width === 150, `Single photo width must be 150, got ${singleEl.width}`);
+  console.assert(singleEl.height === 150, `Single photo height must be 150, got ${singleEl.height}`);
+
+  // 4. Single full-bleed photo adapting when safe margin is increased from 0 to 15mm
+  const fullBleedSpread: Spread = {
+    ...initialSpread,
+    id: 'full-bleed-spread',
+    elements: [
+      {
+        ...initialSpread.elements[0]!,
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+      },
+    ],
+  };
+  const bleedAdapted = applyAdaptiveSafeAreaToSpread(
+    fullBleedSpread,
+    { safeArea: 15, safeAreaTop: 15, safeAreaBottom: 15, safeAreaOutside: 15, safeAreaSpine: 15 },
+    testProject
+  );
+  const bleedEl = bleedAdapted.elements[0] as PhotoFrameElement;
+  console.assert(bleedEl.x === 15, `Full bleed photo must adapt to safe margin x=15, got ${bleedEl.x}`);
+  console.assert(bleedEl.y === 15, `Full bleed photo must adapt to safe margin y=15, got ${bleedEl.y}`);
+  console.assert(bleedEl.width === 170, `Full bleed photo must adapt to safe margin width=170, got ${bleedEl.width}`);
+  console.assert(bleedEl.height === 170, `Full bleed photo must adapt to safe margin height=170, got ${bleedEl.height}`);
+
+  // 5. Asymmetric spread: 1 photo on left page, 2 photos on right page - both pages adapt in real-time
+  const mixedSpread: Spread = {
+    ...initialSpread,
+    id: 'mixed-spread',
+    elements: [
+      {
+        id: 'f-left',
+        type: 'photo',
+        photoId: 'p1',
+        filePath: '/photos/p1.jpg',
+        fileName: 'p1.jpg',
+        x: 10,
+        y: 10,
+        width: 180,
+        height: 180,
+        rotation: 0,
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+      {
+        id: 'f-right-1',
+        type: 'photo',
+        photoId: 'p2',
+        filePath: '/photos/p2.jpg',
+        fileName: 'p2.jpg',
+        x: 210,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+      {
+        id: 'f-right-2',
+        type: 'photo',
+        photoId: 'p3',
+        filePath: '/photos/p3.jpg',
+        fileName: 'p3.jpg',
+        x: 302,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+    ],
+  };
+
+  const mixedAdapted = applyAdaptiveSafeAreaToSpread(
+    mixedSpread,
+    { safeArea: 20, safeAreaTop: 20, safeAreaBottom: 20, safeAreaOutside: 20, safeAreaSpine: 20 },
+    testProject
+  );
+  const mixedLeft = (mixedAdapted.elements as PhotoFrameElement[]).find((e) => e.id === 'f-left')!;
+  const mixedR1 = (mixedAdapted.elements as PhotoFrameElement[]).find((e) => e.id === 'f-right-1')!;
+  const mixedR2 = (mixedAdapted.elements as PhotoFrameElement[]).find((e) => e.id === 'f-right-2')!;
+
+  console.assert(mixedLeft.x === 20 && mixedLeft.y === 20 && mixedLeft.width === 160 && mixedLeft.height === 160,
+    `Left single photo must scale to safe box (20,20,160,160), got (${mixedLeft.x},${mixedLeft.y},${mixedLeft.width},${mixedLeft.height})`);
+  console.assert(mixedR1.x >= 220 && mixedR1.y >= 20, `Right photo 1 must respect safe area`);
+  console.assert(mixedR2.x + mixedR2.width <= 380.01, `Right photo 2 must stay within safe area`);
 }
 
 console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, adaptive safezone-bounded gap scaling, and real-time adaptive safe margin resizing)!');

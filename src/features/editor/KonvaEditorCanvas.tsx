@@ -1643,7 +1643,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const singlePageH = dims.pageHeight;
   const gutterPhysicalW = 0; // Pure layflat spread (strictly 2 * singlePageW)
 
-  const rawThresholdMm = snappingConfig.threshold ?? 1.69;
+  const rawThresholdMm = snappingConfig.threshold ?? 1.27;
   const projectUnit = (unit as Unit) || 'mm';
   const projectDpi = currentProject?.canvasDpi || 300;
   const snappingThresholdUnits = convertUnit(rawThresholdMm, 'mm', projectUnit, projectDpi, projectUnit === 'px' ? 0 : 3);

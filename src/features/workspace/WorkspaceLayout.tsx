@@ -2542,157 +2542,50 @@ export function WorkspaceLayout() {
                 </div>
               </div>
 
-              {/* Background Color Section */}
-              {(() => {
-                const activeSpreadBg = activeSpread?.backgroundColor || currentProject?.backgroundColor || '#FFFFFF';
-                const currentScopeColor =
-                  bgScope === 'left'
-                    ? (activeSpread?.leftPage?.backgroundColor || activeSpreadBg)
-                    : bgScope === 'right'
-                    ? (activeSpread?.rightPage?.backgroundColor || activeSpreadBg)
-                    : activeSpreadBg;
 
-                return (
-                  <div className={styles.propSection}>
-                    <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span>Background Color</span>
-                    </div>
+              {/* Spacing & Margins Section */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Spacing & Margins</div>
 
-                    {/* Scope Selector (Full Spread, Left Page, Right Page) */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr 1fr',
-                        gap: '4px',
-                        background: 'rgba(0, 0, 0, 0.25)',
-                        padding: '3px',
-                        borderRadius: 'var(--radius-md)',
-                        marginBottom: '10px',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        style={{
-                          padding: '5px 4px',
-                          fontSize: '11px',
-                          fontWeight: bgScope === 'spread' ? 600 : 400,
-                          color: bgScope === 'spread' ? '#ffffff' : 'var(--color-text-secondary)',
-                          backgroundColor: bgScope === 'spread' ? 'var(--color-accent)' : 'transparent',
-                          border: 'none',
-                          borderRadius: 'var(--radius-sm)',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onClick={() => setBgScope('spread')}
-                        title="Apply background color to the entire canvas (both pages & spine)"
+                <div
+                  style={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ flexShrink: 0 }}
                       >
-                        ◫ Spread
-                      </button>
-                      <button
-                        type="button"
-                        style={{
-                          padding: '5px 4px',
-                          fontSize: '11px',
-                          fontWeight: bgScope === 'left' ? 600 : 400,
-                          color: bgScope === 'left' ? '#ffffff' : 'var(--color-text-secondary)',
-                          backgroundColor: bgScope === 'left' ? 'var(--color-accent)' : 'transparent',
-                          border: 'none',
-                          borderRadius: 'var(--radius-sm)',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onClick={() => setBgScope('left')}
-                        title="Apply background color to Left Page only"
-                      >
-                        ◧ Left
-                      </button>
-                      <button
-                        type="button"
-                        style={{
-                          padding: '5px 4px',
-                          fontSize: '11px',
-                          fontWeight: bgScope === 'right' ? 600 : 400,
-                          color: bgScope === 'right' ? '#ffffff' : 'var(--color-text-secondary)',
-                          backgroundColor: bgScope === 'right' ? 'var(--color-accent)' : 'transparent',
-                          border: 'none',
-                          borderRadius: 'var(--radius-sm)',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onClick={() => setBgScope('right')}
-                        title="Apply background color to Right Page only"
-                      >
-                        ◨ Right
-                      </button>
-                    </div>
-
-                    {/* Color Swatch, Hex, Eyedropper & Palette */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <ColorPicker
-                        value={currentScopeColor}
-                        onChange={(newColor) => {
-                          if (activeSpread) {
-                            updateSpreadBackgroundColor(activeSpread.id, newColor, bgScope);
-                          }
-                        }}
-                        presetColors={[
-                          '#FFFFFF', '#F8FAFC', '#FDFBF7', '#E2E8F0', '#CBD5E1', '#94A3B8',
-                          '#64748B', '#475569', '#334155', '#1E293B', '#0F172A', '#000000'
-                        ]}
-                      />
-                    </div>
-
-                    {/* Quick Propagation Actions */}
-                    <div className={styles.propActionsGrid}>
-                      <button
-                        type="button"
-                        className={styles.propActionButton}
-                        onClick={() => {
-                          applyBackgroundColorToAllSpreads(currentScopeColor);
-                          showToast(`Applied ${currentScopeColor} to all spreads`);
-                        }}
-                        title="Apply current background color to all spreads in the album"
-                      >
-                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
-                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                        </svg>
-                        <span>Apply to All</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.propActionButton} ${styles.propActionButtonPrimary}`}
-                        onClick={async () => {
-                          await updateProjectBackgroundColor(currentScopeColor);
-                          showToast(`Set ${currentScopeColor} as project default`);
-                        }}
-                        title="Set this color as default for newly created spreads & project settings"
-                      >
-                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span>Set Default</span>
-                      </button>
+                        <rect x="3" y="3" width="7" height="7" />
+                        <rect x="14" y="3" width="7" height="7" />
+                        <rect x="3" y="14" width="7" height="7" />
+                        <rect x="14" y="14" width="7" height="7" />
+                      </svg>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }} title="Gap between adjacent photo frames">
+                        Photo Spacing
+                      </span>
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* Photo Spacing & Default Gap Section (Interactive rule for Project Spacing) */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Photo Spacing</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Photo Gap</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
+                    <div style={{ width: '110px' }}>
                       {(() => {
                         const currentSpacingUnit = (activeSpread?.spacingUnit ?? currentProject.spacingUnit) as Unit;
                         const maxGap = getMaxGapForUnit(currentSpacingUnit);
@@ -2708,12 +2601,10 @@ export function WorkspaceLayout() {
                             max={maxGap}
                             step={currentSpacingUnit === 'inch' ? 0.05 : currentSpacingUnit === 'cm' ? 0.1 : currentSpacingUnit === 'px' ? 1 : 0.5}
                             precision={currentSpacingUnit === 'px' ? 0 : currentSpacingUnit === 'inch' || currentSpacingUnit === 'cm' ? 2 : 1}
+                            suffix={currentSpacingUnit}
                           />
                         );
                       })()}
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '24px' }}>
-                        {activeSpread?.spacingUnit ?? currentProject.spacingUnit}
-                      </span>
                     </div>
                   </div>
 
@@ -2786,96 +2677,6 @@ export function WorkspaceLayout() {
                       </button>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* Safe Margins & Guides Section */}
-              <div className={styles.propSection}>
-                <div className={styles.propTitle}>Margins & Guides</div>
-
-                {/* Modern Guide Overlay Visibility Toggles */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr',
-                    gap: '4px',
-                    background: 'rgba(0, 0, 0, 0.25)',
-                    padding: '3px',
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: '12px',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleGuide('safeArea')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      padding: '5px 4px',
-                      fontSize: '10px',
-                      fontWeight: showSafeAreaGuide ? 600 : 400,
-                      color: showSafeAreaGuide ? '#ffffff' : 'var(--color-text-muted)',
-                      backgroundColor: showSafeAreaGuide ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                      border: showSafeAreaGuide ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title="Toggle Blue Safe Zone Margin guide visibility"
-                  >
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Safe Zone</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleGuide('bleed')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      padding: '5px 4px',
-                      fontSize: '10px',
-                      fontWeight: showBleedGuide ? 600 : 400,
-                      color: showBleedGuide ? '#ffffff' : 'var(--color-text-muted)',
-                      backgroundColor: showBleedGuide ? 'rgba(239, 68, 68, 0.25)' : 'transparent',
-                      border: showBleedGuide ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid transparent',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title="Toggle Red Bleed Line guide visibility"
-                  >
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Bleed Cut</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleGuide('gutter')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      padding: '5px 4px',
-                      fontSize: '10px',
-                      fontWeight: showGutterGuide ? 600 : 400,
-                      color: showGutterGuide ? '#ffffff' : 'var(--color-text-muted)',
-                      backgroundColor: showGutterGuide ? 'rgba(129, 140, 248, 0.25)' : 'transparent',
-                      border: showGutterGuide ? '1px solid rgba(129, 140, 248, 0.5)' : '1px solid transparent',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title="Toggle Center Spine Crease Guide visibility"
-                  >
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#818cf8', display: 'inline-block', flexShrink: 0 }} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Spine Line</span>
-                  </button>
                 </div>
 
                 {/* Safe Margin Card with Sleek 4S Multi-Directional Switcher */}
@@ -3110,13 +2911,14 @@ export function WorkspaceLayout() {
                             title="Apply current safe margin to all spreads in the album"
                           >
                             <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
+                              <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
+                              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
                             </svg>
                             <span>Apply to All</span>
                           </button>
                           <button
                             type="button"
-                            className={styles.propActionButton}
+                            className={`${styles.propActionButton} ${styles.propActionButtonPrimary}`}
                             onClick={() => {
                               const val = activeSpread?.safeArea ?? (currentProject.marginValue ?? 10);
                               updateProjectMargin(val, currentProject.canvasUnit, 'all');
@@ -3133,6 +2935,238 @@ export function WorkspaceLayout() {
                       </>
                     );
                   })()}
+                </div>
+              </div>
+
+              {/* Background Color Section */}
+              {(() => {
+                const activeSpreadBg = activeSpread?.backgroundColor || currentProject?.backgroundColor || '#FFFFFF';
+                const currentScopeColor =
+                  bgScope === 'left'
+                    ? (activeSpread?.leftPage?.backgroundColor || activeSpreadBg)
+                    : bgScope === 'right'
+                    ? (activeSpread?.rightPage?.backgroundColor || activeSpreadBg)
+                    : activeSpreadBg;
+
+                return (
+                  <div className={styles.propSection}>
+                    <div className={styles.propTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Background Color</span>
+                    </div>
+
+                    {/* Scope Selector (Full Spread, Left Page, Right Page) */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr 1fr',
+                        gap: '4px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        padding: '3px',
+                        borderRadius: 'var(--radius-md)',
+                        marginBottom: '10px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'spread' ? 600 : 400,
+                          color: bgScope === 'spread' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'spread' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('spread')}
+                        title="Apply background color to the entire canvas (both pages & spine)"
+                      >
+                        ◫ Spread
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'left' ? 600 : 400,
+                          color: bgScope === 'left' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'left' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('left')}
+                        title="Apply background color to Left Page only"
+                      >
+                        ◧ Left
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '11px',
+                          fontWeight: bgScope === 'right' ? 600 : 400,
+                          color: bgScope === 'right' ? '#ffffff' : 'var(--color-text-secondary)',
+                          backgroundColor: bgScope === 'right' ? 'var(--color-accent)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setBgScope('right')}
+                        title="Apply background color to Right Page only"
+                      >
+                        ◨ Right
+                      </button>
+                    </div>
+
+                    {/* Color Swatch, Hex, Eyedropper & Palette */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <ColorPicker
+                        value={currentScopeColor}
+                        onChange={(newColor) => {
+                          if (activeSpread) {
+                            updateSpreadBackgroundColor(activeSpread.id, newColor, bgScope);
+                          }
+                        }}
+                        presetColors={[
+                          '#FFFFFF', '#F8FAFC', '#FDFBF7', '#E2E8F0', '#CBD5E1', '#94A3B8',
+                          '#64748B', '#475569', '#334155', '#1E293B', '#0F172A', '#000000'
+                        ]}
+                      />
+                    </div>
+
+                    {/* Quick Propagation Actions */}
+                    <div className={styles.propActionsGrid}>
+                      <button
+                        type="button"
+                        className={styles.propActionButton}
+                        onClick={() => {
+                          applyBackgroundColorToAllSpreads(currentScopeColor);
+                          showToast(`Applied ${currentScopeColor} to all spreads`);
+                        }}
+                        title="Apply current background color to all spreads in the album"
+                      >
+                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                        <span>Apply to All</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.propActionButton} ${styles.propActionButtonPrimary}`}
+                        onClick={async () => {
+                          await updateProjectBackgroundColor(currentScopeColor);
+                          showToast(`Set ${currentScopeColor} as project default`);
+                        }}
+                        title="Set this color as default for newly created spreads & project settings"
+                      >
+                        <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span>Set Default</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Guides & Snapping Section */}
+              <div className={styles.propSection}>
+                <div className={styles.propTitle}>Guides & Snapping</div>
+
+                {/* Modern Guide Overlay Visibility Toggles */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
+                    gap: '4px',
+                    background: 'rgba(0, 0, 0, 0.25)',
+                    padding: '3px',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: '12px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('safeArea')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showSafeAreaGuide ? 600 : 400,
+                      color: showSafeAreaGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showSafeAreaGuide ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                      border: showSafeAreaGuide ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Blue Safe Zone Margin guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Safe Zone</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('bleed')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showBleedGuide ? 600 : 400,
+                      color: showBleedGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showBleedGuide ? 'rgba(239, 68, 68, 0.25)' : 'transparent',
+                      border: showBleedGuide ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Red Bleed Line guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Bleed Cut</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleGuide('gutter')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: showGutterGuide ? 600 : 400,
+                      color: showGutterGuide ? '#ffffff' : 'var(--color-text-muted)',
+                      backgroundColor: showGutterGuide ? 'rgba(129, 140, 248, 0.25)' : 'transparent',
+                      border: showGutterGuide ? '1px solid rgba(129, 140, 248, 0.5)' : '1px solid transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Toggle Center Spine Crease Guide visibility"
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#818cf8', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Spine Line</span>
+                  </button>
                 </div>
 
                 {/* Bleed Allowance Card */}

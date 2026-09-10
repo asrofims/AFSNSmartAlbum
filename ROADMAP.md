@@ -394,6 +394,23 @@
 - [x] Elevate dropdown menus and dropdown container z-indices (`z-index: 99999`) to prevent clipping beneath canvas layers or modal overlays.
 - [x] Application version metadata bumped to `v1.0.52`.
 
+### Phase 34 — Release v1.0.53: Snapping UX Corrections, Panel Hierarchy & Single Photo Safe Margin Real-Time Scaling
+
+- [x] Fix Bypass Magnetic Snapping shortcut display from `Alt + Drag` to `Ctrl + Drag` to match actual implementation (`ctrlKey`).
+- [x] Fix snapping settings tooltip from "hold Alt to bypass" to "hold Ctrl to bypass".
+- [x] Recalibrate Level 2 (Normal) snapping distance threshold from 20 px / 1.69 mm to 15 px / 1.27 mm.
+- [x] Update all default threshold fallback values to match new Level 2 calibration.
+- [x] Restyle Photo Spacing panel to match Safe Margin card UI: bordered card container, amber icon header, and `suffix`-based NumberInput for visual consistency.
+- [x] Reorder workspace properties panel sections for professional workflow ergonomics:
+  - `Spacing & Margins` section: Photo Spacing card on top, Safe Margin card directly below.
+  - `Background Color` section with scope switcher and color palette in the middle.
+  - `Guides & Snapping` section: Guide Overlay Toggles, Bleed Cut card, and Smart Snapping card at the very bottom.
+- [x] Harmonize Safe Margin "Set Default" button visual (`styles.propActionButtonPrimary`) and action icons for visual parity across all property cards.
+- [x] Fix Single Photo Safe Margin Real-Time Scaling in `applyAdaptiveLayoutToSpread`:
+  - Eliminate the `isFullBleedFrame` bypass that prevented full-bleed or page-flush single photos from resizing when Safe Margin is adjusted.
+  - Fully synchronize 4-sided `leftPage` and `rightPage` safe area properties (`safeAreaTop`, `safeAreaBottom`, `safeAreaOutside`, `safeAreaSpine`).
+  - Guarantee single photos and asymmetric spreads (e.g. 1 photo on left page, 2 on right page) adapt strictly to safe area boundaries in real-time.
+- [x] Application version metadata bumped to `v1.0.53`.
 
 
 

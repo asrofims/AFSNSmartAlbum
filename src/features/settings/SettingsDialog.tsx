@@ -180,7 +180,7 @@ const SHORTCUTS: ShortcutDef[] = [
     id: 'transform-bypass-snap',
     category: 'Transform & Layout',
     action: 'Bypass Magnetic Snapping',
-    combos: [['Alt', '+ Drag']],
+    combos: [['Ctrl', '+ Drag']],
     keywords: 'bypass snap magnet ignore disable temporarily align',
   },
   {
@@ -418,7 +418,7 @@ export function SettingsDialog() {
     const defaultLevel = SNAPPING_LEVELS[1]!;
     const currentMm = snappingConfig.threshold;
     if (!currentMm || currentMm <= 0.2) {
-      return defaultLevel; // Default Level 2 (20 px / 1.69 mm)
+      return defaultLevel; // Default Level 2 (15 px / 1.27 mm)
     }
     let closest: SnappingLevel = defaultLevel;
     let minDiff = Infinity;
@@ -598,7 +598,7 @@ export function SettingsDialog() {
                       </span>
                     </div>
                     <div className={styles.cardSubtitle}>
-                      Automatically snap photos to edges, centers, margins, and neighboring frames (hold Alt to bypass).
+                      Automatically snap photos to edges, centers, margins, and neighboring frames (hold Ctrl to bypass).
                     </div>
                   </div>
                   <Switch

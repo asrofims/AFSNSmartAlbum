@@ -139,11 +139,25 @@ export function applyAdaptiveLayoutToSpread(
 
   if (overrides?.safeAreaPatch) {
     const patch = overrides.safeAreaPatch;
-    if (effSpread.leftPage && patch.safeArea !== undefined) {
-      effSpread.leftPage = { ...effSpread.leftPage, safeArea: patch.safeArea };
+    if (effSpread.leftPage) {
+      effSpread.leftPage = {
+        ...effSpread.leftPage,
+        ...(patch.safeArea !== undefined ? { safeArea: patch.safeArea } : {}),
+        ...(patch.safeAreaTop !== undefined ? { safeAreaTop: patch.safeAreaTop } : {}),
+        ...(patch.safeAreaBottom !== undefined ? { safeAreaBottom: patch.safeAreaBottom } : {}),
+        ...(patch.safeAreaOutside !== undefined ? { safeAreaOutside: patch.safeAreaOutside } : {}),
+        ...(patch.safeAreaSpine !== undefined ? { safeAreaSpine: patch.safeAreaSpine } : {}),
+      };
     }
-    if (effSpread.rightPage && patch.safeArea !== undefined) {
-      effSpread.rightPage = { ...effSpread.rightPage, safeArea: patch.safeArea };
+    if (effSpread.rightPage) {
+      effSpread.rightPage = {
+        ...effSpread.rightPage,
+        ...(patch.safeArea !== undefined ? { safeArea: patch.safeArea } : {}),
+        ...(patch.safeAreaTop !== undefined ? { safeAreaTop: patch.safeAreaTop } : {}),
+        ...(patch.safeAreaBottom !== undefined ? { safeAreaBottom: patch.safeAreaBottom } : {}),
+        ...(patch.safeAreaOutside !== undefined ? { safeAreaOutside: patch.safeAreaOutside } : {}),
+        ...(patch.safeAreaSpine !== undefined ? { safeAreaSpine: patch.safeAreaSpine } : {}),
+      };
     }
   }
 
@@ -249,10 +263,8 @@ export function applyAdaptiveLayoutToSpread(
     if (frames.length === 1) {
       const f = frames[0];
       if (f) {
-        if (isFullBleedFrame(f)) {
-          updatedFramesMap.set(f.id, f);
-        } else if (isSafeMarginChange) {
-          // Adapt single safe-margin bounded photo to the new safe area box
+        if (isSafeMarginChange) {
+          // Adapt single photo frame strictly to the new safe area box in real-time
           updatedFramesMap.set(f.id, {
             ...f,
             x: box.x,
@@ -269,8 +281,8 @@ export function applyAdaptiveLayoutToSpread(
       continue;
     }
 
-    // Multi-photo cluster: if all frames are full bleed, keep untouched
-    if (frames.every((f) => isFullBleedFrame(f))) {
+    // Multi-photo cluster: if only gap changed and all frames are full bleed, keep untouched
+    if (!isSafeMarginChange && frames.every((f) => isFullBleedFrame(f))) {
       for (const f of frames) {
         updatedFramesMap.set(f.id, f);
       }
