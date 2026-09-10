@@ -551,6 +551,30 @@ export function WorkspaceLayout() {
                     <button
                       type="button"
                       className={styles.menuItem}
+                      onClick={() => {
+                        setIsFileMenuOpen(false);
+                        usePhotoStore.getState().importFiles(currentProject.id);
+                      }}
+                    >
+                      <span>🖼️ Import Photos...</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setIsFileMenuOpen(false);
+                        usePhotoStore.getState().importFolder(currentProject.id);
+                      }}
+                    >
+                      <span>📁 Import Entire Folder...</span>
+                    </button>
+
+                    <div className={styles.menuDivider} />
+
+                    <button
+                      type="button"
+                      className={styles.menuItem}
                       onClick={async () => {
                         setIsFileMenuOpen(false);
                         const res = await saveProject();

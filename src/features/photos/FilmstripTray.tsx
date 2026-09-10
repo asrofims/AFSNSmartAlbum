@@ -42,7 +42,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     loadPhotos,
     importFiles,
     importFolder,
-    importPaths,
     cancelImport,
     cancelAllImports,
     toggleFavorite,
@@ -61,11 +60,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     openRelink,
     healThumbnail,
   } = usePhotoStore();
-
-  const [isDragOver, setIsDragOver] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
-  const dragCounterRef = useRef(0);
   const filmstripRef = useRef<HTMLElement>(null);
   const isHoveredRef = useRef(false);
 
@@ -238,26 +234,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const favCount = currentPhotoPool.filter((p) => p.isFavorite).length;
   const missingCount = currentPhotoPool.filter((p) => p.isMissing).length;
 
-  // External Drag & Drop handlers (Importing files/folders from Windows Explorer)
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current += 1;
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0 && e.dataTransfer.types.includes('Files')) {
-      setIsDragOver(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current -= 1;
-    if (dragCounterRef.current <= 0) {
-      setIsDragOver(false);
-      dragCounterRef.current = 0;
-    }
-  };
-
   const handleToggleImportMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isImportMenuOpen) {
@@ -271,34 +247,6 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       right: window.innerWidth - rect.right,
     });
     setIsImportMenuOpen(true);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    dragCounterRef.current = 0;
-
-    if (!currentProject) return;
-
-    const files = Array.from(e.dataTransfer.files);
-    const nativePaths: string[] = [];
-
-    for (const f of files) {
-      const p = (f as any).path;
-      if (typeof p === 'string' && p.length > 0) {
-        nativePaths.push(p);
-      }
-    }
-
-    if (nativePaths.length > 0) {
-      await importPaths(currentProject.id, nativePaths);
-    }
   };
 
   // Internal Card Click Handler (Lightroom Style)
@@ -364,13 +312,9 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   return (
     <section
       ref={filmstripRef}
-      className={`${styles.filmstrip} ${!isOpen ? styles.collapsed : ''} ${isDragOver ? styles.dragOver : ''}`}
+      className={`${styles.filmstrip} ${!isOpen ? styles.collapsed : ''}`}
       onMouseEnter={() => { isHoveredRef.current = true; }}
       onMouseLeave={() => { isHoveredRef.current = false; }}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
       aria-label="Photo Library Filmstrip"
     >
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
@@ -530,17 +474,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
         </div>
       )}
 
-      {/* External Drag & Drop Visual Overlay */}
-      {isDragOver && (
-        <div className={styles.dropzoneOverlay}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" x2="12" y1="3" y2="15"/>
-          </svg>
-          <span>Drop photos here to import {activeFolderName ? `to [${activeFolderName}]` : ''}</span>
-        </div>
-      )}
+      
 
       {/* Filmstrip Body */}
       {isOpen && (
@@ -706,16 +640,16 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
             </div>
           ) : !isImporting ? (
             <div className={styles.emptyState}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
                 <circle cx="9" cy="9" r="2"/>
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
               </svg>
               <span>
                 {activeFolderName
-                  ? `No photos in folder "${activeFolderName}". Drag & drop photos here or import above.`
+                  ? `No photos in folder "${activeFolderName}". Click "+ Import" above to add photos.`
                   : photos.length === 0
-                  ? 'No photos in library. Drag & drop photos here or click Import above.'
+                  ? 'No photos in library. Click "+ Import" above to add photos.'
                   : 'No photos match the current filter or search query.'}
               </span>
             </div>
