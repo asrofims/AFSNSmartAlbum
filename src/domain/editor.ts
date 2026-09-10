@@ -469,6 +469,40 @@ export interface ResizeSnapResult {
 }
 
 /**
+ * Accurately aligns element X position to the spread spine fold line without floating point drift or slivers.
+ * If an element's right edge is within tolerance (0.05 units) of the left spine edge (page split),
+ * its position is snapped cleanly so that `x + width === singlePageW` exactly.
+ * If an element's left edge is within tolerance of the right spine edge,
+ * its position is snapped cleanly to `x === spineRight`.
+ * If an element intentionally crosses across the spine (panorama / spread hero), it is preserved.
+ */
+export function alignElementPositionToSpine(
+  x: number,
+  width: number,
+  spreadWidth: number,
+  gutterWidth: number = 0,
+  tolerance: number = 0.05
+): number {
+  const singlePageW = (spreadWidth - gutterWidth) / 2;
+  const spineLeft = singlePageW;
+  const spineRight = singlePageW + gutterWidth;
+
+  const currentRight = x + width;
+
+  // Case 1: Left page element whose right edge is flush or near flush with spine
+  if (Math.abs(currentRight - spineLeft) <= tolerance && x < spineLeft) {
+    return Number((spineLeft - width).toFixed(4));
+  }
+
+  // Case 2: Right page element whose left edge is flush or near flush with spine
+  if (Math.abs(x - spineRight) <= tolerance && currentRight > spineRight) {
+    return Number(spineRight.toFixed(4));
+  }
+
+  return roundToHundredth(x);
+}
+
+/**
  * Calculates smart magnetic snapping lines, equal distance gaps, and adjustments for a dragged frame.
  */
 export function calculateSnapping(
@@ -672,7 +706,15 @@ export function calculateSnapping(
   }
 
   if (bestSnapX !== null && bestVLine !== null) {
-    snappedX = bestSnapX;
+    if (
+      bestVLine.label === 'Left Page Inner Edge' ||
+      bestVLine.label === 'Right Page Inner Edge' ||
+      bestVLine.label === 'Center Fold / Page Edge'
+    ) {
+      snappedX = alignElementPositionToSpine(bestSnapX, dragged.width, spreadWidth, gutterWidth, threshold);
+    } else {
+      snappedX = bestSnapX;
+    }
     snapLines.push(bestVLine);
   }
 
@@ -1265,7 +1307,7 @@ export function calculateResizeSnapping(
 
     if (bestVTarget) {
       if (isVLeft) {
-        const newX = bestVTarget.pos;
+        const newX = bestVTarget.label === 'Spine Right' ? Number(spineRight.toFixed(4)) : bestVTarget.pos;
         const newW = (x + width) - newX;
         if (newW >= 4) {
           x = newX;
@@ -1285,7 +1327,9 @@ export function calculateResizeSnapping(
           });
         }
       } else {
-        const newW = bestVTarget.pos - x;
+        const newW = (bestVTarget.label === 'Spine Left' || bestVTarget.label === 'Spread Center X')
+          ? Number((spineLeft - x).toFixed(4))
+          : bestVTarget.pos - x;
         if (newW >= 4) {
           width = newW;
           if (isCorner) {

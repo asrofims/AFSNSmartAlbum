@@ -16,6 +16,7 @@ import {
   computeMultiFrameGroupInfo,
   RectBounds,
   roundToHundredth,
+  alignElementPositionToSpine,
   getPhotoAspect,
   clamp,
   doesMarqueeIntersectFrame,
@@ -2535,6 +2536,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
               }
             />
 
+            {/* Spread Sheet Perimeter Border (Thin Solid Black) */}
+            <Rect
+              name="background-sheet-border"
+              listening={false}
+              x={0}
+              y={0}
+              width={screenSpreadW}
+              height={screenSpreadH}
+              stroke="#000000"
+              strokeWidth={1}
+            />
+
             {/* Center Gutter / Spine Fold Guide */}
             {showGutterGuide && (
               <Group listening={false}>
@@ -2807,24 +2820,36 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                               }
                             });
 
-                            const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                              sourceId: id,
-                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                            }));
+                            const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => {
+                              const el = (activeSpread.elements || []).find((e) => e.id === id);
+                              const elW = el?.width ?? 0;
+                              const rawX = initPhys.x + deltaPhysX;
+                              const rawY = initPhys.y + deltaPhysY;
+                              return {
+                                sourceId: id,
+                                x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                y: roundToHundredth(rawY),
+                              };
+                            });
 
                             duplicateFramesToPosition(activeSpread.id, duplicates);
                             if (onToast) {
                               onToast(`✓ Duplicated ${duplicates.length} item(s) via Alt+Drag`);
                             }
                           } else if (Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05) {
-                            const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                              id,
-                              geometry: {
-                                x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                                y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                              },
-                            }));
+                            const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => {
+                              const el = (activeSpread.elements || []).find((e) => e.id === id);
+                              const elW = el?.width ?? 0;
+                              const rawX = initPhys.x + deltaPhysX;
+                              const rawY = initPhys.y + deltaPhysY;
+                              return {
+                                id,
+                                geometry: {
+                                  x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                  y: roundToHundredth(rawY),
+                                },
+                              };
+                            });
 
                             batchUpdateFrames(activeSpread.id, updates);
                           }
@@ -2840,7 +2865,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       }
                       openContextMenuAt(e.evt.clientX, e.evt.clientY);
                     }}
-                    onElementChange={(updates, skipHistory) => updateTextElement(activeSpread.id, textEl.id, updates, skipHistory)}
+                    onElementChange={(updates, skipHistory) => {
+                      let finalUpdates = { ...updates };
+                      if (typeof updates.x === 'number') {
+                        const w = typeof updates.width === 'number' ? updates.width : textEl.width;
+                        finalUpdates.x = alignElementPositionToSpine(updates.x, w, totalSpreadPhysicalW, gutterPhysicalW);
+                        const singlePageW = (totalSpreadPhysicalW - gutterPhysicalW) / 2;
+                        if (typeof updates.width === 'number' && Math.abs(finalUpdates.x + updates.width - singlePageW) < 0.05) {
+                          finalUpdates.width = Number((singlePageW - finalUpdates.x).toFixed(4));
+                        }
+                      }
+                      updateTextElement(activeSpread.id, textEl.id, finalUpdates, skipHistory);
+                    }}
                     onDoubleClick={() => { if (!textEl.locked) setEditingTextElementId(textEl.id); }}
                   />
                 );
@@ -3032,24 +3068,36 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                             }
                           });
 
-                          const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                            sourceId: id,
-                            x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                            y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                          }));
+                          const duplicates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => {
+                            const el = (activeSpread.elements || []).find((e) => e.id === id);
+                            const elW = el?.width ?? 0;
+                            const rawX = initPhys.x + deltaPhysX;
+                            const rawY = initPhys.y + deltaPhysY;
+                            return {
+                              sourceId: id,
+                              x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                              y: roundToHundredth(rawY),
+                            };
+                          });
 
                           duplicateFramesToPosition(activeSpread.id, duplicates);
                           if (onToast) {
                             onToast(`✓ Duplicated ${duplicates.length} frame(s) via Alt+Drag`);
                           }
                         } else if (Math.abs(deltaPhysX) > 0.05 || Math.abs(deltaPhysY) > 0.05) {
-                          const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => ({
-                            id,
-                            geometry: {
-                              x: Math.round((initPhys.x + deltaPhysX) * 10) / 10,
-                              y: Math.round((initPhys.y + deltaPhysY) * 10) / 10,
-                            },
-                          }));
+                          const updates = Array.from(dragInitialPhysicalPositionsRef.current.entries()).map(([id, initPhys]) => {
+                            const el = (activeSpread.elements || []).find((e) => e.id === id);
+                            const elW = el?.width ?? 0;
+                            const rawX = initPhys.x + deltaPhysX;
+                            const rawY = initPhys.y + deltaPhysY;
+                            return {
+                              id,
+                              geometry: {
+                                x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                y: roundToHundredth(rawY),
+                              },
+                            };
+                          });
 
                           batchUpdateFrames(activeSpread.id, updates);
                         }
@@ -3060,7 +3108,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   onContextMenu={(e) => {
                     openContextMenuAt(e.evt.clientX, e.evt.clientY);
                   }}
-                  onFrameChange={(updates) => updateFrameGeometry(activeSpread.id, frame.id, updates)}
+                  onFrameChange={(updates) => {
+                    let finalUpdates = { ...updates };
+                    if (typeof updates.x === 'number') {
+                      const w = typeof updates.width === 'number' ? updates.width : frame.width;
+                      finalUpdates.x = alignElementPositionToSpine(updates.x, w, totalSpreadPhysicalW, gutterPhysicalW);
+                      const singlePageW = (totalSpreadPhysicalW - gutterPhysicalW) / 2;
+                      if (typeof updates.width === 'number' && Math.abs(finalUpdates.x + updates.width - singlePageW) < 0.05) {
+                        finalUpdates.width = Number((singlePageW - finalUpdates.x).toFixed(4));
+                      }
+                    }
+                    updateFrameGeometry(activeSpread.id, frame.id, finalUpdates);
+                  }}
                   onCropChange={(updates) => updateCrop(activeSpread.id, frame.id, updates)}
                   onDoubleClick={() => enterCropMode(frame.id)}
                 />
@@ -3531,6 +3590,18 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                   stageRef.current.container().style.cursor = 'default';
                 }
               }}
+            />
+
+            {/* Canvas Outer Perimeter Border (Thin Solid Black) */}
+            <Rect
+              name="canvas-outer-perimeter-border"
+              listening={false}
+              x={0}
+              y={0}
+              width={screenSpreadW}
+              height={screenSpreadH}
+              stroke="#000000"
+              strokeWidth={1}
             />
 
             {/* Rubber-band Marquee Selection Box */}

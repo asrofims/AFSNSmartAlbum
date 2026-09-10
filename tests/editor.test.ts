@@ -5,6 +5,7 @@ import {
   calculateImageOffset,
   calculateSnapping,
   calculateResizeSnapping,
+  alignElementPositionToSpine,
   clampCropTransform,
   getCenteredCrop,
   getCoverImageSize,
@@ -1337,5 +1338,32 @@ for (const factor of [1, 0.1, 1 / 25.4, 300 / 25.4]) {
     }
   }
 }
+
+// 21. Exact Spine Snapping & Zero-Spill Spine Alignment tests
+// Left page frame near spine (spreadWidth = 400, gutter = 0 -> spine = 200)
+// Frame width = 100, x = 100.02 (x + width = 200.02 -> near spine within 0.05 tolerance)
+const leftAlignedX = alignElementPositionToSpine(100.02, 100, 400, 0);
+assert.equal(leftAlignedX, 100, 'Left page frame within tolerance must clamp cleanly to spine: x + width === 200');
+assert.equal(leftAlignedX + 100, 200, 'Left page frame right edge must exactly equal spineLeft');
+
+// Right page frame near spine (x = 199.98, width = 100 -> x is near spine 200 within 0.05 tolerance)
+const rightAlignedX = alignElementPositionToSpine(199.98, 100, 400, 0);
+assert.equal(rightAlignedX, 200, 'Right page frame within tolerance must clamp cleanly to spine: x === 200');
+
+// Panorama frame spanning across spine (x = 150, width = 100 -> spans from 150 to 250 across spine 200)
+const panoramaX = alignElementPositionToSpine(150.12, 100, 400, 0);
+assert.equal(panoramaX, 150.12, 'Panorama spanning across spine must preserve its position without false clamping');
+
+// Drag snapping to spine lines produces exact boundary
+const testDragNearSpine: RectBounds = { x: 100.02, y: 50, width: 100, height: 80 };
+const snapResSpine = calculateSnapping(testDragNearSpine, 400, 300, 10, 0, []);
+assert.equal(snapResSpine.snappedX, 100, 'calculateSnapping must snap frame exactly to spine without floating drift');
+
+// Resize snapping to spine produces exact boundary
+const testResizeNearSpine: RectBounds = { x: 50, y: 50, width: 149.98, height: 80 };
+const resizeResSpine = calculateResizeSnapping(testResizeNearSpine, 400, 300, 10, 0, [], 2.0, 'mm', 'right');
+assert.equal(resizeResSpine.snappedBounds.width, 150, 'calculateResizeSnapping must set width so x + width === spineLeft exactly');
+assert.equal(resizeResSpine.snappedBounds.x + resizeResSpine.snappedBounds.width, 200, 'x + width must equal spineLeft');
+
 
 console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, Snapping Config Persistence, and Dynamic Per-Corner Rounded Corners tests passed successfully!');

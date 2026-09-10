@@ -64,7 +64,8 @@
 - [x] Distribute Spacing (Horizontal & Vertical)
 - [x] Layer Ordering (Bring to Front, Send to Back)
 - [x] Copy & Paste Frames (`Ctrl+C` / `Ctrl+V`)
-- [x] **Standard Professional English UI** across all panels, menus, and HUD overlays
+- [x] Standard Professional English UI across all panels, menus, and HUD overlays
+- [x] Exact Zero-Spill Spine Snapping & Clamping (0.01mm coordinate precision, spine alignment, and zero-drift boundary locking across drag and resize)
 
 ## Phase 5 — Persistence & Project Package
 - [x] Portable `.afsn` Project Packaging & Save As
@@ -368,6 +369,15 @@
 - [x] Validate with `npm test`, `npx tsc --noEmit`, and the native pasteboard/bleed export regression test.
 - [x] Verify crop-handle dragging outside the page, moving a parked object onto the page, bottom-edge resize snapping after scrolling, and zoom in the browser fixture (`/tests/pasteboard.preview.html`). Native desktop interaction verification remains manual.
 - [x] Application version metadata bumped to `v1.0.49`.
+
+### Phase 31 — Release v1.0.50: Exact Center Spine Snapping & Canvas Boundary Contrast
+
+- [x] Implement `alignElementPositionToSpine` for exact zero-spill snapping when moving or resizing photo frames adjacent to the center spine / fold line on layflat albums.
+- [x] Prevent slight floating-point overhangs into facing pages by clamping edge contacts within 0.05 physical unit tolerance to the exact spine boundary.
+- [x] Add high-contrast solid black outer perimeter border around the canvas spread sheet, providing crystal-clear visual delineation against the interactive pasteboard backdrop.
+- [x] Add regression test coverage for spine alignment, single-page clamping, panorama traversal preservation, and spine resize snapping.
+- [x] Application version metadata bumped to `v1.0.50`.
+
 
 
 
