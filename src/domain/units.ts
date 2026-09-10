@@ -20,6 +20,27 @@ export const UNIT_OPTIONS: { value: Unit; label: string }[] = [
   { value: 'px', label: 'px' },
 ];
 
+/**
+ * Returns sensible dynamic maximum photo gap value for a given unit.
+ * - 'px': 2000
+ * - 'mm': 500
+ * - 'cm': 50
+ * - 'inch': 20
+ */
+export function getMaxGapForUnit(unit: Unit = 'mm'): number {
+  switch (unit) {
+    case 'px':
+      return 2000;
+    case 'cm':
+      return 50;
+    case 'inch':
+      return 20;
+    case 'mm':
+    default:
+      return 500;
+  }
+}
+
 const MM_PER_INCH = 25.4;
 
 /**

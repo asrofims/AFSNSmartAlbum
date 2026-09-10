@@ -5,6 +5,7 @@ import { NumberInput } from '../../components/ui/NumberInput';
 import { useAppStore } from '../../stores/appStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { getMaxGapForUnit } from '../../domain/units';
 import styles from './SettingsDialog.module.css';
 
 // ---------------------------------------------------------------------------
@@ -857,10 +858,14 @@ export function SettingsDialog() {
                       <div style={{ width: '90px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <NumberInput
                           value={currentProject.spacingValue}
-                          onChange={(val) => updateProjectSpacing(Math.max(0, val), currentProject.spacingUnit)}
+                          onChange={(val) => {
+                            const maxGap = getMaxGapForUnit(currentProject.spacingUnit);
+                            updateProjectSpacing(Math.max(0, Math.min(val, maxGap)), currentProject.spacingUnit);
+                          }}
                           min={0}
-                          max={100}
-                          step={currentProject.spacingUnit === 'inch' ? 0.05 : 0.5}
+                          max={getMaxGapForUnit(currentProject.spacingUnit)}
+                          step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : currentProject.spacingUnit === 'px' ? 1 : 0.5}
+                          precision={currentProject.spacingUnit === 'px' ? 0 : currentProject.spacingUnit === 'inch' || currentProject.spacingUnit === 'cm' ? 2 : 1}
                         />
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
                           {currentProject.spacingUnit}

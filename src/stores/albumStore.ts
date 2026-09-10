@@ -32,7 +32,7 @@ import {
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
 import { useProjectStore } from './projectStore';
-import { getCornerRadii, adjustSpreadPhotoGaps, type PhotoFrameElement } from '../domain/editor';
+import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
 import { convertUnit } from '../domain/units';
 import type { Photo } from '../domain/photo';
 

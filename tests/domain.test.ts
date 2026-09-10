@@ -5,6 +5,7 @@ import {
   fromPixels,
   calculateExportPixels,
   formatDimensions,
+  getMaxGapForUnit,
 } from '../src/domain/units';
 import {
   ALBUM_PRESETS,
@@ -37,7 +38,14 @@ assert.strictEqual(calculateExportPixels(20, 'cm', 300, 300), 2362);
 assert.strictEqual(calculateExportPixels(1920, 'px', 300, 300), 1920);
 assert.strictEqual(calculateExportPixels(1920, 'px', 600, 300), 3840);
 assert.strictEqual(calculateExportPixels(1000, 'px', 300, 72), 4167);
-console.log('✓ Unit conversions passed.');
+
+// Test getMaxGapForUnit: dynamic sensible maximum gap bounds per unit
+assert.strictEqual(getMaxGapForUnit('px'), 2000);
+assert.strictEqual(getMaxGapForUnit('mm'), 500);
+assert.strictEqual(getMaxGapForUnit('cm'), 50);
+assert.strictEqual(getMaxGapForUnit('inch'), 20);
+assert.strictEqual(getMaxGapForUnit(undefined), 500);
+console.log('✓ Unit conversions and dynamic gap limits passed.');
 
 // Test 2: Presets & Custom Presets Lifecycle
 console.log('Testing Presets...');

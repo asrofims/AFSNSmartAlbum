@@ -13,7 +13,7 @@ import { useHistoryStore } from '../../stores/historyStore';
 import { useAutoSave } from '../persistence/useAutoSave';
 import { useTauriInfo } from '../../hooks/useTauriInfo';
 import { WelcomeScreen } from './WelcomeScreen';
-import { formatDimensions, convertUnit } from '../../domain/units';
+import { formatDimensions, convertUnit, getMaxGapForUnit, Unit } from '../../domain/units';
 import { getAllAlbumSpreads } from '../../domain/album';
 import { clampCropTransform, zoomCropAtPoint, PhotoFrameElement, getCornerRadii } from '../../domain/editor';
 import { formatImportNoticeToast } from '../../domain/photo';
@@ -1149,11 +1149,14 @@ export function WorkspaceLayout() {
                           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <NumberInput
                               value={customGapValue}
-                              onChange={(val) => setCustomGapValue(Math.max(0, val))}
+                              onChange={(val) => {
+                                const maxVal = getMaxGapForUnit(currentProject.canvasUnit);
+                                setCustomGapValue(Math.max(0, Math.min(val, maxVal)));
+                              }}
                               min={0}
-                              max={200}
-                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 1}
-                              precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                              max={getMaxGapForUnit(currentProject.canvasUnit)}
+                              step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                              precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                             />
                             <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{currentProject.canvasUnit}</span>
                           </div>
@@ -2537,19 +2540,24 @@ export function WorkspaceLayout() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Photo Gap</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100px' }}>
-                      <NumberInput
-                        value={activeSpread?.spacingValue ?? currentProject.spacingValue}
-                        onChange={(val) => {
-                          const num = Math.max(0, val);
-                          const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
-                          updateSpreadSpacing(num, unit, currentProject);
-                          setCustomGapValue(num);
-                        }}
-                        min={0}
-                        max={100}
-                        step={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' ? 0.05 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 0.1 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'px' ? 1 : 0.5}
-                        precision={(activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'px' ? 0 : (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'inch' || (activeSpread?.spacingUnit ?? currentProject.spacingUnit) === 'cm' ? 2 : 1}
-                      />
+                      {(() => {
+                        const currentSpacingUnit = (activeSpread?.spacingUnit ?? currentProject.spacingUnit) as Unit;
+                        const maxGap = getMaxGapForUnit(currentSpacingUnit);
+                        return (
+                          <NumberInput
+                            value={activeSpread?.spacingValue ?? currentProject.spacingValue}
+                            onChange={(val) => {
+                              const num = Math.max(0, Math.min(val, maxGap));
+                              updateSpreadSpacing(num, currentSpacingUnit, currentProject);
+                              setCustomGapValue(num);
+                            }}
+                            min={0}
+                            max={maxGap}
+                            step={currentSpacingUnit === 'inch' ? 0.05 : currentSpacingUnit === 'cm' ? 0.1 : currentSpacingUnit === 'px' ? 1 : 0.5}
+                            precision={currentSpacingUnit === 'px' ? 0 : currentSpacingUnit === 'inch' || currentSpacingUnit === 'cm' ? 2 : 1}
+                          />
+                        );
+                      })()}
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '24px' }}>
                         {activeSpread?.spacingUnit ?? currentProject.spacingUnit}
                       </span>

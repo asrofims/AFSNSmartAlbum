@@ -6,7 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { ColorPicker } from '../../components/ui/ColorPicker';
 import { Switch } from '../../components/ui/Switch';
 import { useProjectStore } from '../../stores/projectStore';
-import { Unit, UNIT_OPTIONS, convertUnit, formatDimensions, toPixels } from '../../domain/units';
+import { Unit, UNIT_OPTIONS, convertUnit, formatDimensions, toPixels, getMaxGapForUnit } from '../../domain/units';
 import {
   AlbumPreset,
   CUSTOM_PRESET_ID,
@@ -209,7 +209,10 @@ export function NewProjectDialog() {
     setMarginUnit(newUnit);
 
     // Convert Spacing
-    const convertedSpacing = roundUnit(convertUnit(spacingValue, spacingUnit, newUnit, canvasDpi), newUnit);
+    const convertedSpacing = Math.min(
+      roundUnit(convertUnit(spacingValue, spacingUnit, newUnit, canvasDpi), newUnit),
+      getMaxGapForUnit(newUnit)
+    );
     setSpacingValue(convertedSpacing);
     setSpacingUnit(newUnit);
 
@@ -830,9 +833,9 @@ export function NewProjectDialog() {
                       <NumberInput
                         label="Default Frame Spacing"
                         value={spacingValue}
-                        onChange={setSpacingValue}
+                        onChange={(val) => setSpacingValue(Math.max(0, Math.min(val, getMaxGapForUnit(spacingUnit))))}
                         min={0}
-                        max={500}
+                        max={getMaxGapForUnit(spacingUnit)}
                         step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 1 : 0.5}
                         precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                       />
