@@ -484,7 +484,7 @@ fn export_album_high_res_worker(
                     );
                 }
 
-                let spread_img = if options.sharpen_enabled {
+                let spread_img = if options.sharpen_enabled && (!options.split_pages || spread.r#type == "cover") {
                     apply_print_sharpening(&spread_img, &options.sharpen_amount)
                 } else {
                     spread_img
@@ -518,7 +518,7 @@ fn export_album_high_res_worker(
 
                 // Handle Split Pages vs Full Spread with Atomic Safe Overwrite
                 if options.split_pages && spread.r#type != "cover" {
-                    let (left_page, right_page) = split_spread_into_pages(&spread_img, &project, spread, options.dpi, options.include_bleed);
+                    let (mut left_page, mut right_page) = split_spread_into_pages(&spread_img, &project, spread, options.dpi, options.include_bleed);
                     let left_num = (spread.spread_index - 1) * 2 + 1;
                     let right_num = left_num + 1;
 
@@ -528,6 +528,16 @@ fn export_album_high_res_worker(
                     let should_export_right = options.selected_page_numbers.as_ref()
                         .map(|nums| nums.contains(&right_num))
                         .unwrap_or(true);
+
+                    // Apply sharpening per-page independently to avoid cross-spine convolution bleeding
+                    if options.sharpen_enabled {
+                        if should_export_left {
+                            left_page = apply_print_sharpening(&left_page, &options.sharpen_amount);
+                        }
+                        if should_export_right {
+                            right_page = apply_print_sharpening(&right_page, &options.sharpen_amount);
+                        }
+                    }
 
                     let ext = if options.format == "png" { "png" } else { "jpg" };
                     let left_filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, Some(left_num), ext);

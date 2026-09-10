@@ -269,6 +269,8 @@ fn render_photo_element(
     include_bleed: bool,
     total_spread_w: f64,
     total_spread_h: f64,
+    single_page_w: f64,
+    gutter_w: f64,
 ) {
     if elem.file_path.is_empty() {
         return;
@@ -318,6 +320,31 @@ fn render_photo_element(
             let bottom_edge = frame_px_y + frame_px_h as i64;
             if bottom_edge < canvas_h {
                 frame_px_h += (canvas_h - bottom_edge) as u32;
+            }
+        }
+    }
+
+    // Strict spine boundary clamping for single-page elements:
+    // Prevents floating-point rounding or snapping tolerances from leaking pixels across the center spine.
+    if single_page_w > 0.0 {
+        let spine_x_px = (offset_x_px as i64) + (single_page_w * scale_factor).round() as i64;
+        let right_start_x_px = spine_x_px + if gutter_w > 0.0 { (gutter_w * scale_factor).round() as i64 } else { 0 };
+
+        // Element is placed purely on the left page (does not cross spine)
+        let is_purely_left = (elem.x + elem.width) <= single_page_w + 0.05;
+        if is_purely_left {
+            if frame_px_x + frame_px_w as i64 > spine_x_px {
+                frame_px_w = (spine_x_px - frame_px_x).max(0) as u32;
+            }
+        }
+
+        // Element is placed purely on the right page (starts at or after gutter/spine)
+        let is_purely_right = elem.x >= (single_page_w + gutter_w - 0.05);
+        if is_purely_right {
+            if frame_px_x < right_start_x_px {
+                let shift = (right_start_x_px - frame_px_x) as u32;
+                frame_px_x = right_start_x_px;
+                frame_px_w = frame_px_w.saturating_sub(shift);
             }
         }
     }
@@ -740,12 +767,9 @@ where
     let left_bg = spread.left_page.as_ref().map(|p| parse_hex_color(&p.background_color)).unwrap_or(bg_color);
     let right_bg = spread.right_page.as_ref().map(|p| parse_hex_color(&p.background_color)).unwrap_or(bg_color);
 
-    let left_page_w_px = ((single_page_w + if include_bleed { bleed } else { 0.0 }) * scale).round() as u32;
-    let right_page_start_x = if include_bleed {
-        ((single_page_w + bleed + gutter_w) * scale).round() as u32
-    } else {
-        ((single_page_w + gutter_w) * scale).round() as u32
-    };
+    let left_page_w_px = (offset_x_px as u32) + (single_page_w * scale).round() as u32;
+    let gutter_w_px = if gutter_w > 0.0 { (gutter_w * scale).round() as u32 } else { 0 };
+    let right_page_start_x = left_page_w_px + gutter_w_px;
 
     if left_bg != bg_color {
         for y in 0..canvas_h_px {
@@ -785,6 +809,8 @@ where
                 include_bleed,
                 total_spread_w,
                 total_spread_h,
+                single_page_w,
+                gutter_w,
             );
         }
     }
@@ -818,14 +844,22 @@ pub fn split_spread_into_pages(
     let total_w = spread_img.width();
     let total_h = spread_img.height();
 
-    let spine_center_x = (((if include_bleed { bleed } else { 0.0 }) + single_page_w + gutter_w * 0.5) * scale).round() as u32;
-    let spine_center_x = spine_center_x.min(total_w);
+    let ox = if include_bleed { (bleed * scale).round() as u32 } else { 0 };
+    let single_page_w_px = (single_page_w * scale).round() as u32;
+    let left_page_end_x = (ox + single_page_w_px).min(total_w);
 
-    let left_w = spine_center_x;
-    let right_w = total_w.saturating_sub(spine_center_x);
+    let gutter_w_px = if gutter_w > 0.0 {
+        (gutter_w * scale).round() as u32
+    } else {
+        0
+    };
+    let right_page_start_x = (left_page_end_x + gutter_w_px).min(total_w);
+
+    let left_w = left_page_end_x;
+    let right_w = total_w.saturating_sub(right_page_start_x);
 
     let left_page = image::imageops::crop_imm(spread_img, 0, 0, left_w, total_h).to_image();
-    let right_page = image::imageops::crop_imm(spread_img, spine_center_x, 0, right_w, total_h).to_image();
+    let right_page = image::imageops::crop_imm(spread_img, right_page_start_x, 0, right_w, total_h).to_image();
 
     (left_page, right_page)
 }
@@ -1025,20 +1059,110 @@ mod tests {
             element.x = x;
             element.y = y;
             let mut canvas = RgbaImage::from_pixel(120, 120, white);
-            render_photo_element(&mut canvas, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+            render_photo_element(&mut canvas, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
             assert!(canvas.pixels().all(|pixel| *pixel == white), "Off-page objects must not be pulled onto the export");
         }
         element.x = -15.0;
         element.y = 20.0;
         let mut crossing = RgbaImage::from_pixel(120, 120, white);
-        render_photo_element(&mut crossing, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+        render_photo_element(&mut crossing, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
         assert_eq!(*crossing.get_pixel(0, 35), red);
         assert_eq!(*crossing.get_pixel(18, 35), white, "Crossing frames must retain their original position");
         element.x = 0.0;
         let mut aligned = RgbaImage::from_pixel(120, 120, white);
-        render_photo_element(&mut aligned, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+        render_photo_element(&mut aligned, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
         assert_eq!(*aligned.get_pixel(0, 35), red, "Trim-aligned photos must still extend into bleed");
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_split_spread_into_pages_zero_overlap() {
+        let temp_dir = std::env::temp_dir().join(format!("afsn-test-split-{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let red_path = temp_dir.join("red.png");
+        let blue_path = temp_dir.join("blue.png");
+        let red = Rgba([255, 0, 0, 255]);
+        let blue = Rgba([0, 0, 255, 255]);
+
+        RgbaImage::from_pixel(20, 20, red).save(&red_path).unwrap();
+        RgbaImage::from_pixel(20, 20, blue).save(&blue_path).unwrap();
+
+        let project = ProjectRow {
+            id: "test-proj".to_string(),
+            name: "Test Project".to_string(),
+            canvas_width: 200.0,
+            canvas_height: 200.0,
+            canvas_unit: "mm".to_string(),
+            canvas_dpi: 300,
+            spacing_value: 4.0,
+            spacing_unit: "mm".to_string(),
+            margin_enabled: true,
+            margin_value: 10.0,
+            margin_unit: "mm".to_string(),
+            margin_top: Some(10.0),
+            margin_bottom: Some(10.0),
+            margin_outside: Some(10.0),
+            margin_spine: Some(10.0),
+            border_enabled: false,
+            border_width: 0.0,
+            border_unit: "mm".to_string(),
+            border_color: "#FFFFFF".to_string(),
+            background_type: "solid".to_string(),
+            background_color: "#FFFFFF".to_string(),
+            file_path: None,
+            created_at: "2026-08-29T12:00:00Z".to_string(),
+            updated_at: "2026-08-29T12:00:00Z".to_string(),
+        };
+
+        // Left photo: full left page (x: 0, width: 200)
+        let left_elem: ElementPayload = serde_json::from_value(serde_json::json!({
+            "id": "left-photo", "filePath": red_path.to_string_lossy(), "x": 0.0, "y": 0.0, "width": 200.0, "height": 200.0
+        })).unwrap();
+
+        // Right photo: full right page (x: 200, width: 200)
+        let right_elem: ElementPayload = serde_json::from_value(serde_json::json!({
+            "id": "right-photo", "filePath": blue_path.to_string_lossy(), "x": 200.0, "y": 0.0, "width": 200.0, "height": 200.0
+        })).unwrap();
+
+        let spread = SpreadPayload {
+            id: "spread-1".to_string(),
+            spread_index: 1,
+            r#type: "interior".to_string(),
+            name: "Spread 01".to_string(),
+            left_page: None,
+            right_page: None,
+            gutter_width: 0.0,
+            gutter_unit: "mm".to_string(),
+            bleed: 3.0,
+            safe_area: 10.0,
+            safe_area_top: Some(10.0),
+            safe_area_bottom: Some(10.0),
+            safe_area_outside: Some(10.0),
+            safe_area_spine: Some(10.0),
+            background_color: "#FFFFFF".to_string(),
+            elements: vec![left_elem, right_elem],
+        };
+
+        for dpi in [72, 150, 300] {
+            for include_bleed in [false, true] {
+                let spread_img = render_spread_to_image(&project, &spread, dpi, include_bleed);
+                let (left_page, right_page) = split_spread_into_pages(&spread_img, &project, &spread, dpi, include_bleed);
+
+                let left_has_blue = left_page.pixels().any(|p| *p == blue);
+                assert!(!left_has_blue, "Left page must not contain blue pixels from right page at DPI {}", dpi);
+
+                let right_has_red = right_page.pixels().any(|p| *p == red);
+                assert!(!right_has_red, "Right page must not contain red pixels from left page at DPI {}", dpi);
+
+                let first_col_red = (0..right_page.height()).any(|y| *right_page.get_pixel(0, y) == red);
+                assert!(!first_col_red, "First column of right page must never contain left-page pixels at DPI {}", dpi);
+            }
+        }
+
+        let _ = fs::remove_file(red_path);
+        let _ = fs::remove_file(blue_path);
+        let _ = fs::remove_dir_all(temp_dir);
     }
 
     #[test]
