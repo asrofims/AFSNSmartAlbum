@@ -199,14 +199,6 @@ export function TemplatesPanel({ onApplyToast }: TemplatesPanelProps) {
                       ⭐ {variation.score}%
                     </span>
                   )}
-                  {isCurrent && (
-                    <span
-                      className={styles.tagPill}
-                      style={{ background: 'rgba(59,130,246,0.3)', color: '#93c5fd', fontWeight: 600 }}
-                    >
-                      Active
-                    </span>
-                  )}
                 </div>
               </div>
             </div>

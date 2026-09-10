@@ -378,12 +378,13 @@
 /* Right Panel: Collapsible Properties */
 .rightPanel {
   grid-area: right;
-  width: 280px;
+  width: 300px;
   background-color: var(--color-bg-secondary);
   border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 5;
   transition: width var(--transition-normal), opacity var(--transition-normal);
 }
@@ -392,9 +393,27 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-3);
+  padding: 12px 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
+}
+
+.propertyList::-webkit-scrollbar {
+  width: 5px;
+}
+
+.propertyList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.propertyList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.propertyList::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .propSection {
@@ -837,10 +856,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   height: 28px;
-  padding: 0 8px;
-  font-size: 10px;
+  padding: 0 6px;
+  font-size: 10.5px;
   font-weight: 500;
   line-height: 1;
   border-radius: var(--radius-sm, 4px);
@@ -849,9 +868,18 @@
   color: var(--color-text-secondary, #94a3b8);
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   user-select: none;
+}
+
+.propActionButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .propActionButton:hover {
@@ -891,5 +919,124 @@
 
 .propActionButton:hover .propActionIcon {
   opacity: 1;
+}
+
+/* Modern Creative Studio Alignment Toolbar */
+.alignToolbar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+
+.alignToolbarBtn {
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  min-width: 0;
+}
+
+.alignToolbarBtn:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: var(--color-accent);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.alignToolbarBtn:active {
+  transform: translateY(0);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.alignToolbarBtnSafe {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.alignToolbarBtnSafe:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: #3b82f6;
+  color: #bfdbfe;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+}
+
+/* Match Size 3-Column Action Buttons */
+.matchSizeBtn {
+  height: 28px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.matchSizeBtn:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: var(--color-accent);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.matchSizeBtn:active {
+  transform: translateY(0);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Dual Entity Reset Buttons */
+.resetActionButton {
+  height: 28px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.resetActionButton:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--color-accent, #38bdf8);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.resetActionButton:active {
+  transform: translateY(0);
 }
 

@@ -1051,12 +1051,19 @@ export function WorkspaceLayout() {
                 border: 'none',
                 color: 'var(--color-text-muted)',
                 cursor: 'pointer',
-                fontSize: '12px',
-                padding: '2px 4px',
+                padding: '4px 6px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
               }}
-              title="Collapse Panel"
+              title="Collapse Properties Panel"
+              aria-label="Collapse Properties Panel"
             >
-              ▶
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
 
@@ -1164,25 +1171,35 @@ export function WorkspaceLayout() {
                       {/* Distribute Evenly */}
                       {selectedFrameIds.length >= 3 && (
                         <div style={{ marginBottom: '10px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                             Distribute Spacing
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                             <button
                               type="button"
-                              className={styles.multiActionBtn}
+                              className={styles.matchSizeBtn}
                               onClick={() => distributeSelectedFrames(activeSpread.id, 'horizontal')}
-                              title="Distribute Horizontal Spacing Evenly"
+                              title="Distribute horizontal spacing evenly across selected frames"
                             >
-                              ⇿ Distribute H
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="4" y="4" width="4" height="16" rx="1" />
+                                <rect x="16" y="4" width="4" height="16" rx="1" />
+                                <line x1="12" y1="2" x2="12" y2="22" strokeDasharray="2 2" />
+                              </svg>
+                              <span>Distribute H</span>
                             </button>
                             <button
                               type="button"
-                              className={styles.multiActionBtn}
+                              className={styles.matchSizeBtn}
                               onClick={() => distributeSelectedFrames(activeSpread.id, 'vertical')}
-                              title="Distribute Vertical Spacing Evenly"
+                              title="Distribute vertical spacing evenly across selected frames"
                             >
-                              ⇳ Distribute V
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="4" y="4" width="16" height="4" rx="1" />
+                                <rect x="4" y="16" width="16" height="4" rx="1" />
+                                <line x1="2" y1="12" x2="22" y2="12" strokeDasharray="2 2" />
+                              </svg>
+                              <span>Distribute V</span>
                             </button>
                           </div>
                         </div>
@@ -1190,41 +1207,117 @@ export function WorkspaceLayout() {
 
                       {/* Alignments Grid */}
                       <div style={{ marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                           Align to Canvas Edge
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '8px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left to Canvas Edge">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right to Canvas Edge">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top to Canvas Edge">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom to Canvas Edge">⤓ Bottom</button>
+                        <div className={styles.alignToolbar} style={{ marginBottom: '8px' }}>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="4" y1="21" x2="4" y2="3" />
+                              <rect x="8" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal (Canvas Center)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="21" x2="12" y2="3" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="20" y1="21" x2="20" y2="3" />
+                              <rect x="4" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="4" x2="21" y2="4" />
+                              <rect x="6" y="8" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Center Vertical (Canvas Middle)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="12" x2="21" y2="12" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="20" x2="21" y2="20" />
+                              <rect x="6" y="4" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
                         </div>
 
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span>Align to Safe Margin</span>
                           <span style={{ fontSize: '9px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: 500 }}>Blue Guides</span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left to Blue Safe Margin">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right to Blue Safe Margin">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top to Blue Safe Margin">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
+                        <div className={styles.alignToolbar}>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="4" y1="21" x2="4" y2="3" />
+                              <rect x="8" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal (Page Center)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="21" x2="12" y2="3" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="20" y1="21" x2="20" y2="3" />
+                              <rect x="4" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="4" x2="21" y2="4" />
+                              <rect x="6" y="8" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Center Vertical (Page Middle)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="12" x2="21" y2="12" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="20" x2="21" y2="20" />
+                              <rect x="6" y="4" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
 
                       {/* Match Size */}
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                           Match Size
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'width')} title="Match Width">⬌ Width</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'height')} title="Match Height">⬍ Height</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both">⬚ Both</button>
+                          <button type="button" className={styles.matchSizeBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'width')} title="Match Width of all selected frames">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 12H3M21 12l-4-4m4 4-4 4M3 12l4-4M3 12l4 4" />
+                            </svg>
+                            <span>Width</span>
+                          </button>
+                          <button type="button" className={styles.matchSizeBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'height')} title="Match Height of all selected frames">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 3v18M12 3l-4 4m4-4 4 4M12 21l-4-4m4 4 4-4" />
+                            </svg>
+                            <span>Height</span>
+                          </button>
+                          <button type="button" className={styles.matchSizeBtn} onClick={() => matchSelectedDimensions(activeSpread.id, 'both')} title="Match Both Width & Height">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <path d="M9 3v18M15 3v18M3 9h18M3 15h18" opacity="0.35" />
+                            </svg>
+                            <span>Both</span>
+                          </button>
                         </div>
                       </div>
 
@@ -1285,19 +1378,27 @@ export function WorkspaceLayout() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                           <button
                             type="button"
-                            className={styles.multiActionBtn}
+                            className={styles.resetActionButton}
                             onClick={() => resetSelectedRatio(activeSpread.id)}
                             title="Restore original photo aspect ratios (3:2 / 4:3) for all selected frames"
                           >
-                            ↺ Reset Ratio
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                              <path d="M3 3v5h5" />
+                            </svg>
+                            <span>Reset Ratio</span>
                           </button>
                           <button
                             type="button"
-                            className={styles.multiActionBtn}
+                            className={styles.resetActionButton}
                             onClick={() => resetSelectedCrop(activeSpread.id)}
                             title="Reset pan/zoom crop to 1.0x centered for all selected frames"
                           >
-                            ↺ Reset Crop
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                              <path d="M3 3v5h5" />
+                            </svg>
+                            <span>Reset Crop</span>
                           </button>
                         </div>
 
@@ -2223,70 +2324,118 @@ export function WorkspaceLayout() {
                       </div>
 
                       {/* 1-Click Dual Entity Reset Actions */}
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
                         <button
                           type="button"
+                          className={styles.resetActionButton}
                           onClick={() => resetToOriginalRatio(activeSpread.id, selectedFrame.id)}
-                          style={{
-                            flex: 1,
-                            padding: '4px 6px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                            border: '1px solid var(--color-border)',
-                            color: 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                          }}
                           title="Restore original photo aspect ratio (3:2 / 4:3)"
                         >
-                          ↺ Reset Ratio
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                            <path d="M3 3v5h5" />
+                          </svg>
+                          <span>Reset Ratio</span>
                         </button>
                         <button
                           type="button"
+                          className={styles.resetActionButton}
                           onClick={() => resetCrop(activeSpread.id, selectedFrame.id)}
-                          style={{
-                            flex: 1,
-                            padding: '4px 6px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                            border: '1px solid var(--color-border)',
-                            color: 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                          }}
                           title="Center photo and reset zoom to 1.0x"
                         >
-                          ↺ Reset Crop
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                            <path d="M3 3v5h5" />
+                          </svg>
+                          <span>Reset Crop</span>
                         </button>
                       </div>
 
                       {/* Alignment Grids for Single Frame */}
-                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                           Align to Canvas Edge
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '8px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left to Canvas Edge">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right to Canvas Edge">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top to Canvas Edge">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom to Canvas Edge">⤓ Bottom</button>
+                        <div className={styles.alignToolbar} style={{ marginBottom: '8px' }}>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'page_edge')} title="Align Left (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="4" y1="21" x2="4" y2="3" />
+                              <rect x="8" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'page_edge')} title="Align Center Horizontal (Canvas Center)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="21" x2="12" y2="3" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'page_edge')} title="Align Right (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="20" y1="21" x2="20" y2="3" />
+                              <rect x="4" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'page_edge')} title="Align Top (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="4" x2="21" y2="4" />
+                              <rect x="6" y="8" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'page_edge')} title="Align Center Vertical (Canvas Middle)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="12" x2="21" y2="12" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={styles.alignToolbarBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'page_edge')} title="Align Bottom (Canvas Edge)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="20" x2="21" y2="20" />
+                              <rect x="6" y="4" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
                         </div>
 
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span>Align to Safe Margin</span>
                           <span style={{ fontSize: '9px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: 500 }}>Blue Guides</span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left to Blue Safe Margin">⇤ Left</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal to Page Center">⇥⇤ Center H</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right to Blue Safe Margin">⇥ Right</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top to Blue Safe Margin">⤒ Top</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Middle Vertical to Page Middle">⤓⤒ Center V</button>
-                          <button type="button" className={styles.multiActionBtn} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom to Blue Safe Margin">⤓ Bottom</button>
+                        <div className={styles.alignToolbar}>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'left', 'safe_margin')} title="Align Left (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="4" y1="21" x2="4" y2="3" />
+                              <rect x="8" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'center', 'safe_margin')} title="Align Center Horizontal (Page Center)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="21" x2="12" y2="3" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'right', 'safe_margin')} title="Align Right (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="20" y1="21" x2="20" y2="3" />
+                              <rect x="4" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'top', 'safe_margin')} title="Align Top (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="4" x2="21" y2="4" />
+                              <rect x="6" y="8" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'middle', 'safe_margin')} title="Align Center Vertical (Page Middle)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="12" x2="21" y2="12" strokeDasharray="2 2" />
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                          <button type="button" className={`${styles.alignToolbarBtn} ${styles.alignToolbarBtnSafe}`} onClick={() => alignSelectedFrames(activeSpread.id, 'bottom', 'safe_margin')} title="Align Bottom (Blue Safe Margin)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="3" y1="20" x2="21" y2="20" />
+                              <rect x="6" y="4" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -2490,7 +2639,7 @@ export function WorkspaceLayout() {
                           <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
                           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
                         </svg>
-                        <span>Apply to All Spreads</span>
+                        <span>Apply to All</span>
                       </button>
                       <button
                         type="button"
@@ -2504,7 +2653,7 @@ export function WorkspaceLayout() {
                         <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                         </svg>
-                        <span>Set as Default</span>
+                        <span>Set Default</span>
                       </button>
                     </div>
                   </div>
@@ -2562,7 +2711,7 @@ export function WorkspaceLayout() {
                         <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
                         <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
                       </svg>
-                      <span>Apply to All Spreads</span>
+                      <span>Apply to All</span>
                     </button>
                     <button
                       type="button"
@@ -2578,7 +2727,7 @@ export function WorkspaceLayout() {
                       <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                       </svg>
-                      <span>Set as Default</span>
+                      <span>Set Default</span>
                     </button>
                   </div>
 
@@ -2939,7 +3088,7 @@ export function WorkspaceLayout() {
                             <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
-                            <span>Apply to All Spreads</span>
+                            <span>Apply to All</span>
                           </button>
                           <button
                             type="button"
@@ -2954,7 +3103,7 @@ export function WorkspaceLayout() {
                             <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                             </svg>
-                            <span>Set as Default</span>
+                            <span>Set Default</span>
                           </button>
                         </div>
                       </>
