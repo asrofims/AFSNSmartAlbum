@@ -492,6 +492,17 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   const albumDesignChanged = JSON.parse(JSON.stringify(albumBase));
   albumDesignChanged.spreads[0].elements[0].width = 120;
   console.assert(isAlbumDesignEqual(albumBase, albumDesignChanged) === false, 'Album design equality must detect geometry change');
+
+  // Spacing value and unit equality
+  const spreadSpacingA = { ...albumBase.spreads[0], spacingValue: 4, spacingUnit: 'mm' as const };
+  const spreadSpacingB = { ...albumBase.spreads[0], spacingValue: 4, spacingUnit: 'mm' as const };
+  console.assert(isSpreadDesignEqual(spreadSpacingA, spreadSpacingB) === true, 'Identical spacing must be equal');
+
+  const spreadSpacingValChanged = { ...albumBase.spreads[0], spacingValue: 6, spacingUnit: 'mm' as const };
+  console.assert(isSpreadDesignEqual(spreadSpacingA, spreadSpacingValChanged) === false, 'Different spacing value must not be equal');
+
+  const spreadSpacingUnitChanged = { ...albumBase.spreads[0], spacingValue: 4, spacingUnit: 'inch' as const };
+  console.assert(isSpreadDesignEqual(spreadSpacingA, spreadSpacingUnitChanged) === false, 'Different spacing unit must not be equal');
 }
 
 console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, and in-place non-shuffling photo gap adjustment)!');

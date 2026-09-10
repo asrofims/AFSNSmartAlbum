@@ -313,5 +313,62 @@ native = (command, args) => {
 };
 assert.equal((await useProjectStore.getState().saveProject()).success, true);
 
+// Photo Gap (spread spacing) and project spacing persistence across save and load.
+reset();
+let savedSpreadSpacing: number | null = null;
+let savedSpreadUnit: string | null = null;
+let persistedProjectSpacing: number | null = null;
+let persistedProjectUnit: string | null = null;
+
+const spreadToUpdate = useAlbumStore.getState().currentAlbum!.spreads[0]!;
+useAlbumStore.getState().setActiveSpread(spreadToUpdate.id);
+useAlbumStore.getState().updateSpreadSpacing(6.5, 'mm', useProjectStore.getState().currentProject!);
+await useProjectStore.getState().updateProjectSpacing(6.5, 'mm');
+
+assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingValue, 6.5);
+assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingUnit, 'mm');
+assert.equal(useProjectStore.getState().currentProject?.spacingValue, 6.5);
+assert.equal(useProjectStore.getState().currentProject?.spacingUnit, 'mm');
+assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
+
+native = (command, args) => {
+  if (command === 'update_project_spacing') {
+    persistedProjectSpacing = args.spacingValue;
+    persistedProjectUnit = args.spacingUnit;
+  }
+  if (command === 'save_album_structure') {
+    savedSpreadSpacing = args.album.spreads[0].spacingValue;
+    savedSpreadUnit = args.album.spreads[0].spacingUnit;
+  }
+  return command === 'check_path_exists' ? true : null;
+};
+
+assert.equal((await useProjectStore.getState().saveProject()).success, true);
+assert.equal(persistedProjectSpacing, 6.5);
+assert.equal(persistedProjectUnit, 'mm');
+assert.equal(savedSpreadSpacing, 6.5);
+assert.equal(savedSpreadUnit, 'mm');
+
+// Load album hydration preserves spacingValue and spacingUnit
+native = (command) => {
+  if (command === 'load_album_structure') {
+    return {
+      ...useAlbumStore.getState().currentAlbum!,
+      spreads: [
+        {
+          ...useAlbumStore.getState().currentAlbum!.spreads[0]!,
+          spacingValue: 8.0,
+          spacingUnit: 'mm',
+        },
+      ],
+    };
+  }
+  return null;
+};
+
+assert.equal(await useAlbumStore.getState().loadAlbumFromDb('p'), true);
+assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingValue, 8.0);
+assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingUnit, 'mm');
+
 clearMocks();
 console.log('✓ Project persistence regressions passed: failed writes, cancellation, ZIP protection, save serialization, concurrent edits and missing-file recovery.');

@@ -583,7 +583,13 @@ export function isSpreadDesignEqual(sA?: Spread | null, sB?: Spread | null): boo
   if (!sA || !sB) return false;
   if (sA.id !== sB.id || sA.spreadIndex !== sB.spreadIndex) return false;
   if (sA.gutterWidth !== sB.gutterWidth || (sA.backgroundColor || '') !== (sB.backgroundColor || '')) return false;
-  if (sA.photoInset !== sB.photoInset || sA.spacingValue !== sB.spacingValue) return false;
+  if (
+    sA.photoInset !== sB.photoInset ||
+    sA.spacingValue !== sB.spacingValue ||
+    (sA.spacingUnit || 'mm') !== (sB.spacingUnit || 'mm')
+  ) {
+    return false;
+  }
   const elsA = sA.elements || [];
   const elsB = sB.elements || [];
   if (elsA.length !== elsB.length) return false;

@@ -2566,6 +2566,7 @@ export function WorkspaceLayout() {
                           const num = Math.max(0, val);
                           const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
                           updateSpreadSpacing(num, unit, currentProject);
+                          updateProjectSpacing(num, unit);
                           setCustomGapValue(num);
                           gapChangedRef.current = true;
                         }}
@@ -2590,6 +2591,7 @@ export function WorkspaceLayout() {
                         const val = activeSpread?.spacingValue ?? currentProject.spacingValue;
                         const unit = activeSpread?.spacingUnit ?? currentProject.spacingUnit;
                         applySpacingToAllSpreads(val, unit, currentProject);
+                        updateProjectSpacing(val, unit);
                         showToast(`Applied ${val} ${unit} spacing to all spreads`);
                       }}
                       title="Apply current photo spacing to all spreads in the album"

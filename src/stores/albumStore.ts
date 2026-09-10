@@ -193,10 +193,20 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           ...payload,
           coverSpread: {
             ...payload.coverSpread,
+            spacingValue:
+              payload.coverSpread?.spacingValue !== undefined && payload.coverSpread?.spacingValue !== null
+                ? Number(payload.coverSpread.spacingValue)
+                : undefined,
+            spacingUnit: payload.coverSpread?.spacingUnit || undefined,
             elements: (payload.coverSpread?.elements || []).map(hydrateElement),
           },
           spreads: (payload.spreads || []).map((s: any) => ({
             ...s,
+            spacingValue:
+              s?.spacingValue !== undefined && s?.spacingValue !== null
+                ? Number(s.spacingValue)
+                : undefined,
+            spacingUnit: s?.spacingUnit || undefined,
             elements: (s.elements || []).map(hydrateElement),
           })),
         };
@@ -234,10 +244,20 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
             ...parsed.album,
             coverSpread: {
               ...parsed.album.coverSpread,
+              spacingValue:
+                parsed.album.coverSpread?.spacingValue !== undefined && parsed.album.coverSpread?.spacingValue !== null
+                  ? Number(parsed.album.coverSpread.spacingValue)
+                  : undefined,
+              spacingUnit: parsed.album.coverSpread?.spacingUnit || undefined,
               elements: (parsed.album.coverSpread?.elements || []).map(hydrateElement),
             },
             spreads: (parsed.album.spreads || []).map((s: any) => ({
               ...s,
+              spacingValue:
+                s?.spacingValue !== undefined && s?.spacingValue !== null
+                  ? Number(s.spacingValue)
+                  : undefined,
+              spacingUnit: s?.spacingUnit || undefined,
               elements: (s.elements || []).map(hydrateElement),
             })),
           };
@@ -363,14 +383,24 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       };
     };
 
-    const sanitizedAlbum: Album = {
+    const sanitizedAlbum: any = {
       ...currentAlbum,
       coverSpread: {
         ...currentAlbum.coverSpread,
+        spacingValue:
+          currentAlbum.coverSpread?.spacingValue !== undefined && currentAlbum.coverSpread?.spacingValue !== null
+            ? Number(currentAlbum.coverSpread.spacingValue)
+            : null,
+        spacingUnit: currentAlbum.coverSpread?.spacingUnit || null,
         elements: (currentAlbum.coverSpread.elements || []).map(sanitizeElement),
       },
       spreads: (currentAlbum.spreads || []).map((spread) => ({
         ...spread,
+        spacingValue:
+          spread.spacingValue !== undefined && spread.spacingValue !== null
+            ? Number(spread.spacingValue)
+            : null,
+        spacingUnit: spread.spacingUnit || null,
         elements: (spread.elements || []).map(sanitizeElement),
       })),
     };

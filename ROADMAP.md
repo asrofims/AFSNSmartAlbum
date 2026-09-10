@@ -77,6 +77,7 @@
 - [x] Custom Application Branding (`logosmartalbumafsn2.png`) & File Association
 - [x] Project Migration & Schema Versioning
 - [x] Exclusive `.afsn` save ownership, file identity validation, and recovery preservation when Save As replaces another project's file (SQLite v14).
+- [x] Robust Photo Gap & Spread Spacing Persistence across SQLite migrations, .afsn packages, project reloads, and Inspector panels (SQLite v15).
 - [ ] Manual verification of same-destination Save As, displaced Recent Projects, copied-file reopen, cancellation, and failed save after the ownership fix (automated tests deferred at user request).
 
 ## Phase 6 — Templates & Layout Generator

@@ -18,6 +18,16 @@ const persistProjectMargins = async (project: Project): Promise<void> => {
   });
 };
 
+const persistProjectSpacing = async (project: Project): Promise<void> => {
+  const fallback = Number(project.spacingValue ?? 2);
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('update_project_spacing', {
+    id: project.id,
+    spacingValue: fallback,
+    spacingUnit: project.spacingUnit || 'mm',
+  });
+};
+
 interface ProjectState {
   currentProject: Project | null;
   recentProjects: Project[];
@@ -151,6 +161,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (e) {
       console.warn('[AFSN] localStorage write error:', e);
     }
+
+    try {
+      const { useAlbumStore } = await import('./albumStore');
+      useAlbumStore.getState().setSaveStatus('unsaved');
+    } catch {}
   },
 
   updateProjectMargin: async (marginValue: number, marginUnit?: Unit, side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all') => {
@@ -501,6 +516,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       if (!album || album.projectId !== current.id) throw new Error('The active project is not ready to save.');
       await persistProjectMargins(current);
+      await persistProjectSpacing(current);
       if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
       if (get().currentProject?.id !== current.id) return failed;
       // Unsaved projects receive database recovery checkpoints without opening a dialog.
@@ -553,6 +569,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { usePhotoStore } = await import('./photoStore');
       if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before using Save As.');
       await persistProjectMargins(current);
+      await persistProjectSpacing(current);
       if (!await useAlbumStore.getState().saveAlbumToDb()) throw new Error('The recovery database could not be saved. Your project file was not changed.');
       const { invoke } = await import('@tauri-apps/api/core');
       let saved: Project | null;
@@ -603,6 +620,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const { usePhotoStore } = await import('./photoStore');
       if (usePhotoStore.getState().isImporting) throw new Error('Wait for photo import to finish before exporting a package.');
       await persistProjectMargins(current);
+      await persistProjectSpacing(current);
       if (useAlbumStore.getState().currentAlbum?.projectId !== current.id || !await useAlbumStore.getState().saveAlbumToDb()) {
         throw new Error('The current project could not be saved to the recovery database.');
       }

@@ -241,6 +241,10 @@ pub struct SpreadPayload {
     pub safe_area_outside: Option<f64>,
     #[serde(default)]
     pub safe_area_spine: Option<f64>,
+    #[serde(default)]
+    pub spacing_value: Option<f64>,
+    #[serde(default)]
+    pub spacing_unit: Option<String>,
     #[serde(default = "default_bg_color")]
     pub background_color: String,
     #[serde(default)]
@@ -289,7 +293,7 @@ pub struct Database {
 
 impl Database {
     pub fn expected_version() -> i32 {
-        14
+        15
     }
 
     /// Initialize the database at the given path.
@@ -399,6 +403,9 @@ impl Database {
                  INSERT INTO schema_version (version) VALUES (14);
                  COMMIT;"
             )?;
+        }
+        if current_version < 15 {
+            Self::migrate_v15(conn)?;
         }
 
         Ok(())
@@ -823,6 +830,43 @@ impl Database {
             }
         }
         log::info!("Applied database migration v13");
+        Ok(())
+    }
+
+    /// Schema version 15: Add spacing_value and spacing_unit to album_spreads table.
+    fn migrate_v15(conn: &Connection) -> SqliteResult<()> {
+        let spread_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(album_spreads)")?
+            .query_map([], |row| row.get(1))?
+            .filter_map(|row| row.ok())
+            .collect();
+
+        conn.execute_batch("BEGIN;")?;
+        let result = (|| -> SqliteResult<()> {
+            if !spread_columns.contains(&"spacing_value".to_string()) {
+                conn.execute("ALTER TABLE album_spreads ADD COLUMN spacing_value REAL", [])?;
+            }
+            if !spread_columns.contains(&"spacing_unit".to_string()) {
+                conn.execute("ALTER TABLE album_spreads ADD COLUMN spacing_unit TEXT", [])?;
+            }
+            conn.execute(
+                "UPDATE album_spreads SET
+                    spacing_value = COALESCE(spacing_value, (SELECT spacing_value FROM projects WHERE projects.id = album_spreads.project_id)),
+                    spacing_unit = COALESCE(spacing_unit, (SELECT spacing_unit FROM projects WHERE projects.id = album_spreads.project_id))",
+                [],
+            )?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (15)", [])?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => conn.execute_batch("COMMIT;")?,
+            Err(error) => {
+                let _ = conn.execute_batch("ROLLBACK;");
+                return Err(error);
+            }
+        }
+        log::info!("Applied database migration v15");
         Ok(())
     }
 
@@ -1660,8 +1704,9 @@ impl Database {
                     bleed, safe_area, safe_area_top, safe_area_bottom,
                     safe_area_outside, safe_area_spine, background_color, is_cover,
                     left_page_background_color, right_page_background_color,
+                    spacing_value, spacing_unit,
                     created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, datetime('now'), datetime('now'))",
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, datetime('now'), datetime('now'))",
                 rusqlite::params![
                     spread.id,
                     project_id,
@@ -1682,6 +1727,8 @@ impl Database {
                     if is_cover { 1 } else { 0 },
                     left_bg,
                     right_bg,
+                    spread.spacing_value,
+                    spread.spacing_unit,
                 ],
             )?;
 
@@ -1842,6 +1889,7 @@ impl Database {
                     COALESCE(safe_area_spine, safe_area),
                     background_color, is_cover,
                     left_page_background_color, right_page_background_color,
+                    spacing_value, spacing_unit,
                     created_at, updated_at
              FROM album_spreads
              WHERE project_id = ?1
@@ -1867,6 +1915,8 @@ impl Database {
             let bg: String = row.get::<_, String>(15).unwrap_or_else(|_| "#FFFFFF".to_string());
             let left_bg: String = row.get::<_, Option<String>>(17).ok().flatten().unwrap_or_else(|| bg.clone());
             let right_bg: String = row.get::<_, Option<String>>(18).ok().flatten().unwrap_or_else(|| bg.clone());
+            let spacing_val: Option<f64> = row.get(19).ok();
+            let spacing_u: Option<String> = row.get(20).ok();
             Ok((
                 row.get::<_, String>(0)?, // id
                 row.get::<_, String>(1).unwrap_or_default(), // project_id
@@ -1887,6 +1937,8 @@ impl Database {
                 is_cover_int != 0,                      // is_cover
                 left_bg,                                // left_page_background_color
                 right_bg,                               // right_page_background_color
+                spacing_val,                            // spacing_value
+                spacing_u,                              // spacing_unit
             ))
         })?;
 
@@ -1894,7 +1946,7 @@ impl Database {
         let mut interior_spreads: Vec<SpreadPayload> = Vec::new();
 
         for s_res in spread_rows {
-            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, safe_area_top, safe_area_bottom, safe_area_outside, safe_area_spine, background_color, is_cover, left_bg, right_bg) = s_res?;
+            let (id, _pid, spread_index, spread_type, name, left_page_id, right_page_id, gutter_width, gutter_unit, bleed, safe_area, safe_area_top, safe_area_bottom, safe_area_outside, safe_area_spine, background_color, is_cover, left_bg, right_bg, spacing_value, spacing_unit) = s_res?;
 
             // Load elements for this spread
             let elem_rows = elem_stmt.query_map([&id], |er| {
@@ -2015,6 +2067,8 @@ impl Database {
                 safe_area_bottom: Some(safe_area_bottom),
                 safe_area_outside: Some(safe_area_outside),
                 safe_area_spine: Some(safe_area_spine),
+                spacing_value,
+                spacing_unit,
                 background_color,
                 elements,
             };
@@ -2048,6 +2102,8 @@ impl Database {
             safe_area_bottom: Some(10.0),
             safe_area_outside: Some(10.0),
             safe_area_spine: Some(10.0),
+            spacing_value: Some(project.spacing_value),
+            spacing_unit: Some(project.spacing_unit.clone()),
             background_color: "#1e293b".to_string(),
             elements: Vec::new(),
         });
@@ -2262,6 +2318,8 @@ mod tests {
             safe_area_bottom: Some(12.0),
             safe_area_outside: Some(13.0),
             safe_area_spine: Some(14.0),
+            spacing_value: Some(4.0),
+            spacing_unit: Some("mm".to_string()),
             background_color: "#1e293b".to_string(),
             elements: vec![],
         };
@@ -2303,6 +2361,8 @@ mod tests {
             safe_area_bottom: Some(16.0),
             safe_area_outside: Some(17.0),
             safe_area_spine: Some(18.0),
+            spacing_value: Some(6.0),
+            spacing_unit: Some("mm".to_string()),
             background_color: "#FFFFFF".to_string(),
             elements: vec![
                 ElementPayload {
@@ -2365,10 +2425,14 @@ mod tests {
         assert_eq!(loaded_album.cover_spread.safe_area_bottom, Some(12.0));
         assert_eq!(loaded_album.cover_spread.safe_area_outside, Some(13.0));
         assert_eq!(loaded_album.cover_spread.safe_area_spine, Some(14.0));
+        assert_eq!(loaded_album.cover_spread.spacing_value, Some(4.0));
+        assert_eq!(loaded_album.cover_spread.spacing_unit, Some("mm".to_string()));
         assert_eq!(loaded_album.spreads[0].safe_area_top, Some(15.0));
         assert_eq!(loaded_album.spreads[0].safe_area_bottom, Some(16.0));
         assert_eq!(loaded_album.spreads[0].safe_area_outside, Some(17.0));
         assert_eq!(loaded_album.spreads[0].safe_area_spine, Some(18.0));
+        assert_eq!(loaded_album.spreads[0].spacing_value, Some(6.0));
+        assert_eq!(loaded_album.spreads[0].spacing_unit, Some("mm".to_string()));
 
         // Test Export & Import .afsn Package
         let afsn_path = temp_dir.join("test_package.afsn");
@@ -2381,6 +2445,8 @@ mod tests {
         let imported_album = imported_pkg.album.unwrap();
         assert_eq!(imported_album.spreads.len(), 1);
         assert_eq!(imported_album.spreads[0].safe_area_spine, Some(18.0));
+        assert_eq!(imported_album.spreads[0].spacing_value, Some(6.0));
+        assert_eq!(imported_album.spreads[0].spacing_unit, Some("mm".to_string()));
 
         // Test Export & Import Standalone Bundle .zip Package (with photos)
         let sample_img_path = temp_dir.join("sample_img.jpg");
@@ -2586,6 +2652,8 @@ mod tests {
                 safe_area_bottom: Some(10.0),
                 safe_area_outside: Some(10.0),
                 safe_area_spine: Some(10.0),
+                spacing_value: Some(4.0),
+                spacing_unit: Some("mm".to_string()),
                 background_color: "#FFFFFF".to_string(),
                 elements: vec![elem_fields],
             },

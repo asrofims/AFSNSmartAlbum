@@ -1140,6 +1140,8 @@ mod tests {
             safe_area_bottom: Some(10.0),
             safe_area_outside: Some(10.0),
             safe_area_spine: Some(10.0),
+            spacing_value: Some(4.0),
+            spacing_unit: Some("mm".to_string()),
             background_color: "#FFFFFF".to_string(),
             elements: vec![left_elem, right_elem],
         };
@@ -1294,6 +1296,8 @@ mod tests {
             safe_area_bottom: Some(10.0),
             safe_area_outside: Some(10.0),
             safe_area_spine: Some(10.0),
+            spacing_value: Some(4.0),
+            spacing_unit: Some("mm".to_string()),
             background_color: "#FFFFFF".to_string(),
             elements: vec![],
         };
