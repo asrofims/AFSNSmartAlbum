@@ -21,17 +21,19 @@ import {
   deserializeTextPayload,
   DEFAULT_TEXT_STYLE,
 } from '../domain/text';
-import { getProjectDimensionsInCanvasUnit } from '../domain/templates';
+import { getProjectDimensionsInCanvasUnit, getUsableAreas, type RectBounds } from '../domain/templates';
 import {
   AdaptivePhoto,
   generateAdaptiveLayoutVariations,
   buildSpreadElementsFromVariation,
   shuffleElementsPhotos,
+  partitionPageBoxIntoKRects,
 } from '../domain/adaptiveLayout';
 import { useHistoryStore } from './historyStore';
 import { useEditorStore } from './editorStore';
 import { useProjectStore } from './projectStore';
-import { getCornerRadii, type PhotoFrameElement } from '../domain/editor';
+import { getCornerRadii, adjustSpreadPhotoGaps, type PhotoFrameElement } from '../domain/editor';
+import { convertUnit } from '../domain/units';
 import type { Photo } from '../domain/photo';
 
 let databaseWriteQueue: Promise<unknown> = Promise.resolve();
@@ -39,6 +41,191 @@ export function persistInOrder<T>(write: () => Promise<T>): Promise<T> {
   const result = databaseWriteQueue.then(write, write);
   databaseWriteQueue = result.catch(() => false);
   return result;
+}
+
+let spacingHistoryTimer: any = null;
+let initialAlbumBeforeSpacingChange: Album | null = null;
+
+export function flushSpacingHistory() {
+  if (spacingHistoryTimer) {
+    clearTimeout(spacingHistoryTimer);
+    spacingHistoryTimer = null;
+    if (initialAlbumBeforeSpacingChange) {
+      useHistoryStore.getState().pushState(initialAlbumBeforeSpacingChange);
+      initialAlbumBeforeSpacingChange = null;
+    }
+  }
+}
+
+/**
+ * Finds the partition variant index for a specific box and photo elements that best preserves
+ * the relative arrangement (columns, rows, heroes) of the existing photos.
+ */
+export function findBestVariantIndexForBox(
+  box: RectBounds,
+  elements: PhotoFrameElement[],
+  spacing: number
+): number {
+  const count = elements.length;
+  if (count <= 1) return 0;
+  const maxVariants = count === 2 ? 4 : count === 3 ? 8 : count === 4 ? 8 : 6;
+  let bestV = 0;
+  let minDiff = Infinity;
+
+  const sortedElements = [...elements].sort((a, b) => a.y - b.y || a.x - b.x);
+
+  for (let v = 0; v < maxVariants; v++) {
+    const rects = partitionPageBoxIntoKRects(box, count, spacing, v);
+    const sortedRects = [...rects].sort((a, b) => a.y - b.y || a.x - b.x);
+    let diff = 0;
+    for (let i = 0; i < count; i++) {
+      const el = sortedElements[i];
+      const r = sortedRects[i];
+      if (!el || !r) continue;
+      const elCx = (el.x + el.width / 2 - box.x) / Math.max(1, box.width);
+      const elCy = (el.y + el.height / 2 - box.y) / Math.max(1, box.height);
+      const rCx = (r.x + r.width / 2 - box.x) / Math.max(1, box.width);
+      const rCy = (r.y + r.height / 2 - box.y) / Math.max(1, box.height);
+      diff += Math.hypot(elCx - rCx, elCy - rCy);
+    }
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestV = v;
+    }
+  }
+  return bestV;
+}
+
+/**
+ * Re-applies adaptive layout partitioning per page/cluster with the new gap spacing in real-time,
+ * strictly bounded by the Safe Zone, preserving photos, crops, and layout structure.
+ */
+export function applyAdaptiveGapToSpread(
+  spread: Spread,
+  spacingValue: number,
+  spacingUnit: Unit,
+  project: Project,
+  _layoutIndex?: number
+): Spread {
+  const isCover = !spread.leftPage || !spread.rightPage;
+  const dims = getProjectDimensionsInCanvasUnit(project, spread);
+  const canvasUnit = project?.canvasUnit || spread.leftPage?.unit || 'mm';
+  const dpi = project?.canvasDpi || 300;
+  const targetGapInCanvasUnit = convertUnit(spacingValue, spacingUnit, canvasUnit, dpi);
+
+  const photoElements = (spread.elements || []).filter(
+    (el): el is PhotoFrameElement => el.type === 'photo'
+  );
+  const unlockedElements = photoElements.filter((el) => !el.locked);
+
+  if (unlockedElements.length < 2) {
+    return {
+      ...spread,
+      spacingValue,
+      spacingUnit,
+    };
+  }
+
+  const pageWidth = spread.leftPage ? spread.leftPage.width : dims.pageWidth;
+  const gutterWidth = spread.gutterWidth ?? dims.gutterWidth;
+  const spineX = pageWidth + gutterWidth / 2;
+
+  const isSpread = !isCover;
+  const spreadWidth = isCover
+    ? pageWidth
+    : pageWidth * 2 + gutterWidth;
+  const spreadHeight = dims.pageHeight;
+
+  const { leftPageArea, rightPageArea, spreadArea } = getUsableAreas({
+    spreadWidth,
+    spreadHeight,
+    isSpread,
+    safeMargin: dims.safeMargin,
+    safeMarginTop: dims.safeMarginTop,
+    safeMarginBottom: dims.safeMarginBottom,
+    safeMarginOutside: dims.safeMarginOutside,
+    safeMarginSpine: dims.safeMarginSpine,
+    gutterWidth,
+    spacing: targetGapInCanvasUnit,
+  });
+
+  // Check if any unlocked frame spans across the spine
+  const hasSpanningPhoto = unlockedElements.some(
+    (f) => f.x < spineX - 5 && f.x + f.width > spineX + 5
+  );
+
+  type ClusterTarget = {
+    box: RectBounds;
+    frames: PhotoFrameElement[];
+  };
+
+  const clusters: ClusterTarget[] = [];
+
+  if (isCover || hasSpanningPhoto) {
+    clusters.push({
+      box: spreadArea,
+      frames: unlockedElements,
+    });
+  } else {
+    const leftFrames = unlockedElements.filter((f) => f.x + f.width / 2 < spineX);
+    const rightFrames = unlockedElements.filter((f) => f.x + f.width / 2 >= spineX);
+    if (leftFrames.length > 0) {
+      clusters.push({ box: leftPageArea, frames: leftFrames });
+    }
+    if (rightFrames.length > 0) {
+      clusters.push({ box: rightPageArea, frames: rightFrames });
+    }
+  }
+
+  const updatedFramesMap = new Map<string, PhotoFrameElement>();
+
+  for (const { box, frames } of clusters) {
+    if (frames.length < 2) {
+      for (const f of frames) {
+        updatedFramesMap.set(f.id, f);
+      }
+      continue;
+    }
+
+    // Partition the box adaptively for this cluster with the new spacing
+    const bestV = findBestVariantIndexForBox(box, frames, targetGapInCanvasUnit);
+    const rects = partitionPageBoxIntoKRects(box, frames.length, targetGapInCanvasUnit, bestV);
+
+    const elementsWithIdx = frames.map((el, idx) => ({ el, idx }));
+    elementsWithIdx.sort((a, b) => a.el.y - b.el.y || a.el.x - b.el.x);
+
+    const sortedRects = rects.map((rect, idx) => ({ rect, idx }));
+    sortedRects.sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+
+    for (let i = 0; i < elementsWithIdx.length; i++) {
+      const item = elementsWithIdx[i];
+      if (!item) continue;
+      const newRect = sortedRects[i]?.rect;
+      const el = item.el;
+      if (newRect && el) {
+        updatedFramesMap.set(el.id, {
+          ...el,
+          x: newRect.x,
+          y: newRect.y,
+          width: newRect.width,
+          height: newRect.height,
+          originalWidth: newRect.width,
+          originalHeight: newRect.height,
+        });
+      }
+    }
+  }
+
+  const updatedElements = (spread.elements || []).map((el) =>
+    el.type === 'photo' ? (updatedFramesMap.get(el.id) || el) : el
+  );
+
+  return {
+    ...spread,
+    spacingValue,
+    spacingUnit,
+    elements: updatedElements,
+  };
 }
 
 export interface AlbumState {
@@ -440,6 +627,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   }),
 
   undo: () => {
+    flushSpacingHistory();
     const { currentAlbum } = get();
     if (!currentAlbum) return;
 
@@ -465,6 +653,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   redo: () => {
+    flushSpacingHistory();
     const { currentAlbum } = get();
     if (!currentAlbum) return;
 
@@ -882,10 +1071,23 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => {
-    const { currentAlbum, activeSpreadId } = get();
+    const { currentAlbum, activeSpreadId, spreadLayoutIndices } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
-    useHistoryStore.getState().pushState(currentAlbum);
+    // Debounce history push so typing/scrubbing is 60fps instant with zero lag
+    if (!initialAlbumBeforeSpacingChange) {
+      initialAlbumBeforeSpacingChange = currentAlbum;
+    }
+    if (spacingHistoryTimer) {
+      clearTimeout(spacingHistoryTimer);
+    }
+    spacingHistoryTimer = setTimeout(() => {
+      if (initialAlbumBeforeSpacingChange) {
+        useHistoryStore.getState().pushState(initialAlbumBeforeSpacingChange);
+        initialAlbumBeforeSpacingChange = null;
+      }
+      spacingHistoryTimer = null;
+    }, 400);
 
     const isCover = currentAlbum.coverSpread.id === activeSpreadId;
     const targetSpread = isCover
@@ -894,12 +1096,19 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
 
     if (!targetSpread) return;
 
-    const unit = spacingUnit || targetSpread.spacingUnit || (project ? project.spacingUnit : 'mm');
-    const updatedTargetSpread: Spread = {
-      ...targetSpread,
+    const proj = project || useProjectStore.getState().currentProject;
+    if (!proj) return;
+
+    const unit = spacingUnit || targetSpread.spacingUnit || proj.spacingUnit || 'mm';
+    const layoutIndex = spreadLayoutIndices[activeSpreadId];
+
+    const updatedTargetSpread = applyAdaptiveGapToSpread(
+      targetSpread,
       spacingValue,
-      spacingUnit: unit,
-    };
+      unit,
+      proj,
+      layoutIndex
+    );
 
     if (isCover) {
       set({
@@ -926,21 +1135,28 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   },
 
   applySpacingToAllSpreads: (spacingValue: number, spacingUnit?: Unit, project?: Project) => {
-    const { currentAlbum } = get();
+    const { currentAlbum, spreadLayoutIndices } = get();
     if (!currentAlbum) return;
 
+    flushSpacingHistory();
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const unit = spacingUnit || currentAlbum.coverSpread.spacingUnit || (project ? project.spacingUnit : 'mm');
+    const proj = project || useProjectStore.getState().currentProject;
+    if (!proj) return;
 
-    const updateSpreadGap = (spread: Spread): Spread => ({
-      ...spread,
+    const unit = spacingUnit || currentAlbum.coverSpread.spacingUnit || proj.spacingUnit || 'mm';
+
+    const updatedCover = applyAdaptiveGapToSpread(
+      currentAlbum.coverSpread,
       spacingValue,
-      spacingUnit: unit,
-    });
+      unit,
+      proj,
+      spreadLayoutIndices[currentAlbum.coverSpread.id]
+    );
 
-    const updatedCover = updateSpreadGap(currentAlbum.coverSpread);
-    const updatedSpreads = currentAlbum.spreads.map(updateSpreadGap);
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      applyAdaptiveGapToSpread(s, spacingValue, unit, proj, spreadLayoutIndices[s.id])
+    );
 
     set({
       currentAlbum: {

@@ -13,8 +13,9 @@ import {
   isSpreadDesignEqual,
   isAlbumDesignEqual,
 } from '../src/domain/album';
-import { type PhotoFrameElement, applyFixedGap } from '../src/domain/editor';
+import { type PhotoFrameElement, applyFixedGap, adjustSpreadPhotoGaps } from '../src/domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
+import { applyAdaptiveGapToSpread } from '../src/stores/albumStore';
 
 console.log('Testing Album Structure Domain...');
 
@@ -505,4 +506,187 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   console.assert(isSpreadDesignEqual(spreadSpacingA, spreadSpacingUnitChanged) === false, 'Different spacing unit must not be equal');
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, and in-place non-shuffling photo gap adjustment)!');
+// 18. Test adjustSpreadPhotoGaps: In-place realtime gap adjustment without altering layout topology
+{
+  const f1: PhotoFrameElement = {
+    id: 'f1',
+    type: 'photo',
+    photoId: 'photo-1',
+    filePath: '/photos/p1.jpg',
+    fileName: 'p1.jpg',
+    previewPath: '/cache/p1.jpg',
+    thumbnailPath: '/cache/p1_thumb.jpg',
+    x: 10,
+    y: 10,
+    width: 90,
+    height: 100,
+    rotation: 0,
+    zIndex: 1,
+    cropX: 0,
+    cropY: 0,
+    cropScale: 1,
+    cropRotation: 0,
+    borderEnabled: false,
+    borderWidth: 0,
+    borderColor: '#000',
+    opacity: 1,
+  };
+
+  const f2: PhotoFrameElement = {
+    ...f1,
+    id: 'f2',
+    photoId: 'photo-2',
+    x: 110,
+    width: 90,
+  };
+
+  // Initial setup: 2 photos on Left Page (x: 10..200), initial gap is 10mm (110 - (10 + 90) = 10)
+  // Target gap is 4mm
+  const adjusted = adjustSpreadPhotoGaps([f1, f2], 4, 300, 0);
+  const adj1 = adjusted.find((el: any) => el.id === 'f1') as PhotoFrameElement;
+  const adj2 = adjusted.find((el: any) => el.id === 'f2') as PhotoFrameElement;
+
+  console.assert(adj1 && adj2, 'Both frames must be returned');
+  const measuredGap = Math.round((adj2.x - (adj1.x + adj1.width)) * 100) / 100;
+  console.assert(measuredGap === 4, `Measured gap between f1 and f2 must be 4mm, got ${measuredGap}`);
+  console.assert(adj1.x === 10, `f1 should start at x = 10, got ${adj1.x}`);
+  const outerRight = Math.round((adj2.x + adj2.width) * 100) / 100;
+  console.assert(outerRight === 200, `Outer right boundary should remain 200, got ${outerRight}`);
+  console.assert(adj1.photoId === 'photo-1' && adj2.photoId === 'photo-2', 'Photo identity must never shuffle');
+
+  // Test asymmetric 3-photo layout (1 large left, 2 stacked right)
+  const leftBig: PhotoFrameElement = { ...f1, id: 'leftBig', x: 10, y: 10, width: 100, height: 200 };
+  const rightTop: PhotoFrameElement = { ...f1, id: 'rightTop', x: 120, y: 10, width: 80, height: 95 };
+  const rightBottom: PhotoFrameElement = { ...f1, id: 'rightBottom', x: 120, y: 115, width: 80, height: 95 };
+
+  // Old horizontal gap = 120 - (10 + 100) = 10
+  // Old vertical gap = 115 - (10 + 95) = 10
+  // Total span: X [10, 200], Y [10, 210]
+  const adjAsymm = adjustSpreadPhotoGaps([leftBig, rightTop, rightBottom], 6, 300, 0);
+  const aBig = adjAsymm.find((el: any) => el.id === 'leftBig') as PhotoFrameElement;
+  const aTop = adjAsymm.find((el: any) => el.id === 'rightTop') as PhotoFrameElement;
+  const aBottom = adjAsymm.find((el: any) => el.id === 'rightBottom') as PhotoFrameElement;
+
+  const horizGap = Math.round((aTop.x - (aBig.x + aBig.width)) * 100) / 100;
+  const vertGap = Math.round((aBottom.y - (aTop.y + aTop.height)) * 100) / 100;
+
+  console.assert(horizGap === 6, `Horizontal gap must be 6mm, got ${horizGap}`);
+  console.assert(vertGap === 6, `Vertical gap must be 6mm, got ${vertGap}`);
+  console.assert(aTop.x === aBottom.x, `Right column frames must align horizontally: ${aTop.x} vs ${aBottom.x}`);
+  console.assert(aBig.height === 200, `Left large photo height must be preserved: got ${aBig.height}`);
+}
+
+// 19. Test applyAdaptiveGapToSpread: Adaptive layout gap adjustment strictly bounded by Safe Zone
+{
+  const testProject: Project = {
+    ...mockProject,
+    canvasWidth: 200,
+    canvasHeight: 200,
+    canvasUnit: 'mm',
+    marginEnabled: true,
+    marginValue: 10,
+    marginTop: 10,
+    marginBottom: 10,
+    marginOutside: 10,
+    marginSpine: 10,
+    spacingValue: 4,
+    spacingUnit: 'mm',
+  };
+
+  const initialSpread: Spread = {
+    id: 'spread-adaptive-test',
+    albumId: 'test-album-1',
+    spreadNumber: 1,
+    pageNumber: 1,
+    safeArea: 10,
+    spacingValue: 4,
+    spacingUnit: 'mm',
+    gutterWidth: 0,
+    leftPage: {
+      id: 'lp-1',
+      pageNumber: 1,
+      width: 200,
+      height: 200,
+      unit: 'mm',
+      safeArea: 10,
+    },
+    rightPage: {
+      id: 'rp-1',
+      pageNumber: 2,
+      width: 200,
+      height: 200,
+      unit: 'mm',
+      safeArea: 10,
+    },
+    elements: [
+      {
+        id: 'f1',
+        type: 'photo',
+        photoId: 'p1',
+        filePath: '/photos/p1.jpg',
+        fileName: 'p1.jpg',
+        previewPath: '/cache/p1.jpg',
+        thumbnailPath: '/cache/p1_thumb.jpg',
+        x: 10,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 5,
+        cropY: 5,
+        cropScale: 1.2,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+      {
+        id: 'f2',
+        type: 'photo',
+        photoId: 'p2',
+        filePath: '/photos/p2.jpg',
+        fileName: 'p2.jpg',
+        previewPath: '/cache/p2.jpg',
+        thumbnailPath: '/cache/p2_thumb.jpg',
+        x: 102,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+    ],
+  };
+
+  // Adjust gap from 4mm to 10mm
+  const updatedSpread = applyAdaptiveGapToSpread(initialSpread, 10, 'mm', testProject);
+  const elements = updatedSpread.elements as PhotoFrameElement[];
+  console.assert(elements.length === 2, 'Must have 2 elements');
+
+  const el1 = elements.find((e) => e.id === 'f1')!;
+  const el2 = elements.find((e) => e.id === 'f2')!;
+  console.assert(el1 && el2, 'Both frames must be preserved by ID');
+  console.assert(el1.cropScale === 1.2 && el1.cropX === 5, 'Existing crop settings must be strictly preserved');
+
+  // Verify safe margin confinement (safe box: x from 10 to 190, y from 10 to 190)
+  console.assert(el1.x >= 10, `Photo 1 left edge (${el1.x}) must not exceed safe margin 10`);
+  console.assert(el1.y >= 10, `Photo 1 top edge (${el1.y}) must not exceed safe margin 10`);
+  console.assert(el2.x + el2.width <= 190.01, `Photo 2 right edge (${el2.x + el2.width}) must not exceed safe margin 190`);
+  console.assert(el2.y + el2.height <= 190.01, `Photo 2 bottom edge (${el2.y + el2.height}) must not exceed safe margin 190`);
+
+  // Verify exact gap spacing between adjacent photos
+  const measuredGap = Math.round((el2.x - (el1.x + el1.width)) * 100) / 100;
+  console.assert(measuredGap === 10, `Gap must be 10mm, got ${measuredGap}`);
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, and adaptive safezone-bounded gap scaling)!');

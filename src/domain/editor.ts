@@ -2766,3 +2766,319 @@ export function calculateRotatedMultiFrameResize(
     };
   });
 }
+
+export interface SafeZoneParams {
+  safeMarginTop?: number;
+  safeMarginBottom?: number;
+  safeMarginOutside?: number;
+  safeMarginSpine?: number;
+  enabled?: boolean;
+  spreadWidth?: number;
+  spreadHeight?: number;
+}
+
+/**
+ * Adjusts the inter-frame gaps between existing photo frames on a spread to targetGap in-place,
+ * preserving the exact layout structure, frame topology, relative proportions, and outer bounds.
+ * Does not replace, shuffle, or cycle the layout.
+ */
+export function adjustSpreadPhotoGaps(
+  elements: any[],
+  targetGapInCanvasUnit: number,
+  pageWidth: number,
+  gutterWidth = 0,
+  safeZone?: SafeZoneParams
+): any[] {
+  if (!elements || elements.length === 0) return elements;
+
+  const photoFrames = elements.filter((el): el is PhotoFrameElement => el.type === 'photo');
+
+  if (photoFrames.length < 2) {
+    return elements;
+  }
+
+  const spineX = pageWidth + gutterWidth / 2;
+
+  // Check if any frame crosses the spine by more than 5 units (spread-spanning layout)
+  const hasSpanningPhoto = photoFrames.some(
+    (f) => f.x < spineX - 5 && f.x + f.width > spineX + 5
+  );
+
+  let clusters: PhotoFrameElement[][];
+  if (hasSpanningPhoto) {
+    clusters = [photoFrames];
+  } else {
+    const leftCluster = photoFrames.filter((f) => f.x + f.width / 2 < spineX);
+    const rightCluster = photoFrames.filter((f) => f.x + f.width / 2 >= spineX);
+    clusters = [leftCluster, rightCluster].filter((c) => c.length > 0);
+  }
+
+  const updatedFramesMap = new Map<string, PhotoFrameElement>();
+
+  for (const cluster of clusters) {
+    if (cluster.length < 2) {
+      for (const f of cluster) {
+        updatedFramesMap.set(f.id, f);
+      }
+      continue;
+    }
+
+    const isLeftCluster = cluster[0] && cluster[0].x + cluster[0].width / 2 < spineX;
+    const marginEnabled = safeZone?.enabled ?? true;
+    const safeOutside = marginEnabled ? (safeZone?.safeMarginOutside ?? 0) : 0;
+    const safeSpine = marginEnabled ? (safeZone?.safeMarginSpine ?? 0) : 0;
+    const safeTop = marginEnabled ? (safeZone?.safeMarginTop ?? 0) : 0;
+    const safeBottom = marginEnabled ? (safeZone?.safeMarginBottom ?? 0) : 0;
+    const hasSafeZone =
+      marginEnabled && (safeOutside > 0 || safeSpine > 0 || safeTop > 0 || safeBottom > 0);
+
+    const spreadH = safeZone?.spreadHeight || 300;
+    const spreadW = safeZone?.spreadWidth || pageWidth * 2 + gutterWidth;
+
+    let safeMinX = 0;
+    let safeMaxX = spreadW;
+    let safeMinY = 0;
+    let safeMaxY = spreadH;
+
+    if (hasSafeZone) {
+      safeMinY = safeTop;
+      safeMaxY = spreadH - safeBottom;
+      if (hasSpanningPhoto) {
+        safeMinX = safeOutside;
+        safeMaxX = spreadW - safeOutside;
+      } else if (isLeftCluster) {
+        safeMinX = safeOutside;
+        safeMaxX = pageWidth - safeSpine;
+      } else {
+        safeMinX = pageWidth + gutterWidth + safeSpine;
+        safeMaxX = pageWidth + gutterWidth + pageWidth - safeOutside;
+      }
+    }
+
+    const rawMinX = Math.min(...cluster.map((f) => f.x));
+    const rawMinY = Math.min(...cluster.map((f) => f.y));
+    const rawMaxX = Math.max(...cluster.map((f) => f.x + f.width));
+    const rawMaxY = Math.max(...cluster.map((f) => f.y + f.height));
+
+    const minX = hasSafeZone ? Math.max(safeMinX, rawMinX) : rawMinX;
+    const minY = hasSafeZone ? Math.max(safeMinY, rawMinY) : rawMinY;
+    const maxX = hasSafeZone ? Math.min(safeMaxX, rawMaxX) : rawMaxX;
+    const maxY = hasSafeZone ? Math.min(safeMaxY, rawMaxY) : rawMaxY;
+
+    const totalW = maxX - minX;
+    const totalH = maxY - minY;
+
+    if (totalW <= 0 || totalH <= 0) {
+      for (const f of cluster) updatedFramesMap.set(f.id, f);
+      continue;
+    }
+
+    // 1. Build Spatial Neighbor Relations
+    const leftNeighbors = new Map<string, { neighborId: string; gap: number }>();
+    const rightNeighbors = new Map<string, string[]>();
+    for (const b of cluster) {
+      let closestA: PhotoFrameElement | null = null;
+      let maxRightEdge = -Infinity;
+      for (const a of cluster) {
+        if (a.id === b.id) continue;
+        const rightA = a.x + a.width;
+        if (rightA <= b.x + 0.5) {
+          const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+          if (overlapY > 0.5) {
+            if (rightA > maxRightEdge) {
+              maxRightEdge = rightA;
+              closestA = a;
+            }
+          }
+        }
+      }
+      if (closestA) {
+        const gap = Math.max(0, b.x - (closestA.x + closestA.width));
+        leftNeighbors.set(b.id, { neighborId: closestA.id, gap });
+        const list = rightNeighbors.get(closestA.id) || [];
+        list.push(b.id);
+        rightNeighbors.set(closestA.id, list);
+      }
+    }
+
+    const topNeighbors = new Map<string, { neighborId: string; gap: number }>();
+    const bottomNeighbors = new Map<string, string[]>();
+    for (const b of cluster) {
+      let closestC: PhotoFrameElement | null = null;
+      let maxBottomEdge = -Infinity;
+      for (const c of cluster) {
+        if (c.id === b.id) continue;
+        const bottomC = c.y + c.height;
+        if (bottomC <= b.y + 0.5) {
+          const overlapX = Math.min(c.x + c.width, b.x + b.width) - Math.max(c.x, b.x);
+          if (overlapX > 0.5) {
+            if (bottomC > maxBottomEdge) {
+              maxBottomEdge = bottomC;
+              closestC = c;
+            }
+          }
+        }
+      }
+      if (closestC) {
+        const gap = Math.max(0, b.y - (closestC.y + closestC.height));
+        topNeighbors.set(b.id, { neighborId: closestC.id, gap });
+        const list = bottomNeighbors.get(closestC.id) || [];
+        list.push(b.id);
+        bottomNeighbors.set(closestC.id, list);
+      }
+    }
+
+    // 2. Measure max column depth and max row depth along paths
+    let maxColDepth = 0;
+    let maxOldGapX = 0;
+    for (const frame of cluster) {
+      let depth = 0;
+      let curGap = 0;
+      let curId = frame.id;
+      const visited = new Set<string>();
+      while (leftNeighbors.has(curId) && !visited.has(curId)) {
+        visited.add(curId);
+        depth++;
+        curGap += leftNeighbors.get(curId)!.gap;
+        curId = leftNeighbors.get(curId)!.neighborId;
+      }
+      maxColDepth = Math.max(maxColDepth, depth);
+      maxOldGapX = Math.max(maxOldGapX, curGap);
+    }
+
+    let maxRowDepth = 0;
+    let maxOldGapY = 0;
+    for (const frame of cluster) {
+      let depth = 0;
+      let curGap = 0;
+      let curId = frame.id;
+      const visited = new Set<string>();
+      while (topNeighbors.has(curId) && !visited.has(curId)) {
+        visited.add(curId);
+        depth++;
+        curGap += topNeighbors.get(curId)!.gap;
+        curId = topNeighbors.get(curId)!.neighborId;
+      }
+      maxRowDepth = Math.max(maxRowDepth, depth);
+      maxOldGapY = Math.max(maxOldGapY, curGap);
+    }
+
+    // 3. Compute scale factors for frames that participate in multi-column / multi-row paths
+    const oldSpanX = Math.max(1, totalW - maxOldGapX);
+    const newGapTotalX = maxColDepth * targetGapInCanvasUnit;
+    const newSpanX = Math.max(1, totalW - newGapTotalX);
+    const scaleX = maxColDepth > 0 ? Math.max(0.05, newSpanX / oldSpanX) : 1.0;
+
+    const oldSpanY = Math.max(1, totalH - maxOldGapY);
+    const newGapTotalY = maxRowDepth * targetGapInCanvasUnit;
+    const newSpanY = Math.max(1, totalH - newGapTotalY);
+    const scaleY = maxRowDepth > 0 ? Math.max(0.05, newSpanY / oldSpanY) : 1.0;
+
+    // 4. Compute dimensions
+    const newWidths = new Map<string, number>();
+    const newHeights = new Map<string, number>();
+
+    for (const f of cluster) {
+      if (f.locked) {
+        newWidths.set(f.id, f.width);
+        newHeights.set(f.id, f.height);
+        continue;
+      }
+
+      const hasLeft = leftNeighbors.has(f.id);
+      const hasRight = (rightNeighbors.get(f.id)?.length || 0) > 0;
+      const hasTop = topNeighbors.has(f.id);
+      const hasBottom = (bottomNeighbors.get(f.id)?.length || 0) > 0;
+
+      if (!hasLeft && !hasRight && f.width >= totalW * 0.9) {
+        newWidths.set(f.id, totalW);
+      } else {
+        newWidths.set(f.id, Math.max(1, Math.round(f.width * scaleX * 100) / 100));
+      }
+
+      if (!hasTop && !hasBottom && f.height >= totalH * 0.9) {
+        newHeights.set(f.id, totalH);
+      } else {
+        newHeights.set(f.id, Math.max(1, Math.round(f.height * scaleY * 100) / 100));
+      }
+    }
+
+    // 5. Compute topologically sorted positions
+    const newPositionsX = new Map<string, number>();
+    const sortedByX = [...cluster].sort((a, b) => a.x - b.x);
+
+    for (const f of sortedByX) {
+      if (f.locked) {
+        newPositionsX.set(f.id, f.x);
+        continue;
+      }
+
+      const leftEdge = leftNeighbors.get(f.id);
+      let posX: number;
+      if (leftEdge && newPositionsX.has(leftEdge.neighborId)) {
+        const leftId = leftEdge.neighborId;
+        const leftX = newPositionsX.get(leftId)!;
+        const leftW = newWidths.get(leftId)!;
+        posX = Math.round((leftX + leftW + targetGapInCanvasUnit) * 100) / 100;
+      } else {
+        posX = Math.round((minX + (f.x - rawMinX) * scaleX) * 100) / 100;
+      }
+
+      if (hasSafeZone) {
+        posX = Math.max(safeMinX, posX);
+        const fW = newWidths.get(f.id) || f.width;
+        if (posX + fW > safeMaxX) {
+          const clampedW = Math.max(1, Math.round((safeMaxX - posX) * 100) / 100);
+          newWidths.set(f.id, clampedW);
+        }
+      }
+
+      newPositionsX.set(f.id, posX);
+    }
+
+    const newPositionsY = new Map<string, number>();
+    const sortedByY = [...cluster].sort((a, b) => a.y - b.y);
+
+    for (const f of sortedByY) {
+      if (f.locked) {
+        newPositionsY.set(f.id, f.y);
+        continue;
+      }
+
+      const topEdge = topNeighbors.get(f.id);
+      let posY: number;
+      if (topEdge && newPositionsY.has(topEdge.neighborId)) {
+        const topId = topEdge.neighborId;
+        const topY = newPositionsY.get(topId)!;
+        const topH = newHeights.get(topId)!;
+        posY = Math.round((topY + topH + targetGapInCanvasUnit) * 100) / 100;
+      } else {
+        posY = Math.round((minY + (f.y - rawMinY) * scaleY) * 100) / 100;
+      }
+
+      if (hasSafeZone) {
+        posY = Math.max(safeMinY, posY);
+        const fH = newHeights.get(f.id) || f.height;
+        if (posY + fH > safeMaxY) {
+          const clampedH = Math.max(1, Math.round((safeMaxY - posY) * 100) / 100);
+          newHeights.set(f.id, clampedH);
+        }
+      }
+
+      newPositionsY.set(f.id, posY);
+    }
+
+    for (const f of cluster) {
+      updatedFramesMap.set(f.id, {
+        ...f,
+        x: newPositionsX.get(f.id) ?? f.x,
+        y: newPositionsY.get(f.id) ?? f.y,
+        width: newWidths.get(f.id) ?? f.width,
+        height: newHeights.get(f.id) ?? f.height,
+      });
+    }
+  }
+
+  // Preserve original element order and text elements
+  return elements.map((el) => (el.type === 'photo' ? (updatedFramesMap.get(el.id) || el) : el));
+}
