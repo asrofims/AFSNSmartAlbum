@@ -290,5 +290,28 @@ assert.equal(useAlbumStore.getState().currentAlbum, recoveryEdited);
 assert.equal(useAlbumStore.getState().saveStatus, 'unsaved');
 assert.equal(useProjectStore.getState().currentProject?.filePath, 'D:/Albums/Recovered.afsn');
 
+// Pasteboard placements retain physical coordinates through drop, paste, and save.
+resetWithPhoto();
+const pasteboardSpread = useAlbumStore.getState().currentAlbum!.coverSpread;
+useEditorStore.getState().addPhotoToSpread(pasteboardSpread.id, cachedPhoto, { x: -80, y: -60 });
+const dropped = useAlbumStore.getState().currentAlbum!.coverSpread.elements.at(-1)!;
+assert.ok(dropped.x < 0 && dropped.y < 0);
+assert.ok(Math.abs(dropped.x + dropped.width / 2 + 80) < 1e-9);
+useEditorStore.setState({ selectedFrameIds: [dropped.id] });
+useEditorStore.getState().copySelectedFrames(pasteboardSpread.id);
+useEditorStore.getState().pasteFrames(pasteboardSpread.id, { x: -150.1234, y: -90.5678 });
+const pasted = useAlbumStore.getState().currentAlbum!.coverSpread.elements.at(-1)!;
+assert.equal(pasted.x, -150.1234);
+assert.equal(pasted.y, -90.5678);
+native = (command, args) => {
+  if (command === 'save_album_structure') {
+    const saved = args.album.coverSpread.elements.find((element: any) => element.id === pasted.id);
+    assert.equal(saved.x, pasted.x);
+    assert.equal(saved.y, pasted.y);
+  }
+  return command === 'check_path_exists' ? true : null;
+};
+assert.equal((await useProjectStore.getState().saveProject()).success, true);
+
 clearMocks();
 console.log('✓ Project persistence regressions passed: failed writes, cancellation, ZIP protection, save serialization, concurrent edits and missing-file recovery.');

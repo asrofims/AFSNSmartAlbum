@@ -353,7 +353,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : currentAlbum.spreads.find((s) => s.id === spreadId);
 
     const safeMargin = targetSpread?.safeArea ?? currentProject.marginValue ?? 10;
-    const gutterW = targetSpread?.gutterWidth || 0;
     const maxSafeW = Math.max(10, pageW - safeMargin * 2);
     const maxSafeH = Math.max(10, pageH - safeMargin * 2);
 
@@ -379,8 +378,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let posY: number;
 
     if (pos?.x !== undefined && pos?.y !== undefined) {
-      posX = Math.max(safeMargin, Math.min(pageW * 2 + gutterW - safeMargin - frameW, pos.x - frameW / 2));
-      posY = Math.max(safeMargin, Math.min(pageH - safeMargin - frameH, pos.y - frameH / 2));
+      posX = pos.x - frameW / 2;
+      posY = pos.y - frameH / 2;
     } else {
       posX = safeMargin + (maxSafeW - frameW) / 2;
       posY = safeMargin + (maxSafeH - frameH) / 2;
@@ -394,8 +393,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previewPath: photo.previewPath || photo.thumbnailPath || '',
       thumbnailPath: photo.thumbnailPath || '',
       fileName: photo.fileName,
-      x: Math.max(0, posX),
-      y: Math.max(0, posY),
+      x: posX,
+      y: posY,
       width: Math.round(frameW * 10) / 10,
       height: Math.round(frameH * 10) / 10,
       rotation: 0,
@@ -717,15 +716,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pasted = clipboardFrames.map((f, idx) => ({
           ...f,
           id: `${f.type === 'text' ? 'text' : 'frame'}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-          x: Math.max(0, Number((f.x + deltaX).toFixed(1))),
-          y: Math.max(0, Number((f.y + deltaY).toFixed(1))),
+          x: f.x + deltaX,
+          y: f.y + deltaY,
         }));
       } else {
         pasted = clipboardFrames.map((f, idx) => ({
           ...f,
           id: `${f.type === 'text' ? 'text' : 'frame'}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-          x: Math.max(0, Number((f.x + defaultOffset).toFixed(1))),
-          y: Math.max(0, Number((f.y + defaultOffset).toFixed(1))),
+          x: f.x + defaultOffset,
+          y: f.y + defaultOffset,
         }));
       }
 

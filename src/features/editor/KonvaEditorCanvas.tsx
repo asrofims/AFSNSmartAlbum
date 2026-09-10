@@ -22,10 +22,13 @@ import {
   calculateCropRotationSnap,
   normalizeAngle,
   getCornerRadii,
+  getFrameVisualBounds,
+  calculateCoverDimensions,
+  MAX_CROP_SCALE,
 } from '../../domain/editor';
 import { getAllAlbumSpreads, mergeFramePhotoAsset } from '../../domain/album';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
-import { calculateSpreadViewport } from '../../domain/viewport';
+import { calculateSpreadViewport, calculatePasteboardViewport, preservePasteboardView, screenToSpreadPoint, type PasteboardViewport } from '../../domain/viewport';
 import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
@@ -1167,6 +1170,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   }, []);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
+  const [workspaceScroll, setWorkspaceScroll] = useState({ x: 0, y: 0 });
+  const pasteboardRef = useRef<PasteboardViewport | null>(null);
+  const previousPasteboardRef = useRef<{ viewport: PasteboardViewport; spreadId: string } | null>(null);
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
   const [isHoveredDropAlt, setIsHoveredDropAlt] = useState(false);
   const justDroppedRef = useRef(false);
@@ -1264,21 +1270,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const openContextMenuAt = (clientX: number, clientY: number) => {
     if (stageRef.current) {
       const stageBox = stageRef.current.container().getBoundingClientRect();
-      const relativeX = (clientX - stageBox.left) / scaleFactor;
-      const relativeY = (clientY - stageBox.top) / scaleFactor;
-      if (
-        relativeX >= 0 &&
-        relativeY >= 0 &&
-        relativeX <= totalSpreadPhysicalW &&
-        relativeY <= totalSpreadPhysicalH
-      ) {
-        contextMenuPhysicalPosRef.current = {
-          x: Math.round(relativeX * 10) / 10,
-          y: Math.round(relativeY * 10) / 10,
-        };
-      } else {
-        contextMenuPhysicalPosRef.current = null;
-      }
+      contextMenuPhysicalPosRef.current = screenToSpreadPoint(
+        { x: clientX - stageBox.left, y: clientY - stageBox.top }, stageRef.current.position(), scaleFactor,
+      );
     } else {
       contextMenuPhysicalPosRef.current = null;
     }
@@ -1413,30 +1407,21 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     }
   }, [editingTextElementId, editingCropFrameId]);
 
-  // When zooming in, center scroll position so the view remains focused and both left & right pages are accessible
-  const prevZoomRef = useRef(zoomLevel);
-  useEffect(() => {
+  // Keep the same document point visible as the pasteboard grows or zoom changes.
+  useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-
-    if (prevZoomRef.current !== zoomLevel) {
-      if (zoomLevel > 100 && prevZoomRef.current <= 100) {
-        const targetScrollLeft = (container.scrollWidth - container.clientWidth) / 2;
-        const targetScrollTop = (container.scrollHeight - container.clientHeight) / 2;
-        container.scrollLeft = Math.max(0, targetScrollLeft);
-        container.scrollTop = Math.max(0, targetScrollTop);
-      } else if (zoomLevel > 100 && prevZoomRef.current > 100) {
-        const ratio = zoomLevel / prevZoomRef.current;
-        const currentCenterX = container.scrollLeft + container.clientWidth / 2;
-        const currentCenterY = container.scrollTop + container.clientHeight / 2;
-        const newCenterX = currentCenterX * ratio;
-        const newCenterY = currentCenterY * ratio;
-        container.scrollLeft = Math.max(0, newCenterX - container.clientWidth / 2);
-        container.scrollTop = Math.max(0, newCenterY - container.clientHeight / 2);
-      }
-      prevZoomRef.current = zoomLevel;
-    }
-  }, [zoomLevel]);
+    const next = pasteboardRef.current;
+    if (!container || !next || !activeSpread) return;
+    const previous = previousPasteboardRef.current;
+    const target = previous?.spreadId === activeSpread.id
+      ? preservePasteboardView(previous.viewport, next, workspaceScroll)
+      : { x: next.pageX + next.spreadWidth / 2 - next.viewportWidth / 2,
+          y: next.pageY + next.spreadHeight / 2 - next.viewportHeight / 2 };
+    container.scrollLeft = target.x;
+    container.scrollTop = target.y;
+    setWorkspaceScroll({ x: container.scrollLeft, y: container.scrollTop });
+    previousPasteboardRef.current = { viewport: next, spreadId: activeSpread.id };
+  }, [zoomLevel, containerSize, activeSpread, currentProject, editingCropFrameId]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
@@ -1677,6 +1662,20 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
   const bleedPixel = Math.max(1, Math.round(dims.bleed * scaleFactor));
 
+  const contentBounds = (activeSpread.elements || []).map(getFrameVisualBounds);
+  const cropFrame = activeSpread.elements.find(element => element.id === editingCropFrameId);
+  if (cropFrame?.type === 'photo') {
+    // Reserve space for every crop zoom/rotation without shifting the workspace mid-drag.
+    const cover = calculateCoverDimensions(cropFrame.width, cropFrame.height, getPhotoAspect(cropFrame), MAX_CROP_SCALE);
+    const radius = Math.hypot(cover.width, cover.height) + 40 / scaleFactor;
+    contentBounds.push({ x: cropFrame.x - radius, y: cropFrame.y - radius,
+      width: cropFrame.width + radius * 2, height: cropFrame.height + radius * 2 });
+  }
+  const pasteboard = calculatePasteboardViewport(screenSpreadW, screenSpreadH, scaleFactor,
+    containerSize.width, containerSize.height, contentBounds);
+  pasteboardRef.current = pasteboard;
+  const stageOrigin = { x: pasteboard.pageX - workspaceScroll.x, y: pasteboard.pageY - workspaceScroll.y };
+
   // Multi-selection status
   const selectedElements = (activeSpread.elements || []).filter((f) =>
     selectedFrameIds.includes(f.id)
@@ -1692,8 +1691,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const stageBox = stageRef.current.container().getBoundingClientRect();
       const dropX = e.clientX - stageBox.left;
       const dropY = e.clientY - stageBox.top;
-      const physicalX = dropX / scaleFactor;
-      const physicalY = dropY / scaleFactor;
+      const { x: physicalX, y: physicalY } = screenToSpreadPoint({ x: dropX, y: dropY }, stageOrigin, scaleFactor);
 
       const targetFrame = [...activeSpread.elements].reverse().find((f) =>
         !f.locked &&
@@ -1760,8 +1758,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       const dropX = e.clientX - stageBox.left;
       const dropY = e.clientY - stageBox.top;
 
-      const physicalX = Math.max(0, Math.min(totalSpreadPhysicalW, dropX / scaleFactor));
-      const physicalY = Math.max(0, Math.min(totalSpreadPhysicalH, dropY / scaleFactor));
+      const { x: physicalX, y: physicalY } = screenToSpreadPoint({ x: dropX, y: dropY }, stageOrigin, scaleFactor);
 
       const isAlt = Boolean(e.altKey);
       // Replace photo only if ALT key was held during drop AND frame is not locked
@@ -1803,7 +1800,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       targetName === 'canvas-bg';
 
     if (isBackground) {
-      const pos = e.target.getStage()?.getPointerPosition();
+      const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         setSelectionRect({
           x: pos.x,
@@ -1832,7 +1829,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
 
     const stage = e.target.getStage();
     if (!stage) return;
-    const pos = stage.getPointerPosition();
+    const pos = stage.getRelativePointerPosition();
     if (!pos) return;
 
     const x1 = selectionRect.startX;
@@ -2363,9 +2360,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     <div
       ref={containerRef}
       className={`${styles.canvasContainer} ${isPanning ? styles.spacePanningActive : isSpacePressed ? styles.spacePanning : activeTool === 'pan' ? styles.panningMode : ''} ${editingCropFrameId ? styles.cropModeActive : ''}`}
-      style={{
-        overflow: zoomLevel > 100 ? 'auto' : 'hidden',
-      }}
+      onScroll={(e) => setWorkspaceScroll({ x: e.currentTarget.scrollLeft, y: e.currentTarget.scrollTop })}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -2436,8 +2431,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
       <div
         className={styles.stageWrapper}
         style={{
-          width: `${screenSpreadW}px`,
-          height: `${screenSpreadH}px`,
+          width: `${pasteboard.width}px`,
+          height: `${pasteboard.height}px`,
         }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -2447,11 +2442,13 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
           openContextMenuAt(e.clientX, e.clientY);
         }}
       >
+        <div className={styles.stageViewport} style={{ width: pasteboard.viewportWidth, height: pasteboard.viewportHeight }}>
         {/* Outer Bleed Guide Boundary */}
         {showBleedGuide && (
           <div
             className={styles.bleedGuideBox}
-            style={{ inset: `-${bleedPixel}px` }}
+            style={{ left: stageOrigin.x - bleedPixel, top: stageOrigin.y - bleedPixel,
+              width: screenSpreadW + bleedPixel * 2, height: screenSpreadH + bleedPixel * 2 }}
             title={`Bleed Cut Line: ${activeSpread.bleed} ${unit}`}
           />
         )}
@@ -2459,8 +2456,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         {/* Konva Stage for Facing Pages and Photo Frames */}
         <Stage
           ref={stageRef}
-          width={screenSpreadW}
-          height={screenSpreadH}
+          width={pasteboard.viewportWidth}
+          height={pasteboard.viewportHeight}
+          x={stageOrigin.x}
+          y={stageOrigin.y}
           onMouseDown={handleStageMouseDown}
           onMouseMove={handleStageMouseMove}
           onMouseUp={handleStageMouseUp}
@@ -3422,8 +3421,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
                   const thresholdUnits = Math.max(0.6, 3.5 / scaleFactor);
 
-                  const physicalX = newBox.x / scaleFactor;
-                  const physicalY = newBox.y / scaleFactor;
+                  const { x: physicalX, y: physicalY } = screenToSpreadPoint(newBox, stageOrigin, scaleFactor);
                   const physicalW = newBox.width / scaleFactor;
                   const physicalH = newBox.height / scaleFactor;
 
@@ -3443,8 +3441,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                     setSnapLines(snapRes.snapLines, snapRes.gapGuides);
                     return {
                       ...newBox,
-                      x: snapRes.snappedBounds.x * scaleFactor,
-                      y: snapRes.snappedBounds.y * scaleFactor,
+                      x: stageOrigin.x + snapRes.snappedBounds.x * scaleFactor,
+                      y: stageOrigin.y + snapRes.snappedBounds.y * scaleFactor,
                       width: Math.max(4, snapRes.snappedBounds.width * scaleFactor),
                       height: Math.max(4, snapRes.snappedBounds.height * scaleFactor),
                     };
@@ -3783,6 +3781,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
             onCancel={() => setEditingTextElementId(null)}
           />
         )}
+        </div>
       </div>
 
 

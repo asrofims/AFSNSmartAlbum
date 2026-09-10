@@ -288,10 +288,12 @@ fn render_photo_element(
     if include_bleed && (offset_x_px > 0.0 || offset_y_px > 0.0) {
         let tolerance = 2.0; // 2 physical pixels tolerance for edge snapping
 
-        let touches_left = (elem.x * scale_factor) <= tolerance;
-        let touches_top = (elem.y * scale_factor) <= tolerance;
-        let touches_right = ((elem.x + elem.width) * scale_factor) >= (total_spread_w * scale_factor - tolerance);
-        let touches_bottom = ((elem.y + elem.height) * scale_factor) >= (total_spread_h * scale_factor - tolerance);
+        // Only extend an edge actually on the trim line. Pasteboard objects and
+        // frames crossing the trim must keep their original position and crop.
+        let touches_left = (elem.x * scale_factor).abs() <= tolerance;
+        let touches_top = (elem.y * scale_factor).abs() <= tolerance;
+        let touches_right = ((elem.x + elem.width - total_spread_w) * scale_factor).abs() <= tolerance;
+        let touches_bottom = ((elem.y + elem.height - total_spread_h) * scale_factor).abs() <= tolerance;
 
         if touches_left {
             let extend_left = frame_px_x.max(0);
@@ -1009,6 +1011,35 @@ pub fn assemble_pdf_from_jpegs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pasteboard_photos_stay_outside_export_with_bleed() {
+        let path = std::env::temp_dir().join(format!("afsn-pasteboard-{}.png", uuid::Uuid::new_v4()));
+        let red = Rgba([255, 0, 0, 255]);
+        let white = Rgba([255, 255, 255, 255]);
+        RgbaImage::from_pixel(20, 20, red).save(&path).unwrap();
+        let mut element: ElementPayload = serde_json::from_value(serde_json::json!({
+            "id": "pasteboard-photo", "filePath": path.to_string_lossy(), "width": 20.0, "height": 20.0
+        })).unwrap();
+        for (x, y) in [(-40.0, 20.0), (20.0, -40.0), (130.0, 20.0), (20.0, 130.0)] {
+            element.x = x;
+            element.y = y;
+            let mut canvas = RgbaImage::from_pixel(120, 120, white);
+            render_photo_element(&mut canvas, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+            assert!(canvas.pixels().all(|pixel| *pixel == white), "Off-page objects must not be pulled onto the export");
+        }
+        element.x = -15.0;
+        element.y = 20.0;
+        let mut crossing = RgbaImage::from_pixel(120, 120, white);
+        render_photo_element(&mut crossing, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+        assert_eq!(*crossing.get_pixel(0, 35), red);
+        assert_eq!(*crossing.get_pixel(18, 35), white, "Crossing frames must retain their original position");
+        element.x = 0.0;
+        let mut aligned = RgbaImage::from_pixel(120, 120, white);
+        render_photo_element(&mut aligned, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0);
+        assert_eq!(*aligned.get_pixel(0, 35), red, "Trim-aligned photos must still extend into bleed");
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn test_unit_to_pixels() {

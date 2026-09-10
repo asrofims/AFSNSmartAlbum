@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateSpreadViewport } from '../src/domain/viewport';
+import { calculateSpreadViewport, calculatePasteboardViewport, preservePasteboardView, screenToSpreadPoint } from '../src/domain/viewport';
 import {
   calculateCoverDimensions,
   calculateImageOffset,
@@ -1225,6 +1225,25 @@ const leafRadii = getCornerRadii(leafElem);
 console.assert(leafRadii[0] === 15 && leafRadii[1] === 0 && leafRadii[2] === 15 && leafRadii[3] === 0, 'leaf radii should be [15, 0, 15, 0]');
 
 // A resize snap must retain its exact target and the opposite (stationary) edge.
+for (const scale of [0.67, 2.37, 12]) {
+  const workspace = calculatePasteboardViewport(400 * scale, 200 * scale, scale, 900, 500,
+    [{ x: -130, y: -70, width: 80, height: 50 }, { x: 440, y: 230, width: 100, height: 100 }]);
+  assert.ok(workspace.pageX > 130 * scale && workspace.pageY > 70 * scale);
+  assert.ok(workspace.width > workspace.pageX + 540 * scale);
+  assert.ok(workspace.height > workspace.pageY + 330 * scale);
+  assert.equal(workspace.viewportWidth, 900, 'Canvas bitmap size must not grow with the pasteboard');
+  assert.equal(workspace.viewportHeight, 500);
+  const next = calculatePasteboardViewport(400 * scale * 2, 200 * scale * 2, scale * 2, 900, 500,
+    [{ x: -1500, y: -900, width: 3000, height: 1800 }]);
+  const scroll = { x: workspace.pageX - 200, y: workspace.pageY - 75 };
+  const adjusted = preservePasteboardView(workspace, next, scroll);
+  const before = screenToSpreadPoint({ x: 450, y: 250 }, { x: workspace.pageX - scroll.x, y: workspace.pageY - scroll.y }, scale);
+  const after = screenToSpreadPoint({ x: 450, y: 250 }, { x: next.pageX - adjusted.x, y: next.pageY - adjusted.y }, scale * 2);
+  assert.ok(Math.abs(before.x - after.x) < 1e-9 && Math.abs(before.y - after.y) < 1e-9, 'Zoom and crop workspace expansion must retain the viewport center');
+  const outside = screenToSpreadPoint({ x: 50, y: 30 }, { x: 200, y: 100 }, scale);
+  assert.ok(outside.x < 0 && outside.y < 0, 'Pointer mapping must allow negative pasteboard coordinates');
+}
+
 for (const factor of [1, 0.1, 1 / 25.4, 300 / 25.4]) {
   const pageW = 420.4637 * factor;
   const pageH = 297.0437 * factor;

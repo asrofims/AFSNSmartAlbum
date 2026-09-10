@@ -358,5 +358,16 @@
 - [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
 - [x] Application version metadata bumped to `v1.0.48`.
 
+### Phase 30 — Release v1.0.49: Interactive Pasteboard & Off-Page Staging Canvas
+
+- [x] Extend the scrollable workspace around the spread, including off-page objects and crop handles; keep the Konva bitmap limited to the visible viewport for bounded rendering memory.
+- [x] Preserve the document point at the viewport center during zoom and workspace extent changes, and translate selection, drop, context-menu paste, and resize snapping coordinates consistently.
+- [x] Allow photo placement and paste outside the page, including negative coordinates; retain these objects in the saved spread.
+- [x] Keep export bounded to the page and configured bleed. Only extend trim-aligned photo edges into bleed, without pulling pasteboard objects or shifting frames that cross the trim line.
+- [x] Validate with `npm test`, `npx tsc --noEmit`, and the native pasteboard/bleed export regression test.
+- [x] Verify crop-handle dragging outside the page, moving a parked object onto the page, bottom-edge resize snapping after scrolling, and zoom in the browser fixture (`/tests/pasteboard.preview.html`). Native desktop interaction verification remains manual.
+- [x] Application version metadata bumped to `v1.0.49`.
+
+
 
 
