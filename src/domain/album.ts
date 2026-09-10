@@ -161,7 +161,7 @@ export function createInitialAlbum(project: Project): Album {
   const safeAreaBottom = marginEnabled ? (project.marginBottom ?? marginVal) : 0;
   const safeAreaOutside = marginEnabled ? (project.marginOutside ?? marginVal) : 0;
   const safeAreaSpine = marginEnabled ? (project.marginSpine ?? marginVal) : 0;
-  const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0; // Standard 3mm bleed
+  const defaultBleed = 0; // Default zero bleed cut
   const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
 
   // 1. Cover Spread (Back Cover on left, Front Cover on right)
@@ -294,7 +294,7 @@ export function createInteriorSpread(
   const safeAreaSpine = marginEnabled ? (project.marginSpine ?? marginVal) : 0;
 
   // New spread creation baseline: strictly follows the master project creation settings
-  const defaultBleed = project.canvasUnit === 'inch' ? 0.125 : project.canvasUnit === 'cm' ? 0.3 : 3.0;
+  const defaultBleed = 0;
   const bleedVal = project.bleed !== undefined ? project.bleed : defaultBleed;
 
   const spacingVal = project.spacingValue ?? 2;

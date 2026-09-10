@@ -577,7 +577,7 @@ impl Database {
                 right_page_id TEXT,
                 gutter_width REAL NOT NULL DEFAULT 0.0,
                 gutter_unit TEXT NOT NULL DEFAULT 'mm',
-                bleed REAL NOT NULL DEFAULT 3.0,
+                bleed REAL NOT NULL DEFAULT 0.0,
                 safe_area REAL NOT NULL DEFAULT 10.0,
                 background_color TEXT NOT NULL DEFAULT '#FFFFFF',
                 is_cover INTEGER NOT NULL DEFAULT 0,
@@ -1927,7 +1927,7 @@ impl Database {
                 row.get::<_, Option<String>>(6).ok().flatten(), // right_page_id
                 row.get::<_, f64>(7).unwrap_or(0.0),    // gutter_width
                 row.get::<_, String>(8).unwrap_or_else(|_| "mm".to_string()), // gutter_unit
-                row.get::<_, f64>(9).unwrap_or(3.0),    // bleed
+                row.get::<_, f64>(9).unwrap_or(0.0),    // bleed
                 row.get::<_, f64>(10).unwrap_or(10.0),   // safe_area
                 row.get::<_, f64>(11).unwrap_or(10.0),   // safe_area_top
                 row.get::<_, f64>(12).unwrap_or(10.0),   // safe_area_bottom
@@ -2096,7 +2096,7 @@ impl Database {
             right_page: None,
             gutter_width: 6.0,
             gutter_unit: "mm".to_string(),
-            bleed: 3.0,
+            bleed: 0.0,
             safe_area: 10.0,
             safe_area_top: Some(10.0),
             safe_area_bottom: Some(10.0),
@@ -2646,7 +2646,7 @@ mod tests {
                 right_page: None,
                 gutter_width: 0.0,
                 gutter_unit: "mm".to_string(),
-                bleed: 3.0,
+                bleed: 0.0,
                 safe_area: 10.0,
                 safe_area_top: Some(10.0),
                 safe_area_bottom: Some(10.0),

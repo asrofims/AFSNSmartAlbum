@@ -3161,7 +3161,7 @@ export function WorkspaceLayout() {
                     </div>
                     <div style={{ width: '110px' }}>
                       <NumberInput
-                        value={activeSpread?.bleed ?? currentProject.bleed ?? (currentProject.canvasUnit === 'inch' ? 0.125 : currentProject.canvasUnit === 'cm' ? 0.3 : 3.0)}
+                        value={activeSpread?.bleed ?? currentProject.bleed ?? 0}
                         onChange={(val) => updateBleed(val)}
                         min={0}
                         max={999}
@@ -3171,7 +3171,7 @@ export function WorkspaceLayout() {
                     </div>
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    Standard print bleed: {currentProject.canvasUnit === 'inch' ? '0.125 in (3.2 mm)' : currentProject.canvasUnit === 'cm' ? '0.3 cm (3 mm)' : '3 mm'}
+                    Standard print bleed: 0 {currentProject.canvasUnit}
                   </div>
                 </div>
 
