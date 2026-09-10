@@ -46,7 +46,22 @@ export function persistInOrder<T>(write: () => Promise<T>): Promise<T> {
 let spacingHistoryTimer: any = null;
 let initialAlbumBeforeSpacingChange: Album | null = null;
 
+let safeAreaHistoryTimer: any = null;
+let initialAlbumBeforeSafeAreaChange: Album | null = null;
+
+export function flushSafeAreaHistory() {
+  if (safeAreaHistoryTimer) {
+    clearTimeout(safeAreaHistoryTimer);
+    safeAreaHistoryTimer = null;
+    if (initialAlbumBeforeSafeAreaChange) {
+      useHistoryStore.getState().pushState(initialAlbumBeforeSafeAreaChange);
+      initialAlbumBeforeSafeAreaChange = null;
+    }
+  }
+}
+
 export function flushSpacingHistory() {
+  flushSafeAreaHistory();
   if (spacingHistoryTimer) {
     clearTimeout(spacingHistoryTimer);
     spacingHistoryTimer = null;
@@ -97,40 +112,69 @@ export function findBestVariantIndexForBox(
 }
 
 /**
- * Re-applies adaptive layout partitioning per page/cluster with the new gap spacing in real-time,
- * strictly bounded by the Safe Zone, preserving photos, crops, and layout structure.
+ * Unified adaptive layout partitioning engine for photo spreads.
+ * Dynamically resizes and positions photo frames to fit the active safe margin box and gap spacing,
+ * strictly preserving layout topology, photo assignments, and user crops.
+ * Full-bleed photos (photos flush with canvas/page boundaries) remain edge-to-edge.
  */
-export function applyAdaptiveGapToSpread(
+export function applyAdaptiveLayoutToSpread(
   spread: Spread,
-  spacingValue: number,
-  spacingUnit: Unit,
   project: Project,
-  _layoutIndex?: number
+  overrides?: {
+    spacingValue?: number;
+    spacingUnit?: Unit;
+    safeAreaPatch?: Partial<Spread>;
+  }
 ): Spread {
   const isCover = !spread.leftPage || !spread.rightPage;
-  const dims = getProjectDimensionsInCanvasUnit(project, spread);
-  const canvasUnit = project?.canvasUnit || spread.leftPage?.unit || 'mm';
-  const dpi = project?.canvasDpi || 300;
-  const targetGapInCanvasUnit = convertUnit(spacingValue, spacingUnit, canvasUnit, dpi);
+  const isSpread = !isCover;
 
-  const photoElements = (spread.elements || []).filter(
+  // Build target spread with overrides applied
+  let effSpread: Spread = {
+    ...spread,
+    ...(overrides?.spacingValue !== undefined ? { spacingValue: overrides.spacingValue } : {}),
+    ...(overrides?.spacingUnit !== undefined ? { spacingUnit: overrides.spacingUnit } : {}),
+    ...(overrides?.safeAreaPatch || {}),
+  };
+
+  if (overrides?.safeAreaPatch) {
+    const patch = overrides.safeAreaPatch;
+    if (effSpread.leftPage && patch.safeArea !== undefined) {
+      effSpread.leftPage = { ...effSpread.leftPage, safeArea: patch.safeArea };
+    }
+    if (effSpread.rightPage && patch.safeArea !== undefined) {
+      effSpread.rightPage = { ...effSpread.rightPage, safeArea: patch.safeArea };
+    }
+  }
+
+  const dims = getProjectDimensionsInCanvasUnit(project, effSpread);
+  const canvasUnit = project?.canvasUnit || effSpread.leftPage?.unit || 'mm';
+  const dpi = project?.canvasDpi || 300;
+
+  const rawGap = effSpread.spacingValue ?? project.spacingValue ?? 2;
+  const rawGapUnit = effSpread.spacingUnit ?? project.spacingUnit ?? 'mm';
+  const targetGapInCanvasUnit = convertUnit(rawGap, rawGapUnit, canvasUnit, dpi);
+
+  const photoElements = (effSpread.elements || []).filter(
     (el): el is PhotoFrameElement => el.type === 'photo'
   );
   const unlockedElements = photoElements.filter((el) => !el.locked);
 
-  if (unlockedElements.length < 2) {
-    return {
-      ...spread,
-      spacingValue,
-      spacingUnit,
-    };
+  const isSafeMarginChange = overrides?.safeAreaPatch !== undefined;
+
+  // If only gap changed and there are < 2 unlocked photos, gap between photos does not alter layout
+  if (!isSafeMarginChange && unlockedElements.length < 2) {
+    return effSpread;
   }
 
-  const pageWidth = spread.leftPage ? spread.leftPage.width : dims.pageWidth;
-  const gutterWidth = spread.gutterWidth ?? dims.gutterWidth;
+  if (unlockedElements.length === 0) {
+    return effSpread;
+  }
+
+  const pageWidth = effSpread.leftPage ? effSpread.leftPage.width : dims.pageWidth;
+  const gutterWidth = effSpread.gutterWidth ?? dims.gutterWidth;
   const spineX = pageWidth + gutterWidth / 2;
 
-  const isSpread = !isCover;
   const spreadWidth = isCover
     ? pageWidth
     : pageWidth * 2 + gutterWidth;
@@ -148,6 +192,28 @@ export function applyAdaptiveGapToSpread(
     gutterWidth,
     spacing: targetGapInCanvasUnit,
   });
+
+  // Helper to identify full bleed photos (flush with canvas or page outer perimeter)
+  const isFullBleedFrame = (f: PhotoFrameElement): boolean => {
+    // Full spread bleed
+    if (Math.abs(f.width - spreadWidth) <= 2 && Math.abs(f.height - spreadHeight) <= 2 && f.x <= 1 && f.y <= 1) {
+      return true;
+    }
+    // Left page bleed
+    if (Math.abs(f.width - pageWidth) <= 2 && Math.abs(f.height - spreadHeight) <= 2 && f.x <= 1 && f.y <= 1) {
+      return true;
+    }
+    // Right page bleed
+    if (
+      Math.abs(f.width - pageWidth) <= 2 &&
+      Math.abs(f.height - spreadHeight) <= 2 &&
+      Math.abs(f.x - (pageWidth + gutterWidth)) <= 2 &&
+      f.y <= 1
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   // Check if any unlocked frame spans across the spine
   const hasSpanningPhoto = unlockedElements.some(
@@ -180,14 +246,38 @@ export function applyAdaptiveGapToSpread(
   const updatedFramesMap = new Map<string, PhotoFrameElement>();
 
   for (const { box, frames } of clusters) {
-    if (frames.length < 2) {
+    if (frames.length === 1) {
+      const f = frames[0];
+      if (f) {
+        if (isFullBleedFrame(f)) {
+          updatedFramesMap.set(f.id, f);
+        } else if (isSafeMarginChange) {
+          // Adapt single safe-margin bounded photo to the new safe area box
+          updatedFramesMap.set(f.id, {
+            ...f,
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height,
+            originalWidth: box.width,
+            originalHeight: box.height,
+          });
+        } else {
+          updatedFramesMap.set(f.id, f);
+        }
+      }
+      continue;
+    }
+
+    // Multi-photo cluster: if all frames are full bleed, keep untouched
+    if (frames.every((f) => isFullBleedFrame(f))) {
       for (const f of frames) {
         updatedFramesMap.set(f.id, f);
       }
       continue;
     }
 
-    // Partition the box adaptively for this cluster with the new spacing
+    // Partition the box adaptively for this cluster with the target spacing
     const bestV = findBestVariantIndexForBox(box, frames, targetGapInCanvasUnit);
     const rects = partitionPageBoxIntoKRects(box, frames.length, targetGapInCanvasUnit, bestV);
 
@@ -216,16 +306,40 @@ export function applyAdaptiveGapToSpread(
     }
   }
 
-  const updatedElements = (spread.elements || []).map((el) =>
+  const updatedElements = (effSpread.elements || []).map((el) =>
     el.type === 'photo' ? (updatedFramesMap.get(el.id) || el) : el
   );
 
   return {
-    ...spread,
-    spacingValue,
-    spacingUnit,
+    ...effSpread,
     elements: updatedElements,
   };
+}
+
+/**
+ * Re-applies adaptive layout partitioning per page/cluster with the new gap spacing in real-time,
+ * strictly bounded by the Safe Zone, preserving photos, crops, and layout structure.
+ */
+export function applyAdaptiveGapToSpread(
+  spread: Spread,
+  spacingValue: number,
+  spacingUnit: Unit,
+  project: Project,
+  _layoutIndex?: number
+): Spread {
+  return applyAdaptiveLayoutToSpread(spread, project, { spacingValue, spacingUnit });
+}
+
+/**
+ * Re-applies adaptive layout partitioning per page/cluster with the new safe margin boundaries in real-time,
+ * strictly preserving inter-frame gaps, photos, crops, and layout structure.
+ */
+export function applyAdaptiveSafeAreaToSpread(
+  spread: Spread,
+  safeAreaPatch: Partial<Spread>,
+  project: Project
+): Spread {
+  return applyAdaptiveLayoutToSpread(spread, project, { safeAreaPatch });
 }
 
 export interface AlbumState {
@@ -272,7 +386,8 @@ export interface AlbumState {
   updateBleed: (bleed: number) => void;
   updateSpreadSpacing: (spacingValue: number, spacingUnit?: Unit, project?: Project) => void;
   applySpacingToAllSpreads: (spacingValue: number, spacingUnit?: Unit, project?: Project) => void;
-  updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine') => void;
+  updateSafeArea: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine', project?: Project) => void;
+  applySafeAreaToAllSpreads: (safeArea: number, side?: 'all' | 'top' | 'bottom' | 'outside' | 'spine', project?: Project) => void;
   updateSpreadBackgroundColor: (spreadId: string, color: string, scope?: 'spread' | 'left' | 'right') => void;
   applyBackgroundColorToAllSpreads: (color: string) => void;
   toggleGuide: (guide: 'gutter' | 'bleed' | 'safeArea') => void;
@@ -1168,11 +1283,28 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
     });
   },
 
-  updateSafeArea: (safeArea: number, side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all') => {
+  updateSafeArea: (
+    safeArea: number,
+    side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all',
+    project?: Project
+  ) => {
     const { currentAlbum, activeSpreadId } = get();
     if (!currentAlbum || !activeSpreadId) return;
 
-    useHistoryStore.getState().pushState(currentAlbum);
+    // Debounce history push so typing/scrubbing is 60fps instant with zero lag
+    if (!initialAlbumBeforeSafeAreaChange) {
+      initialAlbumBeforeSafeAreaChange = currentAlbum;
+    }
+    if (safeAreaHistoryTimer) {
+      clearTimeout(safeAreaHistoryTimer);
+    }
+    safeAreaHistoryTimer = setTimeout(() => {
+      if (initialAlbumBeforeSafeAreaChange) {
+        useHistoryStore.getState().pushState(initialAlbumBeforeSafeAreaChange);
+        initialAlbumBeforeSafeAreaChange = null;
+      }
+      safeAreaHistoryTimer = null;
+    }, 400);
 
     const patch: Partial<Spread> = {};
     if (side === 'all') {
@@ -1191,30 +1323,82 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
       patch.safeAreaSpine = safeArea;
     }
 
-    if (currentAlbum.coverSpread.id === activeSpreadId) {
-      const cov = currentAlbum.coverSpread;
-      const updatedLeft = cov.leftPage && patch.safeArea !== undefined ? { ...cov.leftPage, safeArea: patch.safeArea } : cov.leftPage;
-      const updatedRight = cov.rightPage && patch.safeArea !== undefined ? { ...cov.rightPage, safeArea: patch.safeArea } : cov.rightPage;
+    const proj = project || useProjectStore.getState().currentProject;
+    if (!proj) return;
+
+    const isCover = currentAlbum.coverSpread.id === activeSpreadId;
+    const targetSpread = isCover
+      ? currentAlbum.coverSpread
+      : currentAlbum.spreads.find((s) => s.id === activeSpreadId);
+
+    if (!targetSpread) return;
+
+    const updatedTargetSpread = applyAdaptiveSafeAreaToSpread(targetSpread, patch, proj);
+
+    if (isCover) {
       set({
         currentAlbum: {
           ...currentAlbum,
-          coverSpread: { ...cov, ...patch, leftPage: updatedLeft, rightPage: updatedRight },
+          coverSpread: updatedTargetSpread,
         },
         saveStatus: 'unsaved',
       });
       return;
     }
 
-    const updatedSpreads = currentAlbum.spreads.map((s) => {
-      if (s.id !== activeSpreadId) return s;
-      const updatedLeft = s.leftPage && patch.safeArea !== undefined ? { ...s.leftPage, safeArea: patch.safeArea } : s.leftPage;
-      const updatedRight = s.rightPage && patch.safeArea !== undefined ? { ...s.rightPage, safeArea: patch.safeArea } : s.rightPage;
-      return { ...s, ...patch, leftPage: updatedLeft, rightPage: updatedRight };
-    });
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      s.id === activeSpreadId ? updatedTargetSpread : s
+    );
 
     set({
       currentAlbum: {
         ...currentAlbum,
+        spreads: updatedSpreads,
+      },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  applySafeAreaToAllSpreads: (
+    safeArea: number,
+    side: 'all' | 'top' | 'bottom' | 'outside' | 'spine' = 'all',
+    project?: Project
+  ) => {
+    const { currentAlbum } = get();
+    if (!currentAlbum) return;
+
+    flushSafeAreaHistory();
+    useHistoryStore.getState().pushState(currentAlbum);
+
+    const proj = project || useProjectStore.getState().currentProject;
+    if (!proj) return;
+
+    const patch: Partial<Spread> = {};
+    if (side === 'all') {
+      patch.safeArea = safeArea;
+      patch.safeAreaTop = safeArea;
+      patch.safeAreaBottom = safeArea;
+      patch.safeAreaOutside = safeArea;
+      patch.safeAreaSpine = safeArea;
+    } else if (side === 'top') {
+      patch.safeAreaTop = safeArea;
+    } else if (side === 'bottom') {
+      patch.safeAreaBottom = safeArea;
+    } else if (side === 'outside') {
+      patch.safeAreaOutside = safeArea;
+    } else if (side === 'spine') {
+      patch.safeAreaSpine = safeArea;
+    }
+
+    const updatedCover = applyAdaptiveSafeAreaToSpread(currentAlbum.coverSpread, patch, proj);
+    const updatedSpreads = currentAlbum.spreads.map((s) =>
+      applyAdaptiveSafeAreaToSpread(s, patch, proj)
+    );
+
+    set({
+      currentAlbum: {
+        ...currentAlbum,
+        coverSpread: updatedCover,
         spreads: updatedSpreads,
       },
       saveStatus: 'unsaved',

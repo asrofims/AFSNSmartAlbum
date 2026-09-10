@@ -1,7 +1,7 @@
 import { useAlbumStore } from '../../stores/albumStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads } from '../../domain/album';
-import { formatDimensions } from '../../domain/units';
+import { formatDimensions, getMaxGapForUnit } from '../../domain/units';
 import { NumberInput } from '../../components/ui/NumberInput';
 import { Switch } from '../../components/ui/Switch';
 import styles from './AlbumStructurePanel.module.css';
@@ -142,9 +142,9 @@ export function AlbumStructurePanel() {
             <div className={styles.inputWrapper}>
               <NumberInput
                 value={activeSpread.safeArea}
-                onChange={updateSafeArea}
+                onChange={(val) => updateSafeArea(val, 'all', currentProject)}
                 min={0}
-                max={1000}
+                max={Math.min(getMaxGapForUnit(unit), Math.max(10, Math.floor(Math.min(currentProject.canvasWidth, currentProject.canvasHeight) / 2)))}
                 step={unit === 'inch' ? 0.05 : unit === 'cm' ? 0.1 : unit === 'px' ? 1 : 0.5}
                 precision={unit === 'px' ? 0 : unit === 'inch' || unit === 'cm' ? 2 : 1}
               />

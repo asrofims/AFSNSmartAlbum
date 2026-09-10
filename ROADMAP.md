@@ -379,6 +379,15 @@
 - [x] Add regression test coverage for spine alignment, single-page clamping, panorama traversal preservation, and spine resize snapping.
 - [x] Application version metadata bumped to `v1.0.50`.
 
+### Phase 32 — Release v1.0.51: Real-Time Adaptive Safe Margin Scaling & Multi-Spread Application
+
+- [x] Implement `applyAdaptiveSafeAreaToSpread`: adaptively resize and reposition photo frames when safe margins change (uniform or 4-sided asymmetric: top, bottom, outside, spine).
+- [x] Preserve exact physical inter-frame gaps, crop scale, and pan offsets during safe margin scaling.
+- [x] Add `applySafeAreaToAllSpreads` in `useAlbumStore`: batch apply uniform or asymmetric margin changes across the cover and all spreads with full undo/redo history tracking.
+- [x] Add regression test coverage for safe area scaling, ID preservation, crop preservation, and asymmetric 4-sided margin confinement in `tests/album.test.ts`.
+- [x] Application version metadata bumped to `v1.0.51`.
+
+
 
 
 

@@ -61,6 +61,7 @@ export function WorkspaceLayout() {
   const updateSpreadSpacing = useAlbumStore((s) => s.updateSpreadSpacing);
   const applySpacingToAllSpreads = useAlbumStore((s) => s.applySpacingToAllSpreads);
   const updateSafeArea = useAlbumStore((s) => s.updateSafeArea);
+  const applySafeAreaToAllSpreads = useAlbumStore((s) => s.applySafeAreaToAllSpreads);
   const updateSpreadBackgroundColor = useAlbumStore((s) => s.updateSpreadBackgroundColor);
   const applyBackgroundColorToAllSpreads = useAlbumStore((s) => s.applyBackgroundColorToAllSpreads);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
@@ -2809,111 +2810,177 @@ export function WorkspaceLayout() {
                   </div>
 
                   {/* Margin Body */}
-                  {!isMarginExpanded ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        Uniform Margin
-                      </span>
-                      <div style={{ width: '110px' }}>
-                        <NumberInput
-                          value={activeSpread?.safeArea ?? (currentProject.marginValue ?? 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'all');
-                            updateProjectMargin(val, currentProject.canvasUnit, 'all');
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '2px' }}>
-                      {/* Top Margin */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop ?? 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'top');
-                            updateProjectMargin(val, currentProject.canvasUnit, 'top');
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
+                  {(() => {
+                    const maxSafeMargin = Math.min(
+                      getMaxGapForUnit(currentProject.canvasUnit),
+                      Math.max(10, Math.floor(Math.min(currentProject.canvasWidth, currentProject.canvasHeight) / 2))
+                    );
 
-                      {/* Bottom Margin */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom ?? 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'bottom');
-                            updateProjectMargin(val, currentProject.canvasUnit, 'bottom');
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
+                    return (
+                      <>
+                        {!isMarginExpanded ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                              Uniform Margin
+                            </span>
+                            <div style={{ width: '110px' }}>
+                              <NumberInput
+                                value={activeSpread?.safeArea ?? (currentProject.marginValue ?? 10)}
+                                onChange={(val) => {
+                                  const num = Math.max(0, Math.min(val, maxSafeMargin));
+                                  updateSafeArea(num, 'all', currentProject);
+                                }}
+                                onBlur={() => {
+                                  const val = activeSpread?.safeArea ?? (currentProject.marginValue ?? 10);
+                                  updateProjectMargin(val, currentProject.canvasUnit, 'all');
+                                }}
+                                min={0}
+                                max={maxSafeMargin}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                suffix={currentProject.canvasUnit}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '2px' }}>
+                            {/* Top Margin */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤒ Top</span>
+                              </div>
+                              <NumberInput
+                                value={activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop ?? 10)}
+                                onChange={(val) => {
+                                  const num = Math.max(0, Math.min(val, maxSafeMargin));
+                                  updateSafeArea(num, 'top', currentProject);
+                                }}
+                                onBlur={() => {
+                                  const val = activeSpread?.safeAreaTop ?? activeSpread?.safeArea ?? (currentProject.marginTop ?? 10);
+                                  updateProjectMargin(val, currentProject.canvasUnit, 'top');
+                                }}
+                                min={0}
+                                max={maxSafeMargin}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                suffix={currentProject.canvasUnit}
+                              />
+                            </div>
 
-                      {/* Outside Margin */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Outer trim margin (protected from paper cutting)">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Outside</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside ?? 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'outside');
-                            updateProjectMargin(val, currentProject.canvasUnit, 'outside');
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
+                            {/* Bottom Margin */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⤓ Bottom</span>
+                              </div>
+                              <NumberInput
+                                value={activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom ?? 10)}
+                                onChange={(val) => {
+                                  const num = Math.max(0, Math.min(val, maxSafeMargin));
+                                  updateSafeArea(num, 'bottom', currentProject);
+                                }}
+                                onBlur={() => {
+                                  const val = activeSpread?.safeAreaBottom ?? activeSpread?.safeArea ?? (currentProject.marginBottom ?? 10);
+                                  updateProjectMargin(val, currentProject.canvasUnit, 'bottom');
+                                }}
+                                min={0}
+                                max={maxSafeMargin}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                suffix={currentProject.canvasUnit}
+                              />
+                            </div>
 
-                      {/* Spine Margin */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Spine</span>
-                        </div>
-                        <NumberInput
-                          value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine ?? 10)}
-                          onChange={(val) => {
-                            updateSafeArea(val, 'spine');
-                            updateProjectMargin(val, currentProject.canvasUnit, 'spine');
-                          }}
-                          min={0}
-                          max={999}
-                          step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
-                          suffix={currentProject.canvasUnit}
-                        />
-                      </div>
-                    </div>
-                  )}
+                            {/* Outside Margin */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Outer trim margin (protected from paper cutting)">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇤ Outside</span>
+                              </div>
+                              <NumberInput
+                                value={activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside ?? 10)}
+                                onChange={(val) => {
+                                  const num = Math.max(0, Math.min(val, maxSafeMargin));
+                                  updateSafeArea(num, 'outside', currentProject);
+                                }}
+                                onBlur={() => {
+                                  const val = activeSpread?.safeAreaOutside ?? activeSpread?.safeArea ?? (currentProject.marginOutside ?? 10);
+                                  updateProjectMargin(val, currentProject.canvasUnit, 'outside');
+                                }}
+                                min={0}
+                                max={maxSafeMargin}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                suffix={currentProject.canvasUnit}
+                              />
+                            </div>
 
-                  {isMarginExpanded && (activeSpread?.safeAreaSpine === 0 || (!activeSpread && currentProject.marginSpine === 0)) && (
-                    <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', padding: '5px 8px', borderRadius: '4px' }}>
-                      ✓ Seamless Spread: Pages 1 & 2 connect continuously across spine (0 gap)
-                    </div>
-                  )}
+                            {/* Spine Margin */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }} title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>⇥ Spine</span>
+                              </div>
+                              <NumberInput
+                                value={activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine ?? 10)}
+                                onChange={(val) => {
+                                  const num = Math.max(0, Math.min(val, maxSafeMargin));
+                                  updateSafeArea(num, 'spine', currentProject);
+                                }}
+                                onBlur={() => {
+                                  const val = activeSpread?.safeAreaSpine ?? activeSpread?.safeArea ?? (currentProject.marginSpine ?? 10);
+                                  updateProjectMargin(val, currentProject.canvasUnit, 'spine');
+                                }}
+                                min={0}
+                                max={maxSafeMargin}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
+                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                suffix={currentProject.canvasUnit}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {isMarginExpanded && (activeSpread?.safeAreaSpine === 0 || (!activeSpread && currentProject.marginSpine === 0)) && (
+                          <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', padding: '5px 8px', borderRadius: '4px' }}>
+                            ✓ Seamless Spread: Pages 1 & 2 connect continuously across spine (0 gap)
+                          </div>
+                        )}
+
+                        {/* Quick Propagation Actions for Safe Margin */}
+                        <div className={styles.propActionsGrid}>
+                          <button
+                            type="button"
+                            className={styles.propActionButton}
+                            onClick={() => {
+                              const val = activeSpread?.safeArea ?? (currentProject.marginValue ?? 10);
+                              applySafeAreaToAllSpreads(val, 'all', currentProject);
+                              updateProjectMargin(val, currentProject.canvasUnit, 'all');
+                              showToast(`Applied ${val} ${currentProject.canvasUnit} safe margin to all spreads`);
+                            }}
+                            title="Apply current safe margin to all spreads in the album"
+                          >
+                            <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Apply to All Spreads</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.propActionButton}
+                            onClick={() => {
+                              const val = activeSpread?.safeArea ?? (currentProject.marginValue ?? 10);
+                              updateProjectMargin(val, currentProject.canvasUnit, 'all');
+                              showToast(`Set ${val} ${currentProject.canvasUnit} as project default margin`);
+                            }}
+                            title="Set this margin as default for newly created spreads & project settings"
+                          >
+                            <svg className={styles.propActionIcon} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span>Set as Default</span>
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Bleed Allowance Card */}

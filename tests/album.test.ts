@@ -15,7 +15,7 @@ import {
 } from '../src/domain/album';
 import { type PhotoFrameElement, applyFixedGap, adjustSpreadPhotoGaps } from '../src/domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
-import { applyAdaptiveGapToSpread } from '../src/stores/albumStore';
+import { applyAdaptiveGapToSpread, applyAdaptiveSafeAreaToSpread } from '../src/stores/albumStore';
 
 console.log('Testing Album Structure Domain...');
 
@@ -689,4 +689,136 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   console.assert(measuredGap === 10, `Gap must be 10mm, got ${measuredGap}`);
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, and adaptive safezone-bounded gap scaling)!');
+// ---------------------------------------------------------------------------
+// 20. Real-Time Adaptive Safe Margin Scaling Test
+// ---------------------------------------------------------------------------
+{
+  const testProject: Project = {
+    ...mockProject,
+    canvasWidth: 200,
+    canvasHeight: 200,
+    canvasUnit: 'mm',
+    spacingValue: 4,
+    spacingUnit: 'mm',
+    marginValue: 10,
+    marginUnit: 'mm',
+    marginEnabled: true,
+  };
+
+  const initialSpread = {
+    id: 'spread-margin-test',
+    albumId: 'alb-1',
+    spreadIndex: 1,
+    pageNumber: 1,
+    safeArea: 10,
+    spacingValue: 4,
+    spacingUnit: 'mm' as const,
+    gutterWidth: 0,
+    leftPage: {
+      id: 'lp-m',
+      pageNumber: 1,
+      width: 200,
+      height: 200,
+      unit: 'mm' as const,
+      safeArea: 10,
+    },
+    rightPage: {
+      id: 'rp-m',
+      pageNumber: 2,
+      width: 200,
+      height: 200,
+      unit: 'mm' as const,
+      safeArea: 10,
+    },
+    elements: [
+      {
+        id: 'f1',
+        type: 'photo' as const,
+        photoId: 'p1',
+        filePath: '/photos/p1.jpg',
+        fileName: 'p1.jpg',
+        previewPath: '/cache/p1.jpg',
+        thumbnailPath: '/cache/p1_thumb.jpg',
+        x: 10,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 5,
+        cropY: 5,
+        cropScale: 1.2,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+      {
+        id: 'f2',
+        type: 'photo' as const,
+        photoId: 'p2',
+        filePath: '/photos/p2.jpg',
+        fileName: 'p2.jpg',
+        previewPath: '/cache/p2.jpg',
+        thumbnailPath: '/cache/p2_thumb.jpg',
+        x: 102,
+        y: 10,
+        width: 88,
+        height: 180,
+        rotation: 0,
+        cropX: 0,
+        cropY: 0,
+        cropScale: 1.0,
+        cropRotation: 0,
+        borderEnabled: false,
+        borderWidth: 0,
+        borderColor: '#000',
+        cornerRadius: 0,
+        opacity: 1,
+      },
+    ],
+  };
+
+  // 1. Uniform Safe Margin increased from 10mm to 20mm
+  const margin20Spread = applyAdaptiveSafeAreaToSpread(
+    initialSpread,
+    { safeArea: 20, safeAreaTop: 20, safeAreaBottom: 20, safeAreaOutside: 20, safeAreaSpine: 20 },
+    testProject
+  );
+  const m20Elements = margin20Spread.elements as PhotoFrameElement[];
+  console.assert(m20Elements.length === 2, 'Must have 2 elements after margin change');
+
+  const el1_20 = m20Elements.find((e) => e.id === 'f1')!;
+  const el2_20 = m20Elements.find((e) => e.id === 'f2')!;
+  console.assert(el1_20 && el2_20, 'Both frames must be preserved by ID');
+  console.assert(el1_20.cropScale === 1.2 && el1_20.cropX === 5, 'Crop coordinates must remain intact');
+
+  // Verify safe margin confinement to 20mm (safe box: x from 20 to 180, y from 20 to 180)
+  console.assert(el1_20.x >= 20, `Photo 1 left edge (${el1_20.x}) must be >= 20`);
+  console.assert(el1_20.y >= 20, `Photo 1 top edge (${el1_20.y}) must be >= 20`);
+  console.assert(el2_20.x + el2_20.width <= 180.01, `Photo 2 right edge (${el2_20.x + el2_20.width}) must be <= 180`);
+  console.assert(el2_20.y + el2_20.height <= 180.01, `Photo 2 bottom edge (${el2_20.y + el2_20.height}) must be <= 180`);
+
+  // Verify exact gap (4mm) is preserved
+  const gapAt20 = Math.round((el2_20.x - (el1_20.x + el1_20.width)) * 100) / 100;
+  console.assert(gapAt20 === 4, `Gap must remain 4mm, got ${gapAt20}`);
+
+  // 2. Asymmetric 4-sided Safe Margin (Top: 30mm, Bottom: 10mm, Outside: 15mm, Spine: 0mm seamless)
+  const asymSpread = applyAdaptiveSafeAreaToSpread(
+    initialSpread,
+    { safeAreaTop: 30, safeAreaBottom: 10, safeAreaOutside: 15, safeAreaSpine: 0 },
+    testProject
+  );
+  const asymElements = asymSpread.elements as PhotoFrameElement[];
+  const asymEl1 = asymElements.find((e) => e.id === 'f1')!;
+  const asymEl2 = asymElements.find((e) => e.id === 'f2')!;
+
+  console.assert(asymEl1.y >= 30, `Asymmetric top edge (${asymEl1.y}) must be >= 30mm`);
+  console.assert(asymEl1.x >= 15, `Asymmetric outside edge (${asymEl1.x}) must be >= 15mm`);
+  console.assert(asymEl2.x + asymEl2.width <= 200.01, `Asymmetric right edge (${asymEl2.x + asymEl2.width}) must extend to spine (200mm)`);
+  const asymGap = Math.round((asymEl2.x - (asymEl1.x + asymEl1.width)) * 100) / 100;
+  console.assert(asymGap === 4, `Asymmetric gap must remain 4mm, got ${asymGap}`);
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, adaptive safezone-bounded gap scaling, and real-time adaptive safe margin resizing)!');
