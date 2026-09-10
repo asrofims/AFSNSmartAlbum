@@ -928,6 +928,13 @@ export function generateAdaptiveLayoutVariations(
   const isCover = !params.isSpread;
   const fingerprint = getPhotosFingerprint(photos);
   const locked = params.lockedElements || [];
+  const marginSpine = params.safeMarginSpine ?? params.safeMargin;
+  const allowFullBleed = [
+    params.safeMarginTop ?? params.safeMargin,
+    params.safeMarginBottom ?? params.safeMargin,
+    params.safeMarginOutside ?? params.safeMargin,
+    marginSpine,
+  ].every(margin => margin === 0);
 
   // Helper to score, filter collisions, and enrich raw variations
   const scoreAndSortVariations = (rawVariations: AdaptiveLayoutVariation[]): AdaptiveLayoutVariation[] => {
@@ -1148,9 +1155,9 @@ export function generateAdaptiveLayoutVariations(
   const variations: AdaptiveLayoutVariation[] = [];
 
   if (count === 1) {
-    // 1 Photo options: Full-bleed edge-to-edge heroes FIRST, then safe-margin variations
+    // Edge-to-edge options are valid only when the active margins are all zero.
     const pageWidth = round4((params.spreadWidth - params.gutterWidth) / 2);
-    variations.push(
+    if (allowFullBleed) variations.push(
       {
         id: '1g_right_page_bleed',
         name: 'Right Page Full Bleed',
@@ -1171,7 +1178,9 @@ export function generateAdaptiveLayoutVariations(
         description: 'Edge-to-edge full spread statement panorama.',
         rects: [{ x: 0, y: 0, width: round4(params.spreadWidth), height: round4(params.spreadHeight) }],
         tags: ['hero', 'panorama', 'full-bleed'],
-      },
+      }
+    );
+    variations.push(
       {
         id: '1g_right_page_fill',
         name: 'Right Page Safe Zone Hero',
@@ -1185,7 +1194,10 @@ export function generateAdaptiveLayoutVariations(
         description: 'Fills the left page safe margin box cleanly.',
         rects: [{ ...leftPageArea }],
         tags: ['safe', 'hero', 'left', 'fill'],
-      },
+      }
+    );
+    // A panorama may cross the fold only when no spine margin is reserved.
+    if (marginSpine === 0) variations.push(
       {
         id: '1g_spread_center_fill',
         name: 'Center Spread Hero',
@@ -1224,7 +1236,7 @@ export function generateAdaptiveLayoutVariations(
   }
 
   // 1. FULL-BLEED per-page split variations (frames flush to canvas edge, zero gap)
-  splitPairs.forEach(({ nLeft, nRight }) => {
+  if (allowFullBleed) splitPairs.forEach(({ nLeft, nRight }) => {
     const leftVariants = nLeft === 1 ? 1 : nLeft === 2 ? 4 : nLeft === 3 ? 6 : nLeft === 4 ? 6 : 4;
     const rightVariants = nRight === 1 ? 1 : nRight === 2 ? 4 : nRight === 3 ? 6 : nRight === 4 ? 6 : 4;
 
@@ -1256,7 +1268,7 @@ export function generateAdaptiveLayoutVariations(
   });
 
   // 2. FULL-BLEED spread-wide variations (all photos across the entire spread, edge-to-edge)
-  {
+  if (allowFullBleed) {
     const spreadVariants = count === 2 ? 6 : count === 3 ? 8 : count === 4 ? 8 : count === 5 ? 6 : count === 6 ? 6 : 4;
     for (let v = 0; v < spreadVariants; v++) {
       const rects = partitionPageBoxIntoKRects(fullSpreadBleed, count, spacing, v);

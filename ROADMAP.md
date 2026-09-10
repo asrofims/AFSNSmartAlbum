@@ -348,4 +348,15 @@
 - [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
 - [x] Application version metadata bumped to `v1.0.47`.
 
+### Phase 29 — Release v1.0.48: Adaptive Layout Safe Margin Enforcement & Global Version Alignment
+
+- [x] Restrict full-bleed suggestions to zero effective margins, superseding Phase 28's unconditional full-bleed alternatives. Positive margins now constrain every suggested adaptive layout.
+- [x] Keep single-photo spread panoramas available only when the spine margin is zero; positive spine margins keep frames within individual page safe areas.
+- [x] Resolve spread margin overrides before project defaults, including explicit zero values, and retain four-sided unit conversion and disabled-margin behavior.
+- [x] Add regression coverage for every suggested layout with 1–12 photos, cover/spread modes, asymmetric and partially zero margins, and project-zero/spread-positive overrides.
+- [x] Unify versioning metadata across all system components (`package.json`, `Cargo.toml`, `Cargo.lock`, `tauri.conf.json`, `app_commands.rs`, `useTauriInfo.ts`, `appStore.ts`, `README.md`, `README.txt`, `LICENSE.txt`).
+- [x] Validate with `npm test` and `npx tsc --noEmit`; native desktop visual verification remains manual.
+- [x] Application version metadata bumped to `v1.0.48`.
+
+
 

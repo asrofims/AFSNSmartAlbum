@@ -48,7 +48,7 @@ function runTests() {
   }
   console.log('✓ Dynamic variations generated cleanly for photo counts 1 to 12 (all rect counts exact).');
 
-  // Test 2: Verify Strict Blue Safe Margin Box Confinement (non full-bleed variations only)
+  // Test 2: Every suggested variation must respect the active safe margins.
   const sevenPhotos: AdaptivePhoto[] = Array.from({ length: 7 }, (_, i) => ({
     filePath: `img_${i}.jpg`,
     photoAspect: 1.5,
@@ -57,10 +57,7 @@ function runTests() {
 
   const { leftPageArea, rightPageArea } = getUsableAreas(baseParams);
 
-  // Only check safe-margin variations (full-bleed variations intentionally extend to canvas edge)
-  const safeMarginVariations = variations7p.filter((v) => !v.tags?.includes('full-bleed'));
-
-  for (const v of safeMarginVariations) {
+  for (const v of variations7p) {
     for (const r of v.rects) {
       // Check if rect belongs to left page or right page
       const isLeft = r.x < leftPageArea.x + leftPageArea.width + baseParams.gutterWidth / 2;
@@ -80,7 +77,7 @@ function runTests() {
       }
     }
   }
-  console.log('✓ Safe-margin rects strictly bounded inside Left & Right Blue Safe Margin Boxes (full-bleed excluded).');
+  console.log('✓ All suggested layouts respect Left & Right Blue Safe Margin Boxes.');
 
   // Test 3: Single Page Partitioning (K = 1 to 6) with Flush Outer Edge Confinement
   const singleBox = { x: 10, y: 10, width: 180, height: 180 };
@@ -338,7 +335,8 @@ function runTests() {
 
   // Test 14: Full-Bleed Variations for Single Photo (count=1)
   const singlePhoto: AdaptivePhoto[] = [{ photoAspect: 1.5 }];
-  const singlePhotoVariations = generateAdaptiveLayoutVariations(baseParams, singlePhoto);
+  const zeroMarginParams = { ...baseParams, safeMargin: 0 };
+  const singlePhotoVariations = generateAdaptiveLayoutVariations(zeroMarginParams, singlePhoto);
   console.assert(singlePhotoVariations.length > 0, 'Must produce variations for 1 photo');
 
   // Verify full-bleed variations exist and have frames at canvas edge (x=0 or y=0)
@@ -363,7 +361,7 @@ function runTests() {
     const multiPhotos: AdaptivePhoto[] = Array.from({ length: n }, (_, i) => ({
       photoAspect: i % 2 === 0 ? 1.5 : 0.67,
     }));
-    const multiVariations = generateAdaptiveLayoutVariations(baseParams, multiPhotos);
+    const multiVariations = generateAdaptiveLayoutVariations(zeroMarginParams, multiPhotos);
     console.assert(multiVariations.length > 0, `Must produce variations for ${n} photos`);
 
     // Must have at least one full-bleed variation with rects touching canvas edge
@@ -396,6 +394,35 @@ function runTests() {
   console.log('✓ Multi-photo (2-6) full-bleed edge-to-edge variations verified.');
 
   console.log('ALL ADAPTIVE MULTI-PHOTO TESTS PASSED! 🎉');
+}
+
+// All suggestions (including the top-ranked one) must obey every active margin.
+for (const margins of [
+  { safeMargin: 10 },
+  { safeMargin: 0, safeMarginTop: 12.5, safeMarginBottom: 20, safeMarginOutside: 5, safeMarginSpine: 8 },
+  { safeMargin: 0, safeMarginBottom: 15 },
+  { safeMargin: 0, safeMarginSpine: 10 },
+]) {
+  for (const isSpread of [true, false]) {
+    const params: TemplateParams = { spreadWidth: 400, spreadHeight: 200, spacing: 3.125, gutterWidth: 0, isSpread, ...margins };
+    const { leftPageArea, rightPageArea, spreadArea } = getUsableAreas(params);
+    const spineMargin = params.safeMarginSpine ?? params.safeMargin;
+    const allowedBoxes = !isSpread || spineMargin === 0 ? [spreadArea] : [leftPageArea, rightPageArea];
+    for (let count = 1; count <= 12; count++) {
+      const photos = Array.from({ length: count }, (_, i) => ({ photoAspect: i % 2 ? 0.67 : 1.5 }));
+      const variations = generateAdaptiveLayoutVariations(params, photos);
+      assert.ok(variations.length > 0, `Missing margin-aware layouts for ${count} photos`);
+      assert.ok(variations.every(v => !v.tags.includes('full-bleed')), 'Positive margins must exclude full-bleed suggestions');
+      for (const variation of variations) {
+        const frames = buildSpreadElementsFromVariation(variation, photos);
+        for (const frame of frames) {
+          assert.ok(allowedBoxes.some(box => frame.x >= box.x - 0.0002 && frame.y >= box.y - 0.0002 &&
+            frame.x + frame.width <= box.x + box.width + 0.0002 && frame.y + frame.height <= box.y + box.height + 0.0002),
+          `${variation.id} crosses an active safe margin: ${JSON.stringify(frame)}`);
+        }
+      }
+    }
+  }
 }
 
 // Exercise the actual layout -> frame -> photo -> viewport path with fractional sizes.
