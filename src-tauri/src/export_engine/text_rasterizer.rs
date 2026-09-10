@@ -703,13 +703,20 @@ pub fn render_text_element(
         ranges_to_text_runs(full_text, parsed_payload.styled_ranges.as_ref(), base_style)
     };
 
+    let rotation_deg = elem.rotation % 360.0;
+    let is_rotated = rotation_deg.abs() >= 0.01;
+    let ss: f32 = if is_rotated { 2.0 } else { 1.0 };
+
+    let buf_w = (frame_px_w as f32 * ss).round().max(1.0) as u32;
+    let buf_h = (frame_px_h as f32 * ss).round().max(1.0) as u32;
+
     // Calculate padding in export pixels (1pt = dpi / 72.0 px)
     let dpi_f = dpi as f64;
-    let pt_to_px = (dpi_f / 72.0) as f32;
+    let pt_to_px = (dpi_f / 72.0) as f32 * ss;
     let raw_padding_px = (base_style.padding as f32 * pt_to_px).max(0.0);
     let padding_px = raw_padding_px;
-    let available_w = (frame_px_w as f32 - 2.0 * padding_px).max(0.001);
-    let available_h = (frame_px_h as f32 - 2.0 * padding_px).max(0.001);
+    let available_w = (buf_w as f32 - 2.0 * padding_px).max(0.001);
+    let available_h = (buf_h as f32 - 2.0 * padding_px).max(0.001);
 
     let tracking = base_style.letter_spacing as f32 * pt_to_px;
     // 1. Tokenize runs into atomic words, whitespace, and newlines
@@ -953,7 +960,7 @@ pub fn render_text_element(
     };
 
     // 4. Render into element text buffer
-    let mut text_buffer = RgbaImage::new(frame_px_w, frame_px_h);
+    let mut text_buffer = RgbaImage::new(buf_w, buf_h);
     let mut current_top = start_y;
 
     for line in &lines {
@@ -972,10 +979,10 @@ pub fn render_text_element(
         for tok in &line.tokens {
             if let Some(ref hl) = tok.highlight {
                 if !tok.is_space && !tok.is_newline {
-                    let hl_x = (token_x - 2.0).max(0.0).round() as i32;
-                    let hl_y = (baseline - tok.ascent - 2.0).max(0.0).round() as i32;
-                    let hl_w = (tok.width + 4.0).round() as i32;
-                    let hl_h = (tok.ascent + tok.descent + 4.0).round() as i32;
+                    let hl_x = (token_x - 2.0 * ss).max(0.0).round() as i32;
+                    let hl_y = (baseline - tok.ascent - 2.0 * ss).max(0.0).round() as i32;
+                    let hl_w = (tok.width + 4.0 * ss).round() as i32;
+                    let hl_h = (tok.ascent + tok.descent + 4.0 * ss).round() as i32;
                     draw_filled_rect(&mut text_buffer, hl_x, hl_y, hl_w, hl_h, *hl);
                 }
             }
@@ -1005,12 +1012,12 @@ pub fn render_text_element(
 
                         for by in 0..metrics.height {
                             let dest_y = glyph_top_y + by as i32;
-                            if dest_y < 0 || dest_y >= frame_px_h as i32 {
+                            if dest_y < 0 || dest_y >= buf_h as i32 {
                                 continue;
                             }
                             for bx in 0..metrics.width {
                                 let dest_x = glyph_left_x + bx as i32;
-                                if dest_x < 0 || dest_x >= frame_px_w as i32 {
+                                if dest_x < 0 || dest_x >= buf_w as i32 {
                                     continue;
                                 }
 
@@ -1032,8 +1039,8 @@ pub fn render_text_element(
 
                 // Text Decorations
                 if tok.text_decoration == "underline" {
-                    let bar_y = (baseline + 2.0).round() as i32;
-                    let bar_h = (tok.font_size_px * 0.07).max(1.5).round() as i32;
+                    let bar_y = (baseline + 2.0 * ss).round() as i32;
+                    let bar_h = (tok.font_size_px * 0.07).max(1.5 * ss).round() as i32;
                     draw_filled_rect(
                         &mut text_buffer,
                         token_x.round() as i32,
@@ -1044,7 +1051,7 @@ pub fn render_text_element(
                     );
                 } else if tok.text_decoration == "line-through" {
                     let bar_y = (baseline - tok.ascent * 0.35).round() as i32;
-                    let bar_h = (tok.font_size_px * 0.07).max(1.5).round() as i32;
+                    let bar_h = (tok.font_size_px * 0.07).max(1.5 * ss).round() as i32;
                     draw_filled_rect(
                         &mut text_buffer,
                         token_x.round() as i32,
@@ -1063,8 +1070,7 @@ pub fn render_text_element(
     }
 
     // 5. Composite text buffer onto high-res canvas (handling rotation if non-zero)
-    let rotation_deg = elem.rotation % 360.0;
-    if rotation_deg.abs() < 0.01 {
+    if !is_rotated {
         // Direct blit
         for ty in 0..frame_px_h {
             let dest_y = frame_px_y + ty as i64;
@@ -1089,17 +1095,17 @@ pub fn render_text_element(
         }
     } else {
         // Rotated blit around top-left origin (matching Konva coordinate model)
-        let rad = (-rotation_deg).to_radians();
-        let cos_r = rad.cos();
-        let sin_r = rad.sin();
-
-        // Corners in local space: (0,0), (w, 0), (0, h), (w, h)
-        let w_f = frame_px_w as f64;
-        let h_f = frame_px_h as f64;
         let rot_rad = rotation_deg.to_radians();
         let cos_f = rot_rad.cos();
         let sin_f = rot_rad.sin();
 
+        let inv_rad = (-rotation_deg).to_radians();
+        let cos_r = inv_rad.cos();
+        let sin_r = inv_rad.sin();
+
+        // Corners in local space: (0,0), (w, 0), (0, h), (w, h)
+        let w_f = frame_px_w as f64;
+        let h_f = frame_px_h as f64;
         let corners = [
             (0.0, 0.0),
             (w_f * cos_f, w_f * sin_f),
@@ -1107,10 +1113,14 @@ pub fn render_text_element(
             (w_f * cos_f - h_f * sin_f, w_f * sin_f + h_f * cos_f),
         ];
 
-        let min_x = corners.iter().map(|c| c.0).fold(f64::INFINITY, f64::min).floor() as i64;
-        let max_x = corners.iter().map(|c| c.0).fold(f64::NEG_INFINITY, f64::max).ceil() as i64;
-        let min_y = corners.iter().map(|c| c.1).fold(f64::INFINITY, f64::min).floor() as i64;
-        let max_y = corners.iter().map(|c| c.1).fold(f64::NEG_INFINITY, f64::max).ceil() as i64;
+        let min_x = corners.iter().map(|c| c.0).fold(f64::INFINITY, f64::min).floor() as i64 - 1;
+        let max_x = corners.iter().map(|c| c.0).fold(f64::NEG_INFINITY, f64::max).ceil() as i64 + 1;
+        let min_y = corners.iter().map(|c| c.1).fold(f64::INFINITY, f64::min).floor() as i64 - 1;
+        let max_y = corners.iter().map(|c| c.1).fold(f64::NEG_INFINITY, f64::max).ceil() as i64 + 1;
+
+        let ss_f = ss as f64;
+        let buf_w_i = buf_w as i64;
+        let buf_h_i = buf_h as i64;
 
         for cy in min_y..=max_y {
             let dest_y = frame_px_y + cy;
@@ -1123,20 +1133,57 @@ pub fn render_text_element(
                     continue;
                 }
 
-                // Inverse rotation
-                let dx = cx as f64;
-                let dy = cy as f64;
-                let tx = (dx * cos_r - dy * sin_r).round() as i64;
-                let ty = (dx * sin_r + dy * cos_r).round() as i64;
+                // Map canvas pixel center (cx + 0.5, cy + 0.5) to local unrotated buffer space
+                let dx = cx as f64 + 0.5;
+                let dy = cy as f64 + 0.5;
+                let src_x = (dx * cos_r - dy * sin_r) * ss_f - 0.5;
+                let src_y = (dx * sin_r + dy * cos_r) * ss_f - 0.5;
 
-                if tx >= 0 && tx < frame_px_w as i64 && ty >= 0 && ty < frame_px_h as i64 {
-                    let p = text_buffer.get_pixel(tx as u32, ty as u32);
-                    if p[3] == 0 {
-                        continue;
+                let x0 = src_x.floor() as i64;
+                let y0 = src_y.floor() as i64;
+                let x1 = x0 + 1;
+                let y1 = y0 + 1;
+
+                if x1 < 0 || x0 >= buf_w_i || y1 < 0 || y0 >= buf_h_i {
+                    continue;
+                }
+
+                let fx = (src_x - x0 as f64) as f32;
+                let fy = (src_y - y0 as f64) as f32;
+
+                let sample_premul = |x: i64, y: i64| -> (f32, f32, f32, f32) {
+                    if x >= 0 && x < buf_w_i && y >= 0 && y < buf_h_i {
+                        let p = text_buffer.get_pixel(x as u32, y as u32);
+                        let a = p[3] as f32 / 255.0;
+                        (p[0] as f32 * a, p[1] as f32 * a, p[2] as f32 * a, a)
+                    } else {
+                        (0.0, 0.0, 0.0, 0.0)
                     }
-                    let src_a = (p[3] as f32 / 255.0 * elem.opacity as f32).clamp(0.0, 1.0);
+                };
+
+                let p00 = sample_premul(x0, y0);
+                let p10 = sample_premul(x1, y0);
+                let p01 = sample_premul(x0, y1);
+                let p11 = sample_premul(x1, y1);
+
+                let w00 = (1.0 - fx) * (1.0 - fy);
+                let w10 = fx * (1.0 - fy);
+                let w01 = (1.0 - fx) * fy;
+                let w11 = fx * fy;
+
+                let interp_pr = w00 * p00.0 + w10 * p10.0 + w01 * p01.0 + w11 * p11.0;
+                let interp_pg = w00 * p00.1 + w10 * p10.1 + w01 * p01.1 + w11 * p11.1;
+                let interp_pb = w00 * p00.2 + w10 * p10.2 + w01 * p01.2 + w11 * p11.2;
+                let interp_a  = w00 * p00.3 + w10 * p10.3 + w01 * p01.3 + w11 * p11.3;
+
+                if interp_a > 0.001 {
+                    let final_r = (interp_pr / interp_a).round().clamp(0.0, 255.0) as u8;
+                    let final_g = (interp_pg / interp_a).round().clamp(0.0, 255.0) as u8;
+                    let final_b = (interp_pb / interp_a).round().clamp(0.0, 255.0) as u8;
+                    let final_a = (interp_a * elem.opacity as f32).clamp(0.0, 1.0);
+
                     let canvas_pixel = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
-                    blend_pixel_over(canvas_pixel, p[0], p[1], p[2], src_a);
+                    blend_pixel_over(canvas_pixel, final_r, final_g, final_b, final_a);
                 }
             }
         }
@@ -1307,5 +1354,143 @@ mod tests {
         // Verify canvas still has dimensions and did not crash
         assert_eq!(canvas.width(), 600);
         assert_eq!(canvas.height(), 400);
+    }
+
+    #[test]
+    fn test_render_and_save_png() {
+        let mut canvas = RgbaImage::from_pixel(1200, 600, Rgba([255, 255, 255, 255]));
+        let elem = ElementPayload {
+            id: "test-text-1".to_string(),
+            r#type: "text".to_string(),
+            photo_id: None,
+            file_path: String::new(),
+            file_name: String::new(),
+            preview_path: None,
+            thumbnail_path: None,
+            x: 20.0,
+            y: 20.0,
+            width: 80.0,
+            height: 30.0,
+            rotation: 0.0,
+            z_index: 1,
+            photo_aspect: 1.0,
+            group_id: None,
+            original_width: None,
+            original_height: None,
+            crop_x: 0.0,
+            crop_y: 0.0,
+            crop_scale: 1.0,
+            crop_rotation: None,
+            border_enabled: false,
+            border_width: 0.0,
+            border_color: "#000000".to_string(),
+            opacity: 1.0,
+            locked: None,
+            text_payload: Some(
+                serde_json::to_string(&TextElementPayload {
+                    text: "Our Wedding Story".to_string(),
+                    style: TextStylePayload {
+                        font_family: "Inter".to_string(),
+                        font_size: 24.0,
+                        font_weight: "bold".to_string(),
+                        font_style: "normal".to_string(),
+                        text_decoration: "none".to_string(),
+                        fill: "#0f172a".to_string(),
+                        align: "center".to_string(),
+                        vertical_align: "middle".to_string(),
+                        line_height: 1.3,
+                        letter_spacing: 0.0,
+                        padding: 6.0,
+                        word_wrap: "word".to_string(),
+                    },
+                    styled_ranges: None,
+                    text_runs: None,
+                })
+                .unwrap(),
+            ),
+            corner_radius_tl: 0.0,
+            corner_radius_tr: 0.0,
+            corner_radius_br: 0.0,
+            corner_radius_bl: 0.0,
+            corner_radius: None,
+        };
+
+        // Scale for mm at 300 DPI: 300 / 25.4 ≈ 11.8110236
+        let scale = 300.0 / 25.4;
+        render_text_element(&mut canvas, &elem, 0.0, 0.0, scale, 300);
+
+        let non_white_count = canvas.pixels().filter(|p| p[0] < 250 || p[1] < 250 || p[2] < 250).count();
+        assert!(non_white_count > 100, "Text element should render visible pixels onto canvas");
+    }
+
+    #[test]
+    fn test_user_rotated_scenario() {
+        // Dark background like in an album photo
+        let mut canvas = RgbaImage::from_pixel(1080, 1350, Rgba([30, 41, 59, 255]));
+        let elem = ElementPayload {
+            id: "user-text-1".to_string(),
+            r#type: "text".to_string(),
+            photo_id: None,
+            file_path: String::new(),
+            file_name: String::new(),
+            preview_path: None,
+            thumbnail_path: None,
+            x: 171.58,
+            y: 738.48,
+            width: 736.85,
+            height: 104.16,
+            rotation: -14.36524697527854,
+            z_index: 1,
+            photo_aspect: 1.0,
+            group_id: None,
+            original_width: None,
+            original_height: None,
+            crop_x: 0.0,
+            crop_y: 0.0,
+            crop_scale: 1.0,
+            crop_rotation: None,
+            border_enabled: false,
+            border_width: 0.0,
+            border_color: "#000000".to_string(),
+            opacity: 1.0,
+            locked: None,
+            text_payload: Some(
+                serde_json::to_string(&TextElementPayload {
+                    text: "Add a title or story here".to_string(),
+                    style: TextStylePayload {
+                        font_family: "Century Gothic".to_string(),
+                        font_size: 15.202119907206225,
+                        font_weight: "normal".to_string(),
+                        font_style: "normal".to_string(),
+                        text_decoration: "none".to_string(),
+                        fill: "#FFFFFF".to_string(),
+                        align: "center".to_string(),
+                        vertical_align: "middle".to_string(),
+                        line_height: 1.3,
+                        letter_spacing: 0.0,
+                        padding: 2.6177055835656815,
+                        word_wrap: "word".to_string(),
+                    },
+                    styled_ranges: None,
+                    text_runs: None,
+                })
+                .unwrap(),
+            ),
+            corner_radius_tl: 0.0,
+            corner_radius_tr: 0.0,
+            corner_radius_br: 0.0,
+            corner_radius_bl: 0.0,
+            corner_radius: None,
+        };
+
+        // Scale = 1.0 for px at 300 DPI
+        render_text_element(&mut canvas, &elem, 0.0, 0.0, 1.0, 300);
+
+        // Verify that intermediate anti-aliased pixels exist (not just binary 30 or 255)
+        let has_smooth_intermediate = canvas.pixels().any(|p| p[0] > 40 && p[0] < 240);
+        assert!(has_smooth_intermediate, "Rotated text should have smooth anti-aliased intermediate edge pixels");
+
+        let white_text_pixels = canvas.pixels().filter(|p| p[0] > 200).count();
+        assert!(white_text_pixels > 50, "Rotated text should render legible letters");
     }
 }
