@@ -668,7 +668,7 @@ export function WorkspaceLayout() {
                   className={styles.menuItem}
                   onClick={() => {
                     setIsHelpMenuOpen(false);
-                    openSettings('snapping');
+                    openSettings('general');
                   }}
                 >
                   <span>⚙️ Settings...</span>

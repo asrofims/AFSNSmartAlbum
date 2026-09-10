@@ -34,7 +34,7 @@ import { Photo } from '../../domain/photo';
 import { TextNode } from './TextNode';
 import { TextInlineEditor } from './TextInlineEditor';
 import { TextNodeElement, fitTextFrame } from '../../domain/text';
-import { convertPtToUnit } from '../../domain/units';
+import { convertPtToUnit, convertUnit, Unit } from '../../domain/units';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
 import styles from './KonvaEditorCanvas.module.css';
 
@@ -1643,6 +1643,11 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const singlePageH = dims.pageHeight;
   const gutterPhysicalW = 0; // Pure layflat spread (strictly 2 * singlePageW)
 
+  const rawThresholdMm = snappingConfig.threshold ?? 1.69;
+  const projectUnit = (unit as Unit) || 'mm';
+  const projectDpi = currentProject?.canvasDpi || 300;
+  const snappingThresholdUnits = convertUnit(rawThresholdMm, 'mm', projectUnit, projectDpi, projectUnit === 'px' ? 0 : 3);
+
   // Total spread physical dimensions (strictly 2 * singlePageW)
   const totalSpreadPhysicalW = singlePageW * 2;
   const totalSpreadPhysicalH = singlePageH;
@@ -2721,11 +2726,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                           .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
-                        const thresholdUnits =
-                          typeof snappingConfig.threshold === 'number'
-                            ? snappingConfig.threshold
-                            : 0.1;
-
                         const snapRes = calculateSnapping(
                           { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
                           totalSpreadPhysicalW,
@@ -2733,7 +2733,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                           safeAreaMargins,
                           gutterPhysicalW,
                           otherRects,
-                          { ...snappingConfig, threshold: thresholdUnits },
+                          { ...snappingConfig, threshold: snappingThresholdUnits },
                           unit
                         );
 
@@ -2794,7 +2794,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                                 safeAreaMargins,
                                 gutterPhysicalW,
                                 otherRects,
-                                snappingConfig,
+                                { ...snappingConfig, threshold: snappingThresholdUnits },
                                 unit
                               );
 
@@ -2955,11 +2955,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                         .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
-                      const thresholdUnits =
-                        typeof snappingConfig.threshold === 'number'
-                          ? snappingConfig.threshold
-                          : 0.1;
-
                       const snapRes = calculateSnapping(
                         { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
                         totalSpreadPhysicalW,
@@ -2967,7 +2962,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         safeAreaMargins,
                         gutterPhysicalW,
                         otherRects,
-                        { ...snappingConfig, threshold: thresholdUnits },
+                        { ...snappingConfig, threshold: snappingThresholdUnits },
                         unit
                       );
 
@@ -3042,7 +3037,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                             safeAreaMargins,
                             gutterPhysicalW,
                             otherRects,
-                            snappingConfig,
+                            { ...snappingConfig, threshold: snappingThresholdUnits },
                             unit
                           );
 

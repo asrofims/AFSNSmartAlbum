@@ -414,9 +414,26 @@ export interface SnappingConfig {
   snapToEqualGaps: boolean; // equidistant spacing between 3+ frames and dynamic gap HUD
 }
 
+export interface SnappingLevel {
+  level: number;
+  name: string;
+  px: number;
+  mm: number;
+  desc: string;
+  isDefault?: boolean;
+}
+
+export const SNAPPING_LEVELS: readonly SnappingLevel[] = [
+  { level: 1, name: 'Soft', px: 10, mm: 0.85, desc: 'Gentle magnetic pull for fine micro-adjustments' },
+  { level: 2, name: 'Normal', px: 20, mm: 1.69, desc: 'Standard comfortable alignment (Recommended)', isDefault: true },
+  { level: 3, name: 'Medium', px: 35, mm: 2.96, desc: 'Responsive snapping with a broader catch radius' },
+  { level: 4, name: 'Strong', px: 50, mm: 4.23, desc: 'Firm magnetic pull, ideal for rapid multi-photo layout' },
+  { level: 5, name: 'Max', px: 75, mm: 6.35, desc: 'Maximum snap distance, locks quickly to nearest guides' },
+] as const;
+
 export const DEFAULT_SNAPPING_CONFIG: SnappingConfig = {
   enabled: true,
-  threshold: 0.1,
+  threshold: 1.69,
   snapToPageEdges: true,
   snapToPageCenters: true,
   snapToMargins: true,

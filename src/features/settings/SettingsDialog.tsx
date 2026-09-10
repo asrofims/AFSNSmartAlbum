@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Dialog } from '../../components/ui/Dialog';
 import { Switch } from '../../components/ui/Switch';
-import { NumberInput } from '../../components/ui/NumberInput';
 import { useAppStore } from '../../stores/appStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { getMaxGapForUnit } from '../../domain/units';
+import { convertUnit, Unit, UNIT_LABELS } from '../../domain/units';
+import { SNAPPING_LEVELS, SnappingLevel } from '../../domain/editor';
 import styles from './SettingsDialog.module.css';
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ export function SettingsDialog() {
     multiResizeGapMode,
     setMultiResizeGapMode,
   } = useEditorStore();
-  const { currentProject, updateProjectSpacing } = useProjectStore();
+  const { currentProject } = useProjectStore();
 
   // Shortcuts search and filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -409,6 +409,28 @@ export function SettingsDialog() {
     }
     return groups;
   }, [filteredShortcuts]);
+
+  const activeUnit: Unit = currentProject?.canvasUnit || 'mm';
+  const activeDpi: number = currentProject?.canvasDpi || 300;
+  const unitLabel = UNIT_LABELS[activeUnit] || activeUnit;
+
+  const activeLevelObj: SnappingLevel = useMemo(() => {
+    const defaultLevel = SNAPPING_LEVELS[1]!;
+    const currentMm = snappingConfig.threshold;
+    if (!currentMm || currentMm <= 0.2) {
+      return defaultLevel; // Default Level 2 (20 px / 1.69 mm)
+    }
+    let closest: SnappingLevel = defaultLevel;
+    let minDiff = Infinity;
+    for (const lvl of SNAPPING_LEVELS) {
+      const diff = Math.abs(currentMm - lvl.mm);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = lvl;
+      }
+    }
+    return closest;
+  }, [snappingConfig.threshold]);
 
   return (
     <Dialog
@@ -469,7 +491,7 @@ export function SettingsDialog() {
                   <path d="M9 21V9" />
                 </svg>
               </span>
-              <span>Layout & Spacing</span>
+              <span>Multi-Frame Resize</span>
             </button>
 
             {/* Tab 4: Keyboard Shortcuts */}
@@ -550,42 +572,7 @@ export function SettingsDialog() {
                 </div>
               </div>
 
-              {/* Data Protection & Recovery Card */}
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <div className={styles.cardTitle}>
-                      <span>Data Protection & Crash Recovery</span>
-                      <span className={styles.statusBadgeActive}>Protected</span>
-                    </div>
-                    <div className={styles.cardSubtitle}>
-                      Embedded SQLite transactional database with Write-Ahead Logging (WAL) and automatic state snapshots.
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.thresholdSection}>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>Crash Guard Architecture</span>
-                    <span className={styles.infoValue}>
-                      Atomic Multi-Spread Transactions (SQLite)
-                    </span>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>State Persistence</span>
-                    <span className={styles.infoValue}>
-                      Continuous Local Project Sync
-                    </span>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>Offline Guarantee</span>
-                    <span className={styles.infoValue}>
-                      Zero Cloud Dependency (100% Air-Gapped Capable)
-                    </span>
-                  </div>
-                </div>
               </div>
-            </div>
           )}
 
           {/* ================================================================ */}
@@ -621,44 +608,57 @@ export function SettingsDialog() {
                   />
                 </div>
 
-                {/* Magnetic Distance / Sensitivity */}
+                {/* Calibrated Snapping Levels */}
                 <div className={styles.thresholdSection}>
-                  <div className={styles.cardSubtitle} style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                    Snapping Distance Threshold
-                  </div>
-                  <div className={styles.cardSubtitle} style={{ marginTop: 0 }}>
-                    Magnet pull distance in physical project units (0.1 mm is subtle, 2.0 mm is strong).
-                  </div>
-
-                  <div className={styles.thresholdControls}>
-                    <div className={styles.presetGroup}>
-                      {[
-                        { label: '0.1mm Subtle', val: 0.1, title: 'Ultra Soft / Minimal Magnet (0.1mm)' },
-                        { label: '0.5mm Soft', val: 0.5, title: 'Soft Snapping (0.5mm)' },
-                        { label: '1.0mm Standard', val: 1.0, title: 'Standard Professional (1.0mm)' },
-                        { label: '2.0mm Strong', val: 2.0, title: 'Strong Magnet (2.0mm)' },
-                      ].map((p) => (
-                        <button
-                          key={p.label}
-                          type="button"
-                          className={`${styles.presetBtn} ${Math.abs(snappingConfig.threshold - p.val) < 0.01 ? styles.presetBtnActive : ''}`}
-                          onClick={() => updateSnappingConfig({ threshold: p.val })}
-                          title={p.title}
-                        >
-                          {p.label}
-                        </button>
-                      ))}
+                  <div className={styles.thresholdHeaderRow}>
+                    <div>
+                      <div className={styles.cardSubtitle} style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        Snapping Distance Threshold
+                      </div>
+                      <div className={styles.cardSubtitle} style={{ marginTop: '2px' }}>
+                        Calibrated magnetic attraction levels for smooth and effortless frame alignment.
+                      </div>
                     </div>
+                  </div>
 
-                    <div style={{ width: '84px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <NumberInput
-                        value={snappingConfig.threshold}
-                        onChange={(val) => updateSnappingConfig({ threshold: Math.max(0.05, Math.round(val * 100) / 100) })}
-                        min={0.05}
-                        max={20}
-                        step={0.1}
-                      />
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>mm</span>
+                  <div className={styles.levelPillsContainer}>
+                    {SNAPPING_LEVELS.map((lvl) => {
+                      const isActive = activeLevelObj.level === lvl.level;
+                      return (
+                        <button
+                          key={lvl.level}
+                          type="button"
+                          className={`${styles.levelPill} ${isActive ? styles.levelPillActive : ''}`}
+                          onClick={() => updateSnappingConfig({ threshold: lvl.mm })}
+                          title={`Level ${lvl.level} (${lvl.name}) — ${lvl.px} px`}
+                        >
+                          <div className={styles.levelPillTitle}>Level {lvl.level}</div>
+                          <div className={styles.levelPillSubtitle}>{lvl.name}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Active Level Detail Banner */}
+                  <div className={styles.levelDetailBanner}>
+                    <span className={styles.levelDetailIcon}>🧲</span>
+                    <div className={styles.levelDetailContent}>
+                      <div className={styles.levelDetailHeading}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>Level {activeLevelObj.level} • {activeLevelObj.name} Snapping</span>
+                          {activeLevelObj.isDefault && (
+                            <span className={styles.levelPillDefaultTag}>Default</span>
+                          )}
+                        </div>
+                        <span className={styles.levelDetailMetricBadge}>
+                          {activeUnit === 'px'
+                            ? `${activeLevelObj.px} px`
+                            : `${activeLevelObj.px} px (~${convertUnit(activeLevelObj.mm, 'mm', activeUnit, activeDpi, activeUnit === 'mm' ? 1 : 2)} ${unitLabel})`}
+                        </span>
+                      </div>
+                      <div className={styles.levelDetailDesc}>
+                        {activeLevelObj.desc}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -814,70 +814,15 @@ export function SettingsDialog() {
           )}
 
           {/* ================================================================ */}
-          {/* 3. Layout & Spacing Tab                                           */}
+          {/* 3. Multi-Frame Resize Tab                                           */}
           {/* ================================================================ */}
           {activeTab === 'layout' && (
             <div className={styles.tabContent}>
               <div className={styles.sectionHeader}>
-                <div className={styles.sectionTitle}>Layout & Spacing Rules</div>
+                <div className={styles.sectionTitle}>Multi-Frame Resize Behavior</div>
                 <div className={styles.sectionSubtitle}>
-                  Set project default gap distance and multi-selection canvas interaction rules.
+                  Configure inter-frame gap preservation rules when resizing multiple selected photos.
                 </div>
-              </div>
-
-              {/* Default Photo Spacing Card */}
-              <div className={styles.card}>
-                <div className={styles.cardTitle} style={{ marginBottom: '6px' }}>
-                  Default Photo Spacing
-                </div>
-                <div className={styles.cardSubtitle} style={{ marginBottom: '16px' }}>
-                  The physical millimeter gap distance applied between adjacent photo frames across layouts.
-                </div>
-
-                {currentProject ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div className={styles.thresholdControls}>
-                      <div className={styles.presetGroup}>
-                        {[
-                          { label: '0mm Seamless', val: 0 },
-                          { label: '2mm Modern', val: 2 },
-                          { label: '4mm Spacious', val: 4 },
-                          { label: '6mm Classic', val: 6 },
-                        ].map((preset) => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            className={`${styles.presetBtn} ${Math.abs(currentProject.spacingValue - preset.val) < 0.01 ? styles.presetBtnActive : ''}`}
-                            onClick={() => updateProjectSpacing(preset.val, currentProject.spacingUnit)}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div style={{ width: '90px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <NumberInput
-                          value={currentProject.spacingValue}
-                          onChange={(val) => {
-                            const maxGap = getMaxGapForUnit(currentProject.spacingUnit);
-                            updateProjectSpacing(Math.max(0, Math.min(val, maxGap)), currentProject.spacingUnit);
-                          }}
-                          min={0}
-                          max={getMaxGapForUnit(currentProject.spacingUnit)}
-                          step={currentProject.spacingUnit === 'inch' ? 0.05 : currentProject.spacingUnit === 'cm' ? 0.1 : currentProject.spacingUnit === 'px' ? 1 : 0.5}
-                          precision={currentProject.spacingUnit === 'px' ? 0 : currentProject.spacingUnit === 'inch' || currentProject.spacingUnit === 'cm' ? 2 : 1}
-                        />
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                          {currentProject.spacingUnit}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                    Open or create a project to configure active spacing rules.
-                  </div>
-                )}
               </div>
 
               {/* Multi-Frame Resize Gap Mode (2-Card Selector) */}
