@@ -14,6 +14,7 @@
 
 .toolbar {
   grid-area: toolbar;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -21,7 +22,11 @@
   background-color: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   user-select: none;
-  z-index: 500;
+  z-index: 2000;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .toolbarSection {
@@ -37,12 +42,35 @@
   gap: var(--space-2);
 }
 
+.toolbarLeftSection {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 2100;
+}
+
 .toolbarCenterSection {
-  flex: 2;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 4px;
+}
+
+.toolbarRightSection {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
 }
 
 .brand {
@@ -63,14 +91,17 @@
 .activeProjectBadge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   font-size: var(--font-size-xs);
   color: var(--color-text-primary);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   padding: 2px var(--space-2);
   border-radius: var(--radius-md);
-  max-width: 280px;
+  max-width: clamp(100px, 16vw, 220px);
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
 }
 
 .projectNameText {
@@ -81,6 +112,8 @@
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
   transition: background-color 0.15s ease;
 }
 
@@ -97,7 +130,8 @@
   font-weight: var(--font-weight-medium);
   padding: 2px 6px;
   outline: none;
-  width: 150px;
+  width: 120px;
+  max-width: 100%;
 }
 
 .toolButton {
@@ -130,9 +164,185 @@
 
 .toolbarSeparator {
   width: 1px;
-  height: 20px;
+  height: 18px;
   background-color: var(--color-border);
-  margin: 0 var(--space-1);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.historyGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.addTextBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--color-accent);
+  background: rgba(74, 158, 255, 0.12);
+  border: 1px solid rgba(74, 158, 255, 0.35);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.addTextBtn:hover {
+  background: rgba(74, 158, 255, 0.22);
+  border-color: var(--color-accent);
+}
+
+.zoomControls {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1px;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.zoomBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.zoomBtn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.zoomLevelText {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  min-width: 36px;
+  text-align: center;
+  user-select: none;
+}
+
+.zoomFitBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.zoomFitBtn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.toolbarActionBtn {
+  flex-shrink: 0;
+  height: 26px !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+.updateBtn {
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 8px !important;
+  height: 26px !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4) !important;
+  flex-shrink: 0 !important;
+}
+
+.updateVersionBadge {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.toolbarBtnText {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .updateVersionBadge {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .toolbarBtnText {
+    display: none;
+  }
+
+  .activeProjectBadge {
+    max-width: 140px;
+  }
+
+  .addTextBtn {
+    padding: 0 6px;
+  }
+}
+
+@media (max-width: 960px) {
+  .toolbar {
+    padding: 0 var(--space-2);
+  }
+
+  .toolbarCenterSection {
+    gap: 4px;
+    padding: 0 2px;
+  }
+
+  .activeProjectBadge {
+    max-width: 100px;
+    padding: 2px 4px;
+  }
+
+  .zoomFitBtn {
+    display: none;
+  }
+}
+
+@media (max-width: 840px) {
+  .activeProjectBadge {
+    max-width: 75px;
+  }
+
+  .toolbarSeparator {
+    margin: 0 1px;
+  }
 }
 
 /* Center Editor Area (contains Canvas + Bottom PageNavigator spanning full width) */
@@ -498,14 +708,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border-radius: var(--radius-md);
   background: transparent;
   border: 1px solid transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
@@ -535,7 +746,7 @@
 .menuContainer {
   position: relative;
   display: inline-block;
-  z-index: 1000;
+  z-index: 2200;
 }
 
 .dropdownMenu {
@@ -546,9 +757,9 @@
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
   padding: 4px 0;
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   flex-direction: column;
 }

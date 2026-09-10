@@ -387,6 +387,14 @@
 - [x] Add regression test coverage for safe area scaling, ID preservation, crop preservation, and asymmetric 4-sided margin confinement in `tests/album.test.ts`.
 - [x] Application version metadata bumped to `v1.0.51`.
 
+### Phase 33 — Release v1.0.52: Responsive Toolbar Layout & Workspace Ergonomics
+
+- [x] Modernize editor toolbar with dedicated `.toolbarLeftSection` and `.toolbarRightSection` flex alignments, eliminating overflow on compact laptop displays.
+- [x] Implement compact responsive breakpoints down to 840px screen width with label folding, compact separators, and optimized zoom buttons.
+- [x] Elevate dropdown menus and dropdown container z-indices (`z-index: 99999`) to prevent clipping beneath canvas layers or modal overlays.
+- [x] Application version metadata bumped to `v1.0.52`.
+
+
 
 
 

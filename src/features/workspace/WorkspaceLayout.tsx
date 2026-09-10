@@ -503,7 +503,7 @@ export function WorkspaceLayout() {
       <header className={styles.toolbar} data-tauri-drag-region>
         
         {/* Left Section: File & Help Menus */}
-        <div className={styles.toolbarSideSection} style={{ justifyContent: 'flex-start' }}>
+        <div className={styles.toolbarLeftSection}>
           {/* Professional File Menu Dropdown */}
           <div className={styles.menuContainer} ref={fileMenuRef}>
             <Button
@@ -714,7 +714,7 @@ export function WorkspaceLayout() {
               <div className={styles.toolbarSeparator} />
 
               {/* Undo / Redo & Save Action Stack */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <div className={styles.historyGroup}>
                 <button
                   type="button"
                   className={styles.historyBtn}
@@ -794,7 +794,7 @@ export function WorkspaceLayout() {
               {/* Add Text Tool Button */}
               <button
                 type="button"
-                className={styles.toolButton}
+                className={styles.addTextBtn}
                 onClick={() => {
                   if (!activeSpreadId) return;
                   const newId = addTextToSpread(activeSpreadId);
@@ -804,26 +804,13 @@ export function WorkspaceLayout() {
                   }
                 }}
                 title="Add Text Box (T)"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '3px 8px',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  color: 'var(--color-accent, #3b82f6)',
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  border: '1px solid rgba(59, 130, 246, 0.35)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="4 7 4 4 20 4 20 7" />
                   <line x1="9" y1="20" x2="15" y2="20" />
                   <line x1="12" y1="4" x2="12" y2="20" />
                 </svg>
-                <span>Add Text</span>
+                <span className={styles.toolbarBtnText}>Add Text</span>
               </button>
 
               <div className={styles.toolbarSeparator} />
@@ -832,7 +819,7 @@ export function WorkspaceLayout() {
               <div className={styles.zoomControls}>
                 <button
                   type="button"
-                  className={styles.toolButton}
+                  className={styles.zoomBtn}
                   onClick={() => setZoomLevel((z) => Math.max(25, z - 15))}
                   title="Zoom Out"
                 >
@@ -841,7 +828,7 @@ export function WorkspaceLayout() {
                 <span className={styles.zoomLevelText}>{zoomLevel}%</span>
                 <button
                   type="button"
-                  className={styles.toolButton}
+                  className={styles.zoomBtn}
                   onClick={() => setZoomLevel((z) => Math.min(250, z + 15))}
                   title="Zoom In"
                 >
@@ -849,10 +836,9 @@ export function WorkspaceLayout() {
                 </button>
                 <button
                   type="button"
-                  className={styles.toolButton}
+                  className={styles.zoomFitBtn}
                   onClick={() => setZoomLevel(100)}
                   title="Fit to Screen / Reset Zoom"
-                  style={{ fontSize: '10px', padding: '0 6px' }}
                 >
                   Fit
                 </button>
@@ -862,7 +848,7 @@ export function WorkspaceLayout() {
         </div>
 
         {/* Right Section: View Toggles & Export */}
-        <div className={styles.toolbarSideSection} style={{ justifyContent: 'flex-end' }}>
+        <div className={styles.toolbarRightSection}>
           {currentProject && (
             <>
               {/* High-Resolution Print Export Button */}
@@ -871,6 +857,7 @@ export function WorkspaceLayout() {
                 size="sm"
                 onClick={() => setIsExportDialogOpen(true)}
                 title="Export Album for Print (Ctrl+E)"
+                className={styles.toolbarActionBtn}
                 style={{ backgroundColor: '#2563eb', borderColor: '#3b82f6', color: '#ffffff' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -878,7 +865,7 @@ export function WorkspaceLayout() {
                   <polyline points="17 8 12 3 7 8"/>
                   <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <span>Export</span>
+                <span className={styles.toolbarBtnText}>Export</span>
               </Button>
 
               {/* Properties Panel Toggle Button */}
@@ -887,12 +874,13 @@ export function WorkspaceLayout() {
                 size="sm"
                 onClick={() => setIsPropertiesOpen((v) => !v)}
                 title={isPropertiesOpen ? 'Hide Properties Panel' : 'Show Properties Panel'}
+                className={styles.toolbarActionBtn}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect width="18" height="18" x="3" y="3" rx="2"/>
                   <path d="M15 3v18"/>
                 </svg>
-                <span>Properties</span>
+                <span className={styles.toolbarBtnText}>Properties</span>
               </Button>
             </>
           )}
@@ -903,20 +891,11 @@ export function WorkspaceLayout() {
               size="sm"
               onClick={openUpdateModal}
               title={`Update to ${updateAvailableVersion} is available`}
-              style={{
-                backgroundColor: '#10b981',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '2px 8px',
-                boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)',
-              }}
+              className={styles.updateBtn}
             >
               <span style={{ fontSize: '12px' }}>⚡</span>
-              <span>Update ({updateAvailableVersion})</span>
+              <span className={styles.toolbarBtnText}>Update</span>
+              <span className={styles.updateVersionBadge}>({updateAvailableVersion})</span>
             </Button>
           )}
         </div>
