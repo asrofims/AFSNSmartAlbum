@@ -728,8 +728,8 @@ fn render_photo_element(
     }
 }
 
-/// Renders an entire spread to high-res RgbaImage with sub-step progress callback
-pub fn render_spread_to_image_with_progress<F>(
+/// Renders the base layer of a spread (background + photos, without text elements) with sub-step progress callback
+pub fn render_spread_base_to_image_with_progress<F>(
     project: &ProjectRow,
     spread: &SpreadPayload,
     dpi: u32,
@@ -787,34 +787,81 @@ where
         }
     }
 
-    // Sort elements by z_index
+    // Sort elements by z_index and filter photos only
     let mut sorted_elements = spread.elements.clone();
     sorted_elements.sort_by_key(|e| e.z_index);
 
-    let total_elements = sorted_elements.len();
-    for (i, elem) in sorted_elements.iter().enumerate() {
-        let keep_running = on_photo_progress(i + 1, total_elements);
+    let photo_elements: Vec<_> = sorted_elements
+        .into_iter()
+        .filter(|elem| elem.r#type != "text" && elem.text_payload.is_none())
+        .collect();
+
+    let total_photos = photo_elements.len();
+    for (i, elem) in photo_elements.iter().enumerate() {
+        let keep_running = on_photo_progress(i + 1, total_photos);
         if !keep_running {
             break;
         }
-        if elem.r#type == "text" || elem.text_payload.is_some() {
-            render_text_element(&mut canvas, elem, offset_x_px, offset_y_px, scale, dpi);
-        } else {
-            render_photo_element(
-                &mut canvas,
-                elem,
-                offset_x_px,
-                offset_y_px,
-                scale,
-                include_bleed,
-                total_spread_w,
-                total_spread_h,
-                single_page_w,
-                gutter_w,
-            );
-        }
+        render_photo_element(
+            &mut canvas,
+            elem,
+            offset_x_px,
+            offset_y_px,
+            scale,
+            include_bleed,
+            total_spread_w,
+            total_spread_h,
+            single_page_w,
+            gutter_w,
+        );
     }
 
+    canvas
+}
+
+/// Renders text elements on top of an existing canvas (e.g. after print sharpening has been applied to photos)
+pub fn render_spread_text_to_canvas(
+    canvas: &mut RgbaImage,
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    dpi: u32,
+    include_bleed: bool,
+    x_offset_shift: f64,
+) {
+    let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
+    let bleed = spread.bleed;
+
+    let (offset_x_px, offset_y_px) = if include_bleed {
+        let ox = (bleed * scale).round();
+        let oy = (bleed * scale).round();
+        (ox + x_offset_shift, oy)
+    } else {
+        (x_offset_shift, 0.0)
+    };
+
+    let mut sorted_elements = spread.elements.clone();
+    sorted_elements.sort_by_key(|e| e.z_index);
+
+    for elem in sorted_elements.iter() {
+        if elem.r#type == "text" || elem.text_payload.is_some() {
+            render_text_element(canvas, elem, offset_x_px, offset_y_px, scale, dpi);
+        }
+    }
+}
+
+/// Renders an entire spread to high-res RgbaImage with sub-step progress callback
+pub fn render_spread_to_image_with_progress<F>(
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    dpi: u32,
+    include_bleed: bool,
+    on_photo_progress: F,
+) -> RgbaImage
+where
+    F: FnMut(usize, usize) -> bool,
+{
+    let mut canvas = render_spread_base_to_image_with_progress(project, spread, dpi, include_bleed, on_photo_progress);
+    render_spread_text_to_canvas(&mut canvas, project, spread, dpi, include_bleed, 0.0);
     canvas
 }
 
@@ -829,6 +876,31 @@ pub fn render_spread_to_image(
     render_spread_to_image_with_progress(project, spread, dpi, include_bleed, |_, _| true)
 }
 
+/// Returns the right page start X offset in export pixels for split pages
+pub fn calculate_right_page_start_x(
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    dpi: u32,
+    include_bleed: bool,
+    spread_w_px: u32,
+) -> u32 {
+    let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
+    let single_page_w = project.canvas_width;
+    let gutter_w = spread.gutter_width;
+    let bleed = spread.bleed;
+
+    let ox = if include_bleed { (bleed * scale).round() as u32 } else { 0 };
+    let single_page_w_px = (single_page_w * scale).round() as u32;
+    let left_page_end_x = (ox + single_page_w_px).min(spread_w_px);
+
+    let gutter_w_px = if gutter_w > 0.0 {
+        (gutter_w * scale).round() as u32
+    } else {
+        0
+    };
+    (left_page_end_x + gutter_w_px).min(spread_w_px)
+}
+
 /// Slices a spread image into Left Page and Right Page with zero cross-page bleed overlap
 pub fn split_spread_into_pages(
     spread_img: &RgbaImage,
@@ -839,7 +911,6 @@ pub fn split_spread_into_pages(
 ) -> (RgbaImage, RgbaImage) {
     let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
     let single_page_w = project.canvas_width;
-    let gutter_w = spread.gutter_width;
     let bleed = spread.bleed;
     let total_w = spread_img.width();
     let total_h = spread_img.height();
@@ -848,12 +919,7 @@ pub fn split_spread_into_pages(
     let single_page_w_px = (single_page_w * scale).round() as u32;
     let left_page_end_x = (ox + single_page_w_px).min(total_w);
 
-    let gutter_w_px = if gutter_w > 0.0 {
-        (gutter_w * scale).round() as u32
-    } else {
-        0
-    };
-    let right_page_start_x = (left_page_end_x + gutter_w_px).min(total_w);
+    let right_page_start_x = calculate_right_page_start_x(project, spread, dpi, include_bleed, total_w);
 
     let left_w = left_page_end_x;
     let right_w = total_w.saturating_sub(right_page_start_x);
@@ -1468,6 +1534,135 @@ mod tests {
         let rust_src_y: f64 = ((excess_y / 2.0) - (norm_y * (excess_y / 2.0))).clamp(0.0, (img_h - rust_vh).max(0.0));
 
         assert!((konva_src_y - rust_src_y).abs() < 0.01, "Rust crop Y ({}) must match Konva crop Y ({})", rust_src_y, konva_src_y);
+    }
+
+    #[test]
+    fn test_two_pass_text_sharpening_isolation() {
+        let project = ProjectRow {
+            id: "test-proj".to_string(),
+            name: "Test".to_string(),
+            canvas_width: 200.0,
+            canvas_height: 300.0,
+            canvas_unit: "mm".to_string(),
+            canvas_dpi: 300,
+            spacing_value: 4.0,
+            spacing_unit: "mm".to_string(),
+            margin_enabled: false,
+            margin_value: 0.0,
+            margin_unit: "mm".to_string(),
+            margin_top: None,
+            margin_bottom: None,
+            margin_outside: None,
+            margin_spine: None,
+            border_enabled: false,
+            border_width: 0.0,
+            border_unit: "mm".to_string(),
+            border_color: "#FFFFFF".to_string(),
+            background_type: "solid".to_string(),
+            background_color: "#FFFFFF".to_string(),
+            file_path: None,
+            created_at: "2026-08-29T12:00:00Z".to_string(),
+            updated_at: "2026-08-29T12:00:00Z".to_string(),
+        };
+
+        let text_elem = ElementPayload {
+            id: "text-1".to_string(),
+            r#type: "text".to_string(),
+            photo_id: None,
+            file_path: String::new(),
+            file_name: String::new(),
+            preview_path: None,
+            thumbnail_path: None,
+            x: 50.0,
+            y: 50.0,
+            width: 100.0,
+            height: 40.0,
+            rotation: 0.0,
+            z_index: 2,
+            photo_aspect: 1.0,
+            group_id: None,
+            original_width: None,
+            original_height: None,
+            crop_x: 0.0,
+            crop_y: 0.0,
+            crop_scale: 1.0,
+            crop_rotation: None,
+            border_enabled: false,
+            border_width: 0.0,
+            border_color: "#000000".to_string(),
+            opacity: 1.0,
+            locked: None,
+            text_payload: Some(
+                serde_json::to_string(&text_rasterizer::TextElementPayload {
+                    text: "Our Wedding".to_string(),
+                    style: text_rasterizer::TextStylePayload {
+                        font_family: "Inter".to_string(),
+                        font_size: 24.0,
+                        font_weight: "bold".to_string(),
+                        font_style: "normal".to_string(),
+                        text_decoration: "none".to_string(),
+                        fill: "#000000".to_string(),
+                        align: "center".to_string(),
+                        vertical_align: "middle".to_string(),
+                        line_height: 1.3,
+                        letter_spacing: 0.0,
+                        padding: 6.0,
+                        word_wrap: "word".to_string(),
+                    },
+                    styled_ranges: None,
+                    text_runs: None,
+                })
+                .unwrap(),
+            ),
+            corner_radius_tl: 0.0,
+            corner_radius_tr: 0.0,
+            corner_radius_br: 0.0,
+            corner_radius_bl: 0.0,
+            corner_radius: None,
+        };
+
+        let spread = SpreadPayload {
+            id: "spread-1".to_string(),
+            spread_index: 1,
+            r#type: "interior".to_string(),
+            name: "Spread 01".to_string(),
+            left_page: None,
+            right_page: None,
+            gutter_width: 6.0,
+            gutter_unit: "mm".to_string(),
+            bleed: 0.0,
+            safe_area: 0.0,
+            safe_area_top: None,
+            safe_area_bottom: None,
+            safe_area_outside: None,
+            safe_area_spine: None,
+            spacing_value: None,
+            spacing_unit: None,
+            background_color: "#FFFFFF".to_string(),
+            elements: vec![text_elem],
+        };
+
+        // 1. Pass 1: Render base photo layer (should be completely white because there are no photos, only text)
+        let base_img = render_spread_base_to_image_with_progress(&project, &spread, 72, false, |_, _| true);
+        let all_white = base_img.pixels().all(|p| p[0] == 255 && p[1] == 255 && p[2] == 255);
+        assert!(all_white, "Base image before text pass must not contain text pixels");
+
+        // 2. Pass 2a: Sharpening is applied only to base layer
+        let mut sharpened_base = apply_print_sharpening(&base_img, "high");
+        assert_eq!(sharpened_base.dimensions(), base_img.dimensions());
+
+        // 3. Pass 2b: Text is rendered directly onto the sharpened image
+        render_spread_text_to_canvas(&mut sharpened_base, &project, &spread, 72, false, 0.0);
+        let has_dark_text = sharpened_base.pixels().any(|p| p[0] < 50 && p[1] < 50 && p[2] < 50);
+        assert!(has_dark_text, "Text must be cleanly rendered on top of sharpened base");
+
+        // 4. Test calculate_right_page_start_x matches split_spread_into_pages
+        let total_w = sharpened_base.width();
+        let right_start = calculate_right_page_start_x(&project, &spread, 72, false, total_w);
+        let (left_p, right_p) = split_spread_into_pages(&sharpened_base, &project, &spread, 72, false);
+        assert_eq!(left_p.height(), sharpened_base.height());
+        assert_eq!(right_p.height(), sharpened_base.height());
+        assert!(right_start > 0 && right_start < total_w);
     }
 }
 

@@ -6,8 +6,9 @@ use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
 use crate::db::{AlbumPayload, Database, ProjectRow, SpreadPayload};
 use crate::export_engine::{
-    apply_print_sharpening, assemble_pdf_from_jpegs, encode_jpeg_with_dpi, encode_png_with_dpi,
-    render_spread_to_image_with_progress, split_spread_into_pages, ExportOptions, ExportProgressEvent,
+    apply_print_sharpening, assemble_pdf_from_jpegs, calculate_right_page_start_x,
+    encode_jpeg_with_dpi, encode_png_with_dpi, render_spread_base_to_image_with_progress,
+    render_spread_text_to_canvas, split_spread_into_pages, ExportOptions, ExportProgressEvent,
 };
 
 #[derive(Default)]
@@ -340,7 +341,10 @@ fn export_album_high_res_worker(
     }
 
     // Count total photos across all selected spreads for exact monotonic percentage
-    let total_photos: usize = spreads.iter().map(|s| s.elements.len()).sum();
+    let total_photos: usize = spreads
+        .iter()
+        .map(|s| s.elements.iter().filter(|e| e.r#type != "text" && e.text_payload.is_none()).count())
+        .sum();
     let completed_photos = Arc::new(AtomicUsize::new(0));
     let completed_sharpening = Arc::new(AtomicUsize::new(0));
     let completed_encoding = Arc::new(AtomicUsize::new(0));
@@ -416,8 +420,8 @@ fn export_album_high_res_worker(
                 let app_handle = app.clone();
                 let cancel_flag_clone = cancel_flag.clone();
 
-                // Render spread to high resolution bitmap with live photo-by-photo atomic progress
-                let spread_img = render_spread_to_image_with_progress(
+                // Pass 1: Render spread base layer (background + photos) with live photo-by-photo atomic progress
+                let spread_base_img = render_spread_base_to_image_with_progress(
                     &project,
                     spread,
                     options.dpi,
@@ -458,7 +462,7 @@ fn export_album_high_res_worker(
                     return Err("Export cancelled by user".to_string());
                 }
 
-                // Apply Print Output Sharpening with realtime status
+                // Apply Print Output Sharpening with realtime status (photos only!)
                 if options.sharpen_enabled {
                     let done_p = completed_photos_clone.load(Ordering::SeqCst);
                     let done_s = completed_sharpening_clone.load(Ordering::SeqCst);
@@ -483,12 +487,6 @@ fn export_album_high_res_worker(
                         },
                     );
                 }
-
-                let spread_img = if options.sharpen_enabled && (!options.split_pages || spread.r#type == "cover") {
-                    apply_print_sharpening(&spread_img, &options.sharpen_amount)
-                } else {
-                    spread_img
-                };
 
                 let done_s = completed_sharpening_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 let done_p = completed_photos_clone.load(Ordering::SeqCst);
@@ -518,7 +516,9 @@ fn export_album_high_res_worker(
 
                 // Handle Split Pages vs Full Spread with Atomic Safe Overwrite
                 if options.split_pages && spread.r#type != "cover" {
-                    let (mut left_page, mut right_page) = split_spread_into_pages(&spread_img, &project, spread, options.dpi, options.include_bleed);
+                    let total_w = spread_base_img.width();
+                    let right_page_start_x = calculate_right_page_start_x(&project, spread, options.dpi, options.include_bleed, total_w);
+                    let (mut left_page, mut right_page) = split_spread_into_pages(&spread_base_img, &project, spread, options.dpi, options.include_bleed);
                     let left_num = (spread.spread_index - 1) * 2 + 1;
                     let right_num = left_num + 1;
 
@@ -529,7 +529,7 @@ fn export_album_high_res_worker(
                         .map(|nums| nums.contains(&right_num))
                         .unwrap_or(true);
 
-                    // Apply sharpening per-page independently to avoid cross-spine convolution bleeding
+                    // Pass 2a: Apply sharpening per-page independently to photos (avoiding cross-spine convolution bleeding)
                     if options.sharpen_enabled {
                         if should_export_left {
                             left_page = apply_print_sharpening(&left_page, &options.sharpen_amount);
@@ -537,6 +537,14 @@ fn export_album_high_res_worker(
                         if should_export_right {
                             right_page = apply_print_sharpening(&right_page, &options.sharpen_amount);
                         }
+                    }
+
+                    // Pass 2b: Render vector text elements on top of the sharpened photo page (preserving pristine anti-aliasing)
+                    if should_export_left {
+                        render_spread_text_to_canvas(&mut left_page, &project, spread, options.dpi, options.include_bleed, 0.0);
+                    }
+                    if should_export_right {
+                        render_spread_text_to_canvas(&mut right_page, &project, spread, options.dpi, options.include_bleed, -(right_page_start_x as f64));
                     }
 
                     let ext = if options.format == "png" { "png" } else { "jpg" };
@@ -594,7 +602,17 @@ fn export_album_high_res_worker(
                         }
                     }
                 } else {
-                    // Full Spread
+                    // Full Spread / Cover Spread
+                    // Pass 2a: Sharpen full spread base photo image
+                    let mut spread_img = if options.sharpen_enabled {
+                        apply_print_sharpening(&spread_base_img, &options.sharpen_amount)
+                    } else {
+                        spread_base_img
+                    };
+
+                    // Pass 2b: Render vector text elements on top of sharpened spread (preserving pristine anti-aliasing)
+                    render_spread_text_to_canvas(&mut spread_img, &project, spread, options.dpi, options.include_bleed, 0.0);
+
                     let ext = if options.format == "png" { "png" } else { "jpg" };
                     let filename = resolve_export_filename(options.file_prefix.as_deref(), &spread.r#type, spread.spread_index, None, ext);
 
