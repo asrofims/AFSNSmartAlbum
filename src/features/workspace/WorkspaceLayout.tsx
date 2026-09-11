@@ -108,6 +108,11 @@ export function WorkspaceLayout() {
   const batchUpdateFrames = useEditorStore((s) => s.batchUpdateFrames);
 
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [fitTrigger, setFitTrigger] = useState<number>(0);
+
+  const handleFitToScreen = useCallback(() => {
+    setFitTrigger((prev) => prev + 1);
+  }, []);
   const [isRatioLocked, setIsRatioLocked] = useState<boolean>(true);
   const [isCornersLinked, setIsCornersLinked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
@@ -511,9 +516,18 @@ export function WorkspaceLayout() {
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         confirmSafeAction(() => openNewProject());
+      } else if (e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0') {
+        e.preventDefault();
+        handleFitToScreen();
+      } else if (e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd') {
+        e.preventDefault();
+        setZoomLevel((z) => Math.min(250, z + 15));
+      } else if (e.key === '-' || e.key === '_' || e.code === 'Minus' || e.code === 'NumpadSubtract') {
+        e.preventDefault();
+        setZoomLevel((z) => Math.max(25, z - 15));
       }
     },
-    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast, activeSpreadId, activeSpread, selectedFrameIds, toggleLockSelectedFrames, addTextToSpread, setEditingTextElementId, currentProject]
+    [undo, redo, saveProject, exportProjectAsAfsn, importProjectFromAfsn, openNewProject, confirmSafeAction, showToast, activeSpreadId, activeSpread, selectedFrameIds, toggleLockSelectedFrames, addTextToSpread, setEditingTextElementId, currentProject, handleFitToScreen]
   );
 
   useEffect(() => {
@@ -870,7 +884,7 @@ export function WorkspaceLayout() {
                   type="button"
                   className={styles.zoomBtn}
                   onClick={() => setZoomLevel((z) => Math.max(25, z - 15))}
-                  title="Zoom Out"
+                  title="Zoom Out (Ctrl+−)"
                 >
                   -
                 </button>
@@ -879,15 +893,15 @@ export function WorkspaceLayout() {
                   type="button"
                   className={styles.zoomBtn}
                   onClick={() => setZoomLevel((z) => Math.min(250, z + 15))}
-                  title="Zoom In"
+                  title="Zoom In (Ctrl++)"
                 >
                   +
                 </button>
                 <button
                   type="button"
                   className={styles.zoomFitBtn}
-                  onClick={() => setZoomLevel(100)}
-                  title="Fit to Screen / Reset Zoom"
+                  onClick={handleFitToScreen}
+                  title="Fit Spread to Screen & Center (Ctrl+0)"
                 >
                   Fit
                 </button>
@@ -959,6 +973,7 @@ export function WorkspaceLayout() {
             <>
               <KonvaEditorCanvas
                 zoomLevel={zoomLevel}
+                fitTrigger={fitTrigger}
                 onZoomChange={setZoomLevel}
                 onToast={showToast}
               />

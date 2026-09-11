@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, useLayoutEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
 import { Stage, Layer, Rect, Line, Circle, Path as KonvaPath, Text as KonvaText, Group, Image as KonvaImage, Transformer, Label, Tag } from 'react-konva';
 import Konva from 'konva';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -40,6 +40,7 @@ import styles from './KonvaEditorCanvas.module.css';
 
 interface KonvaEditorCanvasProps {
   zoomLevel: number;
+  fitTrigger?: number;
   activeTool?: 'select' | 'pan';
   onZoomChange?: (updater: (prev: number) => number) => void;
   onToast?: (msg: string) => void;
@@ -1071,7 +1072,7 @@ function PhotoFrameNode({
   );
 }
 
-export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoomChange, onToast }: KonvaEditorCanvasProps) {
+export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomChange, onToast }: KonvaEditorCanvasProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     currentAlbum,
@@ -1131,6 +1132,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const photos = usePhotoStore((s) => s.photos);
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
 
+  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
+  const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
+
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -1178,6 +1182,162 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
   const [hoveredDropFrameId, setHoveredDropFrameId] = useState<string | null>(null);
   const [isHoveredDropAlt, setIsHoveredDropAlt] = useState(false);
   const justDroppedRef = useRef(false);
+  const zoomOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const lastFitTriggerRef = useRef<number | undefined>(fitTrigger);
+  const fitAnimationRef = useRef<number | null>(null);
+
+  // Smooth Fit & Center animation using requestAnimationFrame
+  const performSmoothFit = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !activeSpread || !currentProject) return;
+
+    if (fitAnimationRef.current) {
+      cancelAnimationFrame(fitAnimationRef.current);
+      fitAnimationRef.current = null;
+    }
+
+    const startZoom = zoomLevel;
+    const targetZoom = 100;
+    const startScrollX = container.scrollLeft;
+    const startScrollY = container.scrollTop;
+
+    // Physical dimensions of the full spread
+    const singlePageW = currentProject.canvasWidth;
+    const singlePageH = currentProject.canvasHeight;
+    const totalSpreadPhysicalW = singlePageW * 2;
+    const totalSpreadPhysicalH = singlePageH;
+    const marginH = 110;
+    const marginV = 100;
+    const maxAvailableW = Math.max(200, (containerSize.width - marginH) * 0.92);
+    const maxAvailableH = Math.max(150, (containerSize.height - marginV) * 0.92);
+
+    const contentBounds = (activeSpread.elements || []).map(getFrameVisualBounds);
+
+    const startViewport = calculateSpreadViewport(
+      totalSpreadPhysicalW, totalSpreadPhysicalH, maxAvailableW, maxAvailableH, startZoom / 100,
+    );
+    const startPasteboard = calculatePasteboardViewport(
+      startViewport.width, startViewport.height, startViewport.scaleFactor,
+      containerSize.width, containerSize.height, contentBounds,
+    );
+
+    const initialIdealCenterX = Math.round(startPasteboard.pageX + startPasteboard.spreadWidth / 2 - startPasteboard.viewportWidth / 2);
+    const initialIdealCenterY = Math.round(startPasteboard.pageY + startPasteboard.spreadHeight / 2 - startPasteboard.viewportHeight / 2);
+
+    const initialOffsetX = startScrollX - initialIdealCenterX;
+    const initialOffsetY = startScrollY - initialIdealCenterY;
+
+    const targetViewport = calculateSpreadViewport(
+      totalSpreadPhysicalW, totalSpreadPhysicalH, maxAvailableW, maxAvailableH, 1.0,
+    );
+    const targetPasteboard = calculatePasteboardViewport(
+      targetViewport.width, targetViewport.height, targetViewport.scaleFactor,
+      containerSize.width, containerSize.height, contentBounds,
+    );
+    const finalCenterX = Math.round(targetPasteboard.pageX + targetPasteboard.spreadWidth / 2 - targetPasteboard.viewportWidth / 2);
+    const finalCenterY = Math.round(targetPasteboard.pageY + targetPasteboard.spreadHeight / 2 - targetPasteboard.viewportHeight / 2);
+
+    // If already at 100% zoom and already within 1 pixel of the center, nothing to do
+    if (startZoom === 100 && Math.abs(initialOffsetX) <= 1 && Math.abs(initialOffsetY) <= 1) {
+      return;
+    }
+
+    const duration = 280; // milliseconds
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      // Smooth cubic ease-out
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      const currentZ = Math.round(startZoom + (targetZoom - startZoom) * eased);
+      const currentViewport = calculateSpreadViewport(
+        totalSpreadPhysicalW, totalSpreadPhysicalH, maxAvailableW, maxAvailableH, currentZ / 100,
+      );
+      const currentPasteboard = calculatePasteboardViewport(
+        currentViewport.width, currentViewport.height, currentViewport.scaleFactor,
+        containerSize.width, containerSize.height, contentBounds,
+      );
+
+      const currentIdealCenterX = currentPasteboard.pageX + currentPasteboard.spreadWidth / 2 - currentPasteboard.viewportWidth / 2;
+      const currentIdealCenterY = currentPasteboard.pageY + currentPasteboard.spreadHeight / 2 - currentPasteboard.viewportHeight / 2;
+
+      const targetX = Math.round(currentIdealCenterX + initialOffsetX * (1 - eased));
+      const targetY = Math.round(currentIdealCenterY + initialOffsetY * (1 - eased));
+
+      if (currentZ !== zoomLevel) {
+        onZoomChange?.(() => currentZ);
+      }
+
+      container.scrollLeft = targetX;
+      container.scrollTop = targetY;
+      setWorkspaceScroll({ x: targetX, y: targetY });
+
+      if (progress < 1) {
+        fitAnimationRef.current = requestAnimationFrame(animate);
+      } else {
+        fitAnimationRef.current = null;
+        if (onZoomChange) onZoomChange(() => 100);
+        container.scrollLeft = finalCenterX;
+        container.scrollTop = finalCenterY;
+        setWorkspaceScroll({ x: finalCenterX, y: finalCenterY });
+        previousPasteboardRef.current = { viewport: targetPasteboard, spreadId: activeSpread.id };
+      }
+    };
+
+    fitAnimationRef.current = requestAnimationFrame(animate);
+  }, [zoomLevel, activeSpread, currentProject, containerSize, onZoomChange]);
+
+  useEffect(() => {
+    return () => {
+      if (fitAnimationRef.current) {
+        cancelAnimationFrame(fitAnimationRef.current);
+        fitAnimationRef.current = null;
+      }
+    };
+  }, []);
+
+  // When fitTrigger changes from outside (e.g. clicking Fit button in toolbar), smoothly animate to center
+  useEffect(() => {
+    if (fitTrigger !== undefined && fitTrigger !== lastFitTriggerRef.current) {
+      lastFitTriggerRef.current = fitTrigger;
+      performSmoothFit();
+    }
+  }, [fitTrigger, performSmoothFit]);
+
+  // Native non-passive Wheel Event Listener for Ctrl + Mouse Wheel Workspace Zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Zoom canvas when Ctrl (or Cmd on macOS) is held
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (fitAnimationRef.current) {
+          cancelAnimationFrame(fitAnimationRef.current);
+          fitAnimationRef.current = null;
+        }
+
+        const rect = container.getBoundingClientRect();
+        zoomOriginRef.current = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+
+        const delta = e.deltaY < 0 ? 10 : -10;
+        onZoomChange?.((prev) => Math.min(250, Math.max(25, prev + delta)));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [onZoomChange]);
 
   // Window & Drag lifecycle safety guards to guarantee clean reset
   useEffect(() => {
@@ -1318,9 +1478,6 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     }
   }, []);
 
-  const allSpreads = currentAlbum ? getAllAlbumSpreads(currentAlbum) : [];
-  const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
-
   const editingTextElement = useMemo(() => {
     if (!editingTextElementId || !activeSpread) return null;
     const found = (activeSpread.elements || []).find((el) => el.id === editingTextElementId);
@@ -1409,21 +1566,48 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     }
   }, [editingTextElementId, editingCropFrameId]);
 
-  // Keep the same document point visible as the pasteboard grows or zoom changes.
+  // Keep the same document point visible as the pasteboard grows or zoom changes, or center when Fit is triggered.
   useLayoutEffect(() => {
     const container = containerRef.current;
     const next = pasteboardRef.current;
     if (!container || !next || !activeSpread) return;
+
+    // While smooth fit animation is actively controlling scroll, don't let layout effect override it
+    if (fitAnimationRef.current !== null) {
+      previousPasteboardRef.current = { viewport: next, spreadId: activeSpread.id };
+      return;
+    }
+
     const previous = previousPasteboardRef.current;
-    const target = previous?.spreadId === activeSpread.id
-      ? preservePasteboardView(previous.viewport, next, workspaceScroll)
-      : { x: next.pageX + next.spreadWidth / 2 - next.viewportWidth / 2,
-          y: next.pageY + next.spreadHeight / 2 - next.viewportHeight / 2 };
+    let target: { x: number; y: number };
+
+    if (previous?.spreadId !== activeSpread.id) {
+      target = {
+        x: Math.round(next.pageX + next.spreadWidth / 2 - next.viewportWidth / 2),
+        y: Math.round(next.pageY + next.spreadHeight / 2 - next.viewportHeight / 2),
+      };
+    } else if (zoomOriginRef.current && previous) {
+      const origin = zoomOriginRef.current;
+      zoomOriginRef.current = null;
+      const ratio = next.scaleFactor / previous.viewport.scaleFactor;
+      target = {
+        x: Math.round((workspaceScroll.x + origin.x - previous.viewport.pageX) * ratio + next.pageX - origin.x),
+        y: Math.round((workspaceScroll.y + origin.y - previous.viewport.pageY) * ratio + next.pageY - origin.y),
+      };
+    } else if (previous) {
+      target = preservePasteboardView(previous.viewport, next, workspaceScroll);
+    } else {
+      target = {
+        x: Math.round(next.pageX + next.spreadWidth / 2 - next.viewportWidth / 2),
+        y: Math.round(next.pageY + next.spreadHeight / 2 - next.viewportHeight / 2),
+      };
+    }
+
     container.scrollLeft = target.x;
     container.scrollTop = target.y;
     setWorkspaceScroll({ x: container.scrollLeft, y: container.scrollTop });
     previousPasteboardRef.current = { viewport: next, spreadId: activeSpread.id };
-  }, [zoomLevel, containerSize, activeSpread, currentProject, editingCropFrameId]);
+  }, [zoomLevel, fitTrigger, containerSize, activeSpread, currentProject, editingCropFrameId]);
 
   // Global Keyboard shortcuts for editor
   useEffect(() => {
@@ -1463,6 +1647,15 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         } else {
           clearSelection();
         }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0')) {
+        e.preventDefault();
+        performSmoothFit();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd')) {
+        e.preventDefault();
+        onZoomChange?.((z) => Math.min(250, z + 15));
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_' || e.code === 'Minus' || e.code === 'NumpadSubtract')) {
+        e.preventDefault();
+        onZoomChange?.((z) => Math.max(25, z - 15));
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         const isHoveredOnSpreadDrawer = Boolean(document.querySelector('[data-spread-drawer="true"]:hover'));
         const isHoveredOnFilmstrip = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
@@ -1618,6 +1811,8 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     updateCrop,
     nudgeSelected,
     onToast,
+    onZoomChange,
+    performSmoothFit,
   ]);
 
   if (!currentProject || !currentAlbum || !activeSpread) {
@@ -2382,6 +2577,10 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
         usePhotoStore.getState().clearSelection();
       }}
       onMouseDown={(e) => {
+        if (fitAnimationRef.current) {
+          cancelAnimationFrame(fitAnimationRef.current);
+          fitAnimationRef.current = null;
+        }
         if (isSpacePressed || e.button === 1 || activeTool === 'pan') {
           e.preventDefault();
           setIsPanning(true);

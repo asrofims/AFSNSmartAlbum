@@ -70,11 +70,18 @@ const SHORTCUTS: ShortcutDef[] = [
     keywords: 'hand pan move canvas view scroll',
   },
   {
+    id: 'nav-zoom-canvas',
+    category: 'Panels & Navigation',
+    action: 'Zoom Canvas In / Out',
+    combos: [['Ctrl', '+ Wheel'], ['Ctrl', '+ / -']],
+    keywords: 'zoom canvas magnify scale mouse wheel in out',
+  },
+  {
     id: 'nav-reset-zoom',
     category: 'Panels & Navigation',
-    action: 'Fit Spread to Screen',
+    action: 'Fit Spread to Screen & Center',
     combos: [['Ctrl', '0']],
-    keywords: 'zoom reset view fit 100 percent',
+    keywords: 'zoom reset view fit center middle 100 percent',
   },
 
   // 2. Canvas Selection & Manipulation
@@ -119,8 +126,8 @@ const SHORTCUTS: ShortcutDef[] = [
     category: 'Canvas & Selection',
     action: 'Enter Pan & Zoom Crop Mode',
     combos: [['Double Click']],
-    note: 'on photo frame',
-    keywords: 'crop pan zoom scale image photo inside frame',
+    note: 'on photo frame (Wheel to zoom crop)',
+    keywords: 'crop pan zoom scale image photo inside frame wheel',
   },
   {
     id: 'canvas-crop-exit',
