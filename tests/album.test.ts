@@ -12,6 +12,9 @@ import {
   isElementDesignEqual,
   isSpreadDesignEqual,
   isAlbumDesignEqual,
+  getSpreadPageLabel,
+  getSpreadLabel,
+  getSpreadNumberLabel,
 } from '../src/domain/album';
 import { type PhotoFrameElement, applyFixedGap, adjustSpreadPhotoGaps } from '../src/domain/editor';
 import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
@@ -948,4 +951,38 @@ console.assert(darkSpread3.spacingValue === 0.0, `New spread spacing must be ind
   console.assert(mixedR2.x + mixedR2.width <= 380.01, `Right photo 2 must stay within safe area`);
 }
 
-console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, adaptive safezone-bounded gap scaling, and real-time adaptive safe margin resizing)!');
+// ---------------------------------------------------------------------------
+// Test getSpreadPageLabel formatting (pure page numbers, no narrative "Spread")
+// ---------------------------------------------------------------------------
+{
+  const testAlbum = createInitialAlbum(mockProject);
+  console.assert(getSpreadPageLabel(testAlbum.coverSpread) === 'Cover', 'Cover spread label should be "Cover"');
+  console.assert(getSpreadPageLabel(testAlbum.spreads[0]) === '1–2', 'First spread label should be "1–2"');
+
+  // Add another interior spread
+  const spread2 = createInteriorSpread(testAlbum, mockProject, 2);
+  const updatedAlbum = recalculateAlbumPageNumbers({
+    ...testAlbum,
+    spreads: [...testAlbum.spreads, spread2],
+  });
+  console.assert(getSpreadPageLabel(updatedAlbum.spreads[1]) === '3–4', 'Second spread label should be "3–4"');
+
+  // Single page test
+  const singlePageSpread = {
+    ...testAlbum.spreads[0],
+    rightPage: null,
+  };
+  console.assert(getSpreadPageLabel(singlePageSpread) === '1', 'Single left page label should be "1"');
+
+  // Test getSpreadLabel (cukup spread saja: "Cover", "Spread 1", "Spread 2")
+  console.assert(getSpreadLabel(testAlbum.coverSpread) === 'Cover', 'Cover spread getSpreadLabel should be "Cover"');
+  console.assert(getSpreadLabel(testAlbum.spreads[0]) === 'Spread 1', 'Spread 1 getSpreadLabel should be "Spread 1"');
+  console.assert(getSpreadLabel(updatedAlbum.spreads[1]) === 'Spread 2', 'Spread 2 getSpreadLabel should be "Spread 2"');
+
+  // Test getSpreadNumberLabel (cukup angka saja: "Cover", "1", "2")
+  console.assert(getSpreadNumberLabel(testAlbum.coverSpread) === 'Cover', 'Cover spread getSpreadNumberLabel should be "Cover"');
+  console.assert(getSpreadNumberLabel(testAlbum.spreads[0]) === '1', 'Spread 1 getSpreadNumberLabel should be "1"');
+  console.assert(getSpreadNumberLabel(updatedAlbum.spreads[1]) === '2', 'Spread 2 getSpreadNumberLabel should be "2"');
+}
+
+console.log('✓ All Album Structure domain tests passed successfully (1-2, 3-4, 5-6 model, spread duplication & reordering, background color propagation, project baseline defaults & per-spread independence, smart previous spread selection upon deletion, zero safe margin & seamless spine consistency, marginEnabled: false evaluation, design equality vs cache paths, in-place non-shuffling photo gap adjustment, adaptive safezone-bounded gap scaling, real-time adaptive safe margin resizing, getSpreadPageLabel page formatting, getSpreadLabel spread labeling, and getSpreadNumberLabel pure number formatting)!');

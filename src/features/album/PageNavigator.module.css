@@ -41,7 +41,12 @@
   font-size: 11px;
   font-weight: var(--font-weight-medium);
   cursor: pointer;
+  outline: none;
   transition: all var(--transition-fast);
+}
+
+.navBtn:focus {
+  outline: none;
 }
 
 .navBtn:hover:not(:disabled) {
@@ -53,6 +58,7 @@
 .navBtn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+  transition: none !important;
 }
 
 .navBtnActive {
@@ -197,16 +203,16 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.22s ease, opacity 0.18s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.2s ease, opacity 0.18s ease;
   flex-shrink: 0;
-  width: 146px;
+  width: 164px;
   position: relative;
 }
 
 .thumbnailCard:hover {
   border-color: var(--color-border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .draggingCard {
@@ -225,26 +231,36 @@
 
 .cardActive {
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 14px rgba(59, 130, 246, 0.25) !important;
+  background-color: rgba(59, 130, 246, 0.04) !important;
 }
 
 .cardSelected {
   border-color: var(--color-accent) !important;
-  background-color: rgba(59, 130, 246, 0.09) !important;
-  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 12px rgba(59, 130, 246, 0.25) !important;
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  box-shadow: 0 0 0 1px var(--color-accent) !important;
 }
 
-
+.previewContainer {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  padding: 2px;
+}
 
 .miniSpread {
-  width: 100%;
-  height: 52px;
   background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 1px;
   display: flex;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .miniCover {
@@ -265,26 +281,36 @@
   flex: 1;
 }
 
-.cardInfoRow {
+.cardFooter {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  height: 22px;
+  padding: 0 2px;
 }
 
-.cardIndexText {
-  font-size: 10px;
+.pageNumberBadge,
+.spreadBadge {
+  font-size: 11px;
   font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.3px;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color var(--transition-fast);
+}
+
+.cardActive .pageNumberBadge,
+.cardActive .spreadBadge {
   color: var(--color-accent);
 }
 
-.cardNameText {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 75px;
+.cardSelected .pageNumberBadge,
+.cardSelected .spreadBadge {
+  color: var(--color-accent);
 }
 
 .cardActions {
@@ -293,67 +319,53 @@
   gap: 3px;
 }
 
-.reorderBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 9px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  transition: all var(--transition-fast);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reorderBtn:hover:not(:disabled) {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.4);
-}
-
-.reorderBtn:disabled {
-  visibility: hidden;
-  pointer-events: none;
-  cursor: default;
-  opacity: 0;
-}
-
 .cardActionBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  width: 20px;
-  height: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  width: 21px;
+  height: 20px;
   padding: 0;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
+  outline: none;
   transition: all var(--transition-fast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.cardActionBtn:hover {
+.cardActionBtn:focus {
+  outline: none;
+}
+
+.cardActionBtn:hover:not(:disabled) {
   background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
-  border-color: var(--color-border);
+  border-color: var(--color-border-hover);
 }
 
-.cardActionBtnDuplicate:hover {
-  background-color: rgba(59, 130, 246, 0.22) !important;
+.cardActionBtn:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+  transition: none !important;
+}
+
+.cardActionBtnDuplicate:hover:not(:disabled) {
+  background-color: rgba(59, 130, 246, 0.2) !important;
   color: #60a5fa !important;
-  border-color: rgba(59, 130, 246, 0.5) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
   box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
 }
 
-.cardActionBtnDanger:hover {
-  background-color: rgba(239, 68, 68, 0.22) !important;
+.cardActionBtnDanger:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.2) !important;
   color: #f87171 !important;
-  border-color: rgba(239, 68, 68, 0.5) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
 }
 
@@ -363,8 +375,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: 100px;
-  height: 90px;
+  width: 96px;
+  height: 102px;
   background-color: rgba(255, 255, 255, 0.02);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
@@ -384,4 +396,5 @@
 
 .drawerAddIcon {
   font-size: 18px;
+  line-height: 1;
 }

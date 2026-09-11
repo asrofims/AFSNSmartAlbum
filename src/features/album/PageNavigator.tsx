@@ -5,7 +5,7 @@ import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread } from '../../domain/album';
+import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread, getSpreadPageLabel, getSpreadLabel, getSpreadNumberLabel } from '../../domain/album';
 import { PhotoFrameElement, calculateImageOffset, getCornerRadii } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
@@ -22,6 +22,8 @@ function safeConvertFileSrc(filePath: string, version = ''): string {
   }
 }
 
+export { getSpreadPageLabel, getSpreadLabel, getSpreadNumberLabel };
+
 interface MiniSpreadPreviewProps {
   spread: Spread;
   project: Project;
@@ -35,9 +37,9 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
   const totalPhysicalW = (spread.leftPage?.width || dims.pageWidth) + (spread.rightPage?.width || dims.pageWidth) + (spread.gutterWidth ?? dims.gutterWidth ?? 0);
   const totalPhysicalH = spread.leftPage?.height || dims.pageHeight || 200;
 
-  // Mini thumbnail box dimensions
-  const previewBoxW = 124;
-  const previewBoxH = 56;
+  // Mini thumbnail box dimensions inside preview container
+  const previewBoxW = 136;
+  const previewBoxH = 54;
   const scale = Math.min(previewBoxW / (totalPhysicalW || 400), previewBoxH / (totalPhysicalH || 200));
 
   const actualSpreadW = Math.round(totalPhysicalW * scale);
@@ -439,7 +441,7 @@ export function PageNavigator() {
     return [
       {
         id: 'header-single',
-        label: `Spread ${spread.spreadIndex} (${spread.name})`,
+        label: getSpreadLabel(spread),
         header: true,
       },
       {
@@ -601,43 +603,48 @@ export function PageNavigator() {
                       targetSpread: spread,
                     });
                   }}
-                  title={`${spread.name} (Ctrl+Click multi-select, Right-click for options)`}
+                  title={`${getSpreadLabel(spread)} (Ctrl+Click multi-select, Right-click for options)`}
                 >
-                  {/* Real-time Miniature Spread Preview */}
-                  <MiniSpreadPreview spread={spread} project={currentProject} />
+                  {/* Miniature Spread Preview inside centered container */}
+                  <div className={styles.previewContainer}>
+                    <MiniSpreadPreview spread={spread} project={currentProject} />
+                  </div>
 
-                  {/* Card Label & Actions */}
-                  <div className={styles.cardInfoRow}>
-                    <span className={styles.cardIndexText}>{spread.spreadIndex}</span>
-                    <span className={styles.cardNameText}>{spread.name}</span>
+                  {/* Card Bottom: Clean Spread Label on Left, Permanent Action Buttons on Right */}
+                  <div className={styles.cardFooter}>
+                    <span className={styles.spreadBadge}>
+                      {getSpreadNumberLabel(spread)}
+                    </span>
 
                     {/* Quick Actions (Reorder ◀ ▶ / Duplicate / Delete) */}
                     <div className={styles.cardActions}>
                       <button
                         type="button"
-                        className={styles.reorderBtn}
+                        className={styles.cardActionBtn}
                         onClick={(e) => {
                           e.stopPropagation();
                           moveSpread(spread.id, 'left');
                         }}
                         disabled={isFirst}
-                        title={isFirst ? undefined : 'Move spread left (earlier)'}
+                        title={isFirst ? 'First position (cannot move left)' : 'Move spread left (earlier)'}
+                        aria-label="Move spread left"
                       >
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="15 18 9 12 15 6" />
                         </svg>
                       </button>
                       <button
                         type="button"
-                        className={styles.reorderBtn}
+                        className={styles.cardActionBtn}
                         onClick={(e) => {
                           e.stopPropagation();
                           moveSpread(spread.id, 'right');
                         }}
                         disabled={isLast}
-                        title={isLast ? undefined : 'Move spread right (later)'}
+                        title={isLast ? 'Last position (cannot move right)' : 'Move spread right (later)'}
+                        aria-label="Move spread right"
                       >
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="9 18 15 12 9 6" />
                         </svg>
                       </button>
@@ -646,25 +653,26 @@ export function PageNavigator() {
                         className={`${styles.cardActionBtn} ${styles.cardActionBtnDuplicate}`}
                         onClick={(e) => handleDuplicateSpread(e, spread)}
                         title="Duplicate this spread"
+                        aria-label="Duplicate spread"
                       >
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                         </svg>
                       </button>
-                      {allSpreads.length > 1 && (
-                        <button
-                          type="button"
-                          className={`${styles.cardActionBtn} ${styles.cardActionBtnDanger}`}
-                          onClick={(e) => handleDeleteRequest(e, [spread])}
-                          title="Delete this spread"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className={`${styles.cardActionBtn} ${styles.cardActionBtnDanger}`}
+                        onClick={(e) => handleDeleteRequest(e, [spread])}
+                        disabled={allSpreads.length <= 1}
+                        title={allSpreads.length <= 1 ? 'Cannot delete the only spread' : 'Delete this spread'}
+                        aria-label="Delete spread"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -721,7 +729,7 @@ export function PageNavigator() {
           >
             {allSpreads.map((s) => (
               <option key={s.id} value={s.id}>
-                {`📖 ${s.name}`}
+                {getSpreadLabel(s)}
               </option>
             ))}
           </select>

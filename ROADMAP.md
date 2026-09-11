@@ -428,3 +428,11 @@
 - [x] Guarantee inter-frame physical millimeter gaps remain 100% constant during multi-selection resize across rows, columns, and asymmetric layouts.
 - [x] Maintain full backward compatibility for `'proportional'` mode (Harmonious Proportional Scaling).
 - [x] Add comprehensive regression test suite in `tests/editor.test.ts` for fixed gap and proportional mode multi-frame resizing on both unrotated and rotated selections.
+
+### Phase 37 — Spread Card & Navigator UI Ergonomics Overhaul
+
+- [x] Redesign spread cards in bottom drawer (`PageNavigator.tsx`) with pure spread number labeling (`1`, `2`, `Cover`) and no narrative clutter.
+- [x] Keep navigation and action buttons permanently visible with clear disabled styling instead of hiding them or leaving hollow gaps.
+- [x] Eliminate split-second border glow/flash on disabled buttons by removing default browser outline and disabling transition on `:disabled`.
+- [x] Add pure domain helper `getSpreadNumberLabel` and comprehensive unit tests in `tests/album.test.ts`.
+

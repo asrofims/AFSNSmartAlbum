@@ -513,6 +513,48 @@ export function getAllAlbumSpreads(album: Album): Spread[] {
 }
 
 /**
+ * Formats a clean human-readable page number label without narrative words.
+ * Examples:
+ * - Cover spread: "Cover"
+ * - Facing pages interior spread: "1–2", "3–4", "5–6"
+ * - Single page spread: "1", "2"
+ */
+export function getSpreadPageLabel(spread: Spread): string {
+  if (spread.type === 'cover') return 'Cover';
+  const left = spread.leftPage?.pageNumber;
+  const right = spread.rightPage?.pageNumber;
+  if (left !== undefined && right !== undefined) {
+    return `${left}–${right}`;
+  }
+  if (left !== undefined) return `${left}`;
+  if (right !== undefined) return `${right}`;
+  const start = Math.max(1, (spread.spreadIndex - 1) * 2 + 1);
+  return `${start}–${start + 1}`;
+}
+
+/**
+ * Formats a clean spread label without page narrative.
+ * Examples:
+ * - Cover spread: "Cover"
+ * - Interior spreads: "Spread 1", "Spread 2", "Spread 3"
+ */
+export function getSpreadLabel(spread: Spread): string {
+  if (spread.type === 'cover') return 'Cover';
+  return `Spread ${spread.spreadIndex}`;
+}
+
+/**
+ * Formats a clean spread identifier with only the number (or 'Cover').
+ * Examples:
+ * - Cover spread: "Cover"
+ * - Interior spreads: "1", "2", "3"
+ */
+export function getSpreadNumberLabel(spread: Spread): string {
+  if (spread.type === 'cover') return 'Cover';
+  return String(spread.spreadIndex);
+}
+
+/**
  * Checks whether two album elements have identical design and layout properties,
  * intentionally ignoring runtime cache paths (previewPath, thumbnailPath).
  */
