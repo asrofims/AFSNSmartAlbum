@@ -6,7 +6,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread, getSpreadPageLabel, getSpreadLabel, getSpreadNumberLabel } from '../../domain/album';
-import { PhotoFrameElement, calculateImageOffset, getCornerRadii } from '../../domain/editor';
+import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
 import { Project } from '../../domain/project';
@@ -144,10 +144,12 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
 
         const photoMeta = photoEl.photoId ? photoById.get(photoEl.photoId) : null;
 
+        const photoAspect = getPhotoAspect(hydratedElement);
+
         const { offsetX, offsetY, width: imgPhysicalW, height: imgPhysicalH } = calculateImageOffset(
           photoEl.width,
           photoEl.height,
-          photoEl.photoAspect || 1.5,
+          photoAspect,
           Math.max(1.0, photoEl.cropScale || 1.0),
           photoEl.cropX || 0,
           photoEl.cropY || 0
@@ -181,8 +183,11 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               overflow: 'hidden',
               background: imgSrc ? '#ffffff' : 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: photoEl.opacity ?? 1,
-              border: photoEl.borderEnabled && photoEl.borderWidth ? `1px solid ${photoEl.borderColor || '#ffffff'}` : '1px solid rgba(0,0,0,0.15)',
-              borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : '1px',
+              boxSizing: 'border-box',
+              border: photoEl.borderEnabled && photoEl.borderWidth
+                ? `${Math.max(1, Math.round(photoEl.borderWidth * scale))}px solid ${photoEl.borderColor || '#ffffff'}`
+                : 'none',
+              borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
               zIndex: photoEl.zIndex || 2,
             }}
           >
