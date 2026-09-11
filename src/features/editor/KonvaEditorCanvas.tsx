@@ -1126,6 +1126,7 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
     editingTextElementId,
     setEditingTextElementId,
     updateTextElement,
+    multiResizeGapMode,
   } = useEditorStore();
   const photos = usePhotoStore((s) => s.photos);
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
@@ -3437,7 +3438,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                       newX,
                       newY,
                       sx,
-                      sy
+                      sy,
+                      multiResizeGapMode,
+                      activeAnchor || undefined
                     );
 
                     updates.forEach((u) => {
@@ -3561,7 +3564,9 @@ export function KonvaEditorCanvas({ zoomLevel, activeTool, onZoomChange: _onZoom
                         newX,
                         newY,
                         sx,
-                        sy
+                        sy,
+                        multiResizeGapMode,
+                        activeAnchor || undefined
                       );
 
                       if (updates.length > 0) {

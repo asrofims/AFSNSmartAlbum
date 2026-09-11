@@ -985,9 +985,79 @@ const groupResized90 = calculateRotatedMultiFrameResize(
   groupInfo90.groupX,
   groupInfo90.groupY,
   1.5,
-  1.5
+  1.5,
+  'proportional'
 );
 console.assert(groupResized90.length === 2, 'Must return 2 resized frames');
+
+// 18h-1. Strict Fixed Physical Gap Mode (Unrotated Multi-Selection)
+const groupInfo0 = computeMultiFrameGroupInfo(multiRotateFrames);
+const fixedResized0 = calculateRotatedMultiFrameResize(
+  groupInfo0,
+  multiRotateFrames,
+  groupInfo0.groupX,
+  groupInfo0.groupY,
+  1.5,
+  1.5,
+  'fixed_gap',
+  'bottom-right'
+);
+console.assert(fixedResized0.length === 2, 'Must return 2 resized frames in fixed_gap mode');
+const f1Fixed = fixedResized0.find((f) => f.id === 'f1')!;
+const f2Fixed = fixedResized0.find((f) => f.id === 'f2')!;
+const preservedGap0 = (f2Fixed.geometry.x ?? 0) - ((f1Fixed.geometry.x ?? 0) + (f1Fixed.geometry.width ?? 0));
+console.assert(Math.abs(preservedGap0 - 10) < 0.01, `Fixed gap between frames must remain strictly 10mm, got ${preservedGap0}mm`);
+const aspect1 = (f1Fixed.geometry.width ?? 0) / (f1Fixed.geometry.height ?? 0);
+console.assert(Math.abs(aspect1 - 1.25) < 0.01, `f1 aspect ratio must be strictly preserved at 1.25, got ${aspect1}`);
+
+// 18h-2. Strict Fixed Physical Gap Mode with Top-Left Anchor (Stationary Bottom-Right Corner)
+const fixedResizedTL = calculateRotatedMultiFrameResize(
+  groupInfo0,
+  multiRotateFrames,
+  groupInfo0.groupX - 105,
+  groupInfo0.groupY - 40,
+  1.5,
+  1.5,
+  'fixed_gap',
+  'top-left'
+);
+const f1TL = fixedResizedTL.find((f) => f.id === 'f1')!;
+const f2TL = fixedResizedTL.find((f) => f.id === 'f2')!;
+const preservedGapTL = (f2TL.geometry.x ?? 0) - ((f1TL.geometry.x ?? 0) + (f1TL.geometry.width ?? 0));
+console.assert(Math.abs(preservedGapTL - 10) < 0.01, `Top-left anchor fixed gap must remain strictly 10mm, got ${preservedGapTL}mm`);
+const rightEdgeTL = (f2TL.geometry.x ?? 0) + (f2TL.geometry.width ?? 0);
+const bottomEdgeTL = (f2TL.geometry.y ?? 0) + (f2TL.geometry.height ?? 0);
+console.assert(Math.abs(rightEdgeTL - 230) < 0.05, `Bottom-right corner X must stay stationary at 230, got ${rightEdgeTL}`);
+console.assert(Math.abs(bottomEdgeTL - 110) < 0.05, `Bottom-right corner Y must stay stationary at 110, got ${bottomEdgeTL}`);
+
+// 18h-3. Proportional Mode vs Fixed Gap Mode Gap Scaling Contrast
+const propResized0 = calculateRotatedMultiFrameResize(
+  groupInfo0,
+  multiRotateFrames,
+  groupInfo0.groupX,
+  groupInfo0.groupY,
+  1.5,
+  1.5,
+  'proportional',
+  'bottom-right'
+);
+const f1Prop = propResized0.find((f) => f.id === 'f1')!;
+const f2Prop = propResized0.find((f) => f.id === 'f2')!;
+const propGap0 = (f2Prop.geometry.x ?? 0) - ((f1Prop.geometry.x ?? 0) + (f1Prop.geometry.width ?? 0));
+console.assert(Math.abs(propGap0 - 15) < 0.01, `Proportional gap must scale 10mm * 1.5 = 15mm, got ${propGap0}mm`);
+
+// 18h-4. Strict Fixed Physical Gap Mode on 90° Rotated Group
+const fixedResized90 = calculateRotatedMultiFrameResize(
+  groupInfo90,
+  rotatedCW,
+  groupInfo90.groupX,
+  groupInfo90.groupY,
+  1.5,
+  1.5,
+  'fixed_gap',
+  'bottom-right'
+);
+console.assert(fixedResized90.length === 2, 'Must return 2 resized frames for 90° rotated group in fixed_gap mode');
 // 18i. Multi-Frame Group Rotation around Group Center with Invariant Pivot
 const initialRotateGroup = computeMultiFrameGroupInfo(multiRotateFrames);
 const halfW = initialRotateGroup.groupWidth / 2;

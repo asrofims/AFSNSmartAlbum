@@ -1999,7 +1999,8 @@ export function calculateMultiFrameResize(
   initialGroupBounds: RectBounds,
   newGroupBounds: RectBounds,
   anchor?: string,
-  mode: 'proportional' | 'fixed_gap' = 'proportional'
+  mode: 'proportional' | 'fixed_gap' = 'proportional',
+  fixedScale?: number
 ): ResizedFrameUpdate[] {
   if (initialFrames.length === 0) return [];
 
@@ -2073,7 +2074,9 @@ export function calculateMultiFrameResize(
   if (mode === 'proportional') {
     const scaleX = initW > 0 ? newGroupBounds.width / initW : 1;
     const scaleY = initH > 0 ? newGroupBounds.height / initH : 1;
-    const scale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
+    const scale = fixedScale !== undefined
+      ? fixedScale
+      : (Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY);
 
     const newTotalW = initW * scale;
     const newTotalH = initH * scale;
@@ -2246,9 +2249,13 @@ export function calculateMultiFrameResize(
 
   const rawRatioX = initW > 0 ? newGroupBounds.width / initW : 1;
   const rawRatioY = initH > 0 ? newGroupBounds.height / initH : 1;
-  const uniformScale = Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
-    ? scaleXFromGroup
-    : scaleYFromGroup;
+  const uniformScale = fixedScale !== undefined
+    ? fixedScale
+    : (Math.abs(rawRatioX - rawRatioY) < 0.005
+      ? (initW >= initH ? scaleXFromGroup : scaleYFromGroup)
+      : (Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
+        ? scaleXFromGroup
+        : scaleYFromGroup));
 
   // 3. Topologically Sorted Positions
   const newPositionsX = new Map<string, number>();
@@ -2715,70 +2722,142 @@ export function calculateRotatedMultiFrameResize(
   newGroupX: number,
   newGroupY: number,
   scaleX: number,
-  scaleY: number
+  scaleY: number,
+  mode: 'proportional' | 'fixed_gap' = 'proportional',
+  anchor?: string
 ): ResizedFrameUpdate[] {
   if (initialFrames.length === 0 || groupInfo.childLocalFrames.length === 0) return [];
 
   const initialMap = new Map(initialFrames.map((f) => [f.id, f]));
   const scale = (scaleX + scaleY) / 2;
 
-  return groupInfo.childLocalFrames.map((child) => {
+  // --- 1. PROPORTIONAL MODE (Visual Harmony) ---
+  if (mode === 'proportional') {
+    return groupInfo.childLocalFrames.map((child) => {
+      const orig = initialMap.get(child.id);
+      const origW = orig ? orig.width : 100;
+      const origH = orig ? orig.height : 100;
+
+      const isText = (orig as any)?.type === 'text';
+      const newLocalX = child.localX * scale;
+      const newLocalY = child.localY * scale;
+      const newWidth = isText
+        ? Math.ceil((origW * scale) * 100) / 100
+        : roundToHundredth(Math.max(1, origW * scale));
+      const newHeight = isText
+        ? Math.ceil((origH * scale) * 100) / 100
+        : roundToHundredth(Math.max(1, origH * scale));
+
+      const worldGeom = unprojectGroupChildToWorld(
+        newGroupX,
+        newGroupY,
+        groupInfo.groupRotation,
+        newLocalX,
+        newLocalY,
+        child.localRotation
+      );
+
+      const textStyle = isText ? (orig as any)?.style : undefined;
+      let newStyle = undefined;
+      let newStyledRanges = undefined;
+
+      if (isText && textStyle) {
+        const currentFontSize = textStyle.fontSize || 24;
+        const newFontSize = Math.max(1, Math.min(200, currentFontSize * scale));
+        newStyle = {
+          ...textStyle,
+          fontSize: newFontSize,
+          padding: (textStyle.padding ?? 4) * scale,
+          letterSpacing: (textStyle.letterSpacing ?? 0) * scale,
+        };
+        const origRanges = (orig as any)?.styledRanges;
+        if (origRanges && Array.isArray(origRanges)) {
+          newStyledRanges = origRanges.map((r: any) => ({
+            ...r,
+            fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * scale)) : undefined,
+          }));
+        }
+      }
+
+      return {
+        id: child.id,
+        geometry: {
+          x: worldGeom.x,
+          y: worldGeom.y,
+          width: newWidth,
+          height: newHeight,
+          rotation: worldGeom.rotation,
+          groupRotation: groupInfo.groupRotation,
+          ...(isText && newStyle ? { style: newStyle } : {}),
+          ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
+        },
+      };
+    });
+  }
+
+  // --- 2. FIXED GAP MODE: 2D TOPOLOGICAL SPATIAL NEIGHBOR GRAPH IN LOCAL SPACE ---
+  // Represent each frame in the group's local coordinate space
+  const localFrames: FrameBounds[] = groupInfo.childLocalFrames.map((child) => {
     const orig = initialMap.get(child.id);
-    const origW = orig ? orig.width : 100;
-    const origH = orig ? orig.height : 100;
+    return {
+      ...(orig || {}),
+      id: child.id,
+      x: child.localX,
+      y: child.localY,
+      width: orig ? orig.width : 100,
+      height: orig ? orig.height : 100,
+      rotation: child.localRotation,
+    };
+  });
 
-    const isText = (orig as any)?.type === 'text';
-    const newLocalX = child.localX * scale;
-    const newLocalY = child.localY * scale;
-    const newWidth = isText
-      ? Math.ceil((origW * scale) * 100) / 100
-      : roundToHundredth(Math.max(1, origW * scale));
-    const newHeight = isText
-      ? Math.ceil((origH * scale) * 100) / 100
-      : roundToHundredth(Math.max(1, origH * scale));
+  const initialLocalBounds: RectBounds = {
+    x: 0,
+    y: 0,
+    width: groupInfo.groupWidth,
+    height: groupInfo.groupHeight,
+  };
 
+  const newLocalBounds: RectBounds = {
+    x: 0,
+    y: 0,
+    width: groupInfo.groupWidth * scale,
+    height: groupInfo.groupHeight * scale,
+  };
+
+  // Run the 2D Topological Spatial Neighbor Graph algorithm in local group space
+  // passing fixedScale = scale to guarantee smooth, jitter-free 60 FPS scaling
+  const localUpdates = calculateMultiFrameResize(
+    localFrames,
+    initialLocalBounds,
+    newLocalBounds,
+    anchor,
+    'fixed_gap',
+    scale
+  );
+
+  // Unproject each frame's updated local coordinates back to world coordinates
+  const childMap = new Map(groupInfo.childLocalFrames.map((c) => [c.id, c]));
+
+  return localUpdates.map((u) => {
+    const child = childMap.get(u.id);
+    const localRot = child ? child.localRotation : 0;
     const worldGeom = unprojectGroupChildToWorld(
-      newGroupX,
-      newGroupY,
+      anchor ? groupInfo.groupX : newGroupX,
+      anchor ? groupInfo.groupY : newGroupY,
       groupInfo.groupRotation,
-      newLocalX,
-      newLocalY,
-      child.localRotation
+      u.geometry.x ?? (child?.localX || 0),
+      u.geometry.y ?? (child?.localY || 0),
+      u.geometry.rotation ?? localRot
     );
 
-    const textStyle = isText ? (orig as any)?.style : undefined;
-    let newStyle = undefined;
-    let newStyledRanges = undefined;
-
-    if (isText && textStyle) {
-      const currentFontSize = textStyle.fontSize || 24;
-      const newFontSize = Math.max(1, Math.min(200, currentFontSize * scale));
-      newStyle = {
-        ...textStyle,
-        fontSize: newFontSize,
-        padding: (textStyle.padding ?? 4) * scale,
-        letterSpacing: (textStyle.letterSpacing ?? 0) * scale,
-      };
-      const origRanges = (orig as any)?.styledRanges;
-      if (origRanges && Array.isArray(origRanges)) {
-        newStyledRanges = origRanges.map((r: any) => ({
-          ...r,
-          fontSize: r.fontSize ? Math.max(1, Math.min(200, r.fontSize * scale)) : undefined,
-        }));
-      }
-    }
-
     return {
-      id: child.id,
+      id: u.id,
       geometry: {
+        ...u.geometry,
         x: worldGeom.x,
         y: worldGeom.y,
-        width: newWidth,
-        height: newHeight,
         rotation: worldGeom.rotation,
         groupRotation: groupInfo.groupRotation,
-        ...(isText && newStyle ? { style: newStyle } : {}),
-        ...(isText && newStyledRanges ? { styledRanges: newStyledRanges } : {}),
       },
     };
   });

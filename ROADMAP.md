@@ -420,3 +420,11 @@
 - [x] Fix SSAA compositing to use **true multi-sample averaging** (4×4 = 16 bilinear sub-samples per destination pixel) instead of single-point sampling that wasted the supersampled buffer.
 - [x] Preserve zero-overhead direct 1:1 pixel blit for unrotated text elements (`rotation == 0`).
 - [x] Application version metadata bumped to `v1.0.55`.
+
+### Phase 36 — Strict Fixed Physical Gap Canvas Multi-Frame Resize Integration
+
+- [x] Integrate `multiResizeGapMode` into `KonvaEditorCanvas.tsx` for real-time dragging (`onTransform`) and mouse-up commit (`onTransformEnd`).
+- [x] Connect the 2D Topological Spatial Neighbor Graph algorithm into `calculateRotatedMultiFrameResize` in `src/domain/editor.ts` for `'fixed_gap'` mode.
+- [x] Guarantee inter-frame physical millimeter gaps remain 100% constant during multi-selection resize across rows, columns, and asymmetric layouts.
+- [x] Maintain full backward compatibility for `'proportional'` mode (Harmonious Proportional Scaling).
+- [x] Add comprehensive regression test suite in `tests/editor.test.ts` for fixed gap and proportional mode multi-frame resizing on both unrotated and rotated selections.
