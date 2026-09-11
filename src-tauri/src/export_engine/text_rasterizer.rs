@@ -1119,8 +1119,20 @@ pub fn render_text_element(
         let max_y = corners.iter().map(|c| c.1).fold(f64::NEG_INFINITY, f64::max).ceil() as i64 + 1;
 
         let ss_f = ss as f64;
+        let ss_int = ss.round() as u32;
         let buf_w_i = buf_w as i64;
         let buf_h_i = buf_h as i64;
+        let inv_sample_count = 1.0f32 / (ss_int * ss_int) as f32;
+
+        let sample_premul = |x: i64, y: i64| -> (f32, f32, f32, f32) {
+            if x >= 0 && x < buf_w_i && y >= 0 && y < buf_h_i {
+                let p = text_buffer.get_pixel(x as u32, y as u32);
+                let a = p[3] as f32 / 255.0;
+                (p[0] as f32 * a, p[1] as f32 * a, p[2] as f32 * a, a)
+            } else {
+                (0.0, 0.0, 0.0, 0.0)
+            }
+        };
 
         for cy in min_y..=max_y {
             let dest_y = frame_px_y + cy;
@@ -1133,54 +1145,63 @@ pub fn render_text_element(
                     continue;
                 }
 
-                // Map canvas pixel center (cx + 0.5, cy + 0.5) to local unrotated buffer space
-                let dx = cx as f64 + 0.5;
-                let dy = cy as f64 + 0.5;
-                let src_x = (dx * cos_r - dy * sin_r) * ss_f - 0.5;
-                let src_y = (dx * sin_r + dy * cos_r) * ss_f - 0.5;
+                // True SSAA: take ss×ss evenly-spaced sub-samples within this destination pixel,
+                // bilinearly interpolate each from the supersampled buffer, and average them.
+                let mut accum_pr = 0.0f32;
+                let mut accum_pg = 0.0f32;
+                let mut accum_pb = 0.0f32;
+                let mut accum_a  = 0.0f32;
 
-                let x0 = src_x.floor() as i64;
-                let y0 = src_y.floor() as i64;
-                let x1 = x0 + 1;
-                let y1 = y0 + 1;
+                for sub_y in 0..ss_int {
+                    for sub_x in 0..ss_int {
+                        // Sub-pixel center within the destination pixel [cx, cx+1) × [cy, cy+1)
+                        let dx = cx as f64 + (sub_x as f64 + 0.5) / ss_f;
+                        let dy = cy as f64 + (sub_y as f64 + 0.5) / ss_f;
 
-                if x1 < 0 || x0 >= buf_w_i || y1 < 0 || y0 >= buf_h_i {
-                    continue;
+                        // Map through inverse rotation to supersampled buffer coordinates
+                        let src_x = (dx * cos_r - dy * sin_r) * ss_f - 0.5;
+                        let src_y = (dx * sin_r + dy * cos_r) * ss_f - 0.5;
+
+                        let x0 = src_x.floor() as i64;
+                        let y0 = src_y.floor() as i64;
+                        let x1 = x0 + 1;
+                        let y1 = y0 + 1;
+
+                        if x1 < 0 || x0 >= buf_w_i || y1 < 0 || y0 >= buf_h_i {
+                            continue;
+                        }
+
+                        let fx = (src_x - x0 as f64) as f32;
+                        let fy = (src_y - y0 as f64) as f32;
+
+                        let p00 = sample_premul(x0, y0);
+                        let p10 = sample_premul(x1, y0);
+                        let p01 = sample_premul(x0, y1);
+                        let p11 = sample_premul(x1, y1);
+
+                        let w00 = (1.0 - fx) * (1.0 - fy);
+                        let w10 = fx * (1.0 - fy);
+                        let w01 = (1.0 - fx) * fy;
+                        let w11 = fx * fy;
+
+                        accum_pr += w00 * p00.0 + w10 * p10.0 + w01 * p01.0 + w11 * p11.0;
+                        accum_pg += w00 * p00.1 + w10 * p10.1 + w01 * p01.1 + w11 * p11.1;
+                        accum_pb += w00 * p00.2 + w10 * p10.2 + w01 * p01.2 + w11 * p11.2;
+                        accum_a  += w00 * p00.3 + w10 * p10.3 + w01 * p01.3 + w11 * p11.3;
+                    }
                 }
 
-                let fx = (src_x - x0 as f64) as f32;
-                let fy = (src_y - y0 as f64) as f32;
+                // Average the accumulated premultiplied values over all sub-samples
+                let avg_pr = accum_pr * inv_sample_count;
+                let avg_pg = accum_pg * inv_sample_count;
+                let avg_pb = accum_pb * inv_sample_count;
+                let avg_a  = accum_a  * inv_sample_count;
 
-                let sample_premul = |x: i64, y: i64| -> (f32, f32, f32, f32) {
-                    if x >= 0 && x < buf_w_i && y >= 0 && y < buf_h_i {
-                        let p = text_buffer.get_pixel(x as u32, y as u32);
-                        let a = p[3] as f32 / 255.0;
-                        (p[0] as f32 * a, p[1] as f32 * a, p[2] as f32 * a, a)
-                    } else {
-                        (0.0, 0.0, 0.0, 0.0)
-                    }
-                };
-
-                let p00 = sample_premul(x0, y0);
-                let p10 = sample_premul(x1, y0);
-                let p01 = sample_premul(x0, y1);
-                let p11 = sample_premul(x1, y1);
-
-                let w00 = (1.0 - fx) * (1.0 - fy);
-                let w10 = fx * (1.0 - fy);
-                let w01 = (1.0 - fx) * fy;
-                let w11 = fx * fy;
-
-                let interp_pr = w00 * p00.0 + w10 * p10.0 + w01 * p01.0 + w11 * p11.0;
-                let interp_pg = w00 * p00.1 + w10 * p10.1 + w01 * p01.1 + w11 * p11.1;
-                let interp_pb = w00 * p00.2 + w10 * p10.2 + w01 * p01.2 + w11 * p11.2;
-                let interp_a  = w00 * p00.3 + w10 * p10.3 + w01 * p01.3 + w11 * p11.3;
-
-                if interp_a > 0.001 {
-                    let final_r = (interp_pr / interp_a).round().clamp(0.0, 255.0) as u8;
-                    let final_g = (interp_pg / interp_a).round().clamp(0.0, 255.0) as u8;
-                    let final_b = (interp_pb / interp_a).round().clamp(0.0, 255.0) as u8;
-                    let final_a = (interp_a * elem.opacity as f32).clamp(0.0, 1.0);
+                if avg_a > 0.001 {
+                    let final_r = (avg_pr / avg_a).round().clamp(0.0, 255.0) as u8;
+                    let final_g = (avg_pg / avg_a).round().clamp(0.0, 255.0) as u8;
+                    let final_b = (avg_pb / avg_a).round().clamp(0.0, 255.0) as u8;
+                    let final_a = (avg_a * elem.opacity as f32).clamp(0.0, 1.0);
 
                     let canvas_pixel = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
                     blend_pixel_over(canvas_pixel, final_r, final_g, final_b, final_a);
