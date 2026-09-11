@@ -456,3 +456,20 @@
   - Exact visual parity with photo frame rotation controls (label, `NumberInput` with `°` degree suffix, and `↺ 0°` quick reset button).
   - Connected directly to `rotateSelectedFrames` in `editorStore.ts` with center-rotated geometry math (`calculateCenterRotatedPosition`).
   - Supports full undo/redo history tracking and lock state protection (`fieldset disabled`).
+
+### Phase 40 — Release v1.0.56: Lock Panel Multi-Selection, Unselect on Click, Contextual Batch Actions & Canvas Preview Harmonization
+
+- [x] Locked Photos & Elements Panel Multi-Selection Engine:
+  - Full desktop multi-selection support (`Ctrl/Cmd + Click` toggle, `Shift + Click` range selection, `Ctrl + Shift + Click` range addition).
+  - Unselect on click: clicking an already-selected card immediately deselects it from the selection list.
+  - Group-aware selection preserves group integrity across all multi-selection operations.
+  - Contextual batch action bar with clean, single relevant action button (`🔒 Lock (N)` or `🔓 Unlock (N)`) that expands to full width and adapts dynamically to current selection state.
+  - Dedicated "Select All" actions for active spread, locked items section, and unlocked items section.
+- [x] Fix Right Inspector Collapse/Hide Glitch:
+  - Eliminated the infinite reopen loop caused by `isPropertiesOpen` dependency in `WorkspaceLayout.tsx`, allowing the sidebar to be collapsed/expanded freely even when items are selected.
+- [x] Spread Preview & Real Canvas Harmonization:
+  - Removed artificial `1px solid rgba(0,0,0,0.15)` border fallback on photo frames in bottom spread cards (`PageNavigator.tsx`) so previews match the real canvas 100%.
+  - Upgraded preview aspect ratio calculation to `getPhotoAspect(hydratedElement)` to prevent distortion on portrait, square, and panorama photos.
+  - Synchronized border box-sizing and corner radii.
+- [x] Application version metadata bumped to `v1.0.56`.
+

@@ -1,5 +1,5 @@
 ====================================================================
-           AFSNSmartAlbum (v1.0.55)
+           AFSNSmartAlbum (v1.0.56)
    Professional Photo Album Layout Desktop Software
 ====================================================================
 
