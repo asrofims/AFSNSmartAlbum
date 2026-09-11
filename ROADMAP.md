@@ -450,4 +450,9 @@
   - Auto-dismiss after 6 seconds on completion, or instant dismissal via `✕`.
   - Prevent collisions with standard notification toasts.
 
+### Phase 39 — Text Box Inspector Rotation Angle Controls Parity
 
+- [x] Add Rotation Angle controls to `TypographyPanel.tsx` in the right inspector panel for selected text frames:
+  - Exact visual parity with photo frame rotation controls (label, `NumberInput` with `°` degree suffix, and `↺ 0°` quick reset button).
+  - Connected directly to `rotateSelectedFrames` in `editorStore.ts` with center-rotated geometry math (`calculateCenterRotatedPosition`).
+  - Supports full undo/redo history tracking and lock state protection (`fieldset disabled`).

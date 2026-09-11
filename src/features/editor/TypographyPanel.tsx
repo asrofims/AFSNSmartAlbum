@@ -18,6 +18,7 @@ import {
   updateRangesForTextChange,
 } from '../../domain/text';
 import { ColorPicker } from '../../components/ui/ColorPicker';
+import { NumberInput } from '../../components/ui/NumberInput';
 
 interface TypographyPanelProps {
   element: TextNodeElement;
@@ -40,6 +41,7 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
   const activeSpreadId = useAlbumStore((s) => s.activeSpreadId);
   const currentProject = useProjectStore((s) => s.currentProject);
   const updateTextElement = useEditorStore((s) => s.updateTextElement);
+  const rotateSelectedFrames = useEditorStore((s) => s.rotateSelectedFrames);
   const setEditingTextElementId = useEditorStore((s) => s.setEditingTextElementId);
   const panelTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1033,6 +1035,53 @@ export function TypographyPanel({ element, onToast }: TypographyPanelProps) {
               color: 'var(--color-text-primary, #f8fafc)',
             }}
           />
+        </div>
+      </div>
+
+      {/* 8. Rotation Input & Quick Reset */}
+      <div>
+        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>Rotation Angle</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <NumberInput
+              value={element.rotation || 0}
+              onChange={(newRot) => {
+                if (activeSpreadId) rotateSelectedFrames(activeSpreadId, newRot, true);
+              }}
+              min={-360}
+              max={360}
+              step={1}
+              precision={0}
+              disabled={Boolean(element.locked)}
+            />
+            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>°</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (activeSpreadId) rotateSelectedFrames(activeSpreadId, 0, true);
+            }}
+            disabled={Boolean(element.locked) || !element.rotation}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm, 4px)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              cursor: (element.locked || !element.rotation) ? 'default' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '24px',
+              opacity: (element.rotation && !element.locked) ? 1 : 0.6,
+            }}
+            title="Reset rotation to 0°"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+          </button>
         </div>
       </div>
     </fieldset>
