@@ -353,6 +353,12 @@ export function WorkspaceLayout() {
         return;
       }
 
+      // Prevent Windows OS menu bar focus stealing when standalone Alt is pressed outside text inputs
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 

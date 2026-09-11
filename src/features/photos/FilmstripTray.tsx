@@ -63,6 +63,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
   const filmstripRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
 
   // Failed / Missing Thumbnail Cache Fallback (Zero background decoding)
@@ -135,6 +136,39 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       window.removeEventListener('pointerdown', handleGlobalPointerDown, true);
     };
   }, [clearSelection]);
+
+  // Smart Horizontal Mouse Wheel Scrolling for Filmstrip Tray (Direct wheel without Shift)
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Don't intercept if user is holding Ctrl/Cmd (reserved for zoom / future shortcuts)
+      if (e.ctrlKey || e.metaKey) return;
+
+      // When vertical scroll delta is dominant (standard mouse wheel rotation)
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+
+        // Normalize delta across input device deltaModes (pixel vs line vs page)
+        let delta = e.deltaY;
+        if (e.deltaMode === 1) {
+          // DOM_DELTA_LINE
+          delta *= 40;
+        } else if (e.deltaMode === 2) {
+          // DOM_DELTA_PAGE
+          delta *= 800;
+        }
+
+        el.scrollLeft += delta;
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [isOpen]);
 
   // Load photos and folders when project changes
   useEffect(() => {
@@ -478,7 +512,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
 
       {/* Filmstrip Body */}
       {isOpen && (
-        <div className={styles.body} onClick={clearSelection}>
+        <div ref={bodyRef} className={styles.body} onClick={clearSelection}>
           {sortedPhotos.length > 0 ? (
             <div className={styles.photoList}>
               {sortedPhotos.map((photo) => {

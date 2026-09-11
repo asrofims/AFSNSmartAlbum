@@ -1159,13 +1159,32 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
   const isAltPressedRef = useRef(false);
 
   useEffect(() => {
+    const isTextInput = (target: EventTarget | null) => {
+      const elem = target as HTMLElement | null;
+      if (!elem) return false;
+      const tag = elem.tagName?.toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || elem.isContentEditable;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setIsShiftPressed(true);
-      if (e.key === 'Alt') isAltPressedRef.current = true;
+      if (e.key === 'Alt') {
+        isAltPressedRef.current = true;
+        if (!isTextInput(e.target)) {
+          // Prevent Windows OS from intercepting Alt and focusing the hidden system menu bar,
+          // which steals focus and causes scroll, zoom, and canvas shortcuts to freeze.
+          e.preventDefault();
+        }
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setIsShiftPressed(false);
-      if (e.key === 'Alt') isAltPressedRef.current = false;
+      if (e.key === 'Alt') {
+        isAltPressedRef.current = false;
+        if (!isTextInput(e.target)) {
+          e.preventDefault();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -1328,7 +1347,14 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
           y: e.clientY - rect.top,
         };
 
-        const delta = e.deltaY < 0 ? 1 : -1;
+        const rawDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        if (rawDelta === 0) return;
+
+        // Dual-Speed Adaptive Precision:
+        // - Ctrl + Shift + Wheel: ultra-fine 1% calibration
+        // - Ctrl + Wheel: 5% snappy navigation
+        const step = e.shiftKey ? 1 : 5;
+        const delta = rawDelta < 0 ? step : -step;
         onZoomChange?.((prev) => Math.min(350, Math.max(25, prev + delta)));
       }
     };
@@ -1345,6 +1371,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       setIsHoveredDropAlt(false);
       setHoveredDropFrameId(null);
       isAltPressedRef.current = false;
+      setIsShiftPressed(false);
     };
 
     window.addEventListener('blur', handleResetDragState);

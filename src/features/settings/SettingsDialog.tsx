@@ -73,8 +73,9 @@ const SHORTCUTS: ShortcutDef[] = [
     id: 'nav-zoom-canvas',
     category: 'Panels & Navigation',
     action: 'Zoom Canvas In / Out',
-    combos: [['Ctrl', '+ Wheel'], ['Ctrl', '+ / -']],
-    keywords: 'zoom canvas magnify scale mouse wheel in out',
+    combos: [['Ctrl', '+ Wheel'], ['Ctrl', 'Shift', '+ Wheel'], ['Ctrl', '+ / -']],
+    note: '5% step (Shift for 1% fine-tune)',
+    keywords: 'zoom canvas magnify scale mouse wheel in out 1 percent 5 percent fine precision',
   },
   {
     id: 'nav-reset-zoom',
@@ -82,6 +83,14 @@ const SHORTCUTS: ShortcutDef[] = [
     action: 'Fit Spread to Screen & Center',
     combos: [['Ctrl', '0']],
     keywords: 'zoom reset view fit center middle 100 percent',
+  },
+  {
+    id: 'nav-filmstrip-scroll',
+    category: 'Panels & Navigation',
+    action: 'Scroll Filmstrip Photos',
+    combos: [['Wheel'], ['Shift', '+ Wheel']],
+    note: 'over filmstrip tray',
+    keywords: 'filmstrip scroll photos gallery mouse wheel horizontal browse next previous',
   },
 
   // 2. Canvas Selection & Manipulation

@@ -36,6 +36,7 @@
 - [x] Missing Photo Detection & Automatic Relinking Wizard with spread-frame asset recovery
 - [x] Automatic Orphaned Thumbnail & Preview Cache Cleanup
 - [x] Sequential Photo Import Queue, Cancel Rollback Purge, Modal Picker Protection, Ref-Counted Singleton Event Listeners, and Accurate Count Tracking
+- [x] Direct Horizontal Mouse Wheel Scrolling (Lightroom-style natural gallery navigation without requiring Shift key)
 
 ## Phase 3 — Album Structure
 - [x] Spread Model (Left Page, Center Gutter/Crease, Spine Width, Right Page)
@@ -57,6 +58,7 @@
 - [x] **Dual Entity Reset System** (`↺ Reset Ratio` & `↺ Reset Crop`)
 - [x] 90° Clockwise & Counter-Clockwise Frame Rotation
 - [x] Viewport Zoom & Smooth Pan Navigation with Auto-Center Spine Focus & Full Left/Right Page Accessibility
+- [x] **Dual-Speed Adaptive Viewport Zoom** (`Ctrl + Wheel` 5% snappy exploration, `Ctrl + Shift + Wheel` 1% ultra-fine calibration, `±15%` toolbar buttons & shortcuts, max 350%)
 - [x] Granular 1% Sequential Photo Crop Zoom (`0.01` step / 100%-350% range across Toolbar, Slider HUD, and Mouse Wheel)
 - [x] Smart Magnetic Snapping with Visual HUD Distance Lines & Match Dimensions Badges
 - [x] Multi-Selection Alignment Tools (Left, Center H, Right, Top, Middle V, Bottom)
@@ -489,5 +491,25 @@
   - `Ctrl + 0` triggers smooth fit-to-center animation.
   - Registered all canvas zoom and fit shortcuts in Keyboard Shortcuts cheat sheet (`SettingsDialog.tsx`, F1) and updated toolbar tooltips.
 - [x] Application version metadata bumped to `v1.0.57`.
+
+### Phase 42 — Release v1.0.58: Direct Filmstrip Wheel Scroll, Dual-Speed Adaptive Canvas Zoom & Alt Key Focus Fix
+
+- [x] Direct Horizontal Filmstrip Mouse Wheel Scrolling:
+  - Attached non-passive wheel listener on filmstrip body container to convert vertical wheel ticks directly into horizontal scrolling (`scrollLeft += delta`).
+  - Allows rapid, single-handed gallery navigation through hundreds of photos without requiring the `Shift` key (Lightroom & Pixellu style).
+  - Preserves native touchpad 2-finger horizontal gestures and normalizes `deltaMode` (pixels, lines, pages).
+- [x] Dual-Speed Adaptive Canvas Workspace Zoom:
+  - `Ctrl + Wheel`: Snappy 5% increments per wheel notch for agile spread navigation.
+  - `Ctrl + Shift + Wheel`: Ultra-fine 1% increments per wheel notch for pixel-precise calibration.
+  - Toolbar buttons (`-` / `+`) and keyboard shortcuts (`Ctrl + +` / `Ctrl + -`): Fast 15% jumps up to 350% ceiling.
+- [x] Permanent Windows OS Alt Key Focus-Theft Fix (*Anti-Freeze & Anti-Nyangkut*):
+  - Intercepted standalone `Alt` (`e.key === 'Alt'`) on `keydown` and `keyup` and applied `e.preventDefault()` outside text input fields.
+  - Prevents Windows OS from stealing window focus to the hidden system menu bar, ensuring scroll, zoom, pan, and shortcuts never freeze or get stuck when pressing `Alt`.
+  - Added clean safety state reset on window `blur` and `visibilitychange`.
+- [x] Shortcuts & Help Documentation:
+  - Added `Scroll Filmstrip Photos` (`Wheel` / `Shift + Wheel`) in `SettingsDialog.tsx` under Panels & Navigation.
+  - Updated `Zoom Canvas In / Out` documentation to reflect dual-speed controls (`Ctrl+Wheel` 5%, `Ctrl+Shift+Wheel` 1%).
+- [x] Application version metadata bumped to `v1.0.58`.
+
 
 
