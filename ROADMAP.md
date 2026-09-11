@@ -412,10 +412,11 @@
   - Guarantee single photos and asymmetric spreads (e.g. 1 photo on left page, 2 on right page) adapt strictly to safe area boundaries in real-time.
 - [x] Application version metadata bumped to `v1.0.53`.
 
-### Phase 35 — Release v1.0.54: High-Fidelity 4x SSAA Rotated Text Rasterization & Anti-Aliasing
+### Phase 35 — Release v1.0.55: True Multi-Sample SSAA Rotated Text Rasterization & Anti-Aliasing
 
 - [x] Eliminate rotated text jagged staircase artifacts ("pecah bergerigi") during spread export.
 - [x] Implement subpixel premultiplied bilinear anti-aliasing to prevent color fringing and harsh integer-stepping pixel jumps on high-contrast text.
-- [x] Upgrade rotated text rasterization buffer to 4x Supersample Anti-Aliasing (4x SSAA), yielding 16 subpixel samples per destination canvas pixel for pristine vector-grade typography at arbitrary rotation angles.
+- [x] Upgrade rotated text rasterization buffer to 4x Supersample Anti-Aliasing (4x SSAA).
+- [x] Fix SSAA compositing to use **true multi-sample averaging** (4×4 = 16 bilinear sub-samples per destination pixel) instead of single-point sampling that wasted the supersampled buffer.
 - [x] Preserve zero-overhead direct 1:1 pixel blit for unrotated text elements (`rotation == 0`).
-- [x] Application version metadata bumped to `v1.0.54`.
+- [x] Application version metadata bumped to `v1.0.55`.
