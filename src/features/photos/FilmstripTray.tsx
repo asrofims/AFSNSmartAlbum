@@ -457,53 +457,97 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
       {/* Active Photo Import Progress & Queue Bar */}
       {isImporting && importProgress && (
         <div className={styles.progressBarContainer}>
-          <div className={styles.progressTopRow}>
-            <div className={styles.progressInfo}>
-              <span className={styles.progressTitle}>
-                {currentImportTask?.label
-                  ? `Importing: ${currentImportTask.label}`
-                  : 'Importing photos...'}
-              </span>
-              <span className={styles.progressPercent}>
-                {importProgress.current} / {importProgress.total} ({importProgress.percent}%)
-              </span>
+          <div className={styles.progressMainRow}>
+            <div className={styles.progressLeftCol}>
+              <div className={styles.progressSpinnerWrapper}>
+                {importProgress.current === 0 ? (
+                  <div className={styles.pulseRing} />
+                ) : (
+                  <svg className={styles.activeSpinner} viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="2.5" />
+                    <path
+                      d="M12 2a10 10 0 0 1 10 10"
+                      stroke="#38bdf8"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                )}
+              </div>
+
+              <div className={styles.progressTextGroup}>
+                <span className={styles.progressTitle}>
+                  {currentImportTask?.label ? currentImportTask.label : 'Importing Photos'}
+                </span>
+                <span className={styles.progressDivider}>•</span>
+                <span className={styles.progressStatusText}>
+                  {importProgress.current === 0
+                    ? `Scanning & extracting EXIF (${importProgress.total} photos)...`
+                    : `Generating previews${importProgress.currentFile ? ` • ${importProgress.currentFile}` : ''}`}
+                </span>
+              </div>
+            </div>
+
+            <div className={styles.progressRightCol}>
+              <div className={styles.progressCounter}>
+                {importProgress.current === 0 ? (
+                  <span className={styles.phaseBadge}>Phase 1/2</span>
+                ) : (
+                  <>
+                    <span className={styles.counterNum}>
+                      {importProgress.current} <span className={styles.counterTotal}>/ {importProgress.total}</span>
+                    </span>
+                    <span className={styles.percentBadge}>{importProgress.percent}%</span>
+                  </>
+                )}
+              </div>
+
               {importQueue.length > 0 && (
                 <span
                   className={styles.queueBadge}
                   title={`Queued batches:\n${importQueue.map((t, idx) => `${idx + 1}. ${t.label}`).join('\n')}`}
                 >
-                  +{importQueue.length} queued ({importQueue.reduce((acc, t) => acc + t.totalCount, 0)} photos)
+                  +{importQueue.length} queued
                 </span>
               )}
-            </div>
-            <div className={styles.progressRightControls}>
-              <button
-                type="button"
-                className={styles.cancelImportBtn}
-                onClick={cancelImport}
-                disabled={isCancelling}
-                title="Cancel current import batch"
-              >
-                {isCancelling ? 'Cancelling...' : 'Cancel'}
-              </button>
-              {importQueue.length > 0 && (
+
+              <div className={styles.progressActions}>
                 <button
                   type="button"
-                  className={styles.cancelAllBtn}
-                  onClick={cancelAllImports}
+                  className={styles.cancelBtn}
+                  onClick={cancelImport}
                   disabled={isCancelling}
-                  title="Cancel all current and queued imports"
+                  title="Cancel current import batch"
                 >
-                  Cancel All
+                  {isCancelling ? 'Cancelling...' : 'Cancel'}
                 </button>
-              )}
+                {importQueue.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.cancelAllBtn}
+                    onClick={cancelAllImports}
+                    disabled={isCancelling}
+                    title="Cancel all current and queued imports"
+                  >
+                    Cancel All
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
           <div className={styles.progressBarTrack}>
-            <div
-              className={styles.progressBarFill}
-              style={{ width: `${importProgress.percent}%` }}
-            />
+            {importProgress.current === 0 ? (
+              <div
+                className={styles.progressBarIndeterminate}
+                title="Scanning files and extracting EXIF metadata in background..."
+              />
+            ) : (
+              <div
+                className={styles.progressBarFill}
+                style={{ width: `${importProgress.percent}%` }}
+              />
+            )}
           </div>
         </div>
       )}

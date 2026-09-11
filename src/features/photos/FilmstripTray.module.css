@@ -34,140 +34,263 @@
 }
 
 .progressBarContainer {
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-  border-bottom: 1px solid var(--color-accent);
-  padding: var(--space-2) var(--space-4);
+  background-color: #141720;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 16px 6px 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  animation: slideDown 0.2s ease-out;
+  gap: 6px;
+  position: relative;
+  z-index: 40;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.progressTopRow {
+.progressMainRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
 }
 
-.progressInfo {
+.progressLeftCol {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.progressSpinnerWrapper {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activeSpinner {
+  width: 15px;
+  height: 15px;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pulseRing {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  animation: ringPulse 1.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 6px rgba(56, 189, 248, 0);
+  }
+  100% {
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
+
+.progressTextGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .progressTitle {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.progressPercent {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-accent);
+.progressDivider {
+  color: #475569;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.progressStatusText {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+
+.progressRightCol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.progressCounter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-variant-numeric: tabular-nums;
 }
 
-.progressRightControls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.counterNum {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
 }
 
-.cancelImportBtn {
-  background-color: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #f87171;
+.counterTotal {
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.percentBadge {
+  background-color: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.phaseBadge {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
   font-size: 10px;
-  font-weight: var(--font-weight-medium);
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.cancelImportBtn:hover:not(:disabled) {
-  background-color: #ef4444;
-  color: #ffffff;
-}
-
-.cancelImportBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.cancelAllBtn {
-  background-color: rgba(239, 68, 68, 0.25);
-  border: 1px solid rgba(239, 68, 68, 0.6);
-  color: #fca5a5;
-  font-size: 10px;
-  font-weight: var(--font-weight-semibold);
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.cancelAllBtn:hover:not(:disabled) {
-  background-color: #dc2626;
-  color: #ffffff;
-}
-
-.cancelAllBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
 }
 
 .queueBadge {
-  background-color: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
+  background-color: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
   font-size: 10px;
-  font-weight: var(--font-weight-medium);
+  font-weight: 500;
   padding: 1px 6px;
   border-radius: 10px;
   white-space: nowrap;
   cursor: default;
 }
 
-.activeQueueDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #38bdf8;
-  box-shadow: 0 0 6px #38bdf8;
-  margin-left: 2px;
+.progressActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cancelBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cancelAllBtn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancelAllBtn:hover:not(:disabled) {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.cancelAllBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .progressBarTrack {
-  height: 6px;
+  height: 3px;
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
   overflow: hidden;
+  position: relative;
 }
 
 .progressBarFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-accent) 0%, #60a5fa 100%);
-  border-radius: 3px;
-  transition: width 0.15s ease-out;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  background: linear-gradient(90deg, #38bdf8 0%, #60a5fa 100%);
+  border-radius: 2px;
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
 }
 
-.progressFileName {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.progressBarIndeterminate {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.2) 20%,
+    #38bdf8 50%,
+    rgba(56, 189, 248, 0.2) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerGlide 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-radius: 2px;
+}
+
+@keyframes shimmerGlide {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .header {
