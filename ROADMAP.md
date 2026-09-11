@@ -473,3 +473,21 @@
   - Synchronized border box-sizing and corner radii.
 - [x] Application version metadata bumped to `v1.0.56`.
 
+### Phase 41 — Release v1.0.57: Canvas Workspace Zoom (Ctrl + Wheel), 1% Step Precision, 350% Max Zoom & Smooth Fit-to-Center Animation
+
+- [x] Interactive Canvas Workspace Zoom via `Ctrl + Scroll Wheel`:
+  - Native non-passive `{ passive: false }` wheel listener directly on the canvas viewport container to prevent unwanted Tauri window zoom.
+  - Fine-grained 1% increments per mouse wheel notch, matching the precision feel of in-frame photo crop mode.
+  - Cursor-anchored zooming (*Zoom to Pointer*): keeps the object/point directly under the mouse cursor stationary during zoom in and zoom out.
+  - Maximum zoom limit extended from 250% to **350%** (3.5x magnification).
+- [x] Silky Smooth "Fit to Screen & Center" Animation (*Zero Glitch / Jump*):
+  - Replaced abrupt instantaneous coordinate snapping with continuous `requestAnimationFrame` cubic ease-out interpolation (280ms).
+  - Concurrently interpolates zoom scale and scroll coordinates to glide the spread gracefully into the exact horizontal and vertical center of the workspace (`targetX`, `targetY`).
+  - Automatic collision and layout-effect protection: yields scroll control during active animation and provides instant cancel safety on user mouse down/pan/scroll.
+- [x] Quick 15% Jump Controls & Keyboard Shortcuts Parity:
+  - Top toolbar `-` and `+` buttons and keyboard shortcuts (`Ctrl + +` / `Ctrl + -`) operate in 15% steps up to 350% for fast navigation across spreads.
+  - `Ctrl + 0` triggers smooth fit-to-center animation.
+  - Registered all canvas zoom and fit shortcuts in Keyboard Shortcuts cheat sheet (`SettingsDialog.tsx`, F1) and updated toolbar tooltips.
+- [x] Application version metadata bumped to `v1.0.57`.
+
+

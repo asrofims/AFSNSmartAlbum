@@ -521,7 +521,7 @@ export function WorkspaceLayout() {
         handleFitToScreen();
       } else if (e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd') {
         e.preventDefault();
-        setZoomLevel((z) => Math.min(250, z + 15));
+        setZoomLevel((z) => Math.min(350, z + 15));
       } else if (e.key === '-' || e.key === '_' || e.code === 'Minus' || e.code === 'NumpadSubtract') {
         e.preventDefault();
         setZoomLevel((z) => Math.max(25, z - 15));
@@ -892,7 +892,7 @@ export function WorkspaceLayout() {
                 <button
                   type="button"
                   className={styles.zoomBtn}
-                  onClick={() => setZoomLevel((z) => Math.min(250, z + 15))}
+                  onClick={() => setZoomLevel((z) => Math.min(350, z + 15))}
                   title="Zoom In (Ctrl++)"
                 >
                   +

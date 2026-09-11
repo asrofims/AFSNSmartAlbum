@@ -1328,8 +1328,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
           y: e.clientY - rect.top,
         };
 
-        const delta = e.deltaY < 0 ? 10 : -10;
-        onZoomChange?.((prev) => Math.min(250, Math.max(25, prev + delta)));
+        const delta = e.deltaY < 0 ? 1 : -1;
+        onZoomChange?.((prev) => Math.min(350, Math.max(25, prev + delta)));
       }
     };
 
@@ -1652,7 +1652,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
         performSmoothFit();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd')) {
         e.preventDefault();
-        onZoomChange?.((z) => Math.min(250, z + 15));
+        onZoomChange?.((z) => Math.min(350, z + 15));
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_' || e.code === 'Minus' || e.code === 'NumpadSubtract')) {
         e.preventDefault();
         onZoomChange?.((z) => Math.max(25, z - 15));
