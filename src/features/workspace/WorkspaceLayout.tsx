@@ -112,6 +112,8 @@ export function WorkspaceLayout() {
   const [isCornersLinked, setIsCornersLinked] = useState<boolean>(true);
   const [customGapValue, setCustomGapValue] = useState<number>(currentProject?.spacingValue ?? 5);
   const [inspectorTab, setInspectorTab] = useState<'properties' | 'smart_layout' | 'locks'>('properties');
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [isFilmstripOpen, setIsFilmstripOpen] = useState(true);
   const [bgScope, setBgScope] = useState<'spread' | 'left' | 'right'>('spread');
   const [isMarginExpanded, setIsMarginExpanded] = useState<boolean>(false);
 
@@ -127,13 +129,7 @@ export function WorkspaceLayout() {
 
   // Auto-scroll Properties Panel smoothly to the very top whenever any frame (photo or text) or selection changes
   useEffect(() => {
-    if (selectedFrameIds.length > 0) {
-      if (inspectorTab !== 'properties') {
-        setInspectorTab('properties');
-      }
-      if (!isPropertiesOpen) {
-        setIsPropertiesOpen(true);
-      }
+    if (selectedFrameIds.length > 0 && inspectorTab === 'properties') {
       // Smoothly scroll the entire property list to the top so the full card and all properties are completely visible
       const timer = setTimeout(() => {
         if (propertyListRef.current) {
@@ -142,7 +138,7 @@ export function WorkspaceLayout() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [selectedFrameIds]);
+  }, [selectedFrameIds, inspectorTab]);
 
   // Inline Project Rename State (Top Bar & Inspector)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
@@ -298,10 +294,6 @@ export function WorkspaceLayout() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveStatus]);
-
-  // Collapsible Right Properties (closed by default on first launch / Welcome Screen, open when in project)
-  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-  const [isFilmstripOpen, setIsFilmstripOpen] = useState(true);
 
   // Automatically open Properties Panel when entering or creating a project, close when exiting to Welcome Screen
   const prevProjectIdRef = useRef<string | null>(null);

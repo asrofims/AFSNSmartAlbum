@@ -47,6 +47,95 @@
   gap: 8px;
 }
 
+.headerQuickLinks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.headerTextBtn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-accent, #38bdf8);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.headerTextBtn:hover {
+  background: rgba(56, 189, 248, 0.12);
+  text-decoration: underline;
+}
+
+.selectionBar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.selectionCountPill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.selectionActionRow {
+  display: flex;
+  gap: 6px;
+}
+
+.lockSelectedBtn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.lockSelectedBtn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: #f59e0b;
+}
+
+.unlockSelectedBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border, #3f3f46);
+  color: #ffffff;
+}
+
+.unlockSelectedBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.sectionSelectBtn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #a1a1aa);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.sectionSelectBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
 .headerActionBtn {
   flex: 1;
   display: inline-flex;
@@ -136,9 +225,9 @@
 }
 
 .photoCardActive {
-  border-color: var(--color-accent, #3b82f6) !important;
-  background: rgba(59, 130, 246, 0.08) !important;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2) !important;
+  border-color: var(--color-accent, #38bdf8) !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+  box-shadow: 0 0 0 1px var(--color-accent, #38bdf8), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .thumbWrapper {

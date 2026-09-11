@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useAlbumStore } from '../../stores/albumStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -18,7 +18,10 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
   const {
     selectedFrameIds,
     selectFrame,
+    selectFrames,
+    clearSelection,
     toggleLockSingleFrame,
+    toggleLockSelectedFrames,
     lockAllFramesOnSpread,
     unlockAllFramesOnSpread,
   } = useEditorStore();
@@ -38,6 +41,13 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
   const lockedElements = useMemo(() => allElements.filter((f) => f.locked), [allElements]);
   const unlockedElements = useMemo(() => allElements.filter((f) => !f.locked), [allElements]);
 
+  // Display order in the panel (locked items first, then unlocked items)
+  const displayList = useMemo(() => {
+    return [...lockedElements, ...unlockedElements];
+  }, [lockedElements, unlockedElements]);
+
+  const lastClickedIdRef = useRef<string | null>(null);
+
   const dims = useMemo(() => {
     if (!currentProject) return null;
     return getProjectDimensionsInCanvasUnit(currentProject, activeSpread);
@@ -55,8 +65,120 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     return '';
   };
 
-  const handleSelect = (frameId: string) => {
-    selectFrame(frameId);
+  // Helper to expand grouped frames so selections maintain group integrity
+  const expandGroups = (ids: string[], elements: AlbumElement[]) => {
+    const result = new Set<string>();
+    for (const id of ids) {
+      const el = elements.find((e) => e.id === id);
+      if (el?.groupId) {
+        elements.filter((e) => e.groupId === el.groupId).forEach((e) => result.add(e.id));
+      } else {
+        result.add(id);
+      }
+    }
+    return Array.from(result);
+  };
+
+  // Handle Card Click: Single select, Ctrl/Cmd multi-toggle, Shift range selection
+  const handleCardClick = (e: React.MouseEvent, frameId: string) => {
+    const isMulti = Boolean(e.ctrlKey || e.metaKey);
+    const isRange = Boolean(e.shiftKey);
+
+    if (isRange) {
+      const anchorId =
+        lastClickedIdRef.current ||
+        (selectedFrameIds.length > 0 ? selectedFrameIds[selectedFrameIds.length - 1] : frameId);
+      const anchorIdx = displayList.findIndex((el) => el.id === anchorId);
+      const targetIdx = displayList.findIndex((el) => el.id === frameId);
+
+      if (anchorIdx !== -1 && targetIdx !== -1) {
+        const minIdx = Math.min(anchorIdx, targetIdx);
+        const maxIdx = Math.max(anchorIdx, targetIdx);
+        const rangeSlice = displayList.slice(minIdx, maxIdx + 1).map((el) => el.id);
+
+        if (isMulti) {
+          // Ctrl + Shift: Add range to existing selection
+          const expanded = expandGroups([...selectedFrameIds, ...rangeSlice], allElements);
+          selectFrames(expanded);
+        } else {
+          // Shift alone: Set selection to range
+          const expanded = expandGroups(rangeSlice, allElements);
+          selectFrames(expanded);
+        }
+        return;
+      }
+    }
+
+    const targetEl = allElements.find((el) => el.id === frameId);
+    const targetGroupId = targetEl?.groupId;
+    const targetIds = targetGroupId
+      ? allElements.filter((el) => el.groupId === targetGroupId).map((el) => el.id)
+      : [frameId];
+
+    const isSelected = targetIds.some((id) => selectedFrameIds.includes(id));
+
+    if (isSelected) {
+      // Unselect clicked card (and its group members) from the selection
+      const remaining = selectedFrameIds.filter((id) => !targetIds.includes(id));
+      selectFrames(remaining);
+      lastClickedIdRef.current = remaining.length > 0 ? (remaining[remaining.length - 1] ?? null) : null;
+      return;
+    }
+
+    if (isMulti) {
+      selectFrame(frameId, true);
+      lastClickedIdRef.current = frameId;
+    } else {
+      selectFrame(frameId, false);
+      lastClickedIdRef.current = frameId;
+    }
+  };
+
+  // Selection statistics on active spread
+  const selectedOnSpread = useMemo(() => {
+    return allElements.filter((el) => selectedFrameIds.includes(el.id));
+  }, [allElements, selectedFrameIds]);
+
+  const selectedLockedCount = useMemo(() => {
+    return selectedOnSpread.filter((el) => el.locked).length;
+  }, [selectedOnSpread]);
+
+  const selectedUnlockedCount = useMemo(() => {
+    return selectedOnSpread.filter((el) => !el.locked).length;
+  }, [selectedOnSpread]);
+
+  const handleSelectAll = () => {
+    const allIds = allElements.map((el) => el.id);
+    selectFrames(allIds);
+    if (onToast) onToast(`Selected all ${allIds.length} items on spread`);
+  };
+
+  const handleClearSelection = () => {
+    clearSelection();
+  };
+
+  const handleSelectAllLocked = () => {
+    const ids = lockedElements.map((el) => el.id);
+    selectFrames(expandGroups(ids, allElements));
+    if (onToast) onToast(`Selected ${ids.length} locked item${ids.length > 1 ? 's' : ''}`);
+  };
+
+  const handleSelectAllUnlocked = () => {
+    const ids = unlockedElements.map((el) => el.id);
+    selectFrames(expandGroups(ids, allElements));
+    if (onToast) onToast(`Selected ${ids.length} unlocked item${ids.length > 1 ? 's' : ''}`);
+  };
+
+  const handleLockSelected = () => {
+    if (!activeSpread || selectedUnlockedCount === 0) return;
+    toggleLockSelectedFrames(activeSpread.id, true);
+    if (onToast) onToast(`🔒 Locked ${selectedUnlockedCount} selected item${selectedUnlockedCount > 1 ? 's' : ''}`);
+  };
+
+  const handleUnlockSelected = () => {
+    if (!activeSpread || selectedLockedCount === 0) return;
+    toggleLockSelectedFrames(activeSpread.id, false);
+    if (onToast) onToast(`🔓 Unlocked ${selectedLockedCount} selected item${selectedLockedCount > 1 ? 's' : ''}`);
   };
 
   const handleUnlockAll = () => {
@@ -109,8 +231,8 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
       <div
         key={frame.id}
         className={`${styles.photoCard} ${isLocked ? styles.photoCardLocked : ''} ${isSelected ? styles.photoCardActive : ''}`}
-        onClick={() => handleSelect(frame.id)}
-        title={`Click to select ${isText ? 'text box' : 'photo frame'} on canvas`}
+        onClick={(e) => handleCardClick(e, frame.id)}
+        title="Click to select • Click selected to unselect • Ctrl+Click to toggle • Shift+Click for range"
       >
         <div className={styles.thumbWrapper}>
           {isText ? (
@@ -165,32 +287,95 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
       <div className={styles.header}>
         <div className={styles.spreadContextBadge}>
           <span>
-            Active: <strong>{activeSpread.name || 'Spread'}</strong>
+            Active: <strong>{activeSpread.name || 'Spread'}</strong> ({allElements.length})
           </span>
+          <div className={styles.headerQuickLinks}>
+            {selectedOnSpread.length > 0 ? (
+              <button
+                type="button"
+                className={styles.headerTextBtn}
+                onClick={handleClearSelection}
+                title="Deselect all (Esc)"
+              >
+                Clear Selection
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.headerTextBtn}
+                onClick={handleSelectAll}
+                title="Select all items on active spread (Ctrl+A)"
+              >
+                Select All
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className={styles.actionRow}>
-          <button
-            type="button"
-            className={`${styles.headerActionBtn} ${styles.unlockAllBtn}`}
-            onClick={handleUnlockAll}
-            disabled={lockedElements.length === 0}
-            title="Unlock all items on this spread (Ctrl+Alt+L)"
-          >
-            <span>🔓</span>
-            <span>Unlock All</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.headerActionBtn} ${styles.lockAllBtn}`}
-            onClick={handleLockAll}
-            disabled={unlockedElements.length === 0}
-            title="Lock all items on this spread (Ctrl+L)"
-          >
-            <span>🔒</span>
-            <span>Lock All</span>
-          </button>
-        </div>
+        {/* Contextual Action Row: Batch Lock / Unlock for Selection, or Spread-Wide */}
+        {selectedOnSpread.length > 0 ? (
+          <div className={styles.selectionBar}>
+            <div className={styles.selectionCountPill}>
+              <span>{selectedOnSpread.length} Selected</span>
+              <span style={{ fontSize: '9px', opacity: 0.8, fontWeight: 500 }}>
+                {selectedLockedCount > 0 && selectedUnlockedCount > 0
+                  ? `${selectedLockedCount} locked, ${selectedUnlockedCount} unlocked`
+                  : selectedLockedCount > 0
+                  ? 'All locked'
+                  : 'All unlocked'}
+              </span>
+            </div>
+            <div className={styles.selectionActionRow}>
+              {selectedUnlockedCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.headerActionBtn} ${styles.lockSelectedBtn}`}
+                  onClick={handleLockSelected}
+                  title={`Lock ${selectedUnlockedCount} selected item(s) (Ctrl+L)`}
+                >
+                  <span>🔒</span>
+                  <span>Lock ({selectedUnlockedCount})</span>
+                </button>
+              )}
+              {selectedLockedCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.headerActionBtn} ${styles.unlockSelectedBtn}`}
+                  onClick={handleUnlockSelected}
+                  title={`Unlock ${selectedLockedCount} selected item(s) (Alt+L)`}
+                >
+                  <span>🔓</span>
+                  <span>Unlock ({selectedLockedCount})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className={styles.actionRow}>
+            {lockedElements.length > 0 && (
+              <button
+                type="button"
+                className={`${styles.headerActionBtn} ${styles.unlockAllBtn}`}
+                onClick={handleUnlockAll}
+                title="Unlock all items on this spread (Ctrl+Alt+L)"
+              >
+                <span>🔓</span>
+                <span>Unlock All ({lockedElements.length})</span>
+              </button>
+            )}
+            {unlockedElements.length > 0 && (
+              <button
+                type="button"
+                className={`${styles.headerActionBtn} ${styles.lockAllBtn}`}
+                onClick={handleLockAll}
+                title="Lock all items on this spread (Ctrl+L)"
+              >
+                <span>🔒</span>
+                <span>Lock All ({unlockedElements.length})</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={styles.scrollContent}>
@@ -199,6 +384,14 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
           <>
             <div className={styles.sectionTitle}>
               <span>🔒 Locked Items ({lockedElements.length})</span>
+              <button
+                type="button"
+                className={styles.sectionSelectBtn}
+                onClick={handleSelectAllLocked}
+                title="Select all locked items on spread"
+              >
+                Select All
+              </button>
             </div>
 
             <div className={styles.cardList}>
@@ -212,6 +405,14 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
           <>
             <div className={styles.sectionTitle}>
               <span>🔓 Unlocked Items ({unlockedElements.length})</span>
+              <button
+                type="button"
+                className={styles.sectionSelectBtn}
+                onClick={handleSelectAllUnlocked}
+                title="Select all unlocked items on spread"
+              >
+                Select All
+              </button>
             </div>
 
             <div className={styles.cardList}>
