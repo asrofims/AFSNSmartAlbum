@@ -1040,3 +1040,178 @@
   transform: translateY(0);
 }
 
+/* Real-Time Export Project Package (.zip) Progress Toast */
+.exportZipToast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  background: var(--color-bg-secondary, #1e1e20);
+  border: 1px solid var(--color-border-subtle, #38383a);
+  border-radius: var(--radius-lg, 8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  animation: slideInToast 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.exportZipToastSuccess {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(16, 185, 129, 0.2);
+}
+
+.exportZipToastError {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(239, 68, 68, 0.2);
+}
+
+.exportZipHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.exportZipTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.exportZipIconSpin {
+  font-size: 14px;
+  animation: pulseZipIcon 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseZipIcon {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+.exportZipIconSuccess {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.exportZipIconError {
+  font-size: 14px;
+}
+
+.exportZipTitle {
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--color-text-primary, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exportZipHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.exportZipPercentBadge {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent, #e67e22);
+  background: rgba(230, 126, 34, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(230, 126, 34, 0.25);
+}
+
+.exportZipToastSuccess .exportZipPercentBadge {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.exportZipDismissBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #9ca3af);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.exportZipDismissBtn:hover {
+  color: var(--color-text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.exportZipBarTrack {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.exportZipBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #e67e22);
+  border-radius: 3px;
+  transition: width 0.15s ease-out;
+}
+
+.exportZipToastSuccess .exportZipBarFill {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.exportZipToastError .exportZipBarFill {
+  background: #ef4444;
+}
+
+.exportZipFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.exportZipStatus {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.exportZipCounter {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  font-size: 10px;
+  opacity: 0.8;
+}
+

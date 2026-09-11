@@ -1,5 +1,5 @@
-use serde::Deserialize;
-use tauri::{AppHandle, State, Manager};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, State, Manager};
 use uuid::Uuid;
 
 use crate::asset_cache::{PHOTO_ASSET_JOB, cleanup_removed_photo_assets};
@@ -430,8 +430,21 @@ pub async fn save_project_as_with_dialog(
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportZipProgressPayload {
+    pub current: usize,
+    pub total: usize,
+    pub percent: usize,
+    pub status: String,
+    pub is_finished: bool,
+    pub target_path: Option<String>,
+    pub error: Option<String>,
+}
+
 #[tauri::command]
 pub async fn export_bundled_package_with_dialog(
+    app: AppHandle,
     db: State<'_, Database>,
     project_id: String,
     suggested_name: Option<String>,
@@ -454,12 +467,62 @@ pub async fn export_bundled_package_with_dialog(
         }
         let path_str = path.to_string_lossy().to_string();
         log::info!("export_bundled_package_with_dialog: exporting bundled package {} to {}", project_id, path_str);
-        db.export_bundled_project_package(&project_id, &path_str)
-            .map_err(|e| {
+
+        let _ = app.emit(
+            "export-zip-progress",
+            ExportZipProgressPayload {
+                current: 0,
+                total: 1,
+                percent: 0,
+                status: "Preparing package archive...".to_string(),
+                is_finished: false,
+                target_path: Some(path_str.clone()),
+                error: None,
+            },
+        );
+
+        let app_handle = app.clone();
+        let target_clone = path_str.clone();
+
+        let result = db.export_bundled_project_package_with_progress(
+            &project_id,
+            &path_str,
+            move |current, total, percent, status| {
+                let is_finished = percent >= 100;
+                let _ = app_handle.emit(
+                    "export-zip-progress",
+                    ExportZipProgressPayload {
+                        current,
+                        total,
+                        percent,
+                        status: status.to_string(),
+                        is_finished,
+                        target_path: Some(target_clone.clone()),
+                        error: None,
+                    },
+                );
+            },
+        );
+
+        match result {
+            Ok(()) => Ok(Some(path_str)),
+            Err(e) => {
                 log::error!("Failed export_bundled_project_package: {:?}", e);
-                e.to_string()
-            })?;
-        Ok(Some(path_str))
+                let _ = app.emit(
+                    "export-zip-progress",
+                    ExportZipProgressPayload {
+                        current: 0,
+                        total: 1,
+                        percent: 0,
+                        status: format!("Export failed: {}", e),
+                        is_finished: true,
+                        target_path: Some(path_str),
+                        error: Some(e.to_string()),
+                    },
+                );
+                Err(e.to_string())
+            }
+        }
     } else {
         Ok(None)
     }

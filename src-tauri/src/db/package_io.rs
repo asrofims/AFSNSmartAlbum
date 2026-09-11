@@ -256,25 +256,64 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn export_bundled_project_package(
         &self,
         project_id: &str,
         target_path: &str,
     ) -> SqliteResult<()> {
+        self.export_bundled_project_package_with_progress(project_id, target_path, |_, _, _, _| {})
+    }
+
+    pub fn export_bundled_project_package_with_progress<F>(
+        &self,
+        project_id: &str,
+        target_path: &str,
+        mut on_progress: F,
+    ) -> SqliteResult<()>
+    where
+        F: FnMut(usize, usize, usize, &str),
+    {
         let path = Path::new(target_path);
         require_extension(path, "zip")?;
         let mut package = self.project_package(project_id)?;
         // An archive is a transport copy; it must never become the working save path.
         package.project.file_path = None;
+
+        // Determine all placed frames not in package.photos
+        let mut unreferenced_frame_paths = Vec::new();
+        let mut known_photos: std::collections::HashSet<String> =
+            package.photos.iter().map(|p| p.file_path.clone()).collect();
+        if let Some(album) = &package.album {
+            for spread in
+                std::iter::once(&album.cover_spread).chain(album.spreads.iter())
+            {
+                for element in &spread.elements {
+                    if element.r#type != "text" && !known_photos.contains(&element.file_path) {
+                        known_photos.insert(element.file_path.clone());
+                        unreferenced_frame_paths.push(element.file_path.clone());
+                    }
+                }
+            }
+        }
+
+        let total_items = package.photos.len() + unreferenced_frame_paths.len() + 1; // +1 for project.afsn
+        let mut current_item = 0;
+
         atomic_write(path, |file| {
             let mut zip = zip::ZipWriter::new(file);
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Stored);
             let mut paths = HashMap::new();
+
             for (index, photo) in package.photos.iter_mut().enumerate() {
                 let safe_name = photo
                     .file_name
                     .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+                let status_msg = format!("Compressing photo ({}/{}): {}", current_item + 1, total_items, photo.file_name);
+                let pct = if total_items > 0 { (current_item * 100) / total_items } else { 0 };
+                on_progress(current_item, total_items, pct, &status_msg);
+
                 let entry = format!("photos/{}_{}", index, safe_name);
                 let mut original = File::open(&photo.file_path).map_err(|e| {
                     package_error(format!("Cannot package photo '{}': {}", photo.file_path, e))
@@ -286,7 +325,10 @@ impl Database {
                 photo.preview_path = None;
                 photo.thumbnail_path = None;
                 photo.thumbnail_base64 = None;
+
+                current_item += 1;
             }
+
             if let Some(album) = &mut package.album {
                 for spread in
                     std::iter::once(&mut album.cover_spread).chain(album.spreads.iter_mut())
@@ -304,6 +346,11 @@ impl Database {
                                 .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
                             let relative =
                                 format!("photos/frame_{}_{}", uuid::Uuid::new_v4(), safe_name);
+
+                            let status_msg = format!("Compressing placed photo ({}/{}): {}", current_item + 1, total_items, safe_name);
+                            let pct = if total_items > 0 { (current_item * 100) / total_items } else { 0 };
+                            on_progress(current_item, total_items, pct, &status_msg);
+
                             let mut original = File::open(&element.file_path).map_err(|e| {
                                 package_error(format!(
                                     "Cannot package placed photo '{}': {}",
@@ -313,6 +360,8 @@ impl Database {
                             zip.start_file(&relative, options).map_err(package_error)?;
                             std::io::copy(&mut original, &mut zip).map_err(package_error)?;
                             paths.insert(element.file_path.clone(), relative);
+
+                            current_item += 1;
                         }
                         element.file_path = paths[&element.file_path].clone();
                         element.preview_path = None;
@@ -320,11 +369,19 @@ impl Database {
                     }
                 }
             }
+
+            let status_msg = format!("Writing project metadata ({}/{}): project.afsn", current_item + 1, total_items);
+            let pct = if total_items > 0 { (current_item * 100) / total_items } else { 99 };
+            on_progress(current_item, total_items, pct, &status_msg);
+
             zip.start_file("project.afsn", options)
                 .map_err(package_error)?;
             let json = serde_json::to_vec_pretty(&package).map_err(package_error)?;
             zip.write_all(&json).map_err(package_error)?;
             zip.finish().map_err(package_error)?;
+
+            on_progress(total_items, total_items, 100, "Package export complete!");
+
             Ok(())
         })
     }

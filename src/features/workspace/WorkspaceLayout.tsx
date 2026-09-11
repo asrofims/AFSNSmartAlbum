@@ -27,9 +27,20 @@ import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
 import { LockedPhotosPanel } from '../editor/LockedPhotosPanel';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { ExportAlbumDialog, ExportOptions } from '../export/ExportAlbumDialog';
 import { ExportProgressModal } from '../export/ExportProgressModal';
 import styles from './WorkspaceLayout.module.css';
+
+export interface ExportZipProgressPayload {
+  current: number;
+  total: number;
+  percent: number;
+  status: string;
+  isFinished: boolean;
+  targetPath?: string | null;
+  error?: string | null;
+}
 
 export function WorkspaceLayout() {
   useAutoSave();
@@ -111,6 +122,8 @@ export function WorkspaceLayout() {
   const propertyListRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const [exportZipProgress, setExportZipProgress] = useState<ExportZipProgressPayload | null>(null);
+  const exportZipTimeoutRef = useRef<number | null>(null);
 
   // Auto-scroll Properties Panel smoothly to the very top whenever any frame (photo or text) or selection changes
   useEffect(() => {
@@ -235,6 +248,28 @@ export function WorkspaceLayout() {
       dismissImportNotice();
     }
   }, [importNotice, dismissImportNotice, showToast]);
+
+  // Listen for real-time Export Project Package (.zip) progress
+  useEffect(() => {
+    let isMounted = true;
+    const unlistenPromise = listen<ExportZipProgressPayload>('export-zip-progress', (event) => {
+      if (!isMounted) return;
+      const payload = event.payload;
+      setExportZipProgress(payload);
+      if (payload.isFinished) {
+        if (exportZipTimeoutRef.current) clearTimeout(exportZipTimeoutRef.current);
+        exportZipTimeoutRef.current = window.setTimeout(() => {
+          if (isMounted) setExportZipProgress(null);
+        }, 6000);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unlistenPromise.then((unlisten) => unlisten());
+      if (exportZipTimeoutRef.current) clearTimeout(exportZipTimeoutRef.current);
+    };
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -624,8 +659,7 @@ export function WorkspaceLayout() {
                       className={styles.menuItem}
                       onClick={async () => {
                         setIsFileMenuOpen(false);
-                        const path = await exportCompleteProjectPackageWithPhotos();
-                        if (path) showToast(`✓ Complete package exported to: ${path}`);
+                        await exportCompleteProjectPackageWithPhotos();
                       }}
                     >
                       <span>📦 Export Project Package (.zip)...</span>
@@ -800,8 +834,7 @@ export function WorkspaceLayout() {
                   type="button"
                   className={styles.historyBtn}
                   onClick={async () => {
-                    const path = await exportCompleteProjectPackageWithPhotos();
-                    if (path) showToast(`✓ Complete package exported to: ${path}`);
+                    await exportCompleteProjectPackageWithPhotos();
                   }}
                   title="Export Project Package (.zip). Extract the package before opening project.afsn."
                 >
@@ -3270,8 +3303,83 @@ export function WorkspaceLayout() {
       {/* Relink Missing Photos Dialog */}
       <RelinkDialog />
 
+      {/* Real-Time Export Project Package (.zip) Progress Toast */}
+      {exportZipProgress && (
+        <div
+          className={`${styles.exportZipToast} ${exportZipProgress.error ? styles.exportZipToastError : ''} ${exportZipProgress.isFinished && !exportZipProgress.error ? styles.exportZipToastSuccess : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          {/* Header */}
+          <div className={styles.exportZipHeader}>
+            <div className={styles.exportZipTitleGroup}>
+              {exportZipProgress.error ? (
+                <span className={styles.exportZipIconError} aria-hidden="true">⚠️</span>
+              ) : exportZipProgress.isFinished ? (
+                <span className={styles.exportZipIconSuccess} aria-hidden="true">✓</span>
+              ) : (
+                <span className={styles.exportZipIconSpin} aria-hidden="true">📦</span>
+              )}
+              <span className={styles.exportZipTitle}>
+                {exportZipProgress.error
+                  ? 'Export Failed'
+                  : exportZipProgress.isFinished
+                  ? 'Project Package Exported'
+                  : 'Exporting Project Package (.zip)...'}
+              </span>
+            </div>
+
+            <div className={styles.exportZipHeaderRight}>
+              {!exportZipProgress.error && (
+                <span className={styles.exportZipPercentBadge}>
+                  {exportZipProgress.percent}%
+                </span>
+              )}
+              {(exportZipProgress.isFinished || exportZipProgress.error) && (
+                <button
+                  type="button"
+                  className={styles.exportZipDismissBtn}
+                  onClick={() => {
+                    if (exportZipTimeoutRef.current) clearTimeout(exportZipTimeoutRef.current);
+                    setExportZipProgress(null);
+                  }}
+                  title="Dismiss"
+                  aria-label="Dismiss export notification"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className={styles.exportZipBarTrack}>
+            <div
+              className={styles.exportZipBarFill}
+              style={{
+                width: `${Math.min(Math.max(exportZipProgress.percent, 0), 100)}%`,
+              }}
+            />
+          </div>
+
+          {/* Footer Status & Count */}
+          <div className={styles.exportZipFooter}>
+            <span className={styles.exportZipStatus} title={exportZipProgress.status}>
+              {exportZipProgress.targetPath && exportZipProgress.isFinished
+                ? `Saved: ${exportZipProgress.targetPath.split(/[\\/]/).pop() || exportZipProgress.targetPath}`
+                : exportZipProgress.status}
+            </span>
+            {exportZipProgress.total > 0 && !exportZipProgress.isFinished && !exportZipProgress.error && (
+              <span className={styles.exportZipCounter}>
+                {exportZipProgress.current} / {exportZipProgress.total}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Floating Notification Toast */}
-      {toastMessage && (
+      {toastMessage && !exportZipProgress && (
         <div
           className={styles.toastBanner}
           onClick={() => {

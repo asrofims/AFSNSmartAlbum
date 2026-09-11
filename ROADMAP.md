@@ -436,3 +436,18 @@
 - [x] Eliminate split-second border glow/flash on disabled buttons by removing default browser outline and disabling transition on `:disabled`.
 - [x] Add pure domain helper `getSpreadNumberLabel` and comprehensive unit tests in `tests/album.test.ts`.
 
+### Phase 38 — Real-Time Export Project Package (.zip) Progress Bar & Percentage Toast
+
+- [x] Add real-time event reporting (`export-zip-progress`) in Rust backend during project packaging:
+  - Calculate total files to compress (photo library assets + unreferenced placed frames + project descriptor `project.afsn`).
+  - Stream monotonic progress events (`current`, `total`, `percent`, `status`, `isFinished`, `targetPath`).
+  - Maintain 100% backward compatibility for `export_bundled_project_package`.
+- [x] Build dedicated real-time floating progress toast in `WorkspaceLayout.tsx` and `WorkspaceLayout.module.css`:
+  - Animated spinning package / success checkmark / warning error icon.
+  - Percentage badge indicator (0% to 100%).
+  - Smooth animated progress bar fill with subtle background track.
+  - Status text displaying current file name and counter `(X/Y)`.
+  - Auto-dismiss after 6 seconds on completion, or instant dismissal via `✕`.
+  - Prevent collisions with standard notification toasts.
+
+
