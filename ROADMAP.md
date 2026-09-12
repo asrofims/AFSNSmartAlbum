@@ -511,5 +511,21 @@
   - Updated `Zoom Canvas In / Out` documentation to reflect dual-speed controls (`Ctrl+Wheel` 5%, `Ctrl+Shift+Wheel` 1%).
 - [x] Application version metadata bumped to `v1.0.58`.
 
+### Phase 43 — Release v1.0.59: Cyan Pulse Theme Unification, Folder Collections Dark Blue Styling & Welcome Screen Typography Refinements
 
-
+- [x] Application-wide Cyan Pulse Theme Unification:
+  - Unified design tokens to use Electric Cyan / Sky Blue (`#38bdf8`) across buttons, switches, segment controls, and active states.
+  - Eliminated excessive neon glow halos in favor of subtle desktop elevation and clean border highlights.
+  - Enforced high-contrast dark text (`color: #090d16 !important;`) across all primary button interaction states (`:hover`, `:active`, `:focus`, `:disabled`).
+- [x] Photo Library Folder Collections Visual Parity & Dark Blue Palette:
+  - Enclosed "All Photos" in the same `.tabWrapper` and `.wrapperActive` container structure as custom folders with `.tabSolo` symmetrical padding.
+  - Replaced bright cyan with an elegant dark ocean blue tone (`rgba(2, 132, 199, 0.18)` fill, `#0284c7` border) for active tabs.
+  - Redesigned number badges as subdued dark blue pills with tabular numerals and subtle borders.
+  - Harmonized total photo counter badge next to `PHOTOS` in the filmstrip header.
+- [x] Create Folder Modal Button Text Contrast Fix:
+  - Fixed regression where clicking Create Folder turned text white (`#ffffff`) during active state; enforced `#090d16 !important` in `Button.module.css` and `FolderDialog.module.css`.
+- [x] Welcome Screen Typography & Narrative Refinement:
+  - Standardized font weight across "Create New Project" and "Open Project" buttons to `font-weight: 600 !important;` (Segoe UI Semibold optical parity).
+  - Unified action button icon SVG `strokeWidth` to `2`.
+  - Replaced casual subheading with professional industry-standard narrative: *"Start a new photo album project or seamlessly resume your recent work."*
+- [x] Application version metadata bumped to `v1.0.59`.

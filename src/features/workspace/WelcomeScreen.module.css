@@ -160,26 +160,29 @@
   gap: 12px;
 }
 
-.primaryActionButton {
-  flex: 1.2;
+.primaryActionButton,
+.secondaryActionButton {
   height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-weight: var(--font-weight-medium);
   font-size: var(--font-size-sm);
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+
+.primaryActionButton {
+  flex: 1.2;
 }
 
 .secondaryActionButton {
   flex: 1;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
+}
+
+.primaryActionButton span,
+.secondaryActionButton span {
+  font-weight: 600 !important;
 }
 
 /* Recent Projects Section */
