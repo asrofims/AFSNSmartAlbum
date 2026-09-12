@@ -529,3 +529,10 @@
   - Unified action button icon SVG `strokeWidth` to `2`.
   - Replaced casual subheading with professional industry-standard narrative: *"Start a new photo album project or seamlessly resume your recent work."*
 - [x] Application version metadata bumped to `v1.0.59`.
+
+### Phase 44 — Release v1.0.60: Export Progress Percentage Badge Styling & Version Bump
+
+- [x] Export Progress Percentage Badge Styling:
+  - Streamlined `.exportZipPercentBadge` in `WorkspaceLayout.module.css` to a clean, borderless inline readout with `font-size: 12px`, tabular numerals, and amber tone `#f59e0b` transitioning smoothly to emerald green `#10b981` on success.
+  - Eliminated boxy badge background and borders for a cleaner, modern toast notification aesthetic.
+- [x] Application version metadata bumped to `v1.0.60`.

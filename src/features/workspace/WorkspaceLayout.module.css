@@ -1131,20 +1131,19 @@
 }
 
 .exportZipPercentBadge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--color-accent, #e67e22);
-  background: rgba(230, 126, 34, 0.12);
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(230, 126, 34, 0.25);
+  color: #f59e0b;
+  background: transparent;
+  padding: 0;
+  border: none;
+  line-height: 1;
+  transition: color 0.2s ease;
 }
 
 .exportZipToastSuccess .exportZipPercentBadge {
   color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .exportZipDismissBtn {
