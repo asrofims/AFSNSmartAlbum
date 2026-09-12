@@ -21,6 +21,11 @@ pub struct ImportState {
     pub generation: Arc<AtomicUsize>,
 }
 
+#[derive(Clone, Default)]
+pub struct RelinkState {
+    pub cancel_flag: Arc<AtomicBool>,
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportProgressPayload {
@@ -173,6 +178,13 @@ pub fn cancel_photo_import(state: State<'_, ImportState>) -> Result<(), String> 
         *guard = None;
     }
     log::info!("Photo import cancellation requested by user or project close");
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cancel_relink(state: State<'_, RelinkState>) -> Result<(), String> {
+    state.cancel_flag.store(true, Ordering::SeqCst);
+    log::info!("Missing photo relink cancellation requested by user");
     Ok(())
 }
 
@@ -437,43 +449,155 @@ pub async fn regenerate_single_thumbnail(app: AppHandle, photo_id: String) -> Re
     }).await.map_err(|e| e.to_string())?
 }
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelinkProgressPayload {
+    pub project_id: String,
+    pub phase: String, // "scanning" | "matching" | "rebuilding" | "completed" | "cancelled"
+    pub current: usize,
+    pub total: usize,
+    pub percent: u8,
+    pub current_file: Option<String>,
+    pub relinked_count: usize,
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelinkResult {
-    photos: Vec<PhotoRow>,
-    failures: Vec<String>,
+    pub photos: Vec<PhotoRow>,
+    pub failures: Vec<String>,
+    pub relinked_count: usize,
+    pub unresolved_count: usize,
+    pub cancelled: bool,
 }
 
 #[tauri::command]
-pub async fn relink_folder(app: AppHandle, project_id: String) -> Result<RelinkResult, String> {
+pub async fn relink_folder(app: AppHandle, project_id: String, state: State<'_, RelinkState>) -> Result<RelinkResult, String> {
+    state.cancel_flag.store(false, Ordering::SeqCst);
+    let cancel_flag = state.cancel_flag.clone();
     let folder = tauri::async_runtime::spawn_blocking(|| rfd::FileDialog::new()
         .set_title("Select Folder Containing Missing Photos").pick_folder()).await.map_err(|e| e.to_string())?;
     let Some(folder) = folder else {
-        return Ok(RelinkResult { photos: app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures: vec![] });
+        return Ok(RelinkResult {
+            photos: app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?,
+            failures: vec![],
+            relinked_count: 0,
+            unresolved_count: 0,
+            cancelled: false,
+        });
     };
+    let app_handle = app.clone();
+    let proj_id = project_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _ = app_handle.emit("relink-progress", RelinkProgressPayload {
+            project_id: proj_id.clone(),
+            phase: "scanning".to_string(),
+            current: 0,
+            total: 0,
+            percent: 5,
+            current_file: Some(folder.display().to_string()),
+            relinked_count: 0,
+        });
+
+        let db = app_handle.state::<Database>();
+        if cancel_flag.load(Ordering::SeqCst) {
+            let photos = db.get_photos_for_project(&proj_id).map_err(|e| e.to_string())?;
+            return Ok(RelinkResult {
+                photos,
+                failures: vec![],
+                relinked_count: 0,
+                unresolved_count: 0,
+                cancelled: true,
+            });
+        }
+
         let candidates = scan_directory(&folder)?;
         let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
-        let db = app.state::<Database>();
-        let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
+        let all_photos = db.get_photos_for_project(&proj_id).map_err(|e| e.to_string())?;
+        
+        let missing_photos: Vec<PhotoRow> = all_photos
+            .into_iter()
+            .filter(|p| !Path::new(&p.file_path).is_file() || p.is_missing)
+            .collect();
+        let total = missing_photos.len();
+
         let mut failures = Vec::new();
-        for mut photo in photos {
-            if Path::new(&photo.file_path).is_file() && !photo.is_missing { continue; }
+        let mut relinked_count = 0usize;
+        let mut was_cancelled = false;
+
+        for (idx, mut photo) in missing_photos.into_iter().enumerate() {
+            if cancel_flag.load(Ordering::SeqCst) {
+                was_cancelled = true;
+                log::info!("Relink worker detected cancel_flag, stopping gracefully...");
+                break;
+            }
+
+            let current = idx + 1;
+            let percent = if total > 0 {
+                (10 + (idx * 85) / total) as u8
+            } else {
+                100
+            };
+
+            let _ = app_handle.emit("relink-progress", RelinkProgressPayload {
+                project_id: proj_id.clone(),
+                phase: "matching".to_string(),
+                current,
+                total,
+                percent,
+                current_file: Some(photo.file_name.clone()),
+                relinked_count,
+            });
+
             // Filename narrows the search; size and oriented dimensions validate candidates.
             let matches: Vec<_> = candidates.iter().filter(|p| p.file_name().and_then(|n| n.to_str())
                 .map(|n| n.eq_ignore_ascii_case(&photo.file_name)).unwrap_or(false))
                 .filter(|p| extract_photo_metadata(p).map(|m| m.file_size == photo.file_size
                     && m.width == photo.width && m.height == photo.height).unwrap_or(false)).collect();
+
             if matches.len() != 1 {
                 failures.push(format!("{}: {} compatible matches found. Select a folder containing one matching original.", photo.file_name, matches.len()));
                 continue;
             }
+
             photo.file_path = matches[0].to_string_lossy().to_string();
-            if let Err(error) = refresh_photo_assets(&app, &photo) {
+
+            let _ = app_handle.emit("relink-progress", RelinkProgressPayload {
+                project_id: proj_id.clone(),
+                phase: "rebuilding".to_string(),
+                current,
+                total,
+                percent,
+                current_file: Some(photo.file_name.clone()),
+                relinked_count,
+            });
+
+            if let Err(error) = refresh_photo_assets(&app_handle, &photo) {
                 failures.push(format!("{}: {}", photo.file_name, error));
+            } else {
+                relinked_count += 1;
             }
         }
-        Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures })
+
+        let _ = app_handle.emit("relink-progress", RelinkProgressPayload {
+            project_id: proj_id.clone(),
+            phase: if was_cancelled { "cancelled".to_string() } else { "completed".to_string() },
+            current: if was_cancelled { relinked_count } else { total },
+            total,
+            percent: 100,
+            current_file: None,
+            relinked_count,
+        });
+
+        let updated_photos = db.get_photos_for_project(&proj_id).map_err(|e| e.to_string())?;
+        let unresolved_count = updated_photos.iter().filter(|p| !Path::new(&p.file_path).is_file() || p.is_missing).count();
+        Ok(RelinkResult {
+            photos: updated_photos,
+            failures,
+            relinked_count,
+            unresolved_count,
+            cancelled: was_cancelled,
+        })
     }).await.map_err(|e| e.to_string())?
 }
 

@@ -33,7 +33,7 @@
 - [x] Multi-selection Modes: Single, Shift-Range, Ctrl/Cmd-Toggle
 - [x] Batch Action Bar (Batch Favorite, Copy, Move/Add to Folder, Batch Delete)
 - [x] Right-Click Context Menu for Photo Cards
-- [x] Missing Photo Detection & Automatic Relinking Wizard with spread-frame asset recovery
+- [x] Missing Photo Detection & Real-Time Relinking Wizard (Tauri event streaming, animated multi-phase progress bar with pulse indicator, live filename tracking, spread-frame asset recovery, and post-relink summary report)
 - [x] Automatic Orphaned Thumbnail & Preview Cache Cleanup
 - [x] Sequential Photo Import Queue, Cancel Rollback Purge, Modal Picker Protection, Ref-Counted Singleton Event Listeners, and Accurate Count Tracking
 - [x] Direct Horizontal Mouse Wheel Scrolling (Lightroom-style natural gallery navigation without requiring Shift key)

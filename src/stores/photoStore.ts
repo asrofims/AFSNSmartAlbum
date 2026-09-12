@@ -94,6 +94,32 @@ async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promi
   }
 }
 
+export interface RelinkProgress {
+  phase: 'scanning' | 'matching' | 'rebuilding' | 'completed';
+  current: number;
+  total: number;
+  percent: number;
+  currentFile?: string;
+  relinkedCount: number;
+}
+
+export interface RelinkSummary {
+  relinkedCount: number;
+  unresolvedCount: number;
+  failures: string[];
+  cancelled?: boolean;
+}
+
+interface RelinkProgressPayload {
+  projectId: string;
+  phase: 'scanning' | 'matching' | 'rebuilding' | 'completed';
+  current: number;
+  total: number;
+  percent: number;
+  currentFile?: string;
+  relinkedCount: number;
+}
+
 export interface ImportTask {
   id: string;
   projectId: string;
@@ -121,6 +147,11 @@ interface PhotoState {
   isCancelling: boolean;
   isRemoving: boolean;
   isRelinking: boolean;
+  isCancellingRelink: boolean;
+  cancelRelink: () => Promise<void>;
+  relinkProgress: RelinkProgress | null;
+  relinkSummary: RelinkSummary | null;
+  clearRelinkSummary: () => void;
   removalNotice: string | null;
   dismissRemovalNotice: () => void;
   importProgress: ImportProgress | null;
@@ -210,6 +241,20 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   isCancelling: false,
   isRemoving: false,
   isRelinking: false,
+  isCancellingRelink: false,
+  cancelRelink: async () => {
+    if (!get().isRelinking || get().isCancellingRelink) return;
+    set({ isCancellingRelink: true });
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cancel_relink');
+    } catch (err) {
+      console.warn('[AFSN] cancel_relink error:', err);
+    }
+  },
+  relinkProgress: null,
+  relinkSummary: null,
+  clearRelinkSummary: () => set({ relinkSummary: null }),
   removalNotice: null,
   dismissRemovalNotice: () => set({ removalNotice: null }),
   importProgress: null,
@@ -350,12 +395,31 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         const unlistenError = await listen<{ projectId: string; message: string }>('photo-processing-error', (event) => {
           if (isCurrentProject(event.payload.projectId)) set({ error: event.payload.message });
         });
+
+        const unlistenRelink = await listen<RelinkProgressPayload>('relink-progress', (event) => {
+          if (!isCurrentProject(event.payload?.projectId)) return;
+          if (event.payload) {
+            set({
+              isRelinking: event.payload.phase !== 'completed',
+              relinkProgress: {
+                phase: event.payload.phase,
+                current: event.payload.current,
+                total: event.payload.total,
+                percent: event.payload.percent,
+                currentFile: event.payload.currentFile,
+                relinkedCount: event.payload.relinkedCount,
+              },
+            });
+          }
+        });
+
         const unlistenAll = () => {
           unlistenError();
           unlistenProgress();
           unlistenItem();
           unlistenPreview();
           unlistenComplete();
+          unlistenRelink();
         };
 
         if (activeListenersCount === 0) {
@@ -729,21 +793,43 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   relinkFolder: async (projectId: string) => {
     if (get().isRelinking || get().isRemoving || get().isImporting) return;
-    set({ isRelinking: true, error: null });
+    set({ isRelinking: true, isCancellingRelink: false, error: null, relinkSummary: null, relinkProgress: null });
     photoLoadEpoch += 1;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const { useProjectStore } = await import('./projectStore');
       if (useProjectStore.getState().isSaving || useProjectStore.getState().isLoading) throw new Error('The project is busy. Try relinking again when it is ready.');
-      const result = await invoke<{ photos: Photo[]; failures: string[] }>('relink_folder', { projectId });
+      const result = await invoke<{
+        photos: Photo[];
+        failures: string[];
+        relinkedCount: number;
+        unresolvedCount: number;
+        cancelled: boolean;
+      }>('relink_folder', { projectId });
+
       if (useProjectStore.getState().currentProject?.id !== projectId) return;
-      set({ photos: result.photos, isRelinkOpen: result.failures.length > 0, error: result.failures.length ? result.failures.join('\n') : null });
+
+      const relinked = result.relinkedCount ?? 0;
+      const unresolved = result.unresolvedCount ?? result.failures.length;
+      const didCancelPicker = !result.cancelled && relinked === 0 && unresolved === 0 && result.failures.length === 0;
+
+      set({
+        photos: result.photos,
+        isRelinkOpen: true,
+        relinkSummary: didCancelPicker ? null : {
+          relinkedCount: relinked,
+          unresolvedCount: unresolved,
+          failures: result.failures,
+          cancelled: result.cancelled,
+        },
+        error: null,
+      });
       await markLibraryChanged(projectId);
       await syncAlbumFramePhotoAssets(result.photos);
     } catch (err) {
       set({ error: String(err) });
     } finally {
-      set({ isRelinking: false });
+      set({ isRelinking: false, isCancellingRelink: false });
     }
   },
 
@@ -952,8 +1038,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setFilter: (filter: PhotoFilter) => set({ filter, selectedPhotoIds: [], lastSelectedPhotoId: null }),
   setSortBy: (sortBy: PhotoSortBy) => set({ sortBy }),
   setSearchQuery: (searchQuery: string) => set({ searchQuery }),
-  openRelink: () => set({ isRelinkOpen: true }),
-  closeRelink: () => set({ isRelinkOpen: false }),
+  openRelink: () => set({ isRelinkOpen: true, relinkProgress: null, relinkSummary: null, isCancellingRelink: false, error: null }),
+  closeRelink: () => set({ isRelinkOpen: false, relinkProgress: null, relinkSummary: null, isCancellingRelink: false, error: null }),
   openCreateFolderDialog: () => set({ isFolderDialogOpen: true, folderDialogMode: 'create', folderDialogTarget: null }),
   openRenameFolderDialog: (folder: PhotoFolder) => set({ isFolderDialogOpen: true, folderDialogMode: 'rename', folderDialogTarget: folder }),
   closeFolderDialog: () => set({ isFolderDialogOpen: false, folderDialogTarget: null }),

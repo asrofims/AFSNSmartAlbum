@@ -99,6 +99,7 @@ pub fn run() {
             app.manage(database);
             app.manage(launch_state);
             app.manage(commands::photo_commands::ImportState::default());
+            app.manage(commands::photo_commands::RelinkState::default());
             app.manage(commands::export_commands::ExportState::default());
             app.manage(commands::app_commands::AppExitState::default());
 
@@ -146,6 +147,7 @@ pub fn run() {
             commands::photo_commands::regenerate_single_thumbnail,
             commands::photo_commands::relink_folder,
             commands::photo_commands::cancel_photo_import,
+            commands::photo_commands::cancel_relink,
             commands::photo_commands::batch_delete_photos,
             commands::photo_commands::batch_toggle_favorites,
             commands::photo_commands::create_photo_folder,
