@@ -62,20 +62,20 @@
 }
 
 .navBtnActive {
-  background-color: rgba(59, 130, 246, 0.15) !important;
+  background-color: rgba(56, 189, 248, 0.15) !important;
   border-color: var(--color-accent) !important;
   color: var(--color-accent) !important;
 }
 
 .addSpreadBtn {
-  background-color: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.4);
+  background-color: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.4);
   color: var(--color-accent);
 }
 
 .addSpreadBtn:hover {
   background-color: var(--color-accent) !important;
-  color: #ffffff !important;
+  color: #090d16 !important;
 }
 
 .spreadSelect {
@@ -231,13 +231,13 @@
 
 .cardActive {
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 14px rgba(59, 130, 246, 0.25) !important;
-  background-color: rgba(59, 130, 246, 0.04) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 4px 14px rgba(56, 189, 248, 0.25) !important;
+  background-color: rgba(56, 189, 248, 0.05) !important;
 }
 
 .cardSelected {
   border-color: var(--color-accent) !important;
-  background-color: rgba(59, 130, 246, 0.08) !important;
+  background-color: rgba(56, 189, 248, 0.08) !important;
   box-shadow: 0 0 0 1px var(--color-accent) !important;
 }
 
@@ -356,10 +356,9 @@
 }
 
 .cardActionBtnDuplicate:hover:not(:disabled) {
-  background-color: rgba(59, 130, 246, 0.2) !important;
-  color: #60a5fa !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
+  background-color: rgba(56, 189, 248, 0.2) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
 }
 
 .cardActionBtnDanger:hover:not(:disabled) {

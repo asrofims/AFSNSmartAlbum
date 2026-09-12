@@ -759,7 +759,7 @@
 }
 
 .historyBtnSaving {
-  color: #3b82f6 !important;
+  color: #38bdf8 !important;
 }
 
 .menuContainer {
@@ -959,16 +959,16 @@
 }
 
 .alignToolbarBtnSafe {
-  background: rgba(59, 130, 246, 0.05);
-  border-color: rgba(59, 130, 246, 0.25);
-  color: #93c5fd;
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
 }
 
 .alignToolbarBtnSafe:hover {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: #3b82f6;
-  color: #bfdbfe;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(56, 189, 248, 0.25);
 }
 
 /* Match Size 3-Column Action Buttons */

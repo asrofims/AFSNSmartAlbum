@@ -26,13 +26,28 @@
 /* Variants */
 .primary {
   background-color: var(--color-accent);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.15);
+  color: #090d16 !important;
+  font-weight: 600;
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .primary:hover:not(:disabled) {
-  background-color: var(--color-accent-hover);
-  border-color: rgba(255, 255, 255, 0.25);
+  background-color: #7dd3fc;
+  color: #090d16 !important;
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.primary:active:not(:disabled) {
+  background-color: var(--color-accent-active);
+  color: #090d16 !important;
+}
+
+.primary:focus,
+.primary:focus-visible,
+.primary:disabled {
+  color: #090d16 !important;
 }
 
 .secondary {

@@ -27,19 +27,24 @@
   display: flex;
   align-items: center;
   border-radius: var(--radius-md);
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--color-border-subtle);
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all var(--transition-fast);
 }
 
 .tabWrapper:hover {
   background-color: rgba(255, 255, 255, 0.08);
-  border-color: var(--color-border);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .wrapperActive {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border-color: var(--color-accent) !important;
+  background-color: rgba(2, 132, 199, 0.18) !important;
+  border-color: #0284c7 !important;
+}
+
+.wrapperActive:hover {
+  background-color: rgba(2, 132, 199, 0.24) !important;
+  border-color: #0284c7 !important;
 }
 
 .wrapperMenuOpen {
@@ -47,9 +52,8 @@
 }
 
 .tabWrapper.dragOver {
-  background-color: rgba(59, 130, 246, 0.3) !important;
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+  background-color: rgba(2, 132, 199, 0.28) !important;
+  border-color: #0284c7 !important;
   transform: scale(1.02);
 }
 
@@ -71,12 +75,17 @@
   border-bottom-left-radius: var(--radius-md);
 }
 
+.tabSolo {
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+}
+
 .tab:hover {
   color: var(--color-text-primary);
 }
 
 .tabActive {
-  color: var(--color-accent) !important;
+  color: #f1f5f9 !important;
   font-weight: var(--font-weight-semibold);
 }
 
@@ -93,16 +102,21 @@
 
 .tabCount {
   font-size: 10px;
-  font-weight: var(--font-weight-bold);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   padding: 1px 6px;
   border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.08);
-  color: var(--color-text-muted);
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  line-height: 1.2;
 }
 
 .tabActive .tabCount {
-  background-color: var(--color-accent);
-  color: #ffffff;
+  background-color: rgba(2, 132, 199, 0.28) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  color: #e0f2fe !important;
+  font-weight: 600;
 }
 
 .menuTriggerBtn {
@@ -113,7 +127,7 @@
   height: 28px;
   background: transparent;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0 6px 0 2px;
   border-top-right-radius: var(--radius-md);
@@ -122,10 +136,14 @@
   flex-shrink: 0;
 }
 
+.wrapperActive .menuTriggerBtn {
+  color: #94a3b8;
+}
+
 .menuTriggerBtn:hover,
 .menuTriggerActive {
   color: #ffffff !important;
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.12);
 }
 
 .dropdownMenu {

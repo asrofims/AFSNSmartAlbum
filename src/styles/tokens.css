@@ -14,9 +14,18 @@
   --color-text-secondary: #a0a0a8;
   --color-text-muted: #6a6a72;
   --color-text-inverse: #1a1a1e;
-  --color-accent: #4a9eff;
-  --color-accent-hover: #3a8eef;
-  --color-accent-active: #2a7edf;
+  --color-accent: #38bdf8;
+  --color-accent-hover: #0ea5e9;
+  --color-accent-active: #0284c7;
+  --color-accent-subtle: rgba(56, 189, 248, 0.15);
+  --color-accent-glow: rgba(56, 189, 248, 0.35);
+
+  --color-primary: #38bdf8;
+  --color-primary-hover: #0ea5e9;
+  --color-primary-active: #0284c7;
+  --color-primary-light: #7dd3fc;
+  --color-primary-subtle: rgba(56, 189, 248, 0.15);
+
   --color-danger: #ef4444;
   --color-danger-hover: #dc2626;
   --color-success: #22c55e;
@@ -38,6 +47,7 @@
   --text-muted: var(--color-text-muted);
   --text-inverse: var(--color-text-inverse);
   --accent: var(--color-accent);
+  --primary: var(--color-primary);
 
   /* Spacing */
   --space-1: 4px;

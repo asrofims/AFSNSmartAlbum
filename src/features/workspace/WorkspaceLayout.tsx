@@ -927,7 +927,6 @@ export function WorkspaceLayout() {
                 onClick={() => setIsExportDialogOpen(true)}
                 title="Export Album for Print (Ctrl+E)"
                 className={styles.toolbarActionBtn}
-                style={{ backgroundColor: '#2563eb', borderColor: '#3b82f6', color: '#ffffff' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1555,7 +1554,7 @@ export function WorkspaceLayout() {
                                     step={step}
                                     value={currentVal}
                                     onChange={(e) => applyRadiusToAll(Number(e.target.value))}
-                                    style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
+                                    style={{ flex: 1, accentColor: '#38bdf8', cursor: 'pointer' }}
                                   />
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '85px' }}>
                                     <NumberInput
@@ -2745,7 +2744,7 @@ export function WorkspaceLayout() {
                         height="13"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#3b82f6"
+                        stroke="#38bdf8"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2776,7 +2775,7 @@ export function WorkspaceLayout() {
                           padding: '3px 7px',
                           fontSize: '10px',
                           fontWeight: !isMarginExpanded ? 600 : 400,
-                          color: !isMarginExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          color: !isMarginExpanded ? '#090d16' : 'var(--color-text-muted)',
                           backgroundColor: !isMarginExpanded ? 'var(--color-accent)' : 'transparent',
                           border: 'none',
                           borderRadius: '3px',
@@ -2794,7 +2793,7 @@ export function WorkspaceLayout() {
                           padding: '3px 7px',
                           fontSize: '10px',
                           fontWeight: isMarginExpanded ? 600 : 400,
-                          color: isMarginExpanded ? '#ffffff' : 'var(--color-text-muted)',
+                          color: isMarginExpanded ? '#090d16' : 'var(--color-text-muted)',
                           backgroundColor: isMarginExpanded ? 'var(--color-accent)' : 'transparent',
                           border: 'none',
                           borderRadius: '3px',
@@ -3018,7 +3017,7 @@ export function WorkspaceLayout() {
                           padding: '5px 4px',
                           fontSize: '11px',
                           fontWeight: bgScope === 'spread' ? 600 : 400,
-                          color: bgScope === 'spread' ? '#ffffff' : 'var(--color-text-secondary)',
+                          color: bgScope === 'spread' ? '#090d16' : 'var(--color-text-secondary)',
                           backgroundColor: bgScope === 'spread' ? 'var(--color-accent)' : 'transparent',
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
@@ -3038,7 +3037,7 @@ export function WorkspaceLayout() {
                           padding: '5px 4px',
                           fontSize: '11px',
                           fontWeight: bgScope === 'left' ? 600 : 400,
-                          color: bgScope === 'left' ? '#ffffff' : 'var(--color-text-secondary)',
+                          color: bgScope === 'left' ? '#090d16' : 'var(--color-text-secondary)',
                           backgroundColor: bgScope === 'left' ? 'var(--color-accent)' : 'transparent',
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
@@ -3058,7 +3057,7 @@ export function WorkspaceLayout() {
                           padding: '5px 4px',
                           fontSize: '11px',
                           fontWeight: bgScope === 'right' ? 600 : 400,
-                          color: bgScope === 'right' ? '#ffffff' : 'var(--color-text-secondary)',
+                          color: bgScope === 'right' ? '#090d16' : 'var(--color-text-secondary)',
                           backgroundColor: bgScope === 'right' ? 'var(--color-accent)' : 'transparent',
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
@@ -3162,7 +3161,7 @@ export function WorkspaceLayout() {
                     }}
                     title="Toggle Blue Safe Zone Margin guide visibility"
                   >
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#38bdf8', display: 'inline-block', flexShrink: 0 }} />
                     <span style={{ whiteSpace: 'nowrap' }}>Safe Zone</span>
                   </button>
 

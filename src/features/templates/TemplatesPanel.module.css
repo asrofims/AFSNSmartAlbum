@@ -39,9 +39,9 @@
 }
 
 .modeBtnActive {
-  background: var(--color-accent, #3b82f6);
-  border-color: var(--color-accent, #3b82f6);
-  color: #ffffff;
+  background: var(--color-accent, #38bdf8);
+  border-color: var(--color-accent, #38bdf8);
+  color: #090d16;
   font-weight: 600;
 }
 
@@ -63,9 +63,9 @@
 }
 
 .activeCard {
-  border-color: var(--color-accent, #3b82f6) !important;
-  background: rgba(59, 130, 246, 0.08) !important;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25) !important;
+  border-color: var(--color-accent, #38bdf8) !important;
+  background: rgba(56, 189, 248, 0.08) !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25) !important;
 }
 
 .filterHeader {
@@ -101,9 +101,9 @@
 }
 
 .filterBtnActive {
-  background: var(--color-accent, #3b82f6);
-  border-color: var(--color-accent, #3b82f6);
-  color: #ffffff;
+  background: var(--color-accent, #38bdf8);
+  border-color: var(--color-accent, #38bdf8);
+  color: #090d16;
   font-weight: 600;
 }
 
@@ -111,17 +111,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 11px;
-  color: #93c5fd;
+  color: #7dd3fc;
 }
 
 .badgeCount {
-  background: var(--color-accent, #3b82f6);
-  color: #ffffff;
+  background: var(--color-accent, #38bdf8);
+  color: #090d16;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 10px;

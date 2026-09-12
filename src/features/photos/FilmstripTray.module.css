@@ -584,13 +584,15 @@
 }
 
 .countBadge {
-  background-color: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  color: var(--color-accent);
+  background-color: rgba(2, 132, 199, 0.16);
+  border: 1px solid rgba(2, 132, 199, 0.35);
+  color: #bae6fd;
   font-size: 11px;
-  font-weight: var(--font-weight-medium);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   padding: 1px 7px;
   border-radius: 10px;
+  line-height: 1.2;
 }
 
 .photoCard:hover .thumbnailWrapper {

@@ -119,20 +119,24 @@ export function FolderTabs() {
     <>
       <div className={styles.container}>
         {/* Tab: All Photos */}
-        <button
-          type="button"
-          className={`${styles.tab} ${activeFolderId === null ? styles.tabActive : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveFolder(null);
-            setMenuAnchor(null);
-          }}
-          title="Show all project photos"
+        <div
+          className={`${styles.tabWrapper} ${activeFolderId === null ? styles.wrapperActive : ''}`}
         >
-          <span className={styles.folderIcon}>📁</span>
-          <span className={styles.tabName}>All Photos</span>
-          <span className={styles.tabCount}>{totalPhotoCount}</span>
-        </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${styles.tabSolo} ${activeFolderId === null ? styles.tabActive : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveFolder(null);
+              setMenuAnchor(null);
+            }}
+            title="Show all project photos"
+          >
+            <span className={styles.folderIcon}>📁</span>
+            <span className={styles.tabName}>All Photos</span>
+            <span className={styles.tabCount}>{totalPhotoCount}</span>
+          </button>
+        </div>
 
         {/* Custom Folder Tabs */}
         {folders.map((folder) => {

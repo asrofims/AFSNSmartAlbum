@@ -44,7 +44,7 @@
 }
 
 .toolBtnActive {
-  background-color: rgba(59, 130, 246, 0.2) !important;
+  background-color: rgba(56, 189, 248, 0.18) !important;
   color: var(--color-accent) !important;
   border-color: var(--color-accent) !important;
 }
