@@ -630,3 +630,11 @@
 - [x] Keep native layout fallback for older projects and mismatched frame geometry.
 - [x] Add regressions for the default “Add a title or story here” text, saved layout positions, and final-word visibility in regular and rotated export.
 - [ ] Compare the text visually in the running Tauri export preview and exported JPEG/PNG/PDF for the affected project and fonts.
+
+### Phase 56 — Release v1.0.64: Text Preview and Export Layout Consistency
+
+- [x] WYSIWYG Text Preview & Print Export Layout Consistency:
+  - Persist preview-calculated point positions for text tokens in the existing text payload, guaranteeing 1:1 visual match in regular and rotated export.
+  - Preload fonts used across selected spreads before generating export layout; enforce strict album save verification prior to export execution.
+  - Maintain robust native fontdue layout fallback for older projects and resized frames.
+- [x] Application version metadata bumped to `v1.0.64`.
