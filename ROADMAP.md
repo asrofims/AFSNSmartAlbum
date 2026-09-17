@@ -559,3 +559,11 @@
 - [x] Apply the resulting translation uniformly whether the drag starts from the first or another selected object, during drag and on release.
 - [x] Avoid per-object spine corrections when committing a multi-selection translation so internal spacing stays intact.
 - [x] Add regression tests for two-photo center alignment and mixed rotated photo/text selection.
+
+### Phase 48 — Alt+Drag Copy Preview and Independent Groups
+
+- [x] Keep the source artwork visible during Alt+drag and show the moving copy at reduced opacity, including mixed photo/text selections.
+- [x] Remove the temporary source artwork when Alt is released, dragging ends, focus is lost, or the editor unmounts.
+- [x] Give copied groups new identifiers while preserving membership within each copied group for Alt+drag and paste operations.
+- [x] Add store regression coverage for grouped photo/text duplication, separate source groups, ungrouped items, and paste behavior.
+- [ ] Manually verify Alt+drag preview, snapping, and group selection in the running Tauri desktop editor.

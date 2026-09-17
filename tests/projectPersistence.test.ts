@@ -4,7 +4,8 @@ import { useProjectStore } from '../src/stores/projectStore';
 import { useAlbumStore } from '../src/stores/albumStore';
 import { usePhotoStore } from '../src/stores/photoStore';
 import { useEditorStore } from '../src/stores/editorStore';
-import { createInitialAlbum } from '../src/domain/album';
+import { createInitialAlbum, type AlbumElement } from '../src/domain/album';
+import { createTextNode } from '../src/domain/text';
 import { buildSpreadElementsFromVariation } from '../src/domain/adaptiveLayout';
 import type { Photo } from '../src/domain/photo';
 import type { Project } from '../src/domain/project';
@@ -369,6 +370,56 @@ native = (command) => {
 assert.equal(await useAlbumStore.getState().loadAlbumFromDb('p'), true);
 assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingValue, 8.0);
 assert.equal(useAlbumStore.getState().currentAlbum!.spreads[0]?.spacingUnit, 'mm');
+
+// Alt+drag and paste preserve groups within the copy while separating them from the source.
+resetWithPhoto();
+const groupedAlbum = useAlbumStore.getState().currentAlbum!;
+const sourcePhoto = { ...groupedAlbum.coverSpread.elements[0]!, groupId: 'source-photo-group' };
+const secondPhoto = { ...sourcePhoto, id: 'second-photo', x: sourcePhoto.x + 125 };
+const sourceText = { ...createTextNode({ text: 'Caption', unit: 'mm', dpi: 300 }), id: 'source-text', groupId: 'source-text-group' };
+const secondText = { ...sourceText, id: 'second-text', x: sourceText.x + 25 };
+const ungrouped = { ...sourcePhoto, id: 'ungrouped-photo', groupId: null };
+const originalElements: AlbumElement[] = [sourcePhoto, secondPhoto, sourceText, secondText, ungrouped];
+useAlbumStore.setState({ currentAlbum: {
+  ...groupedAlbum, coverSpread: { ...groupedAlbum.coverSpread, elements: originalElements },
+} });
+const coverId = groupedAlbum.coverSpread.id;
+const copiedIds = useEditorStore.getState().duplicateFramesToPosition(coverId,
+  originalElements.map((element) => ({ sourceId: element.id, x: element.x + 20, y: element.y + 10 })));
+const copiedElements = useAlbumStore.getState().currentAlbum!.coverSpread.elements.filter((element) => copiedIds.includes(element.id));
+assert.equal(copiedElements.length, originalElements.length);
+assert.equal(copiedElements[0]?.groupId, copiedElements[1]?.groupId);
+assert.equal(copiedElements[2]?.groupId, copiedElements[3]?.groupId);
+assert.notEqual(copiedElements[0]?.groupId, sourcePhoto.groupId);
+assert.notEqual(copiedElements[2]?.groupId, sourceText.groupId);
+assert.notEqual(copiedElements[0]?.groupId, copiedElements[2]?.groupId);
+assert.equal(copiedElements[4]?.groupId, null);
+assert.equal(useAlbumStore.getState().currentAlbum!.coverSpread.elements[0]?.groupId, sourcePhoto.groupId);
+assert.equal(useAlbumStore.getState().currentAlbum!.coverSpread.elements[2]?.groupId, sourceText.groupId);
+
+useEditorStore.setState({ selectedFrameIds: originalElements.map((element) => element.id) });
+useEditorStore.getState().copySelectedFrames(coverId);
+useEditorStore.getState().pasteFrames(coverId);
+const pastedGroup = useAlbumStore.getState().currentAlbum!.coverSpread.elements.slice(-originalElements.length);
+assert.equal(pastedGroup[0]?.groupId, pastedGroup[1]?.groupId);
+assert.notEqual(pastedGroup[0]?.groupId, sourcePhoto.groupId);
+assert.equal(pastedGroup[2]?.groupId, pastedGroup[3]?.groupId);
+assert.notEqual(pastedGroup[2]?.groupId, sourceText.groupId);
+useEditorStore.getState().pasteFramesInPlace(coverId);
+const inPlaceGroup = useAlbumStore.getState().currentAlbum!.coverSpread.elements.slice(-originalElements.length);
+assert.equal(inPlaceGroup[0]?.groupId, inPlaceGroup[1]?.groupId);
+assert.notEqual(inPlaceGroup[0]?.groupId, pastedGroup[0]?.groupId);
+useEditorStore.getState().pasteFramesToAllSpreads({ includeCover: true });
+const batchAlbum = useAlbumStore.getState().currentAlbum!;
+const batchGroups = [batchAlbum.coverSpread, ...batchAlbum.spreads].map((spread) =>
+  spread.elements.slice(-originalElements.length));
+assert.ok(batchGroups.length > 1);
+assert.equal(new Set(batchGroups.map((elements) => elements[0]?.groupId)).size, batchGroups.length);
+for (const elements of batchGroups) {
+  assert.equal(elements[0]?.groupId, elements[1]?.groupId);
+  assert.equal(elements[2]?.groupId, elements[3]?.groupId);
+  assert.notEqual(elements[0]?.groupId, sourcePhoto.groupId);
+}
 
 clearMocks();
 console.log('✓ Project persistence regressions passed: failed writes, cancellation, ZIP protection, save serialization, concurrent edits and missing-file recovery.');

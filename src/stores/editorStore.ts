@@ -33,6 +33,20 @@ import { useProjectStore } from './projectStore';
 import { usePhotoStore } from './photoStore';
 import { useHistoryStore } from './historyStore';
 
+// A copied selection keeps its internal groups, but never joins the source groups.
+function remapCopiedGroupIds(elements: AlbumElement[]): AlbumElement[] {
+  const newGroupIds = new Map<string, string>();
+  return elements.map((element) => {
+    if (!element.groupId) return element;
+    let newGroupId = newGroupIds.get(element.groupId);
+    if (!newGroupId) {
+      newGroupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      newGroupIds.set(element.groupId, newGroupId);
+    }
+    return { ...element, groupId: newGroupId };
+  });
+}
+
 export interface EditorState {
   selectedFrameIds: string[];
   selectionGroupRotation: number | null;
@@ -728,6 +742,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }));
       }
 
+      pasted = remapCopiedGroupIds(pasted);
+
       if (currentAlbum.coverSpread.id === spreadId) {
         const existing = currentAlbum.coverSpread.elements || [];
         const updatedCover = {
@@ -782,12 +798,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     useHistoryStore.getState().pushState(currentAlbum);
 
-    const pasted: AlbumElement[] = clipboardFrames.map((f, idx) => ({
+    const pasted: AlbumElement[] = remapCopiedGroupIds(clipboardFrames.map((f, idx) => ({
       ...f,
       id: `${f.type === 'text' ? 'text' : 'frame'}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
       x: f.x,
       y: f.y,
-    } as AlbumElement));
+    } as AlbumElement)));
 
     if (currentAlbum.coverSpread.id === spreadId) {
       const existing = currentAlbum.coverSpread.elements || [];
@@ -838,14 +854,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let spreadsModified = 0;
 
     const updatedSpreads = currentAlbum.spreads.map((spread, sIdx) => {
-      const newFrames: AlbumElement[] = clipboardFrames.map((f, idx) => ({
+      const newFrames: AlbumElement[] = remapCopiedGroupIds(clipboardFrames.map((f, idx) => ({
         ...f,
         id: `${f.type === 'text' ? 'text' : 'frame'}-${Date.now()}-${sIdx}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         x: f.x,
         y: f.y,
         width: f.width,
         height: f.height,
-      } as AlbumElement));
+      } as AlbumElement)));
 
       const existing = options?.replaceExisting ? [] : (spread.elements || []);
       spreadsModified++;
@@ -861,14 +877,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     let updatedCover = currentAlbum.coverSpread;
     if (includeCover) {
-      const coverFrames: AlbumElement[] = clipboardFrames.map((f, idx) => ({
+      const coverFrames: AlbumElement[] = remapCopiedGroupIds(clipboardFrames.map((f, idx) => ({
         ...f,
         id: `${f.type === 'text' ? 'text' : 'frame'}-${Date.now()}-c-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         x: f.x,
         y: f.y,
         width: f.width,
         height: f.height,
-      } as AlbumElement));
+      } as AlbumElement)));
       const existing = options?.replaceExisting ? [] : (currentAlbum.coverSpread.elements || []);
       spreadsModified++;
       updatedCover = {
@@ -930,6 +946,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
 
     if (newFrames.length === 0) return [];
+    const independentFrames = remapCopiedGroupIds(newFrames);
 
     if (isCover) {
       useAlbumStore.setState({
@@ -937,7 +954,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ...currentAlbum,
           coverSpread: {
             ...currentAlbum.coverSpread,
-            elements: [...existing, ...newFrames],
+            elements: [...existing, ...independentFrames],
           },
         },
         saveStatus: 'unsaved',
@@ -945,7 +962,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else {
       const updatedSpreads = currentAlbum.spreads.map((s) =>
         s.id === spreadId
-          ? { ...s, elements: [...existing, ...newFrames] }
+          ? { ...s, elements: [...existing, ...independentFrames] }
           : s
       );
       useAlbumStore.setState({
@@ -957,7 +974,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     }
 
-    const newIds = newFrames.map((f) => f.id);
+    const newIds = independentFrames.map((f) => f.id);
     set({ selectedFrameIds: newIds });
     return newIds;
   },

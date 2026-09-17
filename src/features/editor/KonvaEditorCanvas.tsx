@@ -1157,6 +1157,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
   } | null>(null);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const isAltPressedRef = useRef(false);
+  const syncAltDragPreviewRef = useRef<(active: boolean) => void>(() => {});
 
   useEffect(() => {
     const isTextInput = (target: EventTarget | null) => {
@@ -1170,6 +1171,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       if (e.key === 'Shift') setIsShiftPressed(true);
       if (e.key === 'Alt') {
         isAltPressedRef.current = true;
+        syncAltDragPreviewRef.current(true);
         if (!isTextInput(e.target)) {
           // Prevent Windows OS from intercepting Alt and focusing the hidden system menu bar,
           // which steals focus and causes scroll, zoom, and canvas shortcuts to freeze.
@@ -1181,6 +1183,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       if (e.key === 'Shift') setIsShiftPressed(false);
       if (e.key === 'Alt') {
         isAltPressedRef.current = false;
+        syncAltDragPreviewRef.current(false);
         if (!isTextInput(e.target)) {
           e.preventDefault();
         }
@@ -1189,10 +1192,11 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
+      syncAltDragPreviewRef.current(false);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [activeSpreadId]);
 
   const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
   const [workspaceScroll, setWorkspaceScroll] = useState({ x: 0, y: 0 });
@@ -1371,6 +1375,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       setIsHoveredDropAlt(false);
       setHoveredDropFrameId(null);
       isAltPressedRef.current = false;
+      syncAltDragPreviewRef.current(false);
       setIsShiftPressed(false);
     };
 
@@ -1470,6 +1475,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
 
   // Multi-frame synchronized dragging positions
   const dragInitialPhysicalPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const altDragSourceClonesRef = useRef<Konva.Node[]>([]);
+  const altDragMovingOpacityRef = useRef<Map<Konva.Node, number>>(new Map());
   const getInitialDragRects = (): RectBounds[] => (activeSpread?.elements || []).flatMap((element) => {
     const initial = dragInitialPhysicalPositionsRef.current.get(element.id);
     return initial ? [{ x: initial.x, y: initial.y, width: element.width, height: element.height, rotation: element.rotation }] : [];
@@ -1892,6 +1899,43 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
   const { width: screenSpreadW, height: screenSpreadH, scaleFactor } = calculateSpreadViewport(
     totalSpreadPhysicalW, totalSpreadPhysicalH, maxAvailableW, maxAvailableH, zoomScale,
   );
+
+  const clearAltDragPreview = () => {
+    altDragMovingOpacityRef.current.forEach((opacity, node) => node.opacity(opacity));
+    altDragMovingOpacityRef.current.clear();
+    altDragSourceClonesRef.current.forEach((clone) => clone.destroy());
+    altDragSourceClonesRef.current = [];
+    stageRef.current?.batchDraw();
+  };
+
+  const syncAltDragPreview = (active: boolean) => {
+    if (!active) {
+      if (altDragSourceClonesRef.current.length > 0) clearAltDragPreview();
+      return;
+    }
+    if (dragInitialPhysicalPositionsRef.current.size === 0 || altDragSourceClonesRef.current.length > 0) return;
+
+    // Keep a full fidelity, non-interactive source at the original position while
+    // the live Konva nodes provide the moving copy preview and snapping feedback.
+    dragInitialPhysicalPositionsRef.current.forEach((initial, id) => {
+      const node = stageRef.current?.findOne(`#${id}`) as Konva.Node | undefined;
+      const layer = node?.getLayer();
+      if (!node || !layer) return;
+      const clone = node.clone({ x: initial.x * scaleFactor, y: initial.y * scaleFactor, listening: false, draggable: false });
+      const clearClonedIds = (item: Konva.Node) => {
+        item.id('');
+        if (item instanceof Konva.Container) item.getChildren().forEach(clearClonedIds);
+      };
+      clearClonedIds(clone);
+      layer.add(clone);
+      clone.zIndex(node.zIndex());
+      altDragSourceClonesRef.current.push(clone);
+      altDragMovingOpacityRef.current.set(node, node.opacity());
+      node.opacity(node.opacity() * 0.75);
+    });
+    stageRef.current?.batchDraw();
+  };
+  syncAltDragPreviewRef.current = syncAltDragPreview;
 
   const leftPagePixelW = singlePageW * scaleFactor;
   const rightPagePixelW = screenSpreadW - leftPagePixelW;
@@ -2931,9 +2975,11 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         }
                       });
                       dragInitialPhysicalPositionsRef.current = initialPositions;
+                      syncAltDragPreview(isAltPressedRef.current);
                     }}
                     onDragMove={(e) => {
                       if (dragInitialPhysicalPositionsRef.current.size === 0) return;
+                      syncAltDragPreview(Boolean(e.evt?.altKey || isAltPressedRef.current));
                       const draggedNode = (stageRef.current?.findOne(`#${textEl.id}`) || e.currentTarget || e.target) as Konva.Node;
                       if (!draggedNode) return;
 
@@ -3094,6 +3140,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                           }
                         }
                       }
+                      clearAltDragPreview();
                       dragInitialPhysicalPositionsRef.current.clear();
                     }}
                     onContextMenu={(e) => {
@@ -3164,9 +3211,11 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                       }
                     });
                     dragInitialPhysicalPositionsRef.current = initialPositions;
+                    syncAltDragPreview(isAltPressedRef.current);
                   }}
                   onDragMove={(e) => {
                     if (dragInitialPhysicalPositionsRef.current.size === 0) return;
+                    syncAltDragPreview(Boolean(e.evt?.altKey || isAltPressedRef.current));
                     const draggedNode = (stageRef.current?.findOne(`#${frame.id}`) || e.currentTarget || e.target) as Konva.Node;
                     if (!draggedNode) return;
 
@@ -3341,6 +3390,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         }
                       }
                     }
+                    clearAltDragPreview();
                     dragInitialPhysicalPositionsRef.current.clear();
                   }}
                   onContextMenu={(e) => {
