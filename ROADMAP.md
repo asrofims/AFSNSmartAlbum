@@ -584,3 +584,12 @@
 - [x] Multi-selection drag snapping using combined visual bounds of all selected items (including rotated frames).
 - [x] Alt+drag duplicate preview with ghosted copy opacity and independent group ID generation.
 - [x] Application version metadata bumped to `v1.0.61`.
+
+### Phase 51 — Corner Resize Ratio Precision & Crop-Safe Reset
+
+- [x] Keep default new photo frame geometry at full physical precision so its starting dimensions match the source photo aspect ratio.
+- [x] Preserve each photo frame's current ratio during single and multi-selection corner resize without independently rounding width and height; keep the fixed-gap topology path.
+- [x] Avoid width-only spine corrections after a ratio-locked photo corner resize.
+- [x] Make Reset Ratio restore the exact native photo aspect while preserving crop pan and zoom, and skip updates when the ratio already matches.
+- [x] Add regressions for rotated single corners, multi-selection ratio preservation, fixed gaps, legacy rounded frames, and crop-safe no-op resets.
+- [ ] Manually verify single and multi-photo corner resize, spine snapping, and Reset Ratio in the running Tauri editor.

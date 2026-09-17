@@ -384,9 +384,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       frameW = frameH * photoAspect;
     }
 
-    frameW = Math.round(frameW * 10) / 10;
-    frameH = Math.round(frameH * 10) / 10;
-
     // Center in left or right page according to drop X or center in left page safe box
     let posX: number;
     let posY: number;
@@ -409,13 +406,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fileName: photo.fileName,
       x: posX,
       y: posY,
-      width: Math.round(frameW * 10) / 10,
-      height: Math.round(frameH * 10) / 10,
+      width: frameW,
+      height: frameH,
       rotation: 0,
       zIndex: 1,
       photoAspect: photoAspect,
-      originalWidth: Math.round(frameW * 10) / 10,
-      originalHeight: Math.round(frameH * 10) / 10,
+      originalWidth: frameW,
+      originalHeight: frameH,
       cropX: 0,
       cropY: 0,
       cropScale: 1.0,
@@ -1800,15 +1797,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!frame || frame.type !== 'photo') return;
 
     const aspect = getPhotoAspect(frame as PhotoFrameElement);
-    const newHeight = Math.round((frame.width / aspect) * 10) / 10;
+    const newHeight = frame.width / aspect;
+    if (Math.abs(frame.height - newHeight) <= 1e-9 * Math.max(1, newHeight)) return;
 
     const { updateFrameGeometry } = get();
-    updateFrameGeometry(spreadId, frameId, {
-      height: newHeight,
-      cropX: 0,
-      cropY: 0,
-      cropScale: 1.0,
-    });
+    updateFrameGeometry(spreadId, frameId, { height: newHeight });
   },
 
   resetSelectedRatio: (spreadId) => {
@@ -1827,18 +1820,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const updates = (activeSpread.elements || [])
       .filter((f): f is PhotoFrameElement => f.type === 'photo' && selectedFrameIds.includes(f.id))
-      .map((frame) => {
+      .flatMap((frame) => {
         const aspect = getPhotoAspect(frame);
-        const newHeight = Math.round((frame.width / aspect) * 10) / 10;
-        return {
+        const newHeight = frame.width / aspect;
+        if (Math.abs(frame.height - newHeight) <= 1e-9 * Math.max(1, newHeight)) return [];
+        return [{
           id: frame.id,
-          geometry: {
-            height: newHeight,
-            cropX: 0,
-            cropY: 0,
-            cropScale: 1.0,
-          },
-        };
+          geometry: { height: newHeight },
+        }];
       });
 
     if (updates.length > 0) {

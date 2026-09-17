@@ -6,6 +6,7 @@ import {
   calculateSnapping,
   calculateSelectionDragSnapping,
   calculateResizeSnapping,
+  constrainCornerResizeAspect,
   alignElementPositionToSpine,
   clampCropTransform,
   getCenteredCrop,
@@ -39,6 +40,12 @@ import {
   calculateMinCropScaleForRotation,
   normalizeAngle,
 } from '../src/domain/editor';
+import { createInitialAlbum } from '../src/domain/album';
+import type { Photo } from '../src/domain/photo';
+import type { Project } from '../src/domain/project';
+import { useAlbumStore } from '../src/stores/albumStore';
+import { useEditorStore } from '../src/stores/editorStore';
+import { useProjectStore } from '../src/stores/projectStore';
 
 console.log('Testing Editor Domain & Smart Snapping Math...');
 
@@ -1066,11 +1073,11 @@ console.assert(resetRot[1].rotation === 0 && resetRot[1].x === 130 && resetRot[1
 
 // 18d. Batch Reset Aspect Ratio
 const resetRatioFrames = multiRotateFrames.map((f) => {
-  const newHeight = Math.round((f.width / (f.photoAspect || 1.5)) * 10) / 10;
-  return { ...f, height: newHeight, cropX: 0, cropY: 0, cropScale: 1.0 };
+  const newHeight = f.width / (f.photoAspect || 1.5);
+  return { ...f, height: newHeight };
 });
-console.assert(Math.abs(resetRatioFrames[0].height - 66.7) < 0.1, `f1 height should reset to 66.7, got ${resetRatioFrames[0].height}`);
-console.assert(Math.abs(resetRatioFrames[1].height - 66.7) < 0.1, `f2 height should reset to 66.7, got ${resetRatioFrames[1].height}`);
+console.assert(Math.abs(resetRatioFrames[0].height - 100 / 1.5) < 1e-12, `f1 height should reset to the exact photo ratio, got ${resetRatioFrames[0].height}`);
+console.assert(Math.abs(resetRatioFrames[1].height - 100 / 1.5) < 1e-12, `f2 height should reset to the exact photo ratio, got ${resetRatioFrames[1].height}`);
 
 // 18e. Multi-Frame Resize with Rotated Frames
 const framesToResize = rotatedCW.map((f) => ({
@@ -1574,4 +1581,103 @@ assert.equal(resizeResSpine.snappedBounds.width, 150, 'calculateResizeSnapping m
 assert.equal(resizeResSpine.snappedBounds.x + resizeResSpine.snappedBounds.width, 200, 'x + width must equal spineLeft');
 
 
-console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, Snapping Config Persistence, and Dynamic Per-Corner Rounded Corners tests passed successfully!');
+// Corner transforms retain the starting frame ratio and the opposite corner, including rotation.
+const singleCornerStart = { x: 20, y: 30, width: 100, height: 100 / 1.5, rotation: 45 };
+const singleCornerRaw = { x: 15, y: 25, width: 137, height: 91.35, rotation: 45 };
+const singleCornerEnd = constrainCornerResizeAspect(singleCornerStart, singleCornerRaw, 'top-left');
+assert.ok(Math.abs(singleCornerEnd.width / singleCornerEnd.height - 1.5) < 1e-12);
+const rotatedY = (height: number) => ({
+  x: -Math.sin(Math.PI / 4) * height,
+  y: Math.cos(Math.PI / 4) * height,
+});
+assert.ok(Math.abs(singleCornerEnd.x + rotatedY(singleCornerEnd.height).x
+  - (singleCornerRaw.x + rotatedY(singleCornerRaw.height).x)) < 1e-10);
+assert.ok(Math.abs(singleCornerEnd.y + rotatedY(singleCornerEnd.height).y
+  - (singleCornerRaw.y + rotatedY(singleCornerRaw.height).y)) < 1e-10);
+assert.deepEqual(constrainCornerResizeAspect(singleCornerStart, singleCornerRaw, 'middle-right'), singleCornerRaw,
+  'Side handles must keep their independent aspect behavior');
+
+// New photos and ratio resets keep full geometry precision and never change crop.
+const ratioProject: Project = {
+  id: 'ratio-resize', name: 'Ratio resize', canvasWidth: 200, canvasHeight: 200,
+  canvasUnit: 'mm', canvasDpi: 300, spacingValue: 3, spacingUnit: 'mm',
+  borderEnabled: false, borderWidth: 0, borderUnit: 'mm', borderColor: '#fff',
+  backgroundType: 'solid', backgroundColor: '#fff', createdAt: '', updatedAt: '',
+};
+const ratioPhoto: Photo = {
+  id: 'ratio-photo', projectId: ratioProject.id, filePath: 'photo.jpg', fileName: 'photo.jpg',
+  fileSize: 1, width: 3000, height: 2000, format: 'jpeg', isFavorite: false,
+  usedCount: 0, isMissing: false, createdAt: '', updatedAt: '',
+};
+useProjectStore.setState({ currentProject: ratioProject });
+useAlbumStore.setState({ currentAlbum: createInitialAlbum(ratioProject), saveStatus: 'saved' });
+const ratioSpreadId = useAlbumStore.getState().currentAlbum!.spreads[0].id;
+useEditorStore.getState().addPhotoToSpread(ratioSpreadId, ratioPhoto);
+const getRatioFrames = () => useAlbumStore.getState().currentAlbum!.spreads[0].elements as PhotoFrameElement[];
+const firstRatioFrame = getRatioFrames()[0];
+assert.ok(Math.abs(firstRatioFrame.width / firstRatioFrame.height - 1.5) < 1e-12,
+  'A newly added photo must start at its exact native ratio');
+useEditorStore.getState().updateFrameGeometry(ratioSpreadId, firstRatioFrame.id,
+  { x: 10, y: 20, width: 60, height: 40, cropX: 0.28, cropY: -0.15, cropScale: 1.42 });
+const beforeNoopReset = useAlbumStore.getState().currentAlbum;
+useEditorStore.getState().resetToOriginalRatio(ratioSpreadId, firstRatioFrame.id);
+assert.equal(useAlbumStore.getState().currentAlbum, beforeNoopReset,
+  'Reset Ratio must not create a document change when geometry already matches');
+
+// Older albums may contain a tenth-unit rounded height; one reset repairs it exactly.
+useEditorStore.getState().updateFrameGeometry(ratioSpreadId, firstRatioFrame.id, { height: 39.9 });
+useEditorStore.getState().resetToOriginalRatio(ratioSpreadId, firstRatioFrame.id);
+const restoredFrame = getRatioFrames()[0];
+assert.ok(Math.abs(restoredFrame.height - 40) < 1e-12);
+assert.equal(restoredFrame.cropX, 0.28);
+assert.equal(restoredFrame.cropY, -0.15);
+assert.equal(restoredFrame.cropScale, 1.42);
+const resizedSingle = constrainCornerResizeAspect(restoredFrame,
+  { x: restoredFrame.x, y: restoredFrame.y, width: 82.2, height: 54.81 }, 'bottom-right');
+useEditorStore.getState().updateFrameGeometry(ratioSpreadId, restoredFrame.id, resizedSingle);
+const afterSingleResize = useAlbumStore.getState().currentAlbum;
+useEditorStore.getState().resetToOriginalRatio(ratioSpreadId, restoredFrame.id);
+assert.equal(useAlbumStore.getState().currentAlbum, afterSingleResize,
+  'Reset Ratio after a native-ratio corner resize must be a no-op');
+
+useEditorStore.getState().addPhotoToSpread(ratioSpreadId,
+  { ...ratioPhoto, id: 'ratio-photo-2', width: 4000, height: 3000 });
+const secondRatioFrame = getRatioFrames()[1];
+useEditorStore.getState().updateFrameGeometry(ratioSpreadId, secondRatioFrame.id,
+  { x: 80, y: 20, width: 40, height: 30, cropX: -0.2, cropY: 0.3, cropScale: 1.25 });
+useEditorStore.getState().updateFrameGeometry(ratioSpreadId, restoredFrame.id,
+  { x: 10, y: 20, width: 60, height: 40 });
+useEditorStore.getState().selectFrames(getRatioFrames().map((frame) => frame.id));
+const multiRatioFrames = getRatioFrames();
+const multiRatioInfo = computeMultiFrameGroupInfo(multiRatioFrames);
+for (const mode of ['proportional', 'fixed_gap'] as const) {
+  const updates = calculateRotatedMultiFrameResize(multiRatioInfo, multiRatioFrames,
+    multiRatioInfo.groupX, multiRatioInfo.groupY, 1.37, 1.37, mode, 'bottom-right');
+  for (const update of updates) {
+    const original = multiRatioFrames.find((frame) => frame.id === update.id)!;
+    assert.ok(Math.abs(update.geometry.width! / update.geometry.height! - original.width / original.height) < 1e-12,
+      `${mode} resize must preserve each photo's ratio without independent rounding`);
+  }
+  if (mode === 'fixed_gap') {
+    const [left, right] = updates;
+    assert.ok(Math.abs(right.geometry.x! - (left.geometry.x! + left.geometry.width!) - 10) < 0.01,
+      'Fixed-gap resize must retain the physical gap');
+    useEditorStore.getState().batchUpdateFrames(ratioSpreadId, updates);
+    const beforeBatchReset = useAlbumStore.getState().currentAlbum;
+    useEditorStore.getState().resetSelectedRatio(ratioSpreadId);
+    assert.equal(useAlbumStore.getState().currentAlbum, beforeBatchReset,
+      'Batch Reset Ratio after a native-ratio corner resize must be a no-op');
+    assert.equal(getRatioFrames()[0].cropScale, 1.42);
+    assert.equal(getRatioFrames()[1].cropScale, 1.25);
+  }
+}
+const tinyMultiResize = calculateRotatedMultiFrameResize(multiRatioInfo, multiRatioFrames,
+  multiRatioInfo.groupX, multiRatioInfo.groupY, 0.001, 0.001, 'fixed_gap', 'bottom-right');
+for (const update of tinyMultiResize) {
+  const original = multiRatioFrames.find((frame) => frame.id === update.id)!;
+  assert.ok(update.geometry.width! >= 1 && update.geometry.height! >= 1,
+    'The minimum photo size must apply through a shared scale');
+  assert.ok(Math.abs(update.geometry.width! / update.geometry.height! - original.width / original.height) < 1e-12);
+}
+
+console.log('✓ All Editor domain, Multiple Selection, Batch Alignment, Granular Snapping, Group/Ungroup, Group-Aware Layout Spacing, Safe Margin Alignment, Resize Safe Margin Snapping, Shift Orthogonal Drag, Copy-Paste, Paste in Place, Paste to All Spreads, Alt+Drag Duplicate, Photo Replacement, Photo Swap, Multi-Frame Batch Rotation, Mixed-Angle Multi-Frame Rotation, Rotated Multi-Frame Resize, Rotated Group Bounding Box, Multi-Frame Group Info, Persistent Group Rotation, SAT Rotated Marquee Selection, Multi-Frame Text Proportional Font Scaling, In-Frame Crop Rotation & Snapping, Snapping Config Persistence, Dynamic Per-Corner Rounded Corners, and Corner Resize Ratio Precision tests passed successfully!');

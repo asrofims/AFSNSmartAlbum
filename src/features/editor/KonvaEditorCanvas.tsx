@@ -10,6 +10,7 @@ import {
   PhotoFrameElement,
   calculateSelectionDragSnapping,
   calculateResizeSnapping,
+  constrainCornerResizeAspect,
   calculateImageOffset,
   calculateRotatedMultiFrameResize,
   calculateMultiFrameRotation,
@@ -111,6 +112,7 @@ function PhotoFrameNode({
   onDragEnd,
   onContextMenu,
   onFrameChange,
+  getActiveResizeAnchor,
   onCropChange,
   onDoubleClick,
   isShiftPressed = false,
@@ -128,7 +130,8 @@ function PhotoFrameNode({
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-  onFrameChange: (newAttrs: Partial<PhotoFrameElement>) => void;
+  onFrameChange: (newAttrs: Partial<PhotoFrameElement>, anchor?: string | null) => void;
+  getActiveResizeAnchor: () => string | null;
   onCropChange: (newAttrs: Partial<PhotoFrameElement>) => void;
   onDoubleClick: () => void;
   isShiftPressed?: boolean;
@@ -529,7 +532,7 @@ function PhotoFrameNode({
           width: rawW,
           height: rawH,
           rotation: Math.round(node.rotation()),
-        });
+        }, getActiveResizeAnchor());
       }}
     >
       {/* Base Solid Hit Rect for robust selection & drag events */}
@@ -3190,6 +3193,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                   isAltDrop={isHoveredDropAlt}
                   scaleFactor={scaleFactor}
                   isShiftPressed={isShiftPressed}
+                  getActiveResizeAnchor={() => trRef.current?.getActiveAnchor() || activeTransformAnchorRef.current}
                   onSelect={(e) => {
                     if (justDroppedRef.current) return;
                     if (e) {
@@ -3399,14 +3403,32 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                   onContextMenu={(e) => {
                     openContextMenuAt(e.evt.clientX, e.evt.clientY);
                   }}
-                  onFrameChange={(updates) => {
+                  onFrameChange={(updates, anchor) => {
                     let finalUpdates = { ...updates };
-                    if (typeof updates.x === 'number') {
-                      const w = typeof updates.width === 'number' ? updates.width : frame.width;
-                      finalUpdates.x = alignElementPositionToSpine(updates.x, w, totalSpreadPhysicalW, gutterPhysicalW);
+                    const isCorner = anchor === 'top-left' || anchor === 'top-right'
+                      || anchor === 'bottom-left' || anchor === 'bottom-right';
+                    if (isCorner && !isShiftPressed && typeof updates.x === 'number'
+                      && typeof updates.y === 'number' && typeof updates.width === 'number'
+                      && typeof updates.height === 'number') {
+                      const constrained = constrainCornerResizeAspect(frame, {
+                        x: updates.x,
+                        y: updates.y,
+                        width: updates.width,
+                        height: updates.height,
+                        rotation: updates.rotation ?? frame.rotation,
+                      }, anchor);
+                      finalUpdates = { ...finalUpdates, ...constrained };
+                    }
+                    if (typeof finalUpdates.x === 'number') {
+                      const w = typeof finalUpdates.width === 'number' ? finalUpdates.width : frame.width;
+                      finalUpdates.x = alignElementPositionToSpine(finalUpdates.x, w, totalSpreadPhysicalW, gutterPhysicalW);
                       const singlePageW = (totalSpreadPhysicalW - gutterPhysicalW) / 2;
-                      if (typeof updates.width === 'number' && Math.abs(finalUpdates.x + updates.width - singlePageW) < 0.05) {
-                        finalUpdates.width = Number((singlePageW - finalUpdates.x).toFixed(4));
+                      if (typeof finalUpdates.width === 'number' && Math.abs(finalUpdates.x + finalUpdates.width - singlePageW) < 0.05) {
+                        if (isCorner && !isShiftPressed) {
+                          finalUpdates.x = singlePageW - finalUpdates.width;
+                        } else {
+                          finalUpdates.width = Number((singlePageW - finalUpdates.x).toFixed(4));
+                        }
                       }
                     }
                     updateFrameGeometry(activeSpread.id, frame.id, finalUpdates);

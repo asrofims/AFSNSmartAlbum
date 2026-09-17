@@ -171,6 +171,29 @@ export function getPhotoAspect(frame: PhotoFrameElement): number {
   return frame.width / Math.max(1, frame.height);
 }
 
+/** Remove independent axis drift after a ratio-locked corner transform. */
+export function constrainCornerResizeAspect(
+  initial: RectBounds,
+  resized: RectBounds,
+  anchor?: string | null
+): RectBounds {
+  if (!anchor || !['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(anchor)
+    || initial.width <= 0 || initial.height <= 0) return resized;
+
+  const height = resized.width * initial.height / initial.width;
+  if (anchor.startsWith('bottom')) return { ...resized, height };
+
+  // A top handle keeps the opposite bottom corner fixed, also for rotated frames.
+  const heightDelta = resized.height - height;
+  const radians = ((resized.rotation ?? initial.rotation ?? 0) * Math.PI) / 180;
+  return {
+    ...resized,
+    x: resized.x - Math.sin(radians) * heightDelta,
+    y: resized.y + Math.cos(radians) * heightDelta,
+    height,
+  };
+}
+
 /**
  * Calculates the exact rendered dimensions of a photo inside a frame using Cover Fit math.
  */
@@ -2022,6 +2045,13 @@ export interface FrameBounds {
   styledRanges?: any[];
 }
 
+function minimumUniformPhotoScale(frames: FrameBounds[]): number {
+  return frames.reduce((minimum, frame) => {
+    if (frame.type === 'text' || frame.width <= 0 || frame.height <= 0) return minimum;
+    return Math.max(minimum, 1 / frame.width, 1 / frame.height);
+  }, 0);
+}
+
 /**
  * Computes the axis-aligned visual bounding box of a photo frame in spread coordinates,
  * taking its rotation angle into account.
@@ -2196,14 +2226,17 @@ export function calculateMultiFrameResize(
   if (initialFrames.length === 1) {
     const f = initialFrames[0];
     if (!f) return [];
-    const uniformScale = initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1;
+    const uniformScale = Math.max(
+      fixedScale ?? (initialGroupBounds.width > 0 ? newGroupBounds.width / initialGroupBounds.width : 1),
+      minimumUniformPhotoScale(initialFrames)
+    );
     const isText = (f as any)?.type === 'text';
     const newWidth = isText
       ? Math.ceil((f.width * uniformScale) * 100) / 100
-      : roundToHundredth(Math.max(1, f.width * uniformScale));
+      : f.width * uniformScale;
     const newHeight = isText
       ? Math.ceil((f.height * uniformScale) * 100) / 100
-      : roundToHundredth(Math.max(1, f.height * uniformScale));
+      : f.height * uniformScale;
     const newCenterX = newGroupBounds.x + newGroupBounds.width / 2;
     const newCenterY = newGroupBounds.y + newGroupBounds.height / 2;
     const rad = ((f.rotation || 0) * Math.PI) / 180;
@@ -2257,9 +2290,12 @@ export function calculateMultiFrameResize(
   if (mode === 'proportional') {
     const scaleX = initW > 0 ? newGroupBounds.width / initW : 1;
     const scaleY = initH > 0 ? newGroupBounds.height / initH : 1;
-    const scale = fixedScale !== undefined
-      ? fixedScale
-      : (Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY);
+    const scale = Math.max(
+      fixedScale !== undefined
+        ? fixedScale
+        : (Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY),
+      minimumUniformPhotoScale(initialFrames)
+    );
 
     const newTotalW = initW * scale;
     const newTotalH = initH * scale;
@@ -2296,10 +2332,10 @@ export function calculateMultiFrameResize(
       const isText = (f as any)?.type === 'text';
       const newWidth = isText
         ? Math.ceil((f.width * scale) * 100) / 100
-        : roundToHundredth(Math.max(1, f.width * scale));
+        : f.width * scale;
       const newHeight = isText
         ? Math.ceil((f.height * scale) * 100) / 100
-        : roundToHundredth(Math.max(1, f.height * scale));
+        : f.height * scale;
 
       const rad = ((f.rotation || 0) * Math.PI) / 180;
       const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
@@ -2432,13 +2468,16 @@ export function calculateMultiFrameResize(
 
   const rawRatioX = initW > 0 ? newGroupBounds.width / initW : 1;
   const rawRatioY = initH > 0 ? newGroupBounds.height / initH : 1;
-  const uniformScale = fixedScale !== undefined
-    ? fixedScale
-    : (Math.abs(rawRatioX - rawRatioY) < 0.005
-      ? (initW >= initH ? scaleXFromGroup : scaleYFromGroup)
-      : (Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
-        ? scaleXFromGroup
-        : scaleYFromGroup));
+  const uniformScale = Math.max(
+    fixedScale !== undefined
+      ? fixedScale
+      : (Math.abs(rawRatioX - rawRatioY) < 0.005
+        ? (initW >= initH ? scaleXFromGroup : scaleYFromGroup)
+        : (Math.abs(rawRatioX - 1) >= Math.abs(rawRatioY - 1)
+          ? scaleXFromGroup
+          : scaleYFromGroup)),
+    minimumUniformPhotoScale(initialFrames)
+  );
 
   // 3. Topologically Sorted Positions
   const newPositionsX = new Map<string, number>();
@@ -2514,10 +2553,10 @@ export function calculateMultiFrameResize(
     const isText = (f as any)?.type === 'text';
     const newWidth = isText
       ? Math.ceil((f.width * uniformScale) * 100) / 100
-      : roundToHundredth(Math.max(1, f.width * uniformScale));
+      : f.width * uniformScale;
     const newHeight = isText
       ? Math.ceil((f.height * uniformScale) * 100) / 100
-      : roundToHundredth(Math.max(1, f.height * uniformScale));
+      : f.height * uniformScale;
 
     const rad = ((f.rotation || 0) * Math.PI) / 180;
     const finalX = newCenterX - ((newWidth / 2) * Math.cos(rad) - (newHeight / 2) * Math.sin(rad));
@@ -2912,7 +2951,7 @@ export function calculateRotatedMultiFrameResize(
   if (initialFrames.length === 0 || groupInfo.childLocalFrames.length === 0) return [];
 
   const initialMap = new Map(initialFrames.map((f) => [f.id, f]));
-  const scale = (scaleX + scaleY) / 2;
+  const scale = Math.max((scaleX + scaleY) / 2, minimumUniformPhotoScale(initialFrames));
 
   // --- 1. PROPORTIONAL MODE (Visual Harmony) ---
   if (mode === 'proportional') {
@@ -2926,10 +2965,10 @@ export function calculateRotatedMultiFrameResize(
       const newLocalY = child.localY * scale;
       const newWidth = isText
         ? Math.ceil((origW * scale) * 100) / 100
-        : roundToHundredth(Math.max(1, origW * scale));
+        : origW * scale;
       const newHeight = isText
         ? Math.ceil((origH * scale) * 100) / 100
-        : roundToHundredth(Math.max(1, origH * scale));
+        : origH * scale;
 
       const worldGeom = unprojectGroupChildToWorld(
         newGroupX,
