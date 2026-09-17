@@ -567,3 +567,11 @@
 - [x] Give copied groups new identifiers while preserving membership within each copied group for Alt+drag and paste operations.
 - [x] Add store regression coverage for grouped photo/text duplication, separate source groups, ungrouped items, and paste behavior.
 - [ ] Manually verify Alt+drag preview, snapping, and group selection in the running Tauri desktop editor.
+
+### Phase 49 — Visual Gap Matching While Dragging
+
+- [x] Treat stationary originals as gap references during Alt+drag, including grouped photo/text selections.
+- [x] Snap moving objects and copy previews to the configured Photo Spacing or a matching gap between other objects.
+- [x] Highlight matched distances and their reference gaps in the canvas HUD, using rotated visual bounds and unit-appropriate labels.
+- [x] Add regression cases for horizontal and vertical spacing, existing gaps, rotated objects, grouped copies, disabled gap snapping, and inch precision.
+- [ ] Manually verify guide readability and gap matching with overlapping photo/text objects in the running Tauri editor.

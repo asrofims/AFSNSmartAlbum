@@ -414,6 +414,8 @@ export interface GapGuide {
   crossPos: number; // Physical coordinate on perpendicular axis
   distance: number; // Physical distance (e.g. 10.0)
   label: string; // Formatted label (e.g. "10.0 mm")
+  matchedTo?: 'photo_spacing' | 'equal_gap';
+  reference?: boolean;
 }
 
 export interface SnappingConfig {
@@ -549,7 +551,8 @@ export function calculateSnapping(
   gutterWidth: number,
   otherFrames: RectBounds[],
   thresholdOrConfig: number | SnappingConfig = DEFAULT_SNAPPING_CONFIG,
-  unit: string = 'mm'
+  unit: string = 'mm',
+  preferredGap?: number
 ): { snappedX: number; snappedY: number; snapLines: SnapLine[]; gapGuides: GapGuide[] } {
   const config: SnappingConfig =
     typeof thresholdOrConfig === 'number'
@@ -839,6 +842,115 @@ export function calculateSnapping(
     // Maximum proximity distance for displaying adjacent gap guides (25mm / 2.5cm / 1.0 inch)
     const maxProximityGap =
       unit === 'cm' ? 2.5 : unit === 'inch' ? 1.0 : unit === 'px' ? 300 : 25.0;
+    const displayGap = (distance: number) => Number(distance.toFixed(
+      unit === 'inch' ? 4 : unit === 'cm' ? 3 : unit === 'px' ? 1 : 2,
+    ));
+
+    type GapReference = { distance: number; matchedTo: 'photo_spacing' | 'equal_gap'; guide?: GapGuide };
+    type GapMatch = { snapped: number; guide: GapGuide; reference?: GapGuide; matchedTo: GapReference['matchedTo'] };
+    const horizontalReferences: GapReference[] = [];
+    const verticalReferences: GapReference[] = [];
+    if (preferredGap && Number.isFinite(preferredGap) && preferredGap > 0) {
+      const reference = { distance: preferredGap, matchedTo: 'photo_spacing' as const };
+      horizontalReferences.push(reference);
+      verticalReferences.push(reference);
+    }
+
+    const otherVisualBounds = otherFrames.map(getSnappingVisualBounds);
+    // Only immediate facing neighbors define a reusable gap. This also keeps
+    // reference discovery quadratic rather than comparing every gap to every frame.
+    for (const a of otherVisualBounds) {
+      let nearestRight: { bounds: RectBounds; gap: number; crossPos: number } | null = null;
+      let nearestBottom: { bounds: RectBounds; gap: number; crossPos: number } | null = null;
+      for (const b of otherVisualBounds) {
+        if (a === b) continue;
+        const horizontalGap = b.x - (a.x + a.width);
+        const overlapTop = Math.max(a.y, b.y);
+        const overlapBottom = Math.min(a.y + a.height, b.y + b.height);
+        if (horizontalGap > 0 && horizontalGap <= maxProximityGap && overlapBottom > overlapTop
+          && (!nearestRight || horizontalGap < nearestRight.gap)) {
+          nearestRight = { bounds: b, gap: horizontalGap, crossPos: (overlapTop + overlapBottom) / 2 };
+        }
+
+        const verticalGap = b.y - (a.y + a.height);
+        const overlapLeft = Math.max(a.x, b.x);
+        const overlapRight = Math.min(a.x + a.width, b.x + b.width);
+        if (verticalGap > 0 && verticalGap <= maxProximityGap && overlapRight > overlapLeft
+          && (!nearestBottom || verticalGap < nearestBottom.gap)) {
+          nearestBottom = { bounds: b, gap: verticalGap, crossPos: (overlapLeft + overlapRight) / 2 };
+        }
+      }
+      if (nearestRight) {
+        const { bounds, gap, crossPos } = nearestRight;
+        horizontalReferences.push({ distance: gap, matchedTo: 'equal_gap',
+          guide: { type: 'horizontal', start: a.x + a.width, end: bounds.x, crossPos,
+            distance: displayGap(gap), label: `${displayGap(gap)} ${unit}` } });
+      }
+      if (nearestBottom) {
+        const { bounds, gap, crossPos } = nearestBottom;
+        verticalReferences.push({ distance: gap, matchedTo: 'equal_gap',
+          guide: { type: 'vertical', start: a.y + a.height, end: bounds.y, crossPos,
+            distance: displayGap(gap), label: `${displayGap(gap)} ${unit}` } });
+      }
+    }
+
+    let horizontalMatch: GapMatch | null = null;
+    let verticalMatch: GapMatch | null = null;
+    let bestGapDiffX = minDiffX;
+    let bestGapDiffY = minDiffY;
+    for (const bounds of otherVisualBounds) {
+      const overlapTop = Math.max(draggedVisual.y, bounds.y);
+      const overlapBottom = Math.min(draggedVisual.y + draggedVisual.height, bounds.y + bounds.height);
+      if (bestVLine?.kind !== 'center' && overlapBottom > overlapTop) {
+        for (const reference of horizontalReferences) {
+          const leftTarget = bounds.x + bounds.width + reference.distance;
+          const rightTarget = bounds.x - reference.distance - draggedVisual.width;
+          for (const [visualX, start, end] of [
+            [leftTarget, bounds.x + bounds.width, leftTarget],
+            [rightTarget, rightTarget + draggedVisual.width, bounds.x],
+          ] as [number, number, number][]) {
+            const diff = Math.abs(draggedVisual.x - visualX);
+            if (diff > threshold || diff >= bestGapDiffX) continue;
+            bestGapDiffX = diff;
+            const snapped = visualX - dragOffsetX;
+            horizontalMatch = {
+              snapped,
+              matchedTo: reference.matchedTo,
+              reference: reference.guide,
+              guide: { type: 'horizontal', start, end, crossPos: (overlapTop + overlapBottom) / 2,
+                distance: displayGap(reference.distance), label: `${displayGap(reference.distance)} ${unit}` },
+            };
+          }
+        }
+      }
+
+      const overlapLeft = Math.max(draggedVisual.x, bounds.x);
+      const overlapRight = Math.min(draggedVisual.x + draggedVisual.width, bounds.x + bounds.width);
+      if (bestHLine?.kind !== 'center' && overlapRight > overlapLeft) {
+        for (const reference of verticalReferences) {
+          const topTarget = bounds.y + bounds.height + reference.distance;
+          const bottomTarget = bounds.y - reference.distance - draggedVisual.height;
+          for (const [visualY, start, end] of [
+            [topTarget, bounds.y + bounds.height, topTarget],
+            [bottomTarget, bottomTarget + draggedVisual.height, bounds.y],
+          ] as [number, number, number][]) {
+            const diff = Math.abs(draggedVisual.y - visualY);
+            if (diff > threshold || diff >= bestGapDiffY) continue;
+            bestGapDiffY = diff;
+            const snapped = visualY - dragOffsetY;
+            verticalMatch = {
+              snapped,
+              matchedTo: reference.matchedTo,
+              reference: reference.guide,
+              guide: { type: 'vertical', start, end, crossPos: (overlapLeft + overlapRight) / 2,
+                distance: displayGap(reference.distance), label: `${displayGap(reference.distance)} ${unit}` },
+            };
+          }
+        }
+      }
+    }
+    if (horizontalMatch) snappedX = horizontalMatch.snapped;
+    if (verticalMatch) snappedY = verticalMatch.snapped;
 
     // Visual bounds taking rotation into account
     // Active visual bounds at current snapped position
@@ -884,7 +996,7 @@ export function calculateSnapping(
         const totalSpan = rightEdge - leftEdge - activeVisualDragged.width;
         const equalGap = Math.max(0, totalSpan / 2);
         const targetVisualX = leftEdge + equalGap;
-        snappedX = roundToTenth(targetVisualX - dragOffsetX);
+        snappedX = Number((targetVisualX - dragOffsetX).toFixed(6));
 
         const leftCrossY = (leftNeighborItem.overlapStartY + leftNeighborItem.overlapEndY) / 2;
         const rightCrossY = (rightNeighborItem.overlapStartY + rightNeighborItem.overlapEndY) / 2;
@@ -895,16 +1007,18 @@ export function calculateSnapping(
             start: leftEdge,
             end: leftEdge + equalGap,
             crossPos: leftCrossY,
-            distance: roundToTenth(equalGap),
-            label: `${roundToTenth(equalGap)} ${unit}`,
+            distance: displayGap(equalGap),
+            label: `${displayGap(equalGap)} ${unit}`,
+            matchedTo: 'equal_gap',
           },
           {
             type: 'horizontal',
             start: leftEdge + equalGap + activeVisualDragged.width,
             end: rightEdge,
             crossPos: rightCrossY,
-            distance: roundToTenth(equalGap),
-            label: `${roundToTenth(equalGap)} ${unit}`,
+            distance: displayGap(equalGap),
+            label: `${displayGap(equalGap)} ${unit}`,
+            matchedTo: 'equal_gap',
           }
         );
       } else {
@@ -917,8 +1031,8 @@ export function calculateSnapping(
             start: leftEdge,
             end: currentVisualLeft,
             crossPos: crossY,
-            distance: roundToTenth(currentLeftGap),
-            label: `${roundToTenth(currentLeftGap)} ${unit}`,
+            distance: displayGap(currentLeftGap),
+            label: `${displayGap(currentLeftGap)} ${unit}`,
           });
         }
 
@@ -931,8 +1045,8 @@ export function calculateSnapping(
             start: currentVisualRight,
             end: rightEdge,
             crossPos: crossY,
-            distance: roundToTenth(currentRightGap),
-            label: `${roundToTenth(currentRightGap)} ${unit}`,
+            distance: displayGap(currentRightGap),
+            label: `${displayGap(currentRightGap)} ${unit}`,
           });
         }
       }
@@ -947,8 +1061,8 @@ export function calculateSnapping(
           start: leftEdge,
           end: currentVisualLeft,
           crossPos: crossY,
-          distance: roundToTenth(currentLeftGap),
-          label: `${roundToTenth(currentLeftGap)} ${unit}`,
+          distance: displayGap(currentLeftGap),
+          label: `${displayGap(currentLeftGap)} ${unit}`,
         });
       }
     } else if (rightNeighborItem) {
@@ -963,11 +1077,13 @@ export function calculateSnapping(
           start: currentVisualRight,
           end: rightEdge,
           crossPos: crossY,
-          distance: roundToTenth(currentRightGap),
-          label: `${roundToTenth(currentRightGap)} ${unit}`,
+          distance: displayGap(currentRightGap),
+          label: `${displayGap(currentRightGap)} ${unit}`,
         });
       }
     }
+
+    activeVisualDragged.x = snappedX + dragOffsetX;
 
     // 2. Vertical Gaps (strictly facing neighbors with horizontal overlap)
     const facingVertical = otherFrames
@@ -1004,7 +1120,7 @@ export function calculateSnapping(
         const totalSpan = bottomEdge - topEdge - activeVisualDragged.height;
         const equalGap = Math.max(0, totalSpan / 2);
         const targetVisualY = topEdge + equalGap;
-        snappedY = roundToTenth(targetVisualY - dragOffsetY);
+        snappedY = Number((targetVisualY - dragOffsetY).toFixed(6));
 
         const topCrossX = (topNeighborItem.overlapStartX + topNeighborItem.overlapEndX) / 2;
         const bottomCrossX = (bottomNeighborItem.overlapStartX + bottomNeighborItem.overlapEndX) / 2;
@@ -1015,16 +1131,18 @@ export function calculateSnapping(
             start: topEdge,
             end: topEdge + equalGap,
             crossPos: topCrossX,
-            distance: roundToTenth(equalGap),
-            label: `${roundToTenth(equalGap)} ${unit}`,
+            distance: displayGap(equalGap),
+            label: `${displayGap(equalGap)} ${unit}`,
+            matchedTo: 'equal_gap',
           },
           {
             type: 'vertical',
             start: topEdge + equalGap + activeVisualDragged.height,
             end: bottomEdge,
             crossPos: bottomCrossX,
-            distance: roundToTenth(equalGap),
-            label: `${roundToTenth(equalGap)} ${unit}`,
+            distance: displayGap(equalGap),
+            label: `${displayGap(equalGap)} ${unit}`,
+            matchedTo: 'equal_gap',
           }
         );
       } else {
@@ -1037,8 +1155,8 @@ export function calculateSnapping(
             start: topEdge,
             end: currentVisualTop,
             crossPos: crossX,
-            distance: roundToTenth(currentTopGap),
-            label: `${roundToTenth(currentTopGap)} ${unit}`,
+            distance: displayGap(currentTopGap),
+            label: `${displayGap(currentTopGap)} ${unit}`,
           });
         }
 
@@ -1051,8 +1169,8 @@ export function calculateSnapping(
             start: currentVisualBottom,
             end: bottomEdge,
             crossPos: crossX,
-            distance: roundToTenth(currentBottomGap),
-            label: `${roundToTenth(currentBottomGap)} ${unit}`,
+            distance: displayGap(currentBottomGap),
+            label: `${displayGap(currentBottomGap)} ${unit}`,
           });
         }
       }
@@ -1067,8 +1185,8 @@ export function calculateSnapping(
           start: topEdge,
           end: currentVisualTop,
           crossPos: crossX,
-          distance: roundToTenth(currentTopGap),
-          label: `${roundToTenth(currentTopGap)} ${unit}`,
+          distance: displayGap(currentTopGap),
+          label: `${displayGap(currentTopGap)} ${unit}`,
         });
       }
     } else if (bottomNeighborItem) {
@@ -1083,9 +1201,25 @@ export function calculateSnapping(
           start: currentVisualBottom,
           end: bottomEdge,
           crossPos: crossX,
-          distance: roundToTenth(currentBottomGap),
-          label: `${roundToTenth(currentBottomGap)} ${unit}`,
+          distance: displayGap(currentBottomGap),
+          label: `${displayGap(currentBottomGap)} ${unit}`,
         });
+      }
+    }
+
+    for (const match of [horizontalMatch, verticalMatch]) {
+      if (!match) continue;
+      const finalPosition = match.guide.type === 'horizontal' ? snappedX : snappedY;
+      if (Math.abs(finalPosition - match.snapped) > 0.05) continue;
+      const existing = gapGuides.find((guide) => guide.type === match.guide.type
+        && Math.abs(guide.start - match.guide.start) < 0.05
+        && Math.abs(guide.end - match.guide.end) < 0.05);
+      if (existing) existing.matchedTo = match.matchedTo;
+      else gapGuides.push({ ...match.guide, matchedTo: match.matchedTo });
+      if (match.reference && !gapGuides.some((guide) => guide.type === match.reference?.type
+        && Math.abs(guide.start - match.reference.start) < 0.05
+        && Math.abs(guide.end - match.reference.end) < 0.05)) {
+        gapGuides.push({ ...match.reference, matchedTo: 'equal_gap', reference: true });
       }
     }
   }
@@ -1120,10 +1254,11 @@ export function calculateSelectionDragSnapping(
   gutterWidth: number,
   otherFrames: RectBounds[],
   thresholdOrConfig: number | SnappingConfig = DEFAULT_SNAPPING_CONFIG,
-  unit: string = 'mm'
+  unit: string = 'mm',
+  preferredGap?: number
 ): ReturnType<typeof calculateSnapping> {
   if (selectedFrames.length <= 1) {
-    return calculateSnapping(dragged, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit);
+    return calculateSnapping(dragged, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit, preferredGap);
   }
 
   const visualBounds = selectedFrames.map(getSnappingVisualBounds);
@@ -1135,7 +1270,7 @@ export function calculateSelectionDragSnapping(
   const groupY = top + dragged.y - initialDragged.y;
   const result = calculateSnapping(
     { x: groupX, y: groupY, width: right - left, height: bottom - top },
-    spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit
+    spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit, preferredGap
   );
   return {
     snappedX: initialDragged.x + result.snappedX - left,

@@ -1481,6 +1481,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
     const initial = dragInitialPhysicalPositionsRef.current.get(element.id);
     return initial ? [{ x: initial.x, y: initial.y, width: element.width, height: element.height, rotation: element.rotation }] : [];
   });
+  const getDragNeighborRects = (copyDrag: boolean): RectBounds[] => (activeSpread?.elements || [])
+    .filter((element) => copyDrag || !dragInitialPhysicalPositionsRef.current.has(element.id))
+    .map((element) => ({ x: element.x, y: element.y, width: element.width,
+      height: element.height, rotation: element.rotation }));
 
   // Auto-initialize album if project is loaded but album state is null
   useEffect(() => {
@@ -1881,6 +1885,9 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
   const projectUnit = (unit as Unit) || 'mm';
   const projectDpi = currentProject?.canvasDpi || 300;
   const snappingThresholdUnits = convertUnit(rawThresholdMm, 'mm', projectUnit, projectDpi, projectUnit === 'px' ? 0 : 3);
+  const spacingValue = activeSpread.spacingValue ?? currentProject.spacingValue;
+  const spacingUnit = activeSpread.spacingUnit ?? currentProject.spacingUnit ?? unit;
+  const preferredGap = spacingValue > 0 ? convertUnit(spacingValue, spacingUnit, unit, projectDpi, 8) : undefined;
 
   // Total spread physical dimensions (strictly 2 * singlePageW)
   const totalSpreadPhysicalW = singlePageW * 2;
@@ -3003,9 +3010,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                       if (!snapEnabled || e.evt?.ctrlKey) {
                         clearSnapLines();
                       } else {
-                        const otherRects = (activeSpread.elements || [])
-                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
+                        const otherRects = getDragNeighborRects(Boolean(e.evt?.altKey || isAltPressedRef.current));
 
                         const snapRes = calculateSelectionDragSnapping(
                           { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
@@ -3017,7 +3022,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                           gutterPhysicalW,
                           otherRects,
                           { ...snappingConfig, threshold: snappingThresholdUnits },
-                          unit
+                          unit,
+                          preferredGap
                         );
 
                         if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
@@ -3063,9 +3069,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         const rawDy = finalCurrentPhysY - initPos.y;
                         const isHorizontalConstraint = Math.abs(rawDx) >= Math.abs(rawDy);
 
-                        const otherRects = (activeSpread.elements || [])
-                          .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                          .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
+                        const otherRects = getDragNeighborRects(isAltPressed);
 
                         const snapRes =
                           !snapEnabled || e.evt?.ctrlKey
@@ -3080,7 +3084,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                                 gutterPhysicalW,
                                 otherRects,
                                 { ...snappingConfig, threshold: snappingThresholdUnits },
-                                unit
+                                unit,
+                                preferredGap
                               );
 
                         let deltaPhysX = snapRes.snappedX - textEl.x;
@@ -3239,9 +3244,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                     if (!snapEnabled || e.evt?.ctrlKey) {
                       clearSnapLines();
                     } else {
-                      const otherRects = (activeSpread.elements || [])
-                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
+                      const otherRects = getDragNeighborRects(Boolean(e.evt?.altKey || isAltPressedRef.current));
 
                       const snapRes = calculateSelectionDragSnapping(
                         { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
@@ -3253,7 +3256,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         gutterPhysicalW,
                         otherRects,
                         { ...snappingConfig, threshold: snappingThresholdUnits },
-                        unit
+                        unit,
+                        preferredGap
                       );
 
                       if (snapRes.snapLines.length > 0 || snapRes.gapGuides.length > 0) {
@@ -3314,9 +3318,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
 
                       const isAltPressed = Boolean(e.evt?.altKey || isAltPressedRef.current);
 
-                      const otherRects = (activeSpread.elements || [])
-                        .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
-                        .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
+                      const otherRects = getDragNeighborRects(isAltPressed);
 
                       const snapRes = (!snapEnabled || e.evt?.ctrlKey)
                         ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
@@ -3330,7 +3332,8 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                             gutterPhysicalW,
                             otherRects,
                             { ...snappingConfig, threshold: snappingThresholdUnits },
-                            unit
+                            unit,
+                            preferredGap
                           );
 
                       let deltaPhysX = snapRes.snappedX - frame.x;
@@ -3990,6 +3993,11 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
             {/* Gap Guides & Equal Distance Indicators */}
             {activeGapGuides.map((gap, idx) => {
               const isHoriz = gap.type === 'horizontal';
+              const isMatched = Boolean(gap.matchedTo);
+              const guideColor = isMatched ? '#34d399' : '#06b6d4';
+              const badgeText = gap.matchedTo === 'photo_spacing'
+                ? `Photo Spacing · ${gap.label}`
+                : gap.matchedTo === 'equal_gap' ? `Equal Gap · ${gap.label}` : gap.label;
               const startPx = gap.start * scaleFactor;
               const endPx = gap.end * scaleFactor;
               const crossPx = gap.crossPos * scaleFactor;
@@ -4005,8 +4013,9 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         ? [startPx, crossPx, endPx, crossPx]
                         : [crossPx, startPx, crossPx, endPx]
                     }
-                    stroke="#06b6d4"
-                    strokeWidth={1.5}
+                    stroke={guideColor}
+                    strokeWidth={isMatched ? 2 : 1.5}
+                    dash={gap.reference ? [4, 3] : undefined}
                   />
                   {/* Start Tick */}
                   <Line
@@ -4015,7 +4024,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         ? [startPx, crossPx - tickSize, startPx, crossPx + tickSize]
                         : [crossPx - tickSize, startPx, crossPx + tickSize, startPx]
                     }
-                    stroke="#06b6d4"
+                    stroke={guideColor}
                     strokeWidth={1.5}
                   />
                   {/* End Tick */}
@@ -4025,7 +4034,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         ? [endPx, crossPx - tickSize, endPx, crossPx + tickSize]
                         : [crossPx - tickSize, endPx, crossPx + tickSize, endPx]
                     }
-                    stroke="#06b6d4"
+                    stroke={guideColor}
                     strokeWidth={1.5}
                   />
                   {/* Distance Pill Badge */}
@@ -4035,18 +4044,18 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                   >
                     <Label offsetX={isHoriz ? 26 : -8} offsetY={isHoriz ? 24 : 9}>
                       <Tag
-                        fill="#082f49"
-                        stroke="#06b6d4"
+                        fill={isMatched ? '#064e3b' : '#082f49'}
+                        stroke={guideColor}
                         strokeWidth={1}
                         cornerRadius={3}
                         shadowColor="rgba(0,0,0,0.5)"
                         shadowBlur={4}
                       />
                       <KonvaText
-                        text={gap.label}
+                        text={badgeText}
                         fontSize={10}
                         fontStyle="bold"
-                        fill="#38bdf8"
+                        fill={isMatched ? '#d1fae5' : '#38bdf8'}
                         padding={3}
                         fontFamily="sans-serif"
                       />

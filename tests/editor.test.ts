@@ -162,6 +162,67 @@ console.assert(snapEqual.snappedX === 200, `Should snap to equidistant x=200, go
 console.assert(snapEqual.gapGuides.length === 2, `Should generate 2 gap guides for equal spacing, got ${snapEqual.gapGuides.length}`);
 console.assert(snapEqual.gapGuides[0].distance === 50, `Gap distance should be 50mm, got ${snapEqual.gapGuides[0].distance}`);
 
+// A copy can match the configured spacing against its stationary source.
+const copySource: RectBounds = { x: 100, y: 80, width: 60, height: 40 };
+const copyNearSpacing: RectBounds = { x: 164.4, y: 80, width: 60, height: 40 };
+const copySpacingSnap = calculateSnapping(copyNearSpacing, 600, 400, 0, 0, [copySource], 1.27, 'mm', 5);
+assert.equal(copySpacingSnap.snappedX, 165);
+assert.ok(copySpacingSnap.gapGuides.some((guide) => guide.matchedTo === 'photo_spacing'
+  && guide.type === 'horizontal' && guide.start === 160 && guide.end === 165));
+const fineGapSnap = calculateSnapping({ ...copyNearSpacing, x: 160.4 },
+  600, 400, 0, 0, [copySource], 1.27, 'mm', 0.25);
+assert.equal(fineGapSnap.snappedX, 160.25);
+assert.ok(fineGapSnap.gapGuides.some((guide) => guide.label === '0.25 mm'
+  && guide.matchedTo === 'photo_spacing'));
+const copyVerticalSnap = calculateSnapping({ ...copySource, y: 124.3 }, 600, 400, 0, 0, [copySource], 1.27, 'mm', 5);
+assert.equal(copyVerticalSnap.snappedY, 125);
+assert.ok(copyVerticalSnap.gapGuides.some((guide) => guide.matchedTo === 'photo_spacing' && guide.type === 'vertical'));
+
+// Existing adjacent gaps provide another snap target and a matching reference guide.
+const existingGapSnap = calculateSnapping({ x: 301.4, y: 80, width: 40, height: 40 }, 600, 400, 0, 0, [
+  { x: 50, y: 80, width: 50, height: 40 },
+  { x: 112, y: 80, width: 50, height: 40 },
+  { x: 240, y: 80, width: 50, height: 40 },
+], 1.27, 'mm');
+assert.equal(existingGapSnap.snappedX, 302);
+assert.ok(existingGapSnap.gapGuides.some((guide) => guide.matchedTo === 'equal_gap'
+  && guide.start === 290 && guide.end === 302));
+assert.ok(existingGapSnap.gapGuides.some((guide) => guide.reference && guide.start === 100 && guide.end === 112));
+
+const rotatedCopySource: RectBounds = { x: 100, y: 100, width: 80, height: 40, rotation: 90 };
+const rotatedCopySnap = calculateSnapping({ x: 103.4, y: 110, width: 30, height: 30 },
+  600, 400, 0, 0, [rotatedCopySource], 1.27, 'mm', 4);
+assert.equal(rotatedCopySnap.snappedX, 104);
+assert.ok(rotatedCopySnap.gapGuides.some((guide) => guide.matchedTo === 'photo_spacing'
+  && Math.abs(guide.start - 100) < 1e-9 && Math.abs(guide.end - 104) < 1e-9));
+
+const sourcePair: RectBounds[] = [
+  { x: 100, y: 80, width: 40, height: 40 },
+  { x: 150, y: 80, width: 40, height: 40 },
+];
+const groupCopySnap = calculateSelectionDragSnapping({ ...sourcePair[0], x: 195.6 }, sourcePair[0], sourcePair,
+  600, 400, 0, 0, sourcePair, 1.27, 'mm', 5);
+assert.equal(groupCopySnap.snappedX, 195);
+assert.ok(groupCopySnap.gapGuides.some((guide) => guide.matchedTo === 'photo_spacing'
+  && guide.start === 190 && guide.end === 195));
+
+const inchGapSnap = calculateSnapping({ x: 3.124, y: 1, width: 1, height: 1 },
+  8, 6, 0, 0, [{ x: 2, y: 1, width: 1, height: 1 }], 0.02, 'inch', 0.125);
+assert.equal(inchGapSnap.snappedX, 3.125);
+assert.ok(inchGapSnap.gapGuides.some((guide) => guide.label === '0.125 inch'
+  && guide.matchedTo === 'photo_spacing'));
+
+const centerOverGap = calculateSnapping({ x: 249.5, y: 80, width: 100, height: 40 },
+  600, 400, 0, 0, [{ x: 200, y: 80, width: 46, height: 40 }], 1.27, 'mm', 3);
+assert.equal(centerOverGap.snappedX, 250);
+assert.ok(centerOverGap.snapLines.some((line) => line.label === 'Spread Center X'));
+
+const spacingDisabled = calculateSnapping(copyNearSpacing, 600, 400, 0, 0, [copySource],
+  { ...DEFAULT_SNAPPING_CONFIG, snapToEqualGaps: false, snapToFrames: false,
+    snapToPageEdges: false, snapToPageCenters: false, snapToMargins: false }, 'mm', 5);
+assert.equal(spacingDisabled.snappedX, copyNearSpacing.x);
+assert.equal(spacingDisabled.gapGuides.length, 0);
+
 // 5b. Test Spread Center (Full Spread / Foto Sambung) and Page Center Magnetic Snapping
 // Spread: spreadWidth=600, spreadHeight=400, gutterWidth=0 -> singlePageW=300
 // Left Page Center = 150, Right Page Center = 450, Spread Center X = 300, Spread Center Y = 200
