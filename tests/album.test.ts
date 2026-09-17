@@ -203,6 +203,10 @@ const missingFrame = mergeFramePhotoAsset(staleFrame, {
   isMissing: true,
 });
 console.assert(missingFrame.previewPath === recoveredPhoto.thumbnailPath, 'Missing photos should still use a healthy thumbnail instead of the broken original path');
+const missingOnlyFrame = mergeFramePhotoAsset(recoveredFrame, { ...recoveredPhoto, isMissing: true });
+console.assert(missingOnlyFrame.isMissing === true, 'Missing state must propagate even when image paths are unchanged');
+console.assert(missingOnlyFrame !== recoveredFrame, 'A missing-state change must trigger a canvas frame update');
+console.assert(mergeFramePhotoAsset(missingOnlyFrame, recoveredPhoto).isMissing === false, 'Relinking must clear the missing state on the canvas');
 
 const relinkAlbum = {
   ...recalculated,

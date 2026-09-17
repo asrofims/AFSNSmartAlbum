@@ -22,6 +22,7 @@ export interface PhotoContextMenuProps {
   onRemoveFromFolder: (folderId: string, photoIds: string[]) => void;
   onRequestDelete: (photoIds: string[], photoNames: string) => void;
   onSelectAll: () => void;
+  onRelinkPhoto: (photoId: string) => void;
 }
 
 export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
@@ -40,6 +41,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
   onRemoveFromFolder,
   onRequestDelete,
   onSelectAll,
+  onRelinkPhoto,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [folderSubmenuMode, setFolderSubmenuMode] = React.useState<'copy' | 'move' | null>(null);
@@ -76,7 +78,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
 
   // Position adjustment to avoid viewport overflowing
   const menuWidth = 200;
-  const menuHeight = 260;
+  const menuHeight = 310;
   const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
   const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
 
@@ -120,6 +122,13 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
       >
         <span className={styles.menuIcon}>🖼️</span>
         <span>{isMulti ? `Place ${count} Photos on Spread` : 'Place on Spread Canvas'}</span>
+      </button>
+
+      <div className={styles.divider} />
+
+      <button type="button" className={styles.menuItem} onClick={() => { onClose(); onRelinkPhoto(targetPhoto.id); }}>
+        <span className={styles.menuIcon}>↻</span>
+        <span>Relink Photo...</span>
       </button>
 
       <div className={styles.divider} />

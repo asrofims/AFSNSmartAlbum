@@ -30,11 +30,19 @@
 
 .missingItem {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.itemDetails {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .missingItem:last-child {
@@ -53,6 +61,70 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.linkedName {
+  color: #6ee7b7;
+}
+
+.summary,
+.error {
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  white-space: pre-wrap;
+}
+
+.summary {
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+}
+
+.error {
+  max-height: 140px;
+  overflow-y: auto;
+  background: rgba(244, 63, 94, 0.1);
+  color: #fda4af;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.progressTrack {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--color-border);
+}
+
+.progressFill,
+.progressIndeterminate {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 160ms ease;
+}
+
+.progressIndeterminate {
+  width: 35%;
+  animation: relinkScan 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes relinkScan {
+  from { transform: translateX(0); }
+  to { transform: translateX(185%); }
 }
 
 .footer {

@@ -266,7 +266,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
   const unusedCount = currentPhotoPool.filter((p) => !usedPhotoIdSet.has(p.id) && p.usedCount === 0).length;
   const usedCount = currentPhotoPool.filter((p) => usedPhotoIdSet.has(p.id) || p.usedCount > 0).length;
   const favCount = currentPhotoPool.filter((p) => p.isFavorite).length;
-  const missingCount = currentPhotoPool.filter((p) => p.isMissing).length;
+  const missingCount = photos.filter((p) => p.isMissing).length;
 
   const handleToggleImportMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -417,7 +417,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                 <button
                   type="button"
                   className={styles.missingAlertBtn}
-                  onClick={openRelink}
+                  onClick={() => openRelink()}
                   title="Click to relink missing photos"
                 >
                   ⚠️ {missingCount} Missing (Relink)
@@ -681,7 +681,10 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                           <div className={styles.thumbnailPlaceholder} draggable={false}>
                             <div className={styles.placeholderShimmer} />
                             {isMissing ? (
-                              <span
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); openRelink(photo.id); }}
+                                title="Locate missing photo"
                                 style={{
                                   background: '#ef4444',
                                   color: '#ffffff',
@@ -693,10 +696,12 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
                                   top: '6px',
                                   left: '6px',
                                   zIndex: 2,
+                                  border: 0,
+                                  cursor: 'pointer',
                                 }}
                               >
                                 ⚠️ Missing
-                              </span>
+                              </button>
                             ) : (
                               <>
                                 <div className={styles.processingBottomStrip} />
@@ -756,6 +761,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           onRemoveFromFolder={(fId, pIds) => removePhotosFromFolder(currentProject.id, fId, pIds)}
           onRequestDelete={requestPhotoDelete}
           onSelectAll={() => selectAll(sortedPhotos)}
+          onRelinkPhoto={(photoId) => openRelink(photoId)}
         />
       )}
 

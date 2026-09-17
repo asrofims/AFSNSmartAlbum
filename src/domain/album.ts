@@ -75,7 +75,8 @@ function isDifferentFrameAsset(a: PhotoFrameElement, b: PhotoFrameElement): bool
     a.fileName !== b.fileName ||
     a.previewPath !== b.previewPath ||
     a.thumbnailPath !== b.thumbnailPath ||
-    a.photoAspect !== b.photoAspect
+    a.photoAspect !== b.photoAspect ||
+    a.isMissing !== b.isMissing
   );
 }
 

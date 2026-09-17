@@ -3,6 +3,8 @@ import { Photo, PhotoFolder, ImportProgress, ImportNotice, PhotoFilter, PhotoSor
 import { detachRemovedAlbumPhotos, detachRemovedPhotos } from '../domain/photoRemoval';
 
 interface PhotoRemovalResult { removedIds: string[]; warnings: string[] }
+interface RelinkProgress { projectId: string; current: number; total: number; currentFile: string; phase: 'scanning' | 'processing' }
+interface RelinkResult { photos: Photo[]; failures: string[]; relinkedIds: string[]; cancelled: boolean }
 
 async function markLibraryChanged(projectId: string): Promise<void> {
   // Preserve the recovery marker even if the user switched projects during the write.
@@ -94,6 +96,46 @@ async function syncAlbumFramePhotoAssets(photos: Photo[], persist = true): Promi
   }
 }
 
+async function runRelink(projectId: string, command: 'relink_photo' | 'relink_folder', photoId?: string): Promise<void> {
+  const state = usePhotoStore.getState();
+  if (state.isRelinking || state.isRemoving || state.isImporting) return;
+  usePhotoStore.setState({ isRelinking: true, relinkProgress: null, relinkSummary: null, error: null });
+  let unlisten: (() => void) | undefined;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { listen } = await import('@tauri-apps/api/event');
+    const { useProjectStore } = await import('./projectStore');
+    const project = useProjectStore.getState();
+    if (project.currentProject?.id !== projectId || project.isSaving || project.isLoading) {
+      throw new Error('The project is busy or has changed. Try relinking again when it is ready.');
+    }
+    unlisten = await listen<RelinkProgress>('photo-relink-progress', (event) => {
+      if (event.payload?.projectId === useProjectStore.getState().currentProject?.id && usePhotoStore.getState().isRelinking) {
+        usePhotoStore.setState({ relinkProgress: event.payload });
+      }
+    });
+    const result = await invoke<RelinkResult>(command, { projectId, ...(photoId ? { photoId } : {}) });
+    if (useProjectStore.getState().currentProject?.id !== projectId || result.cancelled) return;
+    photoLoadEpoch += 1;
+    usePhotoStore.setState({
+      photos: result.photos,
+      relinkSummary: result.relinkedIds.length > 0
+        ? `Relinked ${result.relinkedIds.length} ${result.relinkedIds.length === 1 ? 'photo' : 'photos'}.`
+        : 'No photos were relinked.',
+      error: result.failures.length ? result.failures.join('\n') : null,
+    });
+    if (result.relinkedIds.length > 0) {
+      await markLibraryChanged(projectId);
+      await syncAlbumFramePhotoAssets(result.photos);
+    }
+  } catch (error) {
+    usePhotoStore.setState({ error: String(error) });
+  } finally {
+    unlisten?.();
+    usePhotoStore.setState({ isRelinking: false, relinkProgress: null });
+  }
+}
+
 export interface ImportTask {
   id: string;
   projectId: string;
@@ -121,6 +163,8 @@ interface PhotoState {
   isCancelling: boolean;
   isRemoving: boolean;
   isRelinking: boolean;
+  relinkProgress: RelinkProgress | null;
+  relinkSummary: string | null;
   removalNotice: string | null;
   dismissRemovalNotice: () => void;
   importProgress: ImportProgress | null;
@@ -128,6 +172,7 @@ interface PhotoState {
   importQueue: ImportTask[];
   currentImportTask: ImportTask | null;
   isRelinkOpen: boolean;
+  relinkTargetPhotoId: string | null;
   isFolderDialogOpen: boolean;
   folderDialogMode: 'create' | 'rename';
   folderDialogTarget: PhotoFolder | null;
@@ -150,6 +195,7 @@ interface PhotoState {
   checkMissing: (projectId: string) => Promise<void>;
   healThumbnail: (photoId: string) => Promise<string | null>;
   relinkFolder: (projectId: string) => Promise<void>;
+  relinkPhoto: (projectId: string, photoId: string) => Promise<void>;
   setupListeners: () => Promise<() => void>;
 
   // Selection actions
@@ -179,7 +225,7 @@ interface PhotoState {
   setFilter: (filter: PhotoFilter) => void;
   setSortBy: (sortBy: PhotoSortBy) => void;
   setSearchQuery: (query: string) => void;
-  openRelink: () => void;
+  openRelink: (photoId?: string) => void;
   closeRelink: () => void;
   openCreateFolderDialog: () => void;
   openRenameFolderDialog: (folder: PhotoFolder) => void;
@@ -210,6 +256,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   isCancelling: false,
   isRemoving: false,
   isRelinking: false,
+  relinkProgress: null,
+  relinkSummary: null,
   removalNotice: null,
   dismissRemovalNotice: () => set({ removalNotice: null }),
   importProgress: null,
@@ -217,6 +265,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   importQueue: [],
   currentImportTask: null,
   isRelinkOpen: false,
+  relinkTargetPhotoId: null,
   isFolderDialogOpen: false,
   folderDialogMode: 'create',
   folderDialogTarget: null,
@@ -727,25 +776,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     try { return await operation; } finally { thumbnailHeals.delete(photoId); }
   },
 
-  relinkFolder: async (projectId: string) => {
-    if (get().isRelinking || get().isRemoving || get().isImporting) return;
-    set({ isRelinking: true, error: null });
-    photoLoadEpoch += 1;
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const { useProjectStore } = await import('./projectStore');
-      if (useProjectStore.getState().isSaving || useProjectStore.getState().isLoading) throw new Error('The project is busy. Try relinking again when it is ready.');
-      const result = await invoke<{ photos: Photo[]; failures: string[] }>('relink_folder', { projectId });
-      if (useProjectStore.getState().currentProject?.id !== projectId) return;
-      set({ photos: result.photos, isRelinkOpen: result.failures.length > 0, error: result.failures.length ? result.failures.join('\n') : null });
-      await markLibraryChanged(projectId);
-      await syncAlbumFramePhotoAssets(result.photos);
-    } catch (err) {
-      set({ error: String(err) });
-    } finally {
-      set({ isRelinking: false });
-    }
-  },
+  relinkFolder: (projectId: string) => runRelink(projectId, 'relink_folder'),
+  relinkPhoto: (projectId: string, photoId: string) => runRelink(projectId, 'relink_photo', photoId),
 
   // Selection actions
   selectPhoto: (photoId: string, mode: 'single' | 'toggle' | 'range' = 'single', currentVisibleList?: Photo[]) => {
@@ -952,8 +984,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setFilter: (filter: PhotoFilter) => set({ filter, selectedPhotoIds: [], lastSelectedPhotoId: null }),
   setSortBy: (sortBy: PhotoSortBy) => set({ sortBy }),
   setSearchQuery: (searchQuery: string) => set({ searchQuery }),
-  openRelink: () => set({ isRelinkOpen: true }),
-  closeRelink: () => set({ isRelinkOpen: false }),
+  openRelink: (photoId?: string) => set({ isRelinkOpen: true, relinkTargetPhotoId: photoId ?? null, relinkSummary: null, relinkProgress: null, error: null }),
+  closeRelink: () => { if (!get().isRelinking) set({ isRelinkOpen: false, relinkTargetPhotoId: null, relinkSummary: null, error: null }); },
   openCreateFolderDialog: () => set({ isFolderDialogOpen: true, folderDialogMode: 'create', folderDialogTarget: null }),
   openRenameFolderDialog: (folder: PhotoFolder) => set({ isFolderDialogOpen: true, folderDialogMode: 'rename', folderDialogTarget: folder }),
   closeFolderDialog: () => set({ isFolderDialogOpen: false, folderDialogTarget: null }),

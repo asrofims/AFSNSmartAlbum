@@ -536,3 +536,12 @@
   - Streamlined `.exportZipPercentBadge` in `WorkspaceLayout.module.css` to a clean, borderless inline readout with `font-size: 12px`, tabular numerals, and amber tone `#f59e0b` transitioning smoothly to emerald green `#10b981` on success.
   - Eliminated boxy badge background and borders for a cleaner, modern toast notification aesthetic.
 - [x] Application version metadata bumped to `v1.0.60`.
+
+### Phase 45 — Photo Relink Reliability & Progress
+
+- [x] Add individual photo relink from the missing-photo dialog and photo context menu, with project ownership checks and refreshed image derivatives.
+- [x] Scope the single-photo relink dialog to the selected photo; reserve the full missing-photo list for folder relink.
+- [x] Keep folder relink recursive and conservative: match the original name, file size, and oriented dimensions; report unmatched and ambiguous files.
+- [x] Show scanning and per-photo relink progress, preserve partial results, and display the remaining missing-photo count and failure reasons in the dialog.
+- [x] Propagate missing-state changes to placed spread frames even when their asset paths remain unchanged.
+- [ ] Manually verify native file/folder pickers, partial matches, and placed-frame rendering in a running Tauri desktop build.

@@ -442,38 +442,141 @@ pub async fn regenerate_single_thumbnail(app: AppHandle, photo_id: String) -> Re
 pub struct RelinkResult {
     photos: Vec<PhotoRow>,
     failures: Vec<String>,
+    relinked_ids: Vec<String>,
+    cancelled: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RelinkProgressPayload {
+    project_id: String,
+    current: usize,
+    total: usize,
+    current_file: String,
+    phase: &'static str,
+}
+
+fn emit_relink_progress(app: &AppHandle, project_id: &str, current: usize, total: usize, current_file: &str, phase: &'static str) {
+    let _ = app.emit("photo-relink-progress", RelinkProgressPayload {
+        project_id: project_id.to_string(), current, total,
+        current_file: current_file.to_string(), phase,
+    });
+}
+
+fn compatible_relink_candidate(photo: &PhotoRow, candidate: &crate::photo_engine::PhotoMetadata) -> bool {
+    candidate.file_name.to_lowercase() == photo.file_name.to_lowercase()
+        && candidate.file_size == photo.file_size
+        && candidate.width == photo.width
+        && candidate.height == photo.height
+}
+
+#[cfg(test)]
+mod relink_tests {
+    use super::*;
+
+    #[test]
+    fn folder_match_requires_original_name_size_and_oriented_dimensions() {
+        let photo = PhotoRow {
+            id: "photo-1".into(), project_id: "project-1".into(), file_path: "old/photo.jpg".into(),
+            file_name: "photo.jpg".into(), file_size: 1234, width: 3000, height: 2000,
+            format: "jpg".into(), thumbnail_path: None, thumbnail_base64: None,
+            preview_path: None, is_favorite: false, used_count: 0, is_missing: true,
+            created_at: String::new(), updated_at: String::new(),
+        };
+        let candidate = crate::photo_engine::PhotoMetadata {
+            file_path: "new/PHOTO.JPG".into(), file_name: "PHOTO.JPG".into(),
+            file_size: 1234, width: 3000, height: 2000, format: "jpg".into(),
+        };
+        assert!(compatible_relink_candidate(&photo, &candidate));
+        assert!(!compatible_relink_candidate(&photo, &crate::photo_engine::PhotoMetadata { file_size: 1235, ..candidate.clone() }));
+        assert!(!compatible_relink_candidate(&photo, &crate::photo_engine::PhotoMetadata { width: 2000, height: 3000, ..candidate.clone() }));
+        assert!(!compatible_relink_candidate(&photo, &crate::photo_engine::PhotoMetadata { file_name: "different.jpg".into(), ..candidate }));
+    }
 }
 
 #[tauri::command]
-pub async fn relink_folder(app: AppHandle, project_id: String) -> Result<RelinkResult, String> {
-    let folder = tauri::async_runtime::spawn_blocking(|| rfd::FileDialog::new()
-        .set_title("Select Folder Containing Missing Photos").pick_folder()).await.map_err(|e| e.to_string())?;
-    let Some(folder) = folder else {
-        return Ok(RelinkResult { photos: app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures: vec![] });
+pub async fn relink_photo(app: AppHandle, window: tauri::Window, project_id: String, photo_id: String) -> Result<RelinkResult, String> {
+    let db = app.state::<Database>();
+    let photo = db.get_photo(&photo_id).map_err(|e| e.to_string())?
+        .ok_or("Photo is no longer in the library")?;
+    if photo.project_id != project_id { return Err("Photo does not belong to this project".into()); }
+    if IS_FILE_PICKER_OPEN.swap(true, Ordering::SeqCst) { return Err("A file picker is already open".into()); }
+    let _picker_guard = PickerGuard;
+    let file = tauri::async_runtime::spawn_blocking(move || rfd::FileDialog::new()
+        .set_parent(&window)
+        .set_title("Locate Original Photo")
+        .add_filter("Images", SUPPORTED_EXTENSIONS)
+        .pick_file()).await.map_err(|e| e.to_string())?;
+    let Some(file) = file else {
+        return Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?,
+            failures: vec![], relinked_ids: vec![], cancelled: true });
     };
     tauri::async_runtime::spawn_blocking(move || {
+        let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
+        let db = app.state::<Database>();
+        let mut photo = db.get_photo(&photo_id).map_err(|e| e.to_string())?
+            .ok_or("Photo is no longer in the library")?;
+        if photo.project_id != project_id { return Err("Photo does not belong to this project".into()); }
+        emit_relink_progress(&app, &project_id, 0, 1, &photo.file_name, "processing");
+        photo.file_path = file.to_string_lossy().to_string();
+        let mut failures = Vec::new();
+        let mut relinked_ids = Vec::new();
+        match refresh_photo_assets(&app, &photo) {
+            Ok(_) => relinked_ids.push(photo_id),
+            Err(error) => failures.push(format!("{}: {}", photo.file_name, error)),
+        }
+        emit_relink_progress(&app, &project_id, 1, 1, &photo.file_name, "processing");
+        Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?,
+            failures, relinked_ids, cancelled: false })
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn relink_folder(app: AppHandle, window: tauri::Window, project_id: String) -> Result<RelinkResult, String> {
+    if IS_FILE_PICKER_OPEN.swap(true, Ordering::SeqCst) { return Err("A file picker is already open".into()); }
+    let _picker_guard = PickerGuard;
+    let folder = tauri::async_runtime::spawn_blocking(move || rfd::FileDialog::new()
+        .set_parent(&window)
+        .set_title("Select Folder Containing Missing Photos").pick_folder()).await.map_err(|e| e.to_string())?;
+    let Some(folder) = folder else {
+        return Ok(RelinkResult { photos: app.state::<Database>().get_photos_for_project(&project_id).map_err(|e| e.to_string())?,
+            failures: vec![], relinked_ids: vec![], cancelled: true });
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        emit_relink_progress(&app, &project_id, 0, 0, "", "scanning");
         let candidates = scan_directory(&folder)?;
         let _assets = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo worker is unavailable".to_string())?;
         let db = app.state::<Database>();
         let photos = db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?;
-        let mut failures = Vec::new();
-        for mut photo in photos {
-            if Path::new(&photo.file_path).is_file() && !photo.is_missing { continue; }
-            // Filename narrows the search; size and oriented dimensions validate candidates.
-            let matches: Vec<_> = candidates.iter().filter(|p| p.file_name().and_then(|n| n.to_str())
-                .map(|n| n.eq_ignore_ascii_case(&photo.file_name)).unwrap_or(false))
-                .filter(|p| extract_photo_metadata(p).map(|m| m.file_size == photo.file_size
-                    && m.width == photo.width && m.height == photo.height).unwrap_or(false)).collect();
-            if matches.len() != 1 {
-                failures.push(format!("{}: {} compatible matches found. Select a folder containing one matching original.", photo.file_name, matches.len()));
-                continue;
-            }
-            photo.file_path = matches[0].to_string_lossy().to_string();
-            if let Err(error) = refresh_photo_assets(&app, &photo) {
-                failures.push(format!("{}: {}", photo.file_name, error));
+        let missing: Vec<_> = photos.into_iter().filter(|photo| photo.is_missing || !Path::new(&photo.file_path).is_file()).collect();
+        let total = missing.len();
+        let mut by_name: std::collections::HashMap<String, Vec<PathBuf>> = std::collections::HashMap::new();
+        for path in candidates {
+            if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                by_name.entry(name.to_lowercase()).or_default().push(path);
             }
         }
-        Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?, failures })
+        let mut failures = Vec::new();
+        let mut relinked_ids = Vec::new();
+        for (index, mut photo) in missing.into_iter().enumerate() {
+            emit_relink_progress(&app, &project_id, index, total, &photo.file_name, "processing");
+            // Filename narrows the search; size and oriented dimensions validate candidates.
+            let matches: Vec<_> = by_name.get(&photo.file_name.to_lowercase()).into_iter().flatten()
+                .filter(|p| extract_photo_metadata(p).map(|m| compatible_relink_candidate(&photo, &m)).unwrap_or(false))
+                .collect();
+            if matches.len() != 1 {
+                failures.push(format!("{}: {} compatible matches found. Select a folder containing one matching original.", photo.file_name, matches.len()));
+            } else {
+                photo.file_path = matches[0].to_string_lossy().to_string();
+                match refresh_photo_assets(&app, &photo) {
+                    Ok(_) => relinked_ids.push(photo.id.clone()),
+                    Err(error) => failures.push(format!("{}: {}", photo.file_name, error)),
+                }
+            }
+            emit_relink_progress(&app, &project_id, index + 1, total, &photo.file_name, "processing");
+        }
+        Ok(RelinkResult { photos: db.get_photos_for_project(&project_id).map_err(|e| e.to_string())?,
+            failures, relinked_ids, cancelled: false })
     }).await.map_err(|e| e.to_string())?
 }
 
