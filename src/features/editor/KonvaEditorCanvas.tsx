@@ -8,7 +8,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { usePhotoStore } from '../../stores/photoStore';
 import {
   PhotoFrameElement,
-  calculateSnapping,
+  calculateSelectionDragSnapping,
   calculateResizeSnapping,
   calculateImageOffset,
   calculateRotatedMultiFrameResize,
@@ -1470,6 +1470,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
 
   // Multi-frame synchronized dragging positions
   const dragInitialPhysicalPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const getInitialDragRects = (): RectBounds[] => (activeSpread?.elements || []).flatMap((element) => {
+    const initial = dragInitialPhysicalPositionsRef.current.get(element.id);
+    return initial ? [{ x: initial.x, y: initial.y, width: element.width, height: element.height, rotation: element.rotation }] : [];
+  });
 
   // Auto-initialize album if project is loaded but album state is null
   useEffect(() => {
@@ -1874,6 +1878,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
   // Total spread physical dimensions (strictly 2 * singlePageW)
   const totalSpreadPhysicalW = singlePageW * 2;
   const totalSpreadPhysicalH = singlePageH;
+  const finalizeDraggedX = (x: number, width: number): number =>
+    dragInitialPhysicalPositionsRef.current.size > 1
+      ? roundToHundredth(x)
+      : alignElementPositionToSpine(x, width, totalSpreadPhysicalW, gutterPhysicalW);
 
   // Dynamic responsive canvas scaling (Fills workspace comfortably with breathing margin)
   const marginH = 110;
@@ -2953,8 +2961,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                           .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                           .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
-                        const snapRes = calculateSnapping(
+                        const snapRes = calculateSelectionDragSnapping(
                           { x: currentPhysX, y: currentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
+                          textEl,
+                          getInitialDragRects(),
                           totalSpreadPhysicalW,
                           totalSpreadPhysicalH,
                           safeAreaMargins,
@@ -3014,8 +3024,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         const snapRes =
                           !snapEnabled || e.evt?.ctrlKey
                             ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
-                            : calculateSnapping(
+                            : calculateSelectionDragSnapping(
                                 { x: finalCurrentPhysX, y: finalCurrentPhysY, width: textEl.width, height: textEl.height, rotation: textEl.rotation },
+                                textEl,
+                                getInitialDragRects(),
                                 totalSpreadPhysicalW,
                                 totalSpreadPhysicalH,
                                 safeAreaMargins,
@@ -3054,7 +3066,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                               const rawY = initPhys.y + deltaPhysY;
                               return {
                                 sourceId: id,
-                                x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                x: finalizeDraggedX(rawX, elW),
                                 y: roundToHundredth(rawY),
                               };
                             });
@@ -3072,7 +3084,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                               return {
                                 id,
                                 geometry: {
-                                  x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                  x: finalizeDraggedX(rawX, elW),
                                   y: roundToHundredth(rawY),
                                 },
                               };
@@ -3182,8 +3194,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                         .filter((f) => !dragInitialPhysicalPositionsRef.current.has(f.id))
                         .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation }));
 
-                      const snapRes = calculateSnapping(
+                      const snapRes = calculateSelectionDragSnapping(
                         { x: currentPhysX, y: currentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
+                        frame,
+                        getInitialDragRects(),
                         totalSpreadPhysicalW,
                         totalSpreadPhysicalH,
                         safeAreaMargins,
@@ -3257,8 +3271,10 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
 
                       const snapRes = (!snapEnabled || e.evt?.ctrlKey)
                         ? { snappedX: finalCurrentPhysX, snappedY: finalCurrentPhysY }
-                        : calculateSnapping(
+                        : calculateSelectionDragSnapping(
                             { x: finalCurrentPhysX, y: finalCurrentPhysY, width: frame.width, height: frame.height, rotation: frame.rotation },
+                            frame,
+                            getInitialDragRects(),
                             totalSpreadPhysicalW,
                             totalSpreadPhysicalH,
                             safeAreaMargins,
@@ -3297,7 +3313,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                             const rawY = initPhys.y + deltaPhysY;
                             return {
                               sourceId: id,
-                              x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                              x: finalizeDraggedX(rawX, elW),
                               y: roundToHundredth(rawY),
                             };
                           });
@@ -3315,7 +3331,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                             return {
                               id,
                               geometry: {
-                                x: alignElementPositionToSpine(rawX, elW, totalSpreadPhysicalW, gutterPhysicalW),
+                                x: finalizeDraggedX(rawX, elW),
                                 y: roundToHundredth(rawY),
                               },
                             };

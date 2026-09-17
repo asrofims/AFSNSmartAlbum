@@ -545,3 +545,17 @@
 - [x] Show scanning and per-photo relink progress, preserve partial results, and display the remaining missing-photo count and failure reasons in the dialog.
 - [x] Propagate missing-state changes to placed spread frames even when their asset paths remain unchanged.
 - [ ] Manually verify native file/folder pickers, partial matches, and placed-frame rendering in a running Tauri desktop build.
+
+### Phase 46 — Rotation-Aware Center Snapping
+
+- [x] Calculate drag snap targets from the rotated visual bounds of text and photo frames, then convert the snapped position back to the Konva anchor.
+- [x] Use rotated visual bounds for neighboring frame alignment and guide visibility.
+- [x] Keep page/spread center alignment ahead of equal-gap suggestions when both fall within the snap threshold.
+- [x] Add regression coverage for photo/text rotation at 45°, 90°, 180°, and 270°, plus rotated neighbor and gap-priority cases.
+
+### Phase 47 — Multi-Selection Drag Snapping
+
+- [x] Snap a moving selection using the combined visual bounds of every selected text and photo object, including rotated members.
+- [x] Apply the resulting translation uniformly whether the drag starts from the first or another selected object, during drag and on release.
+- [x] Avoid per-object spine corrections when committing a multi-selection translation so internal spacing stays intact.
+- [x] Add regression tests for two-photo center alignment and mixed rotated photo/text selection.

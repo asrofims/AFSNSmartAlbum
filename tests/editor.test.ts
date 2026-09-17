@@ -4,6 +4,7 @@ import {
   calculateCoverDimensions,
   calculateImageOffset,
   calculateSnapping,
+  calculateSelectionDragSnapping,
   calculateResizeSnapping,
   alignElementPositionToSpine,
   clampCropTransform,
@@ -171,6 +172,82 @@ console.assert(snapSpreadCenter.snappedX === 200, `Should snap panoramic frame t
 console.assert(snapSpreadCenter.snappedY === 125, `Should snap panoramic frame to Spread Center Y (y=125), got ${snapSpreadCenter.snappedY}`);
 console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center X'), 'Should produce Spread Center X snap line');
 console.assert(snapSpreadCenter.snapLines.some((l) => l.label === 'Spread Center Y'), 'Should produce Spread Center Y snap line');
+
+// Rotated photo and text nodes use their visual center, not the unrotated x/y anchor.
+for (const [kind, width, height, angle] of [
+  ['photo', 120, 80, 90],
+  ['text', 90, 35, 45],
+  ['photo', 120, 80, 180],
+  ['text', 90, 35, 270],
+] as const) {
+  const radians = angle * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const nearCenter: RectBounds = {
+    x: 299.2 - width * cos / 2 + height * sin / 2,
+    y: 199.4 - width * sin / 2 - height * cos / 2,
+    width, height, rotation: angle,
+  };
+  const snapped = calculateSnapping(nearCenter, 600, 400, 0, 0, [], 2, 'mm');
+  const visualCenterX = snapped.snappedX + width * cos / 2 - height * sin / 2;
+  const visualCenterY = snapped.snappedY + width * sin / 2 + height * cos / 2;
+  assert.ok(Math.abs(visualCenterX - 300) < 1e-9, `${kind} rotated ${angle}° must snap exactly to Spread Center X`);
+  assert.ok(Math.abs(visualCenterY - 200) < 1e-9, `${kind} rotated ${angle}° must snap exactly to Spread Center Y`);
+  assert.ok(snapped.snapLines.some((line) => line.label === 'Spread Center X'), `${kind} must show the center X guide`);
+  assert.ok(snapped.snapLines.some((line) => line.label === 'Spread Center Y'), `${kind} must show the center Y guide`);
+}
+
+const rotatedNeighbor: RectBounds = { x: 100, y: 70, width: 100, height: 40, rotation: 90 };
+const snapRotatedNeighbor = calculateSnapping({ x: 69.1, y: 245, width: 20, height: 20 }, 600, 400, 0, 0, [rotatedNeighbor], 2, 'mm');
+assert.ok(Math.abs(snapRotatedNeighbor.snappedX - 70) < 1e-9, 'Neighbor center alignment must use its rotated visual center');
+assert.ok(snapRotatedNeighbor.snapLines.some((line) => line.label === 'Align Center X'), 'Rotated neighbor must show center alignment guide');
+
+const rotatedWithNearbyFrames: RectBounds = { x: 340.8, y: 140, width: 120, height: 80, rotation: 90 };
+const centerWithGapCandidates = calculateSnapping(rotatedWithNearbyFrames, 600, 400, 0, 0, [
+  { x: 200, y: 160, width: 20, height: 40 },
+  { x: 384, y: 160, width: 20, height: 40 },
+], 3, 'mm');
+assert.ok(Math.abs(centerWithGapCandidates.snappedX - 340) < 1e-9, 'Spread center alignment must not be displaced by a nearby equal-gap candidate');
+assert.ok(centerWithGapCandidates.snapLines.some((line) => line.label === 'Spread Center X'), 'Center guide must remain visible when gap candidates are nearby');
+
+const pairSelection: RectBounds[] = [
+  { x: 100, y: 120, width: 100, height: 80 },
+  { x: 230, y: 120, width: 100, height: 80 },
+];
+const pairSnapFromFirst = calculateSelectionDragSnapping(
+  { ...pairSelection[0], x: 184.2, y: 159.3 }, pairSelection[0], pairSelection,
+  600, 400, 0, 0, [], 2, 'mm'
+);
+assert.ok(Math.abs(pairSnapFromFirst.snappedX - 185) < 1e-9 && Math.abs(pairSnapFromFirst.snappedY - 160) < 1e-9,
+  'Dragging the first photo must center the combined two-photo selection');
+const pairDx = pairSnapFromFirst.snappedX - pairSelection[0].x;
+const pairDy = pairSnapFromFirst.snappedY - pairSelection[0].y;
+const movedFirst = { x: pairSelection[0].x + pairDx, y: pairSelection[0].y + pairDy };
+const movedSecond = { x: pairSelection[1].x + pairDx, y: pairSelection[1].y + pairDy };
+assert.ok(Math.abs((movedFirst.x + movedSecond.x + pairSelection[1].width) / 2 - 300) < 1e-9,
+  'Translated pair must have its combined center on Spread Center X');
+assert.ok(Math.abs(movedSecond.x - movedFirst.x - pairSelection[0].width - 30) < 1e-9,
+  'Shared translation must preserve the 30mm inter-photo gap');
+const pairSnapFromSecond = calculateSelectionDragSnapping(
+  { ...pairSelection[1], x: 314.2, y: 159.3 }, pairSelection[1], pairSelection,
+  600, 400, 0, 0, [], 2, 'mm'
+);
+assert.ok(Math.abs(pairSnapFromSecond.snappedX - 315) < 1e-9 && Math.abs(pairSnapFromSecond.snappedY - 160) < 1e-9,
+  'Group snap must produce the same translation regardless of which member is dragged');
+
+const mixedSelection: RectBounds[] = [
+  { x: 100, y: 100, width: 100, height: 50, rotation: 90 },
+  { x: 130, y: 150, width: 80, height: 40, rotation: 0 },
+];
+const mixedSnap = calculateSelectionDragSnapping(
+  { ...mixedSelection[1], x: 299.2, y: 199.3 }, mixedSelection[1], mixedSelection,
+  600, 400, 0, 0, [], 2, 'mm'
+);
+assert.ok(Math.abs(mixedSnap.snappedX - 300) < 1e-9 && Math.abs(mixedSnap.snappedY - 200) < 1e-9,
+  'Mixed rotated photo and text selection must snap by the visual envelope center');
+assert.ok(mixedSnap.snapLines.some((line) => line.label === 'Spread Center X')
+  && mixedSnap.snapLines.some((line) => line.label === 'Spread Center Y'),
+  'Multi-selection must show both center guides');
 
 // Test Left Page (Page 1) Center Snap: frame w=100 -> center at x=150 -> x=100
 const leftPageFrame: RectBounds = { x: 99, y: 50, width: 100, height: 100 };

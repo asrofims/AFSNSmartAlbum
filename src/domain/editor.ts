@@ -119,6 +119,18 @@ export interface RectBounds {
   rotation?: number;
 }
 
+function getSnappingVisualBounds(frame: RectBounds): RectBounds {
+  const radians = ((frame.rotation || 0) * Math.PI) / 180;
+  if (Math.abs(radians % (2 * Math.PI)) < 1e-12) return frame;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const centerX = frame.x + frame.width * cos / 2 - frame.height * sin / 2;
+  const centerY = frame.y + frame.width * sin / 2 + frame.height * cos / 2;
+  const width = Math.abs(frame.width * cos) + Math.abs(frame.height * sin);
+  const height = Math.abs(frame.width * sin) + Math.abs(frame.height * cos);
+  return { x: centerX - width / 2, y: centerY - height / 2, width, height };
+}
+
 export const MAX_CROP_SCALE = 3.5;
 
 export interface CropTransform {
@@ -551,6 +563,9 @@ export function calculateSnapping(
   const threshold = typeof config.threshold === 'number' ? config.threshold : 0.1;
   let snappedX = dragged.x;
   let snappedY = dragged.y;
+  const draggedVisual = getSnappingVisualBounds(dragged);
+  const dragOffsetX = draggedVisual.x - dragged.x;
+  const dragOffsetY = draggedVisual.y - dragged.y;
   const snapLines: SnapLine[] = [];
   const gapGuides: GapGuide[] = [];
 
@@ -631,23 +646,24 @@ export function calculateSnapping(
   // Add points from other frames
   if (config.snapToFrames) {
     for (const other of otherFrames) {
+      const bounds = getSnappingVisualBounds(other);
       vTargets.push(
-        { pos: other.x, label: 'Align Left', kind: 'frame' },
-        { pos: other.x + other.width / 2, label: 'Align Center X', kind: 'center' },
-        { pos: other.x + other.width, label: 'Align Right', kind: 'frame' }
+        { pos: bounds.x, label: 'Align Left', kind: 'frame' },
+        { pos: bounds.x + bounds.width / 2, label: 'Align Center X', kind: 'center' },
+        { pos: bounds.x + bounds.width, label: 'Align Right', kind: 'frame' }
       );
       hTargets.push(
-        { pos: other.y, label: 'Align Top', kind: 'frame' },
-        { pos: other.y + other.height / 2, label: 'Align Center Y', kind: 'center' },
-        { pos: other.y + other.height, label: 'Align Bottom', kind: 'frame' }
+        { pos: bounds.y, label: 'Align Top', kind: 'frame' },
+        { pos: bounds.y + bounds.height / 2, label: 'Align Center Y', kind: 'center' },
+        { pos: bounds.y + bounds.height, label: 'Align Bottom', kind: 'frame' }
       );
     }
   }
 
-  // Check X snapping (left edge, center, right edge of dragged frame)
-  const draggedLeft = dragged.x;
-  const draggedCenterX = dragged.x + dragged.width / 2;
-  const draggedRight = dragged.x + dragged.width;
+  // Snap visual edges and center, then convert back to the Konva top-left anchor.
+  const draggedLeft = draggedVisual.x;
+  const draggedCenterX = draggedVisual.x + draggedVisual.width / 2;
+  const draggedRight = draggedVisual.x + draggedVisual.width;
 
   let minDiffX = threshold + 1;
   let bestSnapX: number | null = null;
@@ -659,7 +675,7 @@ export function calculateSnapping(
       const diffCenter = Math.abs(draggedCenterX - target.pos);
       if (diffCenter <= threshold && diffCenter < minDiffX) {
         minDiffX = diffCenter;
-        bestSnapX = target.pos - dragged.width / 2;
+        bestSnapX = target.pos - draggedVisual.width / 2 - dragOffsetX;
         bestVLine = {
           type: 'vertical',
           position: target.pos,
@@ -678,7 +694,7 @@ export function calculateSnapping(
     const diffLeft = Math.abs(draggedLeft - target.pos);
     if (diffLeft <= threshold && diffLeft < minDiffX) {
       minDiffX = diffLeft;
-      bestSnapX = target.pos;
+      bestSnapX = target.pos - dragOffsetX;
       bestVLine = {
         type: 'vertical',
         position: target.pos,
@@ -693,7 +709,7 @@ export function calculateSnapping(
     const diffRight = Math.abs(draggedRight - target.pos);
     if (diffRight <= threshold && diffRight < minDiffX) {
       minDiffX = diffRight;
-      bestSnapX = target.pos - dragged.width;
+      bestSnapX = target.pos - draggedVisual.width - dragOffsetX;
       bestVLine = {
         type: 'vertical',
         position: target.pos,
@@ -709,7 +725,7 @@ export function calculateSnapping(
       const diffCenter = Math.abs(draggedCenterX - target.pos);
       if (diffCenter <= threshold && diffCenter < minDiffX) {
         minDiffX = diffCenter;
-        bestSnapX = target.pos - dragged.width / 2;
+        bestSnapX = target.pos - draggedVisual.width / 2 - dragOffsetX;
         bestVLine = {
           type: 'vertical',
           position: target.pos,
@@ -728,7 +744,7 @@ export function calculateSnapping(
       bestVLine.label === 'Right Page Inner Edge' ||
       bestVLine.label === 'Center Fold / Page Edge'
     ) {
-      snappedX = alignElementPositionToSpine(bestSnapX, dragged.width, spreadWidth, gutterWidth, threshold);
+      snappedX = alignElementPositionToSpine(bestSnapX + dragOffsetX, draggedVisual.width, spreadWidth, gutterWidth, threshold) - dragOffsetX;
     } else {
       snappedX = bestSnapX;
     }
@@ -736,9 +752,9 @@ export function calculateSnapping(
   }
 
   // Check Y snapping (top edge, center, bottom edge of dragged frame)
-  const draggedTop = dragged.y;
-  const draggedCenterY = dragged.y + dragged.height / 2;
-  const draggedBottom = dragged.y + dragged.height;
+  const draggedTop = draggedVisual.y;
+  const draggedCenterY = draggedVisual.y + draggedVisual.height / 2;
+  const draggedBottom = draggedVisual.y + draggedVisual.height;
 
   let minDiffY = threshold + 1;
   let bestSnapY: number | null = null;
@@ -750,7 +766,7 @@ export function calculateSnapping(
       const diffCenter = Math.abs(draggedCenterY - target.pos);
       if (diffCenter <= threshold && diffCenter < minDiffY) {
         minDiffY = diffCenter;
-        bestSnapY = target.pos - dragged.height / 2;
+        bestSnapY = target.pos - draggedVisual.height / 2 - dragOffsetY;
         bestHLine = {
           type: 'horizontal',
           position: target.pos,
@@ -769,7 +785,7 @@ export function calculateSnapping(
     const diffTop = Math.abs(draggedTop - target.pos);
     if (diffTop <= threshold && diffTop < minDiffY) {
       minDiffY = diffTop;
-      bestSnapY = target.pos;
+      bestSnapY = target.pos - dragOffsetY;
       bestHLine = {
         type: 'horizontal',
         position: target.pos,
@@ -784,7 +800,7 @@ export function calculateSnapping(
     const diffBottom = Math.abs(draggedBottom - target.pos);
     if (diffBottom <= threshold && diffBottom < minDiffY) {
       minDiffY = diffBottom;
-      bestSnapY = target.pos - dragged.height;
+      bestSnapY = target.pos - draggedVisual.height - dragOffsetY;
       bestHLine = {
         type: 'horizontal',
         position: target.pos,
@@ -800,7 +816,7 @@ export function calculateSnapping(
       const diffCenter = Math.abs(draggedCenterY - target.pos);
       if (diffCenter <= threshold && diffCenter < minDiffY) {
         minDiffY = diffCenter;
-        bestSnapY = target.pos - dragged.height / 2;
+        bestSnapY = target.pos - draggedVisual.height / 2 - dragOffsetY;
         bestHLine = {
           type: 'horizontal',
           position: target.pos,
@@ -825,16 +841,12 @@ export function calculateSnapping(
       unit === 'cm' ? 2.5 : unit === 'inch' ? 1.0 : unit === 'px' ? 300 : 25.0;
 
     // Visual bounds taking rotation into account
-    const draggedBounds = getFrameVisualBounds(dragged);
-    const dragOffsetX = draggedBounds.x - dragged.x;
-    const dragOffsetY = draggedBounds.y - dragged.y;
-
     // Active visual bounds at current snapped position
     const activeVisualDragged: RectBounds = {
       x: snappedX + dragOffsetX,
       y: snappedY + dragOffsetY,
-      width: draggedBounds.width,
-      height: draggedBounds.height,
+      width: draggedVisual.width,
+      height: draggedVisual.height,
     };
 
     // 1. Horizontal Gaps (strictly facing neighbors with vertical overlap)
@@ -867,7 +879,7 @@ export function calculateSnapping(
       const leftGap = activeVisualDragged.x - leftEdge;
       const rightGap = rightEdge - (activeVisualDragged.x + activeVisualDragged.width);
 
-      if (leftGap > 0 && rightGap > 0 && Math.abs(leftGap - rightGap) <= threshold * 2) {
+      if (leftGap > 0 && rightGap > 0 && Math.abs(leftGap - rightGap) <= threshold * 2 && bestVLine?.kind !== 'center') {
         // Equidistant snap!
         const totalSpan = rightEdge - leftEdge - activeVisualDragged.width;
         const equalGap = Math.max(0, totalSpan / 2);
@@ -987,7 +999,7 @@ export function calculateSnapping(
       const topGap = activeVisualDragged.y - topEdge;
       const bottomGap = bottomEdge - (activeVisualDragged.y + activeVisualDragged.height);
 
-      if (topGap > 0 && bottomGap > 0 && Math.abs(topGap - bottomGap) <= threshold * 2) {
+      if (topGap > 0 && bottomGap > 0 && Math.abs(topGap - bottomGap) <= threshold * 2 && bestHLine?.kind !== 'center') {
         // Equidistant snap!
         const totalSpan = bottomEdge - topEdge - activeVisualDragged.height;
         const equalGap = Math.max(0, totalSpan / 2);
@@ -1081,20 +1093,56 @@ export function calculateSnapping(
   const finalSnapLines = snapLines.filter((line) => {
     if (line.type === 'vertical') {
       return (
-        Math.abs(line.position - snappedX) <= 0.05 ||
-        Math.abs(line.position - (snappedX + dragged.width / 2)) <= 0.05 ||
-        Math.abs(line.position - (snappedX + dragged.width)) <= 0.05
+        Math.abs(line.position - (snappedX + dragOffsetX)) <= 0.05 ||
+        Math.abs(line.position - (snappedX + dragOffsetX + draggedVisual.width / 2)) <= 0.05 ||
+        Math.abs(line.position - (snappedX + dragOffsetX + draggedVisual.width)) <= 0.05
       );
     } else {
       return (
-        Math.abs(line.position - snappedY) <= 0.05 ||
-        Math.abs(line.position - (snappedY + dragged.height / 2)) <= 0.05 ||
-        Math.abs(line.position - (snappedY + dragged.height)) <= 0.05
+        Math.abs(line.position - (snappedY + dragOffsetY)) <= 0.05 ||
+        Math.abs(line.position - (snappedY + dragOffsetY + draggedVisual.height / 2)) <= 0.05 ||
+        Math.abs(line.position - (snappedY + dragOffsetY + draggedVisual.height)) <= 0.05
       );
     }
   });
 
   return { snappedX, snappedY, snapLines: finalSnapLines, gapGuides };
+}
+
+/** Snap a moving selection as one visual envelope, preserving every member's offset. */
+export function calculateSelectionDragSnapping(
+  dragged: RectBounds,
+  initialDragged: RectBounds,
+  selectedFrames: RectBounds[],
+  spreadWidth: number,
+  spreadHeight: number,
+  safeArea: Parameters<typeof calculateSnapping>[3],
+  gutterWidth: number,
+  otherFrames: RectBounds[],
+  thresholdOrConfig: number | SnappingConfig = DEFAULT_SNAPPING_CONFIG,
+  unit: string = 'mm'
+): ReturnType<typeof calculateSnapping> {
+  if (selectedFrames.length <= 1) {
+    return calculateSnapping(dragged, spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit);
+  }
+
+  const visualBounds = selectedFrames.map(getSnappingVisualBounds);
+  const left = Math.min(...visualBounds.map((bounds) => bounds.x));
+  const top = Math.min(...visualBounds.map((bounds) => bounds.y));
+  const right = Math.max(...visualBounds.map((bounds) => bounds.x + bounds.width));
+  const bottom = Math.max(...visualBounds.map((bounds) => bounds.y + bounds.height));
+  const groupX = left + dragged.x - initialDragged.x;
+  const groupY = top + dragged.y - initialDragged.y;
+  const result = calculateSnapping(
+    { x: groupX, y: groupY, width: right - left, height: bottom - top },
+    spreadWidth, spreadHeight, safeArea, gutterWidth, otherFrames, thresholdOrConfig, unit
+  );
+  return {
+    snappedX: initialDragged.x + result.snappedX - left,
+    snappedY: initialDragged.y + result.snappedY - top,
+    snapLines: result.snapLines,
+    gapGuides: result.gapGuides,
+  };
 }
 
 /**
