@@ -575,3 +575,12 @@
 - [x] Highlight matched distances and their reference gaps in the canvas HUD, using rotated visual bounds and unit-appropriate labels.
 - [x] Add regression cases for horizontal and vertical spacing, existing gaps, rotated objects, grouped copies, disabled gap snapping, and inch precision.
 - [ ] Manually verify guide readability and gap matching with overlapping photo/text objects in the running Tauri editor.
+
+### Phase 50 — Release v1.0.61: Visual Gap Matching, Alt+Drag Copy Preview & Multi-Selection Snapping
+
+- [x] Gap Snapping & Distance Matching:
+  - Snap moving objects and Alt+drag copy previews to the configured Photo Spacing or matching adjacent gaps between frames.
+  - Highlight matched distances and their reference gaps with visual HUD indicators (emerald badge for Photo Spacing / Equal Gap).
+- [x] Multi-selection drag snapping using combined visual bounds of all selected items (including rotated frames).
+- [x] Alt+drag duplicate preview with ghosted copy opacity and independent group ID generation.
+- [x] Application version metadata bumped to `v1.0.61`.
