@@ -352,7 +352,7 @@ export function TextNode({
         height={internalH}
         scaleX={visualScale}
         scaleY={visualScale}
-        opacity={isEditing ? 0 : 1}
+        opacity={isEditing ? 0 : (element.opacity ?? 1)}
         listening={false}
         sceneFunc={(context) => drawRichTextLayout(context._context, liveLayoutRef.current ?? richLayout)}
       />

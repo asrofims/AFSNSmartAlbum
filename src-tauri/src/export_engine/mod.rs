@@ -573,11 +573,20 @@ fn render_photo_element(
         1.0
     };
 
-    // 3. Blit into canvas with subpixel anti-aliased corner clipping
+    // 3. Composite the photo and its border as one object before applying opacity.
     let render_w = resized_rgba.width();
     let render_h = resized_rgba.height();
     let frame_w_f = frame_px_w as f64;
     let frame_h_f = frame_px_h as f64;
+    let has_border = elem.border_enabled && elem.border_width > 0.0;
+    let border_px = if has_border { (elem.border_width * scale_factor).round().max(1.0) } else { 0.0 };
+    let border_color = parse_hex_color(&elem.border_color);
+    let inner_w = (frame_w_f - 2.0 * border_px).max(0.0);
+    let inner_h = (frame_h_f - 2.0 * border_px).max(0.0);
+    let inner_r_tl = (r_tl - border_px).max(0.0);
+    let inner_r_tr = (r_tr - border_px).max(0.0);
+    let inner_r_br = (r_br - border_px).max(0.0);
+    let inner_r_bl = (r_bl - border_px).max(0.0);
 
     for fy in 0..render_h {
         let dest_y = frame_px_y + fy as i64;
@@ -610,119 +619,59 @@ fn render_photo_element(
                 continue;
             }
 
+            let border_alpha = if !has_border {
+                0.0
+            } else if !has_corner_radius {
+                if (fx as f64) < border_px || (fy as f64) < border_px
+                    || (fx as f64) >= frame_w_f - border_px || (fy as f64) >= frame_h_f - border_px {
+                    1.0
+                } else {
+                    0.0
+                }
+            } else {
+                let px_center_x = fx as f64 + 0.5;
+                let px_center_y = fy as f64 + 0.5;
+                let inner_alpha = if inner_w > 0.0 && inner_h > 0.0
+                    && px_center_x >= border_px && px_center_x < frame_w_f - border_px
+                    && px_center_y >= border_px && px_center_y < frame_h_f - border_px {
+                    compute_corner_alpha(
+                        px_center_x - border_px, px_center_y - border_px,
+                        inner_w, inner_h, inner_r_tl, inner_r_tr, inner_r_br, inner_r_bl,
+                    )
+                } else {
+                    0.0
+                };
+                (corner_alpha - inner_alpha).clamp(0.0, 1.0)
+            };
+
             let p = resized_rgba.get_pixel(fx, fy);
-            let effective_alpha = (p[3] as f64 / 255.0 * elem.opacity * corner_alpha).clamp(0.0, 1.0);
+            let photo_alpha = p[3] as f64 / 255.0 * corner_alpha;
+            let source_alpha = border_alpha + photo_alpha * (1.0 - border_alpha);
+            let effective_alpha = (source_alpha * elem.opacity).clamp(0.0, 1.0);
             if effective_alpha < 0.001 {
-                // Completely transparent pixel, leave canvas background intact
                 continue;
             }
+            let source_color = if border_alpha > 0.0 {
+                let photo_weight = photo_alpha * (1.0 - border_alpha);
+                [
+                    ((border_color[0] as f64 * border_alpha + p[0] as f64 * photo_weight) / source_alpha).round() as u8,
+                    ((border_color[1] as f64 * border_alpha + p[1] as f64 * photo_weight) / source_alpha).round() as u8,
+                    ((border_color[2] as f64 * border_alpha + p[2] as f64 * photo_weight) / source_alpha).round() as u8,
+                ]
+            } else {
+                [p[0], p[1], p[2]]
+            };
             if effective_alpha > 0.999 {
-                canvas.put_pixel(dest_x as u32, dest_y as u32, *p);
+                canvas.put_pixel(dest_x as u32, dest_y as u32, Rgba([
+                    source_color[0], source_color[1], source_color[2], 255,
+                ]));
             } else {
                 let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
                 let inv_alpha = 1.0 - effective_alpha;
-                existing[0] = ((p[0] as f64 * effective_alpha) + (existing[0] as f64 * inv_alpha)).round() as u8;
-                existing[1] = ((p[1] as f64 * effective_alpha) + (existing[1] as f64 * inv_alpha)).round() as u8;
-                existing[2] = ((p[2] as f64 * effective_alpha) + (existing[2] as f64 * inv_alpha)).round() as u8;
+                existing[0] = ((source_color[0] as f64 * effective_alpha) + (existing[0] as f64 * inv_alpha)).round() as u8;
+                existing[1] = ((source_color[1] as f64 * effective_alpha) + (existing[1] as f64 * inv_alpha)).round() as u8;
+                existing[2] = ((source_color[2] as f64 * effective_alpha) + (existing[2] as f64 * inv_alpha)).round() as u8;
                 existing[3] = 255;
-            }
-        }
-    }
-
-    // 4. Render frame border if enabled
-    if elem.border_enabled && elem.border_width > 0.0 {
-        let border_px = (elem.border_width * scale_factor).round().max(1.0);
-        let border_color = parse_hex_color(&elem.border_color);
-
-        if !has_corner_radius {
-            // Fast standard rectangular border
-            let b_px = border_px as i64;
-            for b in 0..b_px {
-                for fx in 0..frame_px_w as i64 {
-                    let dx = frame_px_x + fx;
-                    if dx >= 0 && dx < canvas_w {
-                        let dy_top = frame_px_y + b;
-                        let dy_bot = frame_px_y + frame_px_h as i64 - 1 - b;
-                        if dy_top >= 0 && dy_top < canvas_h {
-                            canvas.put_pixel(dx as u32, dy_top as u32, border_color);
-                        }
-                        if dy_bot >= 0 && dy_bot < canvas_h {
-                            canvas.put_pixel(dx as u32, dy_bot as u32, border_color);
-                        }
-                    }
-                }
-                for fy in 0..frame_px_h as i64 {
-                    let dy = frame_px_y + fy;
-                    if dy >= 0 && dy < canvas_h {
-                        let dx_left = frame_px_x + b;
-                        let dx_right = frame_px_x + frame_px_w as i64 - 1 - b;
-                        if dx_left >= 0 && dx_left < canvas_w {
-                            canvas.put_pixel(dx_left as u32, dy as u32, border_color);
-                        }
-                        if dx_right >= 0 && dx_right < canvas_w {
-                            canvas.put_pixel(dx_right as u32, dy as u32, border_color);
-                        }
-                    }
-                }
-            }
-        } else {
-            // Anti-aliased rounded corner border
-            let inner_w = (frame_w_f - 2.0 * border_px).max(0.0);
-            let inner_h = (frame_h_f - 2.0 * border_px).max(0.0);
-            let inner_r_tl = (r_tl - border_px).max(0.0);
-            let inner_r_tr = (r_tr - border_px).max(0.0);
-            let inner_r_br = (r_br - border_px).max(0.0);
-            let inner_r_bl = (r_bl - border_px).max(0.0);
-
-            for fy in 0..frame_px_h {
-                let dest_y = frame_px_y + fy as i64;
-                if dest_y < 0 || dest_y >= canvas_h {
-                    continue;
-                }
-                for fx in 0..frame_px_w {
-                    let dest_x = frame_px_x + fx as i64;
-                    if dest_x < 0 || dest_x >= canvas_w {
-                        continue;
-                    }
-
-                    let px_center_x = fx as f64 + 0.5;
-                    let px_center_y = fy as f64 + 0.5;
-
-                    let outer_alpha = compute_corner_alpha(
-                        px_center_x, px_center_y,
-                        frame_w_f, frame_h_f,
-                        r_tl, r_tr, r_br, r_bl,
-                    );
-                    if outer_alpha < 0.001 {
-                        continue;
-                    }
-
-                    let inner_alpha = if inner_w > 0.0 && inner_h > 0.0 && px_center_x >= border_px && px_center_x < (frame_w_f - border_px) && px_center_y >= border_px && px_center_y < (frame_h_f - border_px) {
-                        compute_corner_alpha(
-                            px_center_x - border_px, px_center_y - border_px,
-                            inner_w, inner_h,
-                            inner_r_tl, inner_r_tr, inner_r_br, inner_r_bl,
-                        )
-                    } else {
-                        0.0
-                    };
-
-                    let border_alpha = (outer_alpha - inner_alpha).clamp(0.0, 1.0);
-                    if border_alpha < 0.001 {
-                        continue;
-                    }
-
-                    if border_alpha > 0.999 {
-                        canvas.put_pixel(dest_x as u32, dest_y as u32, border_color);
-                    } else {
-                        let existing = canvas.get_pixel_mut(dest_x as u32, dest_y as u32);
-                        let inv_a = 1.0 - border_alpha;
-                        existing[0] = ((border_color[0] as f64 * border_alpha) + (existing[0] as f64 * inv_a)).round() as u8;
-                        existing[1] = ((border_color[1] as f64 * border_alpha) + (existing[1] as f64 * inv_a)).round() as u8;
-                        existing[2] = ((border_color[2] as f64 * border_alpha) + (existing[2] as f64 * inv_a)).round() as u8;
-                        existing[3] = 255;
-                    }
-                }
             }
         }
     }
@@ -1138,6 +1087,44 @@ mod tests {
         let mut aligned = RgbaImage::from_pixel(120, 120, white);
         render_photo_element(&mut aligned, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
         assert_eq!(*aligned.get_pixel(0, 35), red, "Trim-aligned photos must still extend into bleed");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn photo_and_border_share_object_opacity() {
+        let path = std::env::temp_dir().join(format!("afsn-opacity-{}.png", uuid::Uuid::new_v4()));
+        RgbaImage::from_pixel(20, 20, Rgba([255, 0, 0, 255])).save(&path).unwrap();
+        let white = Rgba([255, 255, 255, 255]);
+        let mut element: ElementPayload = serde_json::from_value(serde_json::json!({
+            "id": "opacity-photo", "filePath": path.to_string_lossy(),
+            "x": 10.0, "y": 10.0, "width": 20.0, "height": 20.0,
+            "borderEnabled": true, "borderWidth": 2.0, "borderColor": "#0000FF"
+        })).unwrap();
+
+        for radius in [0.0, 4.0] {
+            element.corner_radius_tl = radius;
+            element.corner_radius_tr = radius;
+            element.corner_radius_br = radius;
+            element.corner_radius_bl = radius;
+            for opacity in [0.0, 0.5, 1.0] {
+                element.opacity = opacity;
+                let mut canvas = RgbaImage::from_pixel(50, 50, white);
+                render_photo_element(&mut canvas, &element, 0.0, 0.0, 1.0, false, 50.0, 50.0, 0.0, 0.0);
+                let fill = *canvas.get_pixel(20, 20);
+                let border = *canvas.get_pixel(10, 20);
+                match opacity {
+                    0.0 => { assert_eq!(fill, white); assert_eq!(border, white); }
+                    0.5 => {
+                        assert_eq!(fill, Rgba([255, 128, 128, 255]));
+                        assert_eq!(border, Rgba([128, 128, 255, 255]));
+                    }
+                    _ => {
+                        assert_eq!(fill, Rgba([255, 0, 0, 255]));
+                        assert_eq!(border, Rgba([0, 0, 255, 255]));
+                    }
+                }
+            }
+        }
         std::fs::remove_file(path).unwrap();
     }
 

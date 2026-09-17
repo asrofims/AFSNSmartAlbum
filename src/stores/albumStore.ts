@@ -479,6 +479,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           width: Number.isFinite(el.width) ? el.width : 120,
           height: Number.isFinite(el.height) ? el.height : 35,
           rotation: Number.isFinite(el.rotation) ? el.rotation : 0,
+          opacity: Number.isFinite(el.opacity) ? Math.max(0, Math.min(1, el.opacity)) : 1,
           zIndex: Number.isFinite(el.zIndex) ? el.zIndex : 10,
           locked: Boolean(el.locked),
           groupId: el.groupId || null,
@@ -651,7 +652,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
           cornerRadiusBr: 0,
           cornerRadiusBl: 0,
           borderColor: '#FFFFFF',
-          opacity: 1.0,
+          opacity: Number.isFinite(textEl.opacity) ? Math.max(0, Math.min(1, textEl.opacity!)) : 1.0,
           locked: Boolean(textEl.locked),
           textPayload: serializeTextPayload({
             ...textEl,
@@ -691,7 +692,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
         cornerRadiusBr: rBr,
         cornerRadiusBl: rBl,
         cornerRadius: (rTl === rTr && rTr === rBr && rBr === rBl) ? rTl : [rTl, rTr, rBr, rBl],
-        opacity: Number.isFinite(el.opacity) ? el.opacity : 1.0,
+        opacity: Number.isFinite(el.opacity) ? Math.max(0, Math.min(1, el.opacity)) : 1.0,
         locked: Boolean(el.locked),
         textPayload: null,
       };

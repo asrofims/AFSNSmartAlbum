@@ -22,6 +22,7 @@ import { RelinkDialog } from '../photos/RelinkDialog';
 import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { TypographyPanel } from '../editor/TypographyPanel';
+import { OpacityControl } from '../editor/OpacityControl';
 import { TextNodeElement } from '../../domain/text';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
@@ -1196,6 +1197,11 @@ export function WorkspaceLayout() {
                         );
                       })()}
 
+                      <OpacityControl
+                        spreadId={activeSpread.id}
+                        elements={(activeSpread.elements || []).filter((element) => selectedFrameIds.includes(element.id))}
+                      />
+
                       {/* GAP Spacing Control */}
                       <div style={{ marginBottom: '10px', padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)' }}>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
@@ -1618,6 +1624,7 @@ export function WorkspaceLayout() {
                         </button>
                       </div>
 
+                      <OpacityControl spreadId={activeSpread.id} elements={[selectedFrame]} />
                       <TypographyPanel element={selectedFrame as TextNodeElement} onToast={showToast} />
                     </div>
                   );
@@ -1661,6 +1668,8 @@ export function WorkspaceLayout() {
                         )}
                       </button>
                     </div>
+
+                    <OpacityControl spreadId={activeSpread.id} elements={[selectedFrame]} />
 
                     {/* Locked Notice Banner */}
                     {selectedFrame.locked && (

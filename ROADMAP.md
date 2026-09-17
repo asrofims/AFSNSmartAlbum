@@ -603,3 +603,12 @@
   - Make Reset Ratio restore exact native photo aspect ratio while fully preserving crop pan and zoom.
   - Skip redundant updates when the frame ratio already matches.
 - [x] Application version metadata bumped to `v1.0.62`.
+
+### Phase 53 — Object Opacity for Photos and Text
+
+- [x] Add a 0–100% Opacity control to Properties for one photo, one text object, and mixed selections, with live slider preview and one Undo step per drag.
+- [x] Preserve opacity in the existing element column for photos and text; older text objects load at 100% without a schema migration.
+- [x] Apply object opacity in the Konva editor, spread navigator, and export preview.
+- [x] Composite photo content and its border together before applying opacity in print export; retain text opacity in both regular and rotated export paths.
+- [x] Add selection, locking, history, persistence, legacy, and export pixel regressions.
+- [ ] Manually verify slider interaction and matching appearance in the running Tauri canvas, navigator, preview, and exported JPEG/PNG/PDF.

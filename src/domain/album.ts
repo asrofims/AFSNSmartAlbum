@@ -608,6 +608,7 @@ export function isElementDesignEqual(a?: AlbumElement | null, b?: AlbumElement |
   if (a.type === 'text' && b.type === 'text') {
     const tA = a as TextNodeElement;
     const tB = b as TextNodeElement;
+    if ((tA.opacity ?? 1) !== (tB.opacity ?? 1)) return false;
     if (tA.text !== tB.text) return false;
     if (JSON.stringify(tA.style || {}) !== JSON.stringify(tB.style || {})) return false;
     if (JSON.stringify(tA.textRuns || []) !== JSON.stringify(tB.textRuns || [])) return false;

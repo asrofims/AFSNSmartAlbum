@@ -415,7 +415,7 @@ function PhotoFrameNode({
       width={pixelW}
       height={pixelH}
       rotation={frame.rotation || 0}
-      opacity={isMuted ? 0.38 : 1}
+      opacity={(frame.opacity ?? 1) * (isMuted ? 0.38 : 1)}
       listening={!isMuted}
       draggable={!frame.locked && !isCropMode}
       onMouseDown={(e) => {

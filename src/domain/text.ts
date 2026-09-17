@@ -44,6 +44,7 @@ export interface TextNodeElement {
   width: number; // in canvas units
   height: number; // in canvas units
   rotation: number; // degrees
+  opacity?: number; // 0..1, defaults to fully opaque for older projects
   zIndex?: number;
   locked?: boolean;
   groupId?: string | null;
@@ -299,6 +300,7 @@ export function createTextNode(options: {
     width: options.width ?? targetDefaultW,
     height: options.height ?? targetDefaultH,
     rotation: 0,
+    opacity: 1,
     zIndex: options.zIndex ?? 10,
     locked: false,
     style: mergedStyle,

@@ -43,7 +43,7 @@ The local SQLite database contains structured relations:
 4. `folder_photos`:
    - `folder_id`, `photo_id`, `added_at`.
 5. `spreads` & `elements`:
-   - Spread geometry, independent `safe_area_top`, `safe_area_bottom`, `safe_area_outside`, and `safe_area_spine` values, plus photo/text frame placements and crop transformations.
+   - Spread geometry, independent `safe_area_top`, `safe_area_bottom`, `safe_area_outside`, and `safe_area_spine` values, plus photo/text frame placements, crop transformations, and element `opacity` (0.0–1.0). Older elements default to 1.0; the existing column needs no migration.
 
 ## Photo Storage
 

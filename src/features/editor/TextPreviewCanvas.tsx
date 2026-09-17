@@ -28,5 +28,5 @@ export function TextPreviewCanvas({ element, unit, dpi, width, height }: {
     document.fonts?.addEventListener('loadingdone', draw);
     return () => { cancelled = true; document.fonts?.removeEventListener('loadingdone', draw); };
   }, [element, unit, dpi, width, height]);
-  return <canvas ref={ref} style={{ display: 'block', width, height }} aria-hidden="true" />;
+  return <canvas ref={ref} style={{ display: 'block', width, height, opacity: element.opacity ?? 1 }} aria-hidden="true" />;
 }

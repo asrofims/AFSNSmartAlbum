@@ -1323,8 +1323,8 @@ mod tests {
             thumbnail_path: None,
             x: 20.0,
             y: 20.0,
-            width: 100.0,
-            height: 40.0,
+            width: 500.0,
+            height: 150.0,
             rotation: 0.0,
             z_index: 1,
             photo_aspect: 1.0,
@@ -1375,6 +1375,30 @@ mod tests {
         // Verify canvas still has dimensions and did not crash
         assert_eq!(canvas.width(), 600);
         assert_eq!(canvas.height(), 400);
+        assert!(canvas.pixels().any(|pixel| *pixel != Rgba([255, 255, 255, 255])));
+
+        let mut invisible = elem.clone();
+        invisible.opacity = 0.0;
+        let mut zero_canvas = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+        render_text_element(&mut zero_canvas, &invisible, 0.0, 0.0, 1.0, 300);
+        assert!(zero_canvas.pixels().all(|pixel| *pixel == Rgba([255, 255, 255, 255])));
+
+        let mut half = elem.clone();
+        half.opacity = 0.5;
+        let mut half_canvas = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+        render_text_element(&mut half_canvas, &half, 0.0, 0.0, 1.0, 300);
+        assert!(canvas.pixels().zip(half_canvas.pixels()).any(|(full, faded)|
+            faded[0] > full[0] && faded[0] < 255));
+
+        let mut rotated_half = half.clone();
+        rotated_half.rotation = 45.0;
+        let mut rotated_canvas = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+        render_text_element(&mut rotated_canvas, &rotated_half, 0.0, 0.0, 1.0, 300);
+        assert!(rotated_canvas.pixels().any(|pixel| *pixel != Rgba([255, 255, 255, 255])));
+        rotated_half.opacity = 0.0;
+        let mut rotated_zero = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+        render_text_element(&mut rotated_zero, &rotated_half, 0.0, 0.0, 1.0, 300);
+        assert!(rotated_zero.pixels().all(|pixel| *pixel == Rgba([255, 255, 255, 255])));
     }
 
     #[test]

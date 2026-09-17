@@ -103,6 +103,7 @@ export interface EditorState {
     spreadId: string,
     updates: { id: string; geometry: Partial<AlbumElement> }[]
   ) => void;
+  setSelectedOpacity: (spreadId: string, opacity: number, skipHistory?: boolean) => void;
   deleteSelectedFrames: (spreadId: string) => void;
   copySelectedFrames: (spreadId: string) => void;
   pasteFrames: (spreadId: string, targetPos?: { x: number; y: number }) => void;
@@ -637,6 +638,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         coverSpread: updatedCover,
         spreads: updatedSpreads,
       },
+      saveStatus: 'unsaved',
+    });
+  },
+
+  setSelectedOpacity: (spreadId, opacity, skipHistory = false) => {
+    if (!Number.isFinite(opacity)) return;
+    const { currentAlbum } = useAlbumStore.getState();
+    if (!currentAlbum) return;
+    const spread = getAllAlbumSpreads(currentAlbum).find((item) => item.id === spreadId);
+    if (!spread) return;
+
+    const nextOpacity = Math.round(Math.max(0, Math.min(1, opacity)) * 100) / 100;
+    const selectedIds = new Set(get().selectedFrameIds);
+    const changedIds = new Set((spread.elements || [])
+      .filter((element) => selectedIds.has(element.id) && !element.locked
+        && (element.opacity ?? 1) !== nextOpacity)
+      .map((element) => element.id));
+    if (changedIds.size === 0) return;
+
+    if (!skipHistory) useHistoryStore.getState().pushState(currentAlbum);
+    const nextSpread = {
+      ...spread,
+      elements: (spread.elements || []).map((element) => changedIds.has(element.id)
+        ? { ...element, opacity: nextOpacity } : element),
+    };
+    useAlbumStore.setState({
+      currentAlbum: spreadId === currentAlbum.coverSpread.id
+        ? { ...currentAlbum, coverSpread: nextSpread }
+        : { ...currentAlbum, spreads: currentAlbum.spreads.map((item) => item.id === spreadId ? nextSpread : item) },
       saveStatus: 'unsaved',
     });
   },
