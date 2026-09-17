@@ -612,3 +612,13 @@
 - [x] Composite photo content and its border together before applying opacity in print export; retain text opacity in both regular and rotated export paths.
 - [x] Add selection, locking, history, persistence, legacy, and export pixel regressions.
 - [ ] Manually verify slider interaction and matching appearance in the running Tauri canvas, navigator, preview, and exported JPEG/PNG/PDF.
+
+### Phase 54 — Release v1.0.63: Object Opacity for Photos and Text
+
+- [x] Object Opacity (0–100%) Control:
+  - Add Opacity slider to Properties panel for photos, text, and mixed multi-selections with live preview and single undo step per gesture.
+  - Seamless persistence in SQLite without schema migration; full legacy compatibility (older text defaults to 100%).
+- [x] High-Resolution Print Export Opacity:
+  - Composite photo content and borders together before applying opacity to prevent unnatural border bleed-through.
+  - Full support across unrotated and 4x SSAA rotated text export paths.
+- [x] Application version metadata bumped to `v1.0.63`.
