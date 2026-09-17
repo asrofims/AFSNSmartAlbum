@@ -1598,6 +1598,7 @@ mod tests {
                     },
                     styled_ranges: None,
                     text_runs: None,
+                    export_layout: None,
                 })
                 .unwrap(),
             ),

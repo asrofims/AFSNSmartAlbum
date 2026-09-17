@@ -44,6 +44,7 @@ The local SQLite database contains structured relations:
    - `folder_id`, `photo_id`, `added_at`.
 5. `spreads` & `elements`:
    - Spread geometry, independent `safe_area_top`, `safe_area_bottom`, `safe_area_outside`, and `safe_area_spine` values, plus photo/text frame placements, crop transformations, and element `opacity` (0.0–1.0). Older elements default to 1.0; the existing column needs no migration.
+   - Text `text_payload` may contain `exportLayout` with point-based token positions from the editor preview. Export uses it when frame dimensions match; older payloads still use native text layout. This adds no SQLite column or project version change.
 
 ## Photo Storage
 

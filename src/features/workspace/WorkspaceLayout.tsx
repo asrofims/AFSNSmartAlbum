@@ -23,7 +23,7 @@ import { KonvaEditorCanvas } from '../editor/KonvaEditorCanvas';
 import { FrameToolbar } from '../editor/FrameToolbar';
 import { TypographyPanel } from '../editor/TypographyPanel';
 import { OpacityControl } from '../editor/OpacityControl';
-import { TextNodeElement } from '../../domain/text';
+import { TextNodeElement, getTextRuns, resolveCssFontFamily } from '../../domain/text';
 import { PageNavigator } from '../album/PageNavigator';
 import { TemplatesPanel } from '../templates/TemplatesPanel';
 import { LockedPhotosPanel } from '../editor/LockedPhotosPanel';
@@ -188,7 +188,22 @@ export function WorkspaceLayout() {
     setActiveExportDir(options.outputDir);
     setIsExportProgressOpen(true);
     try {
-      await saveAlbumToDb();
+      const album = useAlbumStore.getState().currentAlbum;
+      const selectedIds = new Set(options.selectedSpreadIds || []);
+      const faces = new Set<string>();
+      for (const spread of album ? getAllAlbumSpreads(album) : []) {
+        if (selectedIds.size && !selectedIds.has(spread.id)) continue;
+        for (const element of spread.elements) {
+          if (element.type !== 'text') continue;
+          for (const run of getTextRuns(element.text, element.style, element.styledRanges)) {
+            const family = resolveCssFontFamily(run.fontFamily || element.style.fontFamily);
+            faces.add(`${run.fontStyle || element.style.fontStyle} ${run.fontWeight || element.style.fontWeight} ${run.fontSize || element.style.fontSize}px ${family}`);
+          }
+        }
+      }
+      if (document.fonts) await Promise.allSettled([...faces].map((face) => document.fonts.load(face)));
+      await document.fonts?.ready;
+      if (!await saveAlbumToDb()) throw new Error('The latest album changes could not be saved before export.');
       await invoke('export_album_high_res', {
         projectId: currentProject.id,
         options,

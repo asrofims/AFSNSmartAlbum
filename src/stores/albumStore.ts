@@ -609,6 +609,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
   saveAlbumToDb: () => persistInOrder(async () => {
     const { currentAlbum, saveStatus: previousStatus } = get();
     if (!currentAlbum) return false;
+    const project = useProjectStore.getState().currentProject;
+    const layoutContext = {
+      unit: project?.canvasUnit || currentAlbum.spreads[0]?.leftPage?.unit || 'mm',
+      dpi: project?.canvasDpi || 300,
+    };
 
     set({ saveStatus: 'saving' });
 
@@ -658,7 +663,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => ({
             ...textEl,
             text: textStr,
             style: styleObj,
-          }),
+          }, layoutContext),
         };
       }
       const [rTl, rTr, rBr, rBl] = getCornerRadii(el as PhotoFrameElement);

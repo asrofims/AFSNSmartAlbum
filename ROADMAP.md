@@ -622,3 +622,11 @@
   - Composite photo content and borders together before applying opacity to prevent unnatural border bleed-through.
   - Full support across unrotated and 4x SSAA rotated text export paths.
 - [x] Application version metadata bumped to `v1.0.63`.
+
+### Phase 55 — Text Preview and Export Layout Consistency
+
+- [x] Persist preview-calculated point positions for text tokens in the existing text payload and use them in regular and rotated export rendering.
+- [x] Load fonts used by selected spreads before preparing export layout; stop export if the latest album save fails.
+- [x] Keep native layout fallback for older projects and mismatched frame geometry.
+- [x] Add regressions for the default “Add a title or story here” text, saved layout positions, and final-word visibility in regular and rotated export.
+- [ ] Compare the text visually in the running Tauri export preview and exported JPEG/PNG/PDF for the affected project and fonts.

@@ -118,5 +118,20 @@ for (const unit of ['mm', 'cm', 'inch', 'px'] as Unit[]) {
   assert.equal(useAlbumStore.getState().saveStatus, 'saved');
 }
 void saved;
+// The persisted export layout must carry the preview's last word and point positions.
+(globalThis as any).document = { createElement: () => ({ getContext: () => ({
+  font: '',
+  measureText: (value: string) => ({ width: value.length * 7, actualBoundingBoxAscent: 10, actualBoundingBoxDescent: 3 }),
+}) }) };
+const placeholder = createTextNode({ text: 'Add a title or story here', width: 100, height: 30,
+  unit: 'mm', dpi: 300, style: { fontSize: 15, padding: 3, verticalAlign: 'middle' } });
+const exportPayload = JSON.parse(serializeTextPayload(placeholder, { unit: 'mm', dpi: 300 }));
+assert.equal(exportPayload.exportLayout.tokens.at(-1).text, 'here');
+assert.ok(exportPayload.exportLayout.tokens.every((token: any) => Number.isFinite(token.xPt)
+  && Number.isFinite(token.baselinePt)));
+assert.ok(exportPayload.exportLayout.frameWidthPt > exportPayload.exportLayout.tokens.at(-1).xPt);
+assert.equal(await useAlbumStore.getState().saveAlbumToDb(), true);
+assert.ok(JSON.parse(saved.album.spreads[0].elements[0].textPayload).exportLayout.tokens.length > 0);
+delete (globalThis as any).document;
 clearMocks();
 console.log('✓ Typography regressions passed: units, fitting, rotation, wrapping, ranges, load, placement, lock and history.');

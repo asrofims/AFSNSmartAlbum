@@ -400,12 +400,45 @@ export function editTextNode(element: TextNodeElement, newText: string): TextNod
   };
 }
 
-export function serializeTextPayload(element: TextNodeElement): string {
+/** Positions from the same point-based layout used by the editor and spread previews. */
+export function createTextExportLayout(element: TextNodeElement, unit: Unit, dpi: number) {
+  const style = { ...DEFAULT_TEXT_STYLE, ...element.style };
+  const frameWidthPt = convertUnitToPt(element.width, unit, dpi);
+  const frameHeightPt = convertUnitToPt(element.height, unit, dpi);
+  const layout = layoutRichText(getTextRuns(element.text, style, element.styledRanges),
+    style, frameWidthPt, frameHeightPt, 72, 'inch', dpi);
+  return {
+    frameWidthPt,
+    frameHeightPt,
+    tokens: layout.lines.flatMap((line) => line.tokens.filter((token) => !token.isSpace && !token.isNewline)
+      .map((token) => ({
+        text: token.text,
+        xPt: token.x,
+        baselinePt: token.yBaseline,
+        widthPt: token.width,
+        ascentPt: token.ascent,
+        descentPt: token.descent,
+        fontFamily: token.fontFamily,
+        fontSizePt: token.fontSizePx,
+        fontWeight: token.fontWeight,
+        fontStyle: token.fontStyle,
+        textDecoration: token.textDecoration,
+        fill: token.fill,
+        highlight: token.highlight,
+        letterSpacingPt: token.letterSpacing,
+      }))),
+  };
+}
+
+export function serializeTextPayload(element: TextNodeElement, layoutContext?: { unit: Unit; dpi: number }): string {
   return JSON.stringify({
     text: element.text,
     style: element.style,
     styledRanges: element.styledRanges,
     textRuns: getTextRuns(element.text, element.style, element.styledRanges),
+    ...(layoutContext && typeof document !== 'undefined'
+      ? { exportLayout: createTextExportLayout(element, layoutContext.unit, layoutContext.dpi) }
+      : {}),
   });
 }
 

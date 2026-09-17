@@ -17,6 +17,35 @@ pub struct TextElementPayload {
     pub style: TextStylePayload,
     pub styled_ranges: Option<Vec<StyledRangePayload>>,
     pub text_runs: Option<Vec<TextRunPayload>>,
+    #[serde(default)]
+    pub export_layout: Option<TextExportLayoutPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextExportLayoutPayload {
+    pub frame_width_pt: f32,
+    pub frame_height_pt: f32,
+    pub tokens: Vec<TextExportTokenPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextExportTokenPayload {
+    pub text: String,
+    pub x_pt: f32,
+    pub baseline_pt: f32,
+    pub width_pt: f32,
+    pub ascent_pt: f32,
+    pub descent_pt: f32,
+    pub font_family: String,
+    pub font_size_pt: f32,
+    pub font_weight: String,
+    pub font_style: String,
+    pub text_decoration: String,
+    pub fill: String,
+    pub highlight: Option<String>,
+    pub letter_spacing_pt: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -507,6 +536,8 @@ struct MeasuredToken {
     width: f32,
     ascent: f32,
     descent: f32,
+    // Point-based preview position and tracking, scaled to export pixels.
+    position: Option<(f32, f32, f32)>,
 }
 
 /// A line containing laid out tokens
@@ -762,6 +793,7 @@ pub fn render_text_element(
                         width: w,
                         ascent: asc,
                         descent: desc,
+                        position: None,
                     });
                     current_segment.clear();
                 }
@@ -779,6 +811,7 @@ pub fn render_text_element(
                     width: 0.0,
                     ascent: font_size_px * 0.8,
                     descent: font_size_px * 0.2,
+                    position: None,
                 });
             } else if c.is_whitespace() {
                 if !current_segment.is_empty() {
@@ -799,6 +832,7 @@ pub fn render_text_element(
                         width: w,
                         ascent: asc,
                         descent: desc,
+                        position: None,
                     });
                     current_segment.clear();
                 }
@@ -828,6 +862,7 @@ pub fn render_text_element(
                     width: w,
                     ascent: asc,
                     descent: desc,
+                    position: None,
                 });
             } else {
                 current_segment.push(c);
@@ -852,6 +887,7 @@ pub fn render_text_element(
                 width: w,
                 ascent: asc,
                 descent: desc,
+                position: None,
             });
         }
     }
@@ -951,6 +987,48 @@ pub fn render_text_element(
         );
     }
 
+    // The editor and spread preview use the browser's shaped glyph measurements.
+    // Reuse their word positions so small fontdue measurement differences cannot
+    // push the last word into an extra line that the saved frame cannot contain.
+    let expected_width_pt = (elem.width * scale_factor / (dpi_f / 72.0)) as f32;
+    let expected_height_pt = (elem.height * scale_factor / (dpi_f / 72.0)) as f32;
+    if let Some(layout) = parsed_payload.export_layout.as_ref().filter(|layout| {
+        (layout.frame_width_pt - expected_width_pt).abs() < 0.05
+            && (layout.frame_height_pt - expected_height_pt).abs() < 0.05
+            && layout.tokens.iter().all(|token| {
+                token.x_pt.is_finite() && token.baseline_pt.is_finite()
+                    && token.width_pt.is_finite() && token.ascent_pt.is_finite()
+                    && token.descent_pt.is_finite() && token.font_size_pt.is_finite()
+                    && token.font_size_pt > 0.0 && token.letter_spacing_pt.is_finite()
+            })
+    }) {
+        let tokens = layout.tokens.iter().map(|token| MeasuredToken {
+            text: token.text.clone(),
+            is_space: false,
+            is_newline: false,
+            font_family: token.font_family.clone(),
+            font_size_px: token.font_size_pt * pt_to_px,
+            font_weight: if token.font_weight == "bold" { 700 }
+                else { token.font_weight.parse::<u16>().unwrap_or(400) },
+            is_italic: token.font_style == "italic",
+            text_decoration: token.text_decoration.clone(),
+            fill: parse_color(&token.fill),
+            highlight: token.highlight.as_ref().map(|color| parse_color(color)),
+            width: token.width_pt * pt_to_px,
+            ascent: token.ascent_pt * pt_to_px,
+            descent: token.descent_pt * pt_to_px,
+            position: Some((token.x_pt * pt_to_px, token.baseline_pt * pt_to_px,
+                token.letter_spacing_pt * pt_to_px)),
+        }).collect();
+        lines = vec![LayoutLine {
+            tokens,
+            width: 0.0,
+            max_line_height: 0.0,
+            max_ascent: 0.0,
+            max_descent: 0.0,
+        }];
+    }
+
     // 3. Vertical alignment
     let total_content_h: f32 = lines.iter().map(|l| l.max_line_height).sum();
     let start_y = match base_style.vertical_align.as_str() {
@@ -977,10 +1055,11 @@ pub fn render_text_element(
 
         // Pass 1: Render Highlights
         for tok in &line.tokens {
+            let (draw_x, draw_baseline, _) = tok.position.unwrap_or((token_x, baseline, tracking));
             if let Some(ref hl) = tok.highlight {
                 if !tok.is_space && !tok.is_newline {
-                    let hl_x = (token_x - 2.0 * ss).max(0.0).round() as i32;
-                    let hl_y = (baseline - tok.ascent - 2.0 * ss).max(0.0).round() as i32;
+                    let hl_x = (draw_x - 2.0 * ss).max(0.0).round() as i32;
+                    let hl_y = (draw_baseline - tok.ascent - 2.0 * ss).max(0.0).round() as i32;
                     let hl_w = (tok.width + 4.0 * ss).round() as i32;
                     let hl_h = (tok.ascent + tok.descent + 4.0 * ss).round() as i32;
                     draw_filled_rect(&mut text_buffer, hl_x, hl_y, hl_w, hl_h, *hl);
@@ -995,19 +1074,20 @@ pub fn render_text_element(
             if tok.is_newline {
                 continue;
             }
+            let (draw_x, draw_baseline, draw_tracking) = tok.position.unwrap_or((token_x, baseline, tracking));
 
             let font_opt = load_font_weight(&tok.font_family, tok.font_weight, tok.is_italic);
 
             if !tok.is_space {
                 if let Some(ref font) = font_opt {
-                    let mut pen_x = token_x;
+                    let mut pen_x = draw_x;
                     let mut previous = None;
                     for ch in tok.text.chars() {
                         if let Some(prev) = previous {
-                            pen_x += if tracking == 0.0 { font.horizontal_kern(prev, ch, tok.font_size_px).unwrap_or(0.0) } else { tracking };
+                            pen_x += if draw_tracking == 0.0 { font.horizontal_kern(prev, ch, tok.font_size_px).unwrap_or(0.0) } else { draw_tracking };
                         }
                         let (metrics, bitmap) = font.rasterize(ch, tok.font_size_px);
-                        let glyph_top_y = (baseline - metrics.ymin as f32 - metrics.height as f32).round() as i32;
+                        let glyph_top_y = (draw_baseline - metrics.ymin as f32 - metrics.height as f32).round() as i32;
                         let glyph_left_x = (pen_x + metrics.xmin as f32).round() as i32;
 
                         for by in 0..metrics.height {
@@ -1039,22 +1119,22 @@ pub fn render_text_element(
 
                 // Text Decorations
                 if tok.text_decoration == "underline" {
-                    let bar_y = (baseline + 2.0 * ss).round() as i32;
+                    let bar_y = (draw_baseline + 2.0 * ss).round() as i32;
                     let bar_h = (tok.font_size_px * 0.07).max(1.5 * ss).round() as i32;
                     draw_filled_rect(
                         &mut text_buffer,
-                        token_x.round() as i32,
+                        draw_x.round() as i32,
                         bar_y,
                         tok.width.round() as i32,
                         bar_h,
                         tok.fill,
                     );
                 } else if tok.text_decoration == "line-through" {
-                    let bar_y = (baseline - tok.ascent * 0.35).round() as i32;
+                    let bar_y = (draw_baseline - tok.ascent * 0.35).round() as i32;
                     let bar_h = (tok.font_size_px * 0.07).max(1.5 * ss).round() as i32;
                     draw_filled_rect(
                         &mut text_buffer,
-                        token_x.round() as i32,
+                        draw_x.round() as i32,
                         bar_y,
                         tok.width.round() as i32,
                         bar_h,
@@ -1359,6 +1439,7 @@ mod tests {
                     },
                     styled_ranges: None,
                     text_runs: None,
+                    export_layout: None,
                 })
                 .unwrap(),
             ),
@@ -1450,6 +1531,7 @@ mod tests {
                     },
                     styled_ranges: None,
                     text_runs: None,
+                    export_layout: None,
                 })
                 .unwrap(),
             ),
@@ -1518,6 +1600,7 @@ mod tests {
                     },
                     styled_ranges: None,
                     text_runs: None,
+                    export_layout: None,
                 })
                 .unwrap(),
             ),
@@ -1537,5 +1620,54 @@ mod tests {
 
         let white_text_pixels = canvas.pixels().filter(|p| p[0] > 200).count();
         assert!(white_text_pixels > 50, "Rotated text should render legible letters");
+    }
+
+    #[test]
+    fn preview_positions_keep_the_last_word_in_export() {
+        let token = |text: &str, x: f32, baseline: f32, fill: &str| TextExportTokenPayload {
+            text: text.to_string(), x_pt: x, baseline_pt: baseline, width_pt: 24.0,
+            ascent_pt: 10.0, descent_pt: 3.0, font_family: "Inter".to_string(),
+            font_size_pt: 12.0, font_weight: "normal".to_string(),
+            font_style: "normal".to_string(), text_decoration: "none".to_string(),
+            fill: fill.to_string(), highlight: None, letter_spacing_pt: 0.0,
+        };
+        let payload = TextElementPayload {
+            text: "Add a title or story here".to_string(),
+            style: TextStylePayload { font_family: "Inter".to_string(), font_size: 24.0,
+                align: "left".to_string(), vertical_align: "top".to_string(),
+                padding: 4.0, ..TextStylePayload::default() },
+            styled_ranges: None,
+            text_runs: None,
+            export_layout: Some(TextExportLayoutPayload {
+                frame_width_pt: 120.0, frame_height_pt: 40.0,
+                tokens: vec![
+                    token("Add", 4.0, 15.0, "#000000"),
+                    token("a", 29.0, 15.0, "#000000"),
+                    token("title", 42.0, 15.0, "#000000"),
+                    token("or", 4.0, 32.0, "#000000"),
+                    token("story", 29.0, 32.0, "#000000"),
+                    token("here", 76.0, 32.0, "#ff0000"),
+                ],
+            }),
+        };
+        let mut element: ElementPayload = serde_json::from_value(serde_json::json!({
+            "id": "last-word", "type": "text", "x": 60.0, "y": 60.0,
+            "width": 120.0, "height": 40.0,
+            "textPayload": serde_json::to_string(&payload).unwrap(),
+        })).unwrap();
+        for rotation in [0.0, 45.0] {
+            element.rotation = rotation;
+            let mut canvas = RgbaImage::from_pixel(240, 240, Rgba([255, 255, 255, 255]));
+            render_text_element(&mut canvas, &element, 0.0, 0.0, 1.0, 72);
+            assert!(canvas.pixels().any(|pixel| pixel[0] > 200 && pixel[1] < 100 && pixel[2] < 100),
+                "The final word must remain visible at {rotation}°");
+        }
+
+        // A layout for different frame geometry is ignored, preserving legacy behavior.
+        element.rotation = 0.0;
+        element.width = 121.0;
+        let mut canvas = RgbaImage::from_pixel(240, 240, Rgba([255, 255, 255, 255]));
+        render_text_element(&mut canvas, &element, 0.0, 0.0, 1.0, 72);
+        assert!(!canvas.pixels().any(|pixel| pixel[0] > 200 && pixel[1] < 100 && pixel[2] < 100));
     }
 }
