@@ -593,3 +593,13 @@
 - [x] Make Reset Ratio restore the exact native photo aspect while preserving crop pan and zoom, and skip updates when the ratio already matches.
 - [x] Add regressions for rotated single corners, multi-selection ratio preservation, fixed gaps, legacy rounded frames, and crop-safe no-op resets.
 - [ ] Manually verify single and multi-photo corner resize, spine snapping, and Reset Ratio in the running Tauri editor.
+
+### Phase 52 — Release v1.0.62: Corner Resize Ratio Precision & Crop-Safe Reset
+
+- [x] Photo Frame Corner Resize Ratio Precision:
+  - Preserve exact native photo aspect ratio during single and multi-selection corner resize without independent rounding distortions.
+  - Eliminate width-only spine corrections after ratio-locked corner resize to keep proportions intact.
+- [x] Crop-Safe Reset Ratio:
+  - Make Reset Ratio restore exact native photo aspect ratio while fully preserving crop pan and zoom.
+  - Skip redundant updates when the frame ratio already matches.
+- [x] Application version metadata bumped to `v1.0.62`.
