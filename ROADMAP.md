@@ -670,3 +670,14 @@
 - [x] Add placement and clipboard regressions, and verify the frontend build and test suite.
 - [ ] Manually verify multi-photo drag, context menu, Copy feedback, and Paste to All Spreads in the running Tauri editor.
 - [x] Application version metadata bumped to `v1.0.67`.
+
+### Phase 60 — Release v1.0.68: Layflat Spread Preview Consistency
+
+- [x] Make spread navigator and export preview use the same two-page, zero-gutter geometry as the canvas, including legacy spreads with stored gutter values.
+- [x] Keep native export and split-page slicing aligned with the canvas crease for those legacy spreads.
+- [x] Project spread thumbnails and export previews from one physical coordinate model without independent pixel rounding; preserve object gaps, safe bounds, and center spine at each preview scale.
+- [x] Show the correct right-page safe area when previewing that page alone.
+- [x] Draw preview frame borders as overlays so border thickness does not shrink or shift photo content.
+- [x] Verify the center crease and object spacing visually in the running Tauri editor, spread navigator, and export preview.
+- [x] Make Left/Right Page export previews retain bleed only at the outside edge, matching native split slicing, and cover subpixel raster seams at the Left Page cut edge without changing intentional frame borders.
+- [x] Application version metadata bumped to `v1.0.68`.

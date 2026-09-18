@@ -256,7 +256,7 @@
 
 .miniSpread {
   background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  outline: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 1px;
   display: flex;
   overflow: hidden;

@@ -691,7 +691,8 @@ where
     let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
     let single_page_w = project.canvas_width;
     let single_page_h = project.canvas_height;
-    let gutter_w = spread.gutter_width;
+    // The editor uses a layflat spread: legacy stored gutter values must not widen print output.
+    let gutter_w = 0.0;
     let bleed = spread.bleed;
 
     let total_spread_w = single_page_w * 2.0 + gutter_w;
@@ -835,7 +836,7 @@ pub fn calculate_right_page_start_x(
 ) -> u32 {
     let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, dpi);
     let single_page_w = project.canvas_width;
-    let gutter_w = spread.gutter_width;
+    let gutter_w = 0.0;
     let bleed = spread.bleed;
 
     let ox = if include_bleed { (bleed * scale).round() as u32 } else { 0 };
@@ -1185,7 +1186,7 @@ mod tests {
             name: "Spread 01".to_string(),
             left_page: None,
             right_page: None,
-            gutter_width: 0.0,
+            gutter_width: 6.0, // Legacy metadata; the editor crease is still at 200 mm.
             gutter_unit: "mm".to_string(),
             bleed: 3.0,
             safe_area: 10.0,
@@ -1357,8 +1358,11 @@ mod tests {
 
         // Render at 72 DPI for fast unit test
         let img = render_spread_to_image(&project, &spread, 72, false);
-        // Total spread width = 200 * 2 + 6 = 406 mm -> 406 * (72/25.4) ~ 1150 px
-        assert!(img.width() > 1000);
+        // A legacy stored gutter must not change the layflat output width or split crease.
+        let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, 72);
+        assert_eq!(img.width(), (project.canvas_width * 2.0 * scale).round() as u32);
+        assert_eq!(calculate_right_page_start_x(&project, &spread, 72, false, img.width()),
+            (project.canvas_width * scale).round() as u32);
         assert!(img.height() > 800);
 
         // Test PDF Assembly

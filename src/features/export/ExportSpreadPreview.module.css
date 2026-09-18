@@ -98,8 +98,8 @@
 .spineLine {
   position: absolute;
   width: 1px;
-  background: rgba(248, 250, 252, 0.9);
-  box-shadow: -1px 0 0 rgba(15, 23, 42, 0.85), 1px 0 0 rgba(15, 23, 42, 0.85);
+  background: #fff;
+  mix-blend-mode: difference;
   z-index: 3;
   pointer-events: none;
 }

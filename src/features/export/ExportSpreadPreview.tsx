@@ -6,6 +6,7 @@ import { Project } from '../../domain/project';
 import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
+import { calculatePreviewProjection, projectPreviewRect } from '../../domain/previewGeometry';
 import { calculateExportPixels } from '../../domain/units';
 import { usePhotoStore } from '../../stores/photoStore';
 import styles from './ExportSpreadPreview.module.css';
@@ -50,47 +51,45 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
 
   const singlePageW = dims.pageWidth;
   const singlePageH = dims.pageHeight;
-  const gutterW = spread.gutterWidth ?? dims.gutterWidth ?? 0;
+  const gutterW = dims.gutterWidth;
   const bleed = includeBleed ? (spread.bleed ?? dims.bleed ?? 0) : 0;
 
   // Base physical spread geometry (without bleed)
   const baseSpreadW = singlePageW * 2 + gutterW;
   const baseSpreadH = singlePageH;
 
-  // Target view geometry
-  let targetW = baseSpreadW;
-  let targetH = baseSpreadH;
-  let viewOffsetX = 0; // horizontal offset in spread coordinate space
-
-  if (viewMode === 'left-page') {
-    targetW = singlePageW;
-    viewOffsetX = 0;
-  } else if (viewMode === 'right-page') {
-    targetW = singlePageW;
-    viewOffsetX = singlePageW + gutterW;
-  }
+  const targetW = viewMode === 'spread' ? baseSpreadW : singlePageW;
+  const targetH = baseSpreadH;
 
   // With bleed geometry
-  const finalExportW = targetW + bleed * 2;
+  const finalExportW = targetW + bleed * (viewMode === 'spread' ? 2 : 1);
   const finalExportH = targetH + bleed * 2;
 
   // Compute live pixel output dimensions for specs badge
-  const pixelW = calculateExportPixels(finalExportW, dims.unit, dpi, dims.dpi);
+  const spreadPixelW = calculateExportPixels(baseSpreadW + bleed * 2, dims.unit, dpi, dims.dpi);
+  const leftCutPixelX = calculateExportPixels(bleed, dims.unit, dpi, dims.dpi)
+    + calculateExportPixels(singlePageW, dims.unit, dpi, dims.dpi);
+  const pixelW = viewMode === 'spread' ? spreadPixelW
+    : viewMode === 'left-page' ? leftCutPixelX : spreadPixelW - leftCutPixelX;
   const pixelH = calculateExportPixels(finalExportH, dims.unit, dpi, dims.dpi);
 
   // Scale canvas to fill the preview container while strictly preserving aspect ratio
   const boxW = 550;
   const boxH = 330;
-  const scale = Math.min(boxW / finalExportW, boxH / finalExportH);
-
-  let containerW = Math.round(finalExportW * scale);
-  let containerH = Math.round(finalExportH * scale);
-  // Guarantee even pixel dimensions so vertical and horizontal flex centering never produces fractional .5px offsets
-  if (containerW % 2 !== 0) containerW += 1;
-  if (containerH % 2 !== 0) containerH += 1;
-
-  const bleedPx = Math.round(bleed * scale);
-  const spinePx = Math.round((singlePageW + (bleed > 0 ? bleed : 0)) * scale);
+  const projection = calculatePreviewProjection(singlePageW, singlePageH, gutterW,
+    boxW, boxH, viewMode, bleed);
+  const { scale, width: containerW, height: containerH, bleedPx, bleedLeftPx, bleedRightPx,
+    spineX: spinePx, viewOffsetX } = projection;
+  const safeAreaWidth = Math.max(0, singlePageW - dims.safeMarginOutside - dims.safeMarginSpine);
+  const safeAreaHeight = Math.max(0, singlePageH - dims.safeMarginTop - dims.safeMarginBottom);
+  const leftSafeArea = projectPreviewRect({
+    x: dims.safeMarginOutside, y: dims.safeMarginTop,
+    width: safeAreaWidth, height: safeAreaHeight,
+  }, projection);
+  const rightSafeArea = projectPreviewRect({
+    x: singlePageW + gutterW + dims.safeMarginSpine, y: dims.safeMarginTop,
+    width: safeAreaWidth, height: safeAreaHeight,
+  }, projection);
 
   // Background colors
   const spreadBgColor = spread.backgroundColor || project.backgroundColor || '#FFFFFF';
@@ -183,9 +182,9 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             <div
               className={styles.trimLineBox}
               style={{
-                left: `${bleedPx}px`,
+                left: `${bleedLeftPx}px`,
                 top: `${bleedPx}px`,
-                right: `${bleedPx}px`,
+                right: `${bleedRightPx}px`,
                 bottom: `${bleedPx}px`,
               }}
               title="Dashed red line indicates the final trim cut line after printing"
@@ -198,20 +197,20 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               <div
                 style={{
                   position: 'absolute',
-                  left: `${bleedPx}px`,
+                  left: `${bleedLeftPx}px`,
                   top: `${bleedPx}px`,
-                  width: `${Math.round(singlePageW * scale)}px`,
-                  height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+                  width: `${singlePageW * scale}px`,
+                  height: `${singlePageH * scale}px`,
                   backgroundColor: leftPageBg,
                 }}
               />
               <div
                 style={{
                   position: 'absolute',
-                  left: `${bleedPx + Math.round((singlePageW + gutterW) * scale)}px`,
+                  left: `${projection.rightPageX}px`,
                   top: `${bleedPx}px`,
-                  width: `${Math.max(1, containerW - bleedPx * 2 - Math.round((singlePageW + gutterW) * scale))}px`,
-                  height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+                  width: `${singlePageW * scale}px`,
+                  height: `${singlePageH * scale}px`,
                   backgroundColor: rightPageBg,
                 }}
               />
@@ -222,10 +221,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             <div
               style={{
                 position: 'absolute',
-                left: `${bleedPx}px`,
+                left: `${bleedLeftPx}px`,
                 top: `${bleedPx}px`,
-                width: `${Math.max(1, containerW - bleedPx * 2)}px`,
-                height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+                width: `${singlePageW * scale}px`,
+                height: `${singlePageH * scale}px`,
                 backgroundColor: leftPageBg,
               }}
             />
@@ -235,10 +234,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             <div
               style={{
                 position: 'absolute',
-                left: `${bleedPx}px`,
+                left: `${bleedLeftPx}px`,
                 top: `${bleedPx}px`,
-                width: `${Math.max(1, containerW - bleedPx * 2)}px`,
-                height: `${Math.max(1, containerH - bleedPx * 2)}px`,
+                width: `${singlePageW * scale}px`,
+                height: `${singlePageH * scale}px`,
                 backgroundColor: rightPageBg,
               }}
             />
@@ -263,29 +262,29 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
           {showSafeAreaGuide && (
             <>
               {/* Left Page Safe Area */}
-              <div
+              {viewMode !== 'right-page' && <div
                 style={{
                   position: 'absolute',
-                  left: `${bleedPx + Math.round(dims.safeMarginOutside * scale)}px`,
-                  top: `${bleedPx + Math.round(dims.safeMarginTop * scale)}px`,
-                  width: `${Math.max(1, Math.round((dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scale))}px`,
-                  height: `${Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scale))}px`,
+                  left: `${leftSafeArea.x}px`,
+                  top: `${leftSafeArea.y}px`,
+                  width: `${leftSafeArea.width}px`,
+                  height: `${leftSafeArea.height}px`,
                   border: '1px dashed rgba(59, 130, 246, 0.75)',
                   pointerEvents: 'none',
                   boxSizing: 'border-box',
                   zIndex: 20,
                 }}
                 title={`Safe Area Margin (Left Page): ${dims.safeMarginOutside} ${dims.unit}`}
-              />
-              {/* Right Page Safe Area (when in full spread view) */}
-              {viewMode === 'spread' && (
+              />}
+              {/* Right Page Safe Area */}
+              {viewMode !== 'left-page' && (
                 <div
                   style={{
                     position: 'absolute',
-                    left: `${bleedPx + Math.round((dims.pageWidth + gutterW + dims.safeMarginSpine) * scale)}px`,
-                    top: `${bleedPx + Math.round(dims.safeMarginTop * scale)}px`,
-                    width: `${Math.max(1, Math.round((dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scale))}px`,
-                    height: `${Math.max(1, Math.round((dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scale))}px`,
+                    left: `${rightSafeArea.x}px`,
+                    top: `${rightSafeArea.y}px`,
+                    width: `${rightSafeArea.width}px`,
+                    height: `${rightSafeArea.height}px`,
                     border: '1px dashed rgba(59, 130, 246, 0.75)',
                     pointerEvents: 'none',
                     boxSizing: 'border-box',
@@ -301,13 +300,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
           <div className={styles.artworkLayer}>
             {visibleElements.map((el, idx) => {
               // Coordinate transformation relative to view container
-              const localX = el.x - viewOffsetX + bleed;
-              const localY = el.y + bleed;
-
-              const renderX = Math.round(localX * scale);
-              const renderY = Math.round(localY * scale);
-              const renderW = Math.max(1, Math.round(el.width * scale));
-              const renderH = Math.max(1, Math.round(el.height * scale));
+              const { x: renderX, y: renderY, width: renderW, height: renderH } =
+                projectPreviewRect(el, projection);
               const rot = el.rotation || 0;
 
               // Strict 1:1 physical positioning matching real canvas
@@ -320,14 +314,15 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               // and the frame touches the spread outer boundary in canvas coordinates (tolerance <= 0.05 mm/unit)
               if (includeBleed && !rot && bleedPx > 0) {
                 const tol = 0.05;
-                const touchesLeft = (el.x - viewOffsetX) <= tol;
+                const touchesLeft = viewMode !== 'right-page' && (el.x - viewOffsetX) <= tol;
                 const touchesTop = el.y <= tol;
-                const touchesRight = (el.x + el.width - viewOffsetX) >= (targetW - tol);
+                const touchesRight = viewMode !== 'left-page'
+                  && (el.x + el.width - viewOffsetX) >= (targetW - tol);
                 const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
 
                 if (touchesLeft) {
                   finalRenderX = 0;
-                  finalRenderW += bleedPx;
+                  finalRenderW += bleedLeftPx;
                 }
                 if (touchesTop) {
                   finalRenderY = 0;
@@ -339,6 +334,16 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                 if (touchesBottom) {
                   finalRenderH = containerH - finalRenderY;
                 }
+              }
+
+              // A frame ending exactly at the left-page cut can rasterize one CSS pixel
+              // short of the stage when its fractional position and width are rounded
+              // separately. Let the stage clip that extra pixel; the physical geometry
+              // and any intentional frame border stay unchanged.
+              if (viewMode === 'left-page' && !rot
+                && el.type === 'photo' && !el.borderEnabled
+                && Math.abs(el.x + el.width - singlePageW) <= 0.05) {
+                finalRenderW = Math.max(finalRenderW, containerW - finalRenderX + 1);
               }
 
               if (el.type === 'text') {
@@ -395,6 +400,9 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             const imgTopPct = (offsetY / photoEl.height) * 100;
             const imgWidthPct = (imgPhysicalW / photoEl.width) * 100;
             const imgHeightPct = (imgPhysicalH / photoEl.height) * 100;
+            // Overscan the cropped image inside its clipped frame so subpixel image
+            // rasterization cannot expose the white loading background at a cut edge.
+            const imageEdgeOverscan = 1;
             const cropRot = photoEl.cropRotation || 0;
 
             const [crTl, crTr, crBr, crBl] = getCornerRadii(photoEl);
@@ -420,9 +428,6 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   background: imgSrc ? '#ffffff' : '#1e293b',
                   opacity: photoEl.opacity ?? 1,
                   boxSizing: 'border-box',
-                  border: photoEl.borderEnabled && photoEl.borderWidth
-                    ? `${Math.max(1, Math.round(photoEl.borderWidth * scale))}px solid ${photoEl.borderColor || '#ffffff'}`
-                    : 'none',
                   borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
                   zIndex: photoEl.zIndex ?? (idx + 1),
                 }}
@@ -433,10 +438,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     alt=""
                     style={{
                       position: 'absolute',
-                      left: `${imgLeftPct}%`,
-                      top: `${imgTopPct}%`,
-                      width: `${imgWidthPct}%`,
-                      height: `${imgHeightPct}%`,
+                      left: `calc(${imgLeftPct}% - ${imageEdgeOverscan}px)`,
+                      top: `calc(${imgTopPct}% - ${imageEdgeOverscan}px)`,
+                      width: `calc(${imgWidthPct}% + ${imageEdgeOverscan * 2}px)`,
+                      height: `calc(${imgHeightPct}% + ${imageEdgeOverscan * 2}px)`,
                       maxWidth: 'none',
                       maxHeight: 'none',
                       transform: cropRot ? `rotate(${cropRot}deg)` : undefined,
@@ -454,6 +459,13 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                   </div>
+                )}
+                {photoEl.borderEnabled && photoEl.borderWidth > 0 && (
+                  <div style={{
+                    position: 'absolute', inset: 0, boxSizing: 'border-box', pointerEvents: 'none',
+                    border: `${photoEl.borderWidth * scale}px solid ${photoEl.borderColor || '#ffffff'}`,
+                    borderRadius: 'inherit',
+                  }} />
                 )}
               </div>
             );

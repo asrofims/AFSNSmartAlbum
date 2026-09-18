@@ -9,6 +9,7 @@ import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread, getSpreadPageLabel, g
 import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
+import { calculatePreviewProjection, projectPreviewRect } from '../../domain/previewGeometry';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
@@ -33,18 +34,14 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
   const photos = usePhotoStore((s) => s.photos);
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
 
-  const dims = getProjectDimensionsInCanvasUnit(project);
-  const totalPhysicalW = (spread.leftPage?.width || dims.pageWidth) + (spread.rightPage?.width || dims.pageWidth) + (spread.gutterWidth ?? dims.gutterWidth ?? 0);
-  const totalPhysicalH = spread.leftPage?.height || dims.pageHeight || 200;
-
+  const dims = getProjectDimensionsInCanvasUnit(project, spread);
   // Mini thumbnail box dimensions inside preview container
   const previewBoxW = 136;
   const previewBoxH = 54;
-  const scale = Math.min(previewBoxW / (totalPhysicalW || 400), previewBoxH / (totalPhysicalH || 200));
-
-  const actualSpreadW = Math.round(totalPhysicalW * scale);
-  const actualSpreadH = Math.round(totalPhysicalH * scale);
-  const spineX = (spread.leftPage ? spread.leftPage.width : totalPhysicalW / 2) * scale;
+  const projection = calculatePreviewProjection(dims.pageWidth, dims.pageHeight, dims.gutterWidth,
+    previewBoxW, previewBoxH);
+  const scale = projection.scale;
+  const spineX = projection.spineX;
   const spreadBgColor = spread.backgroundColor || project.backgroundColor || '#FFFFFF';
   const leftPageBg = spread.leftPage?.backgroundColor || spreadBgColor;
   const rightPageBg = spread.rightPage?.backgroundColor || spreadBgColor;
@@ -54,8 +51,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       className={styles.miniSpread}
       style={{
         position: 'relative',
-        width: `${actualSpreadW}px`,
-        height: `${actualSpreadH}px`,
+        width: `${projection.width}px`,
+        height: `${projection.height}px`,
         backgroundColor: spreadBgColor,
         overflow: 'hidden',
       }}
@@ -92,8 +89,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           top: 0,
           bottom: 0,
           width: '1px',
-          backgroundColor: 'rgba(248, 250, 252, 0.9)',
-          boxShadow: '-1px 0 0 rgba(15, 23, 42, 0.85), 1px 0 0 rgba(15, 23, 42, 0.85)',
+          backgroundColor: '#ffffff',
+          mixBlendMode: 'difference',
           zIndex: 2,
           pointerEvents: 'none',
         }}
@@ -102,10 +99,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       {/* Real-time Rendered Photo & Text Elements */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
         {(spread.elements || []).map((el) => {
-          const x = el.x * scale;
-          const y = el.y * scale;
-          const w = el.width * scale;
-          const h = el.height * scale;
+          const { x, y, width: w, height: h } = projectPreviewRect(el, projection);
           const rot = el.rotation || 0;
 
           if (el.type === 'text') {
@@ -187,9 +181,6 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               background: imgSrc ? '#ffffff' : 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: photoEl.opacity ?? 1,
               boxSizing: 'border-box',
-              border: photoEl.borderEnabled && photoEl.borderWidth
-                ? `${Math.max(1, Math.round(photoEl.borderWidth * scale))}px solid ${photoEl.borderColor || '#ffffff'}`
-                : 'none',
               borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
               zIndex: photoEl.zIndex || 2,
             }}
@@ -227,6 +218,13 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                   }
                 }}
               />
+            )}
+            {photoEl.borderEnabled && photoEl.borderWidth > 0 && (
+              <div style={{
+                position: 'absolute', inset: 0, boxSizing: 'border-box', pointerEvents: 'none',
+                border: `${photoEl.borderWidth * scale}px solid ${photoEl.borderColor || '#ffffff'}`,
+                borderRadius: 'inherit',
+              }} />
             )}
           </div>
         );

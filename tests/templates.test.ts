@@ -106,6 +106,7 @@ function runTests() {
   }
   // 4. Spread margins override project defaults, including zero defaults.
   const legacySpreadWith10: any = {
+    gutterWidth: 6,
     safeArea: 10,
     safeAreaTop: 10,
     safeAreaBottom: 10,
@@ -121,6 +122,9 @@ function runTests() {
     marginSpine: 0,
   };
   const dimsProjectZero = getProjectDimensionsInCanvasUnit(zeroProject, legacySpreadWith10);
+  if (dimsProjectZero.gutterWidth !== 0) {
+    throw new Error('Legacy stored gutter must not expand the layflat canvas or its previews');
+  }
   if (dimsProjectZero.safeMargin !== 1 || dimsProjectZero.safeMarginOutside !== 1 || dimsProjectZero.safeMarginTop !== 1) {
     throw new Error(`Spread margin 10mm must override the zero project default as 1cm, got ${dimsProjectZero.safeMargin}`);
   }
