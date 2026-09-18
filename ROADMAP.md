@@ -638,3 +638,16 @@
   - Preload fonts used across selected spreads before generating export layout; enforce strict album save verification prior to export execution.
   - Maintain robust native fontdue layout fallback for older projects and resized frames.
 - [x] Application version metadata bumped to `v1.0.64`.
+
+### Phase 57 — Release v1.0.65: Modernized Canvas & Side Panel Lock Badges and Adaptive Layout Shuffle UI
+
+- [x] Modernized Padlock Badge on Canvas & Text Nodes:
+  - Scaled down locked badge diameter to a compact 16px (`radius: 8`) positioned neatly at `x = pixelW - 12, y = 12`.
+  - Replaced chunky fill with modern dark glass circular badge (`rgba(18, 20, 26, 0.9)`), subtle 1px amber border (`rgba(245, 158, 11, 0.7)`), and clean `#fbbf24` outline stroke path.
+  - Added interactive pointer hover cursor for intuitive canvas unlocking.
+- [x] Standardized Side Panel & Layout UI Elements:
+  - Eliminated raw emoji locks (`🔒`/`🔓`) across `LockedPhotosPanel`, batch actions, section titles, and `WorkspaceLayout` locked banner in favor of crisp, scalable vector SVG lock/unlock icons.
+  - Revamped item toggle lock button into a sleek 26×26px modern rounded button with amber active state and red hover unlock preview.
+  - Re-styled Adaptive Layout **Shuffle** button to match the **Add Text** button (26px height, subtle cyan tint background, clean SVG shuffle icon, smooth hover transition).
+- [x] Application version metadata bumped to `v1.0.65`.
+

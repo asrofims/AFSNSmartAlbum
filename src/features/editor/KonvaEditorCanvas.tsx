@@ -1034,11 +1034,11 @@ function PhotoFrameNode({
         />
       )}
 
-      {/* Locked Vector Padlock Badge (top-right corner) */}
+      {/* Modern Compact Locked Padlock Badge (top-right corner) */}
       {frame.locked && (
         <Group
-          x={Math.max(14, pixelW - 16)}
-          y={16}
+          x={Math.max(11, pixelW - 12)}
+          y={12}
           listening={true}
           onClick={(e) => {
             e.cancelBubble = true;
@@ -1048,24 +1048,32 @@ function PhotoFrameNode({
             e.cancelBubble = true;
             useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
           }}
+          onMouseEnter={(e) => {
+            const container = e.target.getStage()?.container();
+            if (container) container.style.cursor = 'pointer';
+          }}
+          onMouseLeave={(e) => {
+            const container = e.target.getStage()?.container();
+            if (container) container.style.cursor = 'default';
+          }}
         >
           <Circle
-            radius={11}
-            fill="rgba(15, 23, 42, 0.92)"
-            stroke="#f59e0b"
-            strokeWidth={1.5}
-            shadowColor="rgba(0, 0, 0, 0.6)"
-            shadowBlur={4}
+            radius={8}
+            fill="rgba(18, 20, 26, 0.9)"
+            stroke="rgba(245, 158, 11, 0.7)"
+            strokeWidth={1}
+            shadowColor="rgba(0, 0, 0, 0.45)"
+            shadowBlur={3}
             shadowOffset={{ x: 0, y: 1 }}
           />
           <KonvaPath
-            data="M7 11V7a5 5 0 0 1 10 0v4M4 11h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
+            data="M7 11V7a5 5 0 0 1 10 0v4M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
             stroke="#fbbf24"
             strokeWidth={2}
-            fill="#f59e0b"
-            scale={{ x: 0.5, y: 0.5 }}
-            x={-6}
-            y={-6}
+            fillEnabled={false}
+            scale={{ x: 0.38, y: 0.38 }}
+            x={-4.5}
+            y={-4.5}
             listening={false}
           />
         </Group>
@@ -2386,7 +2394,12 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       items.push({
         id: 'lock-elements',
         label: count > 1 ? `Lock ${count} ${itemNounPlural}` : `Lock ${itemNounSingular}`,
-        icon: '🔒',
+        icon: (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        ),
         shortcut: 'Ctrl+L',
         onClick: () => {
           useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, true);
@@ -2399,7 +2412,12 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       items.push({
         id: 'unlock-elements',
         label: count > 1 ? `Unlock ${count} ${itemNounPlural}` : `Unlock ${itemNounSingular}`,
-        icon: '🔓',
+        icon: (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+          </svg>
+        ),
         shortcut: 'Alt+L',
         onClick: () => {
           useEditorStore.getState().toggleLockSelectedFrames(activeSpread.id, false);

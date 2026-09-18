@@ -9,6 +9,40 @@ import { AlbumElement } from '../../domain/album';
 import { TextNodeElement } from '../../domain/text';
 import styles from './LockedPhotosPanel.module.css';
 
+const LockIcon = ({ size = 12 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+const UnlockIcon = ({ size = 12 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+  </svg>
+);
+
 interface LockedPhotosPanelProps {
   onToast?: (msg: string) => void;
 }
@@ -210,7 +244,9 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
     return (
       <div className={styles.container}>
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>🔒</div>
+          <div className={styles.emptyIcon}>
+            <LockIcon size={22} />
+          </div>
           <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
             No elements on active spread
           </p>
@@ -275,7 +311,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
           onClick={(e) => handleToggleLock(e, frame.id, isLocked, isText)}
           title={isLocked ? `Unlock this ${isText ? 'text box' : 'photo frame'}` : `Lock this ${isText ? 'text box' : 'photo frame'}`}
         >
-          {isLocked ? '🔒' : '🔓'}
+          {isLocked ? <LockIcon size={13} /> : <UnlockIcon size={13} />}
         </button>
       </div>
     );
@@ -333,7 +369,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
                   onClick={handleLockSelected}
                   title={`Lock ${selectedUnlockedCount} selected item(s) (Ctrl+L)`}
                 >
-                  <span>🔒</span>
+                  <LockIcon size={12} />
                   <span>Lock ({selectedUnlockedCount})</span>
                 </button>
               )}
@@ -344,7 +380,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
                   onClick={handleUnlockSelected}
                   title={`Unlock ${selectedLockedCount} selected item(s) (Alt+L)`}
                 >
-                  <span>🔓</span>
+                  <UnlockIcon size={12} />
                   <span>Unlock ({selectedLockedCount})</span>
                 </button>
               )}
@@ -359,7 +395,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
                 onClick={handleUnlockAll}
                 title="Unlock all items on this spread (Ctrl+Alt+L)"
               >
-                <span>🔓</span>
+                <UnlockIcon size={12} />
                 <span>Unlock All ({lockedElements.length})</span>
               </button>
             )}
@@ -370,7 +406,7 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
                 onClick={handleLockAll}
                 title="Lock all items on this spread (Ctrl+L)"
               >
-                <span>🔒</span>
+                <LockIcon size={12} />
                 <span>Lock All ({unlockedElements.length})</span>
               </button>
             )}
@@ -383,7 +419,10 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
         {lockedElements.length > 0 && (
           <>
             <div className={styles.sectionTitle}>
-              <span>🔒 Locked Items ({lockedElements.length})</span>
+              <span className={styles.sectionTitleLabel}>
+                <LockIcon size={12} />
+                <span>Locked Items ({lockedElements.length})</span>
+              </span>
               <button
                 type="button"
                 className={styles.sectionSelectBtn}
@@ -404,7 +443,10 @@ export function LockedPhotosPanel({ onToast }: LockedPhotosPanelProps) {
         {unlockedElements.length > 0 && (
           <>
             <div className={styles.sectionTitle}>
-              <span>🔓 Unlocked Items ({unlockedElements.length})</span>
+              <span className={styles.sectionTitleLabel}>
+                <UnlockIcon size={12} />
+                <span>Unlocked Items ({unlockedElements.length})</span>
+              </span>
               <button
                 type="button"
                 className={styles.sectionSelectBtn}

@@ -392,11 +392,11 @@ export function TextNode({
         />
       )}
 
-      {/* Locked Vector Padlock Badge (top-right corner) - Identical to Photo Frame */}
+      {/* Modern Compact Locked Padlock Badge (top-right corner) - Identical to Photo Frame */}
       {element.locked && (
         <Group
-          x={Math.max(14, displayPixelW - 16)}
-          y={16}
+          x={Math.max(11, displayPixelW - 12)}
+          y={12}
           listening={true}
           onClick={(e) => {
             e.cancelBubble = true;
@@ -406,24 +406,32 @@ export function TextNode({
             e.cancelBubble = true;
             useEditorStore.getState().toggleLockSelectedFrames(undefined, false);
           }}
+          onMouseEnter={(e) => {
+            const container = e.target.getStage()?.container();
+            if (container) container.style.cursor = 'pointer';
+          }}
+          onMouseLeave={(e) => {
+            const container = e.target.getStage()?.container();
+            if (container) container.style.cursor = 'default';
+          }}
         >
           <Circle
-            radius={11}
-            fill="rgba(15, 23, 42, 0.92)"
-            stroke="#f59e0b"
-            strokeWidth={1.5}
-            shadowColor="rgba(0, 0, 0, 0.6)"
-            shadowBlur={4}
+            radius={8}
+            fill="rgba(18, 20, 26, 0.9)"
+            stroke="rgba(245, 158, 11, 0.7)"
+            strokeWidth={1}
+            shadowColor="rgba(0, 0, 0, 0.45)"
+            shadowBlur={3}
             shadowOffset={{ x: 0, y: 1 }}
           />
           <KonvaPath
-            data="M7 11V7a5 5 0 0 1 10 0v4M4 11h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
+            data="M7 11V7a5 5 0 0 1 10 0v4M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
             stroke="#fbbf24"
             strokeWidth={2}
-            fill="#f59e0b"
-            scale={{ x: 0.5, y: 0.5 }}
-            x={-6}
-            y={-6}
+            fillEnabled={false}
+            scale={{ x: 0.38, y: 0.38 }}
+            x={-4.5}
+            y={-4.5}
             listening={false}
           />
         </Group>

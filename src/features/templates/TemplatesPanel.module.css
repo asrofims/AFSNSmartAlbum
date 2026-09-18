@@ -62,6 +62,34 @@
   color: var(--color-text-primary, #ffffff);
 }
 
+.shuffleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--color-accent, #38bdf8);
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease), color var(--transition-fast, 0.15s ease), transform 0.1s ease;
+}
+
+.shuffleBtn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: var(--color-accent, #38bdf8);
+}
+
+.shuffleBtn:active {
+  transform: scale(0.97);
+}
+
 .activeCard {
   border-color: var(--color-accent, #38bdf8) !important;
   background: rgba(56, 189, 248, 0.08) !important;
