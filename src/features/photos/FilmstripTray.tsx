@@ -61,10 +61,17 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     healThumbnail,
   } = usePhotoStore();
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const [importAnchor, setImportAnchor] = useState<{ top: number; right: number } | null>(null);
   const filmstripRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+
+  useEffect(() => {
+    if (!copyNotice) return;
+    const timeout = window.setTimeout(() => setCopyNotice(null), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [copyNotice]);
 
   // Failed / Missing Thumbnail Cache Fallback (Zero background decoding)
   const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set());
@@ -76,7 +83,8 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     x: number;
     y: number;
     photo: Photo | null;
-  }>({ isOpen: false, x: 0, y: 0, photo: null });
+    selectedPhotos: Photo[];
+  }>({ isOpen: false, x: 0, y: 0, photo: null, selectedPhotos: [] });
 
   // Single / Target Photo Deletion Confirm State
   const [photoToDelete, setPhotoToDelete] = useState<{ projectId: string; ids: string[]; name: string } | null>(null);
@@ -302,26 +310,51 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     e.stopPropagation();
 
     // If right-clicked photo is not in current multi-selection, make it the single selection
-    if (!selectedPhotoIds.includes(photo.id)) {
+    const isSelected = selectedPhotoIds.includes(photo.id);
+    if (!isSelected) {
       selectPhoto(photo.id, 'single', sortedPhotos);
     }
+    const selectedPhotos = isSelected
+      ? sortedPhotos.filter((item) => selectedPhotoIds.includes(item.id))
+      : [photo];
 
     setContextMenuState({
       isOpen: true,
       x: e.clientX,
       y: e.clientY,
       photo,
+      selectedPhotos,
     });
   };
 
   // Card Drag Handler for Folder Organization & Canvas Placement
   const handleCardDragStart = (e: React.DragEvent, photo: Photo) => {
-    if (!selectedPhotoIds.includes(photo.id)) {
+    const isSelected = selectedPhotoIds.includes(photo.id);
+    if (!isSelected) {
       selectPhoto(photo.id, 'single', sortedPhotos);
     }
-    e.dataTransfer.setData('application/json', JSON.stringify(photo));
-    e.dataTransfer.setData('text/plain', photo.id);
+    const ids = isSelected ? sortedPhotos.filter((item) => selectedPhotoIds.includes(item.id)).map((item) => item.id) : [photo.id];
+    e.dataTransfer.setData('application/x-afsn-photo-ids', JSON.stringify(ids));
+    if (ids.length > 1) e.dataTransfer.setData('application/x-afsn-multi-photo', String(ids.length));
+    e.dataTransfer.setData('application/json', JSON.stringify(ids));
+    e.dataTransfer.setData('text/plain', ids[0] || photo.id);
     e.dataTransfer.effectAllowed = 'copyMove';
+    if (ids.length > 1) {
+      const dragImage = document.createElement('canvas');
+      dragImage.width = 150;
+      dragImage.height = 48;
+      const context = dragImage.getContext('2d');
+      if (context) {
+        context.fillStyle = '#182433';
+        context.fillRect(0, 0, 150, 48);
+        context.strokeStyle = '#38bdf8';
+        context.strokeRect(1, 1, 148, 46);
+        context.fillStyle = '#f1f5f9';
+        context.font = '600 14px sans-serif';
+        context.fillText(`${ids.length} Photos`, 18, 30);
+        e.dataTransfer.setDragImage(dragImage, 18, 24);
+      }
+    }
   };
 
   // Execute Photo Deletion after ConfirmDialog
@@ -353,6 +386,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
     >
       {/* Batch Action Bar (Appears when 2 or more photos are selected - Lightroom style) */}
       <BatchActionBar onRequestDelete={requestPhotoDelete} />
+      {copyNotice && <div className={styles.copyNotice} role="status">{copyNotice}</div>}
       {libraryError && (
         <div className={styles.libraryError}>
           <span role="alert">{libraryError}</span>
@@ -750,7 +784,7 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           x={contextMenuState.x}
           y={contextMenuState.y}
           targetPhoto={contextMenuState.photo}
-          selectedPhotos={photos.filter((p) => selectedPhotoIds.includes(p.id))}
+          selectedPhotos={contextMenuState.selectedPhotos}
           folders={folders}
           activeFolderId={activeFolderId}
           onClose={() => setContextMenuState((s) => ({ ...s, isOpen: false }))}
@@ -762,6 +796,11 @@ export function FilmstripTray({ isOpen, onToggle }: FilmstripTrayProps) {
           onRequestDelete={requestPhotoDelete}
           onSelectAll={() => selectAll(sortedPhotos)}
           onRelinkPhoto={(photoId) => openRelink(photoId)}
+          onCopyPhotos={(ids) => {
+            void usePhotoStore.getState().copySelectedPhotos(ids).then((count) => {
+              if (count > 0) setCopyNotice(`${count} ${count === 1 ? 'photo' : 'photos'} copied. Paste onto a spread.`);
+            });
+          }}
         />
       )}
 

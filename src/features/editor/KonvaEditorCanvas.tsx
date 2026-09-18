@@ -1106,7 +1106,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
     selectFrame,
     selectFrames,
     clearSelection,
-    addPhotoToSpread,
+    addPhotosToSpread,
     updateFrameGeometry,
     batchUpdateFrames,
     updateCrop,
@@ -1732,9 +1732,17 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
             return;
           }
         }
-        if (selectedFrameIds.length > 0) {
+        const librarySelection = usePhotoStore.getState().selectedPhotoIds;
+        const filmstripHovered = Boolean(document.querySelector('[aria-label="Photo Library Filmstrip"]:hover'));
+        if (librarySelection.length > 0 && (filmstripHovered || selectedFrameIds.length === 0)) {
+          e.preventDefault();
+          void usePhotoStore.getState().copySelectedPhotos().then((count) => {
+            if (count > 0 && onToast) onToast(`✓ Copied ${count} ${count === 1 ? 'photo' : 'photos'}`);
+          });
+        } else if (selectedFrameIds.length > 0) {
           e.preventDefault();
           copySelectedFrames(activeSpread.id);
+          if (onToast) onToast(`✓ Copied ${selectedFrameIds.length} ${selectedFrameIds.length === 1 ? 'element' : 'elements'}`);
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
@@ -2000,7 +2008,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
         physicalY <= f.y + f.height
       );
 
-      const isAlt = Boolean(e.altKey);
+      const isAlt = Boolean(e.altKey) && !Array.from(e.dataTransfer.types).includes('application/x-afsn-multi-photo');
       setHoveredDropFrameId(targetFrame ? targetFrame.id : null);
       setIsHoveredDropAlt(isAlt);
     }
@@ -2023,34 +2031,30 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
       justDroppedRef.current = false;
     }, 250);
 
-    let photo: Photo | null = null;
+    const libraryPhotos = usePhotoStore.getState().photos;
+    const byId = new Map(libraryPhotos.map((photo) => [photo.id, photo]));
+    let photoIds: string[] = [];
     try {
-      const rawData = e.dataTransfer.getData('application/json');
+      const rawData = e.dataTransfer.getData('application/x-afsn-photo-ids') || e.dataTransfer.getData('application/json');
       if (rawData) {
         const parsed = JSON.parse(rawData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          photo = usePhotoStore.getState().photos.find((p) => p.id === parsed[0]) || null;
-        } else if (parsed && parsed.id) {
-          photo = parsed as Photo;
-        }
+        if (Array.isArray(parsed)) photoIds = parsed.filter((id): id is string => typeof id === 'string');
+        else if (typeof parsed?.id === 'string') photoIds = [parsed.id];
       }
     } catch {}
 
-    if (!photo) {
+    if (photoIds.length === 0) {
       const textId = e.dataTransfer.getData('text/plain');
-      if (textId) {
-        photo = usePhotoStore.getState().photos.find((p) => p.id === textId) || null;
-      }
+      if (byId.has(textId)) photoIds = [textId];
     }
 
-    if (!photo) {
-      const selIds = usePhotoStore.getState().selectedPhotoIds;
-      if (selIds.length > 0) {
-        photo = usePhotoStore.getState().photos.find((p) => p.id === selIds[0]) || null;
-      }
+    if (photoIds.length === 0 && Array.from(e.dataTransfer.types).includes('application/x-afsn-photo-ids')) {
+      photoIds = usePhotoStore.getState().selectedPhotoIds;
     }
 
-    if (!photo) return;
+    const photosToPlace = [...new Set(photoIds)].map((id) => byId.get(id))
+      .filter((photo): photo is Photo => Boolean(photo && photo.projectId === currentProject?.id));
+    if (photosToPlace.length === 0) return;
 
     if (stageRef.current) {
       const stageBox = stageRef.current.container().getBoundingClientRect();
@@ -2061,7 +2065,7 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
 
       const isAlt = Boolean(e.altKey);
       // Replace photo only if ALT key was held during drop AND frame is not locked
-      if (isAlt) {
+      if (isAlt && photosToPlace.length === 1) {
         const targetFrame = [...(activeSpread.elements || [])].reverse().find((f) =>
           !f.locked &&
           physicalX >= f.x &&
@@ -2071,16 +2075,15 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
         );
 
         if (targetFrame) {
-          replacePhotoInFrame(activeSpread.id, targetFrame.id, photo);
+          replacePhotoInFrame(activeSpread.id, targetFrame.id, photosToPlace[0]!);
           clearSelection();
           return;
         }
       }
 
-      // Default: Add as new frame at drop position (stacking / overlaying freely)
-      addPhotoToSpread(activeSpread.id, photo, { x: physicalX, y: physicalY });
+      addPhotosToSpread(activeSpread.id, photosToPlace, { x: physicalX, y: physicalY });
     } else {
-      addPhotoToSpread(activeSpread.id, photo);
+      addPhotosToSpread(activeSpread.id, photosToPlace);
     }
   };
 

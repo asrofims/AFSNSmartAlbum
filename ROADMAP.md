@@ -658,3 +658,15 @@
 - [x] Increase spine guide contrast over light and dark images without changing exported artwork.
 - [ ] Verify guide visibility and interaction manually in the running Tauri editor, export preview, and spread navigator.
 - [x] Application version metadata bumped to `v1.0.66`.
+
+### Phase 59 — Release v1.0.67: Multi-Photo Placement and Clipboard
+
+- [x] Drag a selected filmstrip batch onto the canvas and place every photo in a non-overlapping layout near the drop point, with one Undo step.
+- [x] Place multiple selected photos from the filmstrip context menu without stacking them at the same position.
+- [x] Keep the selected photo batch intact when clicking actions in the portaled context menu, and capture the batch when the menu opens.
+- [x] Use one placement geometry from the active spread for filmstrip photo Paste to All Spreads, even when spread margins or spacing differ.
+- [x] Copy one or multiple filmstrip photos from the context menu or batch bar, with visible copied feedback.
+- [x] Paste copied photos onto a spread or all interior spreads; keep canvas object clipboard behavior intact.
+- [x] Add placement and clipboard regressions, and verify the frontend build and test suite.
+- [ ] Manually verify multi-photo drag, context menu, Copy feedback, and Paste to All Spreads in the running Tauri editor.
+- [x] Application version metadata bumped to `v1.0.67`.

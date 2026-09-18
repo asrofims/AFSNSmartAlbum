@@ -7,6 +7,7 @@ export function BatchActionBar({ onRequestDelete }: { onRequestDelete: (ids: str
   const currentProject = useProjectStore((s) => s.currentProject);
   const {
     selectedPhotoIds,
+    clipboardPhotoIds,
     folders,
     activeFolderId,
     photos,
@@ -27,6 +28,8 @@ export function BatchActionBar({ onRequestDelete }: { onRequestDelete: (ids: str
   const count = selectedPhotoIds.length;
   const selectedPhotos = photos.filter((p) => selectedPhotoIds.includes(p.id));
   const allFav = selectedPhotos.length > 0 && selectedPhotos.every((p) => p.isFavorite);
+  const isCopied = selectedPhotoIds.length === clipboardPhotoIds.length
+    && selectedPhotoIds.every((id) => clipboardPhotoIds.includes(id));
 
   const handleToggleFav = async () => {
     await batchToggleFavoritesSelected(!allFav);
@@ -77,11 +80,12 @@ export function BatchActionBar({ onRequestDelete }: { onRequestDelete: (ids: str
           {/* Copy to Clipboard */}
           <button
             type="button"
-            className={styles.actionBtn}
-            onClick={copySelectedPhotos}
-            title="Copy selected photos to clipboard (Ctrl+C)"
+            className={`${styles.actionBtn} ${isCopied ? styles.copiedBtn : ''}`}
+            onClick={() => { void copySelectedPhotos(); }}
+            title={isCopied ? `${count} photos copied. Paste onto a spread.` : 'Copy selected photos (Ctrl+C)'}
+            aria-live="polite"
           >
-            📋 Copy
+            {isCopied ? '✓ Copied' : '📋 Copy'}
           </button>
 
           {/* Add / Move to Folder Dropdown */}

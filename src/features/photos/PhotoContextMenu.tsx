@@ -23,6 +23,7 @@ export interface PhotoContextMenuProps {
   onRequestDelete: (photoIds: string[], photoNames: string) => void;
   onSelectAll: () => void;
   onRelinkPhoto: (photoId: string) => void;
+  onCopyPhotos: (photoIds: string[]) => void;
 }
 
 export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
@@ -42,6 +43,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
   onRequestDelete,
   onSelectAll,
   onRelinkPhoto,
+  onCopyPhotos,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [folderSubmenuMode, setFolderSubmenuMode] = React.useState<'copy' | 'move' | null>(null);
@@ -78,13 +80,14 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
 
   // Position adjustment to avoid viewport overflowing
   const menuWidth = 200;
-  const menuHeight = 310;
+  const menuHeight = 340;
   const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
   const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
 
   return createPortal(
     <div
       ref={menuRef}
+      data-context-menu
       className={styles.contextMenu}
       style={{ left: `${adjustedX}px`, top: `${adjustedY}px` }}
       onClick={(e) => e.stopPropagation()}
@@ -94,7 +97,7 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
           {isMulti ? `${count} Photos Selected` : targetPhoto.fileName}
         </span>
         <span className={styles.fileMeta}>
-          {targetPhoto.width}×{targetPhoto.height} • {formatFileSize(targetPhoto.fileSize)}
+          {isMulti ? 'Use Place or Copy for the selected photos' : `${targetPhoto.width}×${targetPhoto.height} • ${formatFileSize(targetPhoto.fileSize)}`}
         </span>
       </div>
 
@@ -113,15 +116,22 @@ export const PhotoContextMenu: React.FC<PhotoContextMenuProps> = ({
             const activeSpread = allSpreads.find((s) => s.id === activeSpreadId) || allSpreads[0];
             if (activeSpread) {
               const toPlace = isMulti ? selectedPhotos : [targetPhoto];
-              for (const p of toPlace) {
-                useEditorStore.getState().addPhotoToSpread(activeSpread.id, p);
-              }
+              useEditorStore.getState().addPhotosToSpread(activeSpread.id, toPlace);
             }
           }
         }}
       >
         <span className={styles.menuIcon}>🖼️</span>
         <span>{isMulti ? `Place ${count} Photos on Spread` : 'Place on Spread Canvas'}</span>
+      </button>
+
+      <button
+        type="button"
+        className={styles.menuItem}
+        onClick={() => { onClose(); onCopyPhotos(photoIds); }}
+      >
+        <span className={styles.menuIcon}>📋</span>
+        <span>{isMulti ? `Copy ${count} Photos` : 'Copy Photo'}</span>
       </button>
 
       <div className={styles.divider} />

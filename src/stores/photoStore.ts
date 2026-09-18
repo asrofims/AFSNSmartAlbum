@@ -218,7 +218,7 @@ interface PhotoState {
   movePhotosToFolder: (projectId: string, fromFolderId: string, toFolderId: string, photoIds: string[]) => Promise<void>;
 
   // Clipboard (Copy & Paste)
-  copySelectedPhotos: () => void;
+  copySelectedPhotos: (photoIds?: string[]) => Promise<number>;
   pastePhotosToActiveFolder: (projectId: string) => Promise<void>;
 
   // View options & dialogs
@@ -967,11 +967,15 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   // Clipboard
-  copySelectedPhotos: () => {
-    const { selectedPhotoIds } = get();
-    if (selectedPhotoIds.length > 0) {
-      set({ clipboardPhotoIds: [...selectedPhotoIds] });
-    }
+  copySelectedPhotos: async (photoIds) => {
+    const ids = photoIds ?? get().selectedPhotoIds;
+    const liveIds = new Set(get().photos.map((photo) => photo.id));
+    const copiedIds = [...new Set(ids)].filter((id) => liveIds.has(id));
+    if (copiedIds.length === 0) return 0;
+    const { useEditorStore } = await import('./editorStore');
+    useEditorStore.setState({ clipboardFrames: [] });
+    set({ clipboardPhotoIds: copiedIds });
+    return copiedIds.length;
   },
 
   pastePhotosToActiveFolder: async (projectId: string) => {

@@ -82,6 +82,17 @@
   border-color: rgba(255, 255, 255, 0.3);
 }
 
+.copiedBtn {
+  color: #86efac;
+  border-color: rgba(134, 239, 172, 0.55);
+  background-color: rgba(34, 197, 94, 0.16);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .activeFav {
   color: #f59e0b;
   border-color: rgba(245, 158, 11, 0.4);

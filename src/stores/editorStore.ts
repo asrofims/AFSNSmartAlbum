@@ -17,6 +17,8 @@ import {
   SnappingConfig,
 } from '../domain/editor';
 import { Photo } from '../domain/photo';
+import { calculatePhotoBatchPlacement, type PhotoPlacement } from '../domain/photoPlacement';
+import type { Project } from '../domain/project';
 import { Album, getAllAlbumSpreads, AlbumElement } from '../domain/album';
 import {
   createTextNode,
@@ -45,6 +47,24 @@ function remapCopiedGroupIds(elements: AlbumElement[]): AlbumElement[] {
     }
     return { ...element, groupId: newGroupId };
   });
+}
+
+function createPhotoFrame(photo: Photo, project: Project, placement: PhotoPlacement, zIndex: number): PhotoFrameElement {
+  const photoAspect = photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
+  return {
+    id: `frame-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    type: 'photo', photoId: photo.id, filePath: photo.filePath,
+    previewPath: photo.previewPath || photo.thumbnailPath || '',
+    thumbnailPath: photo.thumbnailPath || '', fileName: photo.fileName,
+    ...placement, rotation: 0, zIndex, photoAspect,
+    originalWidth: placement.width, originalHeight: placement.height,
+    cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0,
+    borderEnabled: project.borderEnabled || false,
+    borderWidth: project.borderWidth || 1,
+    borderColor: project.borderColor || '#FFFFFF',
+    cornerRadius: 0, cornerRadiusTl: 0, cornerRadiusTr: 0, cornerRadiusBr: 0, cornerRadiusBl: 0,
+    opacity: 1,
+  };
 }
 
 export interface EditorState {
@@ -103,6 +123,7 @@ export interface EditorState {
     spreadId: string,
     updates: { id: string; geometry: Partial<AlbumElement> }[]
   ) => void;
+  addPhotosToSpread: (spreadId: string, photos: Photo[], pos?: { x: number; y: number }) => void;
   setSelectedOpacity: (spreadId: string, opacity: number, skipHistory?: boolean) => void;
   deleteSelectedFrames: (spreadId: string) => void;
   copySelectedFrames: (spreadId: string) => void;
@@ -397,37 +418,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       posY = safeMargin + (maxSafeH - frameH) / 2;
     }
 
-    const newFrame: PhotoFrameElement = {
-      id: `frame-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      type: 'photo',
-      photoId: photo.id,
-      filePath: photo.filePath,
-      previewPath: photo.previewPath || photo.thumbnailPath || '',
-      thumbnailPath: photo.thumbnailPath || '',
-      fileName: photo.fileName,
-      x: posX,
-      y: posY,
-      width: frameW,
-      height: frameH,
-      rotation: 0,
-      zIndex: 1,
-      photoAspect: photoAspect,
-      originalWidth: frameW,
-      originalHeight: frameH,
-      cropX: 0,
-      cropY: 0,
-      cropScale: 1.0,
-      cropRotation: 0,
-      borderEnabled: currentProject.borderEnabled || false,
-      borderWidth: currentProject.borderWidth || 1,
-      borderColor: currentProject.borderColor || '#FFFFFF',
-      cornerRadius: 0,
-      cornerRadiusTl: 0,
-      cornerRadiusTr: 0,
-      cornerRadiusBr: 0,
-      cornerRadiusBl: 0,
-      opacity: 1,
-    };
+    const newFrame = createPhotoFrame(photo, currentProject,
+      { x: posX, y: posY, width: frameW, height: frameH }, 1);
 
     // Update album store
     if (currentAlbum.coverSpread.id === spreadId) {
@@ -458,6 +450,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set({ selectedFrameIds: [newFrame.id] });
+  },
+
+  addPhotosToSpread: (spreadId, photos, pos) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) { get().addPhotoToSpread(spreadId, photos[0]!, pos); return; }
+    const { currentAlbum } = useAlbumStore.getState();
+    const project = useProjectStore.getState().currentProject;
+    if (!currentAlbum || !project) return;
+    const isCover = currentAlbum.coverSpread.id === spreadId;
+    const spread = isCover ? currentAlbum.coverSpread : currentAlbum.spreads.find((item) => item.id === spreadId);
+    if (!spread) return;
+    const gutterWidth = convertUnit(spread.gutterWidth, spread.gutterUnit, project.canvasUnit, project.canvasDpi, 8);
+    const spacing = convertUnit(spread.spacingValue ?? project.spacingValue,
+      spread.spacingUnit ?? project.spacingUnit, project.canvasUnit, project.canvasDpi, 8);
+    const placements = calculatePhotoBatchPlacement(photos, project.canvasWidth, project.canvasHeight,
+      gutterWidth, spread.safeArea ?? project.marginValue ?? 10, spacing, pos);
+    const existing = spread.elements || [];
+    const frames = photos.map((photo, index) => createPhotoFrame(photo, project, placements[index]!, existing.length + index + 1));
+    useHistoryStore.getState().pushState(currentAlbum);
+    const updatedSpread = { ...spread, elements: [...existing, ...frames] };
+    useAlbumStore.setState({
+      currentAlbum: isCover
+        ? { ...currentAlbum, coverSpread: updatedSpread }
+        : { ...currentAlbum, spreads: currentAlbum.spreads.map((item) => item.id === spreadId ? updatedSpread : item) },
+      saveStatus: 'unsaved',
+    });
+    set({ selectedFrameIds: frames.map((frame) => frame.id), selectionGroupRotation: null });
   },
 
   addTextToSpread: (spreadId, options) => {
@@ -732,6 +751,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const toCopy = (activeSpread.elements || []).filter((f) =>
       selectedFrameIds.includes(f.id)
     );
+    usePhotoStore.setState({ clipboardPhotoIds: [] });
     set({ clipboardFrames: toCopy });
   },
 
@@ -741,8 +761,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const currentProject = useProjectStore.getState().currentProject;
     if (!currentAlbum) return;
 
+    const { clipboardPhotoIds, photos } = usePhotoStore.getState();
+    if (clipboardPhotoIds.length > 0) {
+      const byId = new Map(photos.map((photo) => [photo.id, photo]));
+      get().addPhotosToSpread(spreadId, clipboardPhotoIds.map((id) => byId.get(id)).filter((photo): photo is Photo => Boolean(photo)), targetPos);
+      return;
+    }
+
     // 1. If we have copied frames in editor clipboard
     if (clipboardFrames.length > 0) {
+      useHistoryStore.getState().pushState(currentAlbum);
       const unit = currentProject?.canvasUnit || 'mm';
       const defaultOffset = unit === 'inch' ? 0.25 : unit === 'cm' ? 0.5 : unit === 'px' ? 20 : 5;
 
@@ -808,18 +836,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
     }
 
-    // 2. If no frames in editor clipboard, check photo library clipboard
-    const { clipboardPhotoIds, photos } = usePhotoStore.getState();
-    if (clipboardPhotoIds.length > 0) {
-      const selectedPhotos = photos.filter((p) => clipboardPhotoIds.includes(p.id));
-      for (const p of selectedPhotos) {
-        get().addPhotoToSpread(spreadId, p, targetPos);
-      }
-    }
   },
 
   pasteFramesInPlace: (spreadId) => {
     const { clipboardFrames } = get();
+    if (clipboardFrames.length === 0 && usePhotoStore.getState().clipboardPhotoIds.length > 0) {
+      get().pasteFrames(spreadId);
+      return;
+    }
     const { currentAlbum } = useAlbumStore.getState();
     if (!currentAlbum || clipboardFrames.length === 0) return;
 
@@ -870,10 +894,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   pasteFramesToAllSpreads: (options) => {
     const { clipboardFrames } = get();
-    const { currentAlbum } = useAlbumStore.getState();
-    if (!currentAlbum || clipboardFrames.length === 0) {
+    const { currentAlbum, activeSpreadId } = useAlbumStore.getState();
+    if (!currentAlbum) {
       return { count: 0, spreadsCount: 0 };
     }
+
+    const { clipboardPhotoIds, photos } = usePhotoStore.getState();
+    if (clipboardPhotoIds.length > 0) {
+      const project = useProjectStore.getState().currentProject;
+      if (!project) return { count: 0, spreadsCount: 0 };
+      const byId = new Map(photos.map((photo) => [photo.id, photo]));
+      const copiedPhotos = clipboardPhotoIds.map((id) => byId.get(id))
+        .filter((photo): photo is Photo => Boolean(photo && photo.projectId === project.id));
+      if (copiedPhotos.length === 0) return { count: 0, spreadsCount: 0 };
+      const includeCover = options?.includeCover ?? false;
+      if (currentAlbum.spreads.length === 0 && !includeCover) return { count: 0, spreadsCount: 0 };
+      const referenceSpread = currentAlbum.spreads.find((spread) => spread.id === activeSpreadId)
+        ?? (includeCover && currentAlbum.coverSpread.id === activeSpreadId
+          ? currentAlbum.coverSpread : currentAlbum.spreads[0] ?? currentAlbum.coverSpread);
+      const gutter = convertUnit(referenceSpread.gutterWidth, referenceSpread.gutterUnit,
+        project.canvasUnit, project.canvasDpi, 8);
+      const spacing = convertUnit(referenceSpread.spacingValue ?? project.spacingValue,
+        referenceSpread.spacingUnit ?? project.spacingUnit, project.canvasUnit, project.canvasDpi, 8);
+      const placements = calculatePhotoBatchPlacement(copiedPhotos, project.canvasWidth, project.canvasHeight,
+        gutter, referenceSpread.safeArea ?? project.marginValue ?? 10, spacing);
+      const addToSpread = (spread: typeof currentAlbum.coverSpread) => {
+        const existing = options?.replaceExisting ? [] : (spread.elements || []);
+        const frames = copiedPhotos.map((photo, index) => createPhotoFrame(photo, project, placements[index]!, existing.length + index + 1));
+        return { ...spread, elements: [...existing, ...frames] };
+      };
+      useHistoryStore.getState().pushState(currentAlbum);
+      useAlbumStore.setState({
+        currentAlbum: {
+          ...currentAlbum,
+          spreads: currentAlbum.spreads.map(addToSpread),
+          coverSpread: includeCover ? addToSpread(currentAlbum.coverSpread) : currentAlbum.coverSpread,
+        },
+        saveStatus: 'unsaved',
+      });
+      return { count: copiedPhotos.length, spreadsCount: currentAlbum.spreads.length + (includeCover ? 1 : 0) };
+    }
+    if (clipboardFrames.length === 0) return { count: 0, spreadsCount: 0 };
 
     useHistoryStore.getState().pushState(currentAlbum);
 
