@@ -651,3 +651,10 @@
   - Re-styled Adaptive Layout **Shuffle** button to match the **Add Text** button (26px height, subtle cyan tint background, clean SVG shuffle icon, smooth hover transition).
 - [x] Application version metadata bumped to `v1.0.65`.
 
+### Phase 58 — Release v1.0.66: Guide Visibility Above Spread Artwork
+
+- [x] Draw canvas spine and safe area guides above photo and text objects while keeping selection and transform controls usable.
+- [x] Isolate artwork stacking in export preview and spread navigator so spine, split cut, trim, and safe area guides remain visible above objects at any object z-index.
+- [x] Increase spine guide contrast over light and dark images without changing exported artwork.
+- [ ] Verify guide visibility and interaction manually in the running Tauri editor, export preview, and spread navigator.
+- [x] Application version metadata bumped to `v1.0.66`.

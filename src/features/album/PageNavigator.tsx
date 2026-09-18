@@ -92,39 +92,42 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           top: 0,
           bottom: 0,
           width: '1px',
-          backgroundColor: 'rgba(0, 0, 0, 0.25)',
-          zIndex: 1,
+          backgroundColor: 'rgba(248, 250, 252, 0.9)',
+          boxShadow: '-1px 0 0 rgba(15, 23, 42, 0.85), 1px 0 0 rgba(15, 23, 42, 0.85)',
+          zIndex: 2,
+          pointerEvents: 'none',
         }}
       />
 
       {/* Real-time Rendered Photo & Text Elements */}
-      {(spread.elements || []).map((el) => {
-        const x = el.x * scale;
-        const y = el.y * scale;
-        const w = el.width * scale;
-        const h = el.height * scale;
-        const rot = el.rotation || 0;
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+        {(spread.elements || []).map((el) => {
+          const x = el.x * scale;
+          const y = el.y * scale;
+          const w = el.width * scale;
+          const h = el.height * scale;
+          const rot = el.rotation || 0;
 
-        if (el.type === 'text') {
-          const textEl = el as TextNodeElement;
-          return (
-            <div
-              key={textEl.id}
-              style={{
-                position: 'absolute',
-                left: `${x}px`,
-                top: `${y}px`,
-                width: `${w}px`,
-                height: `${h}px`,
-                transform: rot ? `rotate(${rot}deg)` : undefined,
-                transformOrigin: '0 0',
-                overflow: 'hidden',
-                pointerEvents: 'none',
-                userSelect: 'none',
-                zIndex: textEl.zIndex || 2,
-              }}
-            >
-              <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={w} height={h} />
+          if (el.type === 'text') {
+            const textEl = el as TextNodeElement;
+            return (
+              <div
+                key={textEl.id}
+                style={{
+                  position: 'absolute',
+                  left: `${x}px`,
+                  top: `${y}px`,
+                  width: `${w}px`,
+                  height: `${h}px`,
+                  transform: rot ? `rotate(${rot}deg)` : undefined,
+                  transformOrigin: '0 0',
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  zIndex: textEl.zIndex || 2,
+                }}
+              >
+                <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={w} height={h} />
             </div>
           );
         }
@@ -228,6 +231,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

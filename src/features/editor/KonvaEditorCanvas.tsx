@@ -2859,101 +2859,6 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
               stroke="#000000"
               strokeWidth={1}
             />
-
-            {/* Center Gutter / Spine Fold Guide */}
-            {showGutterGuide && (
-              <Group listening={false}>
-                {gutterPixelW > 0 ? (
-                  <>
-                    {/* Shaded Gutter Zone */}
-                    <Rect
-                      x={leftPagePixelW}
-                      y={0}
-                      width={gutterPixelW}
-                      height={screenSpreadH}
-                      fill="rgba(100, 116, 139, 0.12)"
-                    />
-                    {/* Left & Right Gutter Crease Lines */}
-                    <Line
-                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-                      stroke="#475569"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                    />
-                    <Line
-                      points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
-                      stroke="#475569"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                    />
-                  </>
-                ) : (
-                  <>
-                    {/* Subtle Shadow on Left of Crease */}
-                    <Line
-                      points={[leftPagePixelW - 1, 0, leftPagePixelW - 1, screenSpreadH]}
-                      stroke="rgba(0, 0, 0, 0.15)"
-                      strokeWidth={2}
-                    />
-                    {/* Distinct Center Crease Dashed Line */}
-                    <Line
-                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-                      stroke="#475569"
-                      strokeWidth={1.5}
-                      dash={[6, 3]}
-                    />
-                  </>
-                )}
-
-                {/* Top Notch Marker */}
-                <Line
-                  points={[
-                    leftPagePixelW + gutterPixelW / 2 - 6, 0,
-                    leftPagePixelW + gutterPixelW / 2 + 6, 0,
-                    leftPagePixelW + gutterPixelW / 2, 8,
-                  ]}
-                  closed
-                  fill="#334155"
-                />
-
-                {/* Bottom Notch Marker */}
-                <Line
-                  points={[
-                    leftPagePixelW + gutterPixelW / 2 - 6, screenSpreadH,
-                    leftPagePixelW + gutterPixelW / 2 + 6, screenSpreadH,
-                    leftPagePixelW + gutterPixelW / 2, screenSpreadH - 8,
-                  ]}
-                  closed
-                  fill="#334155"
-                />
-              </Group>
-            )}
-
-            {/* Safe Area Guides (Left & Right Facing Pages) */}
-            {showSafeAreaGuide && (
-              <Group listening={false}>
-                {/* Left Page Safe Area (Blue) */}
-                <Rect
-                  x={dims.safeMarginOutside * scaleFactor}
-                  y={dims.safeMarginTop * scaleFactor}
-                  width={Math.max(0, (dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scaleFactor)}
-                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
-                  stroke="rgba(59, 130, 246, 0.65)"
-                  strokeWidth={1}
-                  dash={[5, 4]}
-                />
-                {/* Right Page Safe Area (Blue) */}
-                <Rect
-                  x={(dims.pageWidth + dims.gutterWidth + dims.safeMarginSpine) * scaleFactor}
-                  y={dims.safeMarginTop * scaleFactor}
-                  width={Math.max(0, (dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scaleFactor)}
-                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
-                  stroke="rgba(59, 130, 246, 0.65)"
-                  strokeWidth={1}
-                  dash={[5, 4]}
-                />
-              </Group>
-            )}
           </Layer>
 
           {/* Layer 2: Interactive Photo Frames & Text Nodes */}
@@ -3457,6 +3362,110 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
               );
             })}
 
+            {/* Center Gutter / Spine Fold Guide */}
+            {showGutterGuide && (
+              <Group listening={false}>
+                {gutterPixelW > 0 ? (
+                  <>
+                    {/* Shaded Gutter Zone */}
+                    <Rect
+                      x={leftPagePixelW}
+                      y={0}
+                      width={gutterPixelW}
+                      height={screenSpreadH}
+                      fill="rgba(100, 116, 139, 0.12)"
+                    />
+                    {/* Left & Right Gutter Crease Lines */}
+                    <Line
+                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
+                      stroke="rgba(248, 250, 252, 0.95)"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                      shadowColor="rgba(15, 23, 42, 0.95)"
+                      shadowBlur={3}
+                    />
+                    <Line
+                      points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
+                      stroke="rgba(248, 250, 252, 0.95)"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                      shadowColor="rgba(15, 23, 42, 0.95)"
+                      shadowBlur={3}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {/* Subtle Shadow on Left of Crease */}
+                    <Line
+                      points={[leftPagePixelW - 1, 0, leftPagePixelW - 1, screenSpreadH]}
+                      stroke="rgba(0, 0, 0, 0.15)"
+                      strokeWidth={2}
+                    />
+                    {/* Distinct Center Crease Dashed Line */}
+                    <Line
+                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
+                      stroke="rgba(248, 250, 252, 0.95)"
+                      strokeWidth={1.5}
+                      dash={[6, 3]}
+                      shadowColor="rgba(15, 23, 42, 0.95)"
+                      shadowBlur={3}
+                    />
+                  </>
+                )}
+
+                {/* Top Notch Marker */}
+                <Line
+                  points={[
+                    leftPagePixelW + gutterPixelW / 2 - 6, 0,
+                    leftPagePixelW + gutterPixelW / 2 + 6, 0,
+                    leftPagePixelW + gutterPixelW / 2, 8,
+                  ]}
+                  closed
+                  fill="#f8fafc"
+                  stroke="#0f172a"
+                  strokeWidth={1}
+                />
+
+                {/* Bottom Notch Marker */}
+                <Line
+                  points={[
+                    leftPagePixelW + gutterPixelW / 2 - 6, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2 + 6, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2, screenSpreadH - 8,
+                  ]}
+                  closed
+                  fill="#f8fafc"
+                  stroke="#0f172a"
+                  strokeWidth={1}
+                />
+              </Group>
+            )}
+
+            {/* Safe Area Guides (Left & Right Facing Pages) */}
+            {showSafeAreaGuide && (
+              <Group listening={false}>
+                {/* Left Page Safe Area (Blue) */}
+                <Rect
+                  x={dims.safeMarginOutside * scaleFactor}
+                  y={dims.safeMarginTop * scaleFactor}
+                  width={Math.max(0, (dims.pageWidth - dims.safeMarginOutside - dims.safeMarginSpine) * scaleFactor)}
+                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
+                  stroke="rgba(59, 130, 246, 0.65)"
+                  strokeWidth={1}
+                  dash={[5, 4]}
+                />
+                {/* Right Page Safe Area (Blue) */}
+                <Rect
+                  x={(dims.pageWidth + dims.gutterWidth + dims.safeMarginSpine) * scaleFactor}
+                  y={dims.safeMarginTop * scaleFactor}
+                  width={Math.max(0, (dims.pageWidth - dims.safeMarginSpine - dims.safeMarginOutside) * scaleFactor)}
+                  height={Math.max(0, (dims.pageHeight - dims.safeMarginTop - dims.safeMarginBottom) * scaleFactor)}
+                  stroke="rgba(59, 130, 246, 0.65)"
+                  strokeWidth={1}
+                  dash={[5, 4]}
+                />
+              </Group>
+            )}
             {/* 2. Multi-Selection Proxy Rect for Rotated Transformer Envelope */}
             {selectedFrameIds.length > 1 && multiGroupInfo && (
               <Rect

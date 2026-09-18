@@ -298,68 +298,69 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
           )}
 
           {/* Scaled Rendered Elements */}
-          {visibleElements.map((el, idx) => {
-            // Coordinate transformation relative to view container
-            const localX = el.x - viewOffsetX + bleed;
-            const localY = el.y + bleed;
+          <div className={styles.artworkLayer}>
+            {visibleElements.map((el, idx) => {
+              // Coordinate transformation relative to view container
+              const localX = el.x - viewOffsetX + bleed;
+              const localY = el.y + bleed;
 
-            const renderX = Math.round(localX * scale);
-            const renderY = Math.round(localY * scale);
-            const renderW = Math.max(1, Math.round(el.width * scale));
-            const renderH = Math.max(1, Math.round(el.height * scale));
-            const rot = el.rotation || 0;
+              const renderX = Math.round(localX * scale);
+              const renderY = Math.round(localY * scale);
+              const renderW = Math.max(1, Math.round(el.width * scale));
+              const renderH = Math.max(1, Math.round(el.height * scale));
+              const rot = el.rotation || 0;
 
-            // Strict 1:1 physical positioning matching real canvas
-            let finalRenderX = renderX;
-            let finalRenderY = renderY;
-            let finalRenderW = renderW;
-            let finalRenderH = renderH;
+              // Strict 1:1 physical positioning matching real canvas
+              let finalRenderX = renderX;
+              let finalRenderY = renderY;
+              let finalRenderW = renderW;
+              let finalRenderH = renderH;
 
-            // Only extend full-bleed photos into outer bleed margin when includeBleed is ACTIVE
-            // and the frame touches the spread outer boundary in canvas coordinates (tolerance <= 0.05 mm/unit)
-            if (includeBleed && !rot && bleedPx > 0) {
-              const tol = 0.05;
-              const touchesLeft = (el.x - viewOffsetX) <= tol;
-              const touchesTop = el.y <= tol;
-              const touchesRight = (el.x + el.width - viewOffsetX) >= (targetW - tol);
-              const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
+              // Only extend full-bleed photos into outer bleed margin when includeBleed is ACTIVE
+              // and the frame touches the spread outer boundary in canvas coordinates (tolerance <= 0.05 mm/unit)
+              if (includeBleed && !rot && bleedPx > 0) {
+                const tol = 0.05;
+                const touchesLeft = (el.x - viewOffsetX) <= tol;
+                const touchesTop = el.y <= tol;
+                const touchesRight = (el.x + el.width - viewOffsetX) >= (targetW - tol);
+                const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
 
-              if (touchesLeft) {
-                finalRenderX = 0;
-                finalRenderW += bleedPx;
+                if (touchesLeft) {
+                  finalRenderX = 0;
+                  finalRenderW += bleedPx;
+                }
+                if (touchesTop) {
+                  finalRenderY = 0;
+                  finalRenderH += bleedPx;
+                }
+                if (touchesRight) {
+                  finalRenderW = containerW - finalRenderX;
+                }
+                if (touchesBottom) {
+                  finalRenderH = containerH - finalRenderY;
+                }
               }
-              if (touchesTop) {
-                finalRenderY = 0;
-                finalRenderH += bleedPx;
-              }
-              if (touchesRight) {
-                finalRenderW = containerW - finalRenderX;
-              }
-              if (touchesBottom) {
-                finalRenderH = containerH - finalRenderY;
-              }
-            }
 
-            if (el.type === 'text') {
-              const textEl = el as TextNodeElement;
-              return (
-                <div
-                  key={textEl.id}
-                  style={{
-                    position: 'absolute',
-                    left: `${renderX}px`,
-                    top: `${renderY}px`,
-                    width: `${renderW}px`,
-                    height: `${renderH}px`,
-                    transform: rot ? `rotate(${rot}deg)` : undefined,
-                    transformOrigin: '0 0',
-                    overflow: 'hidden',
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    zIndex: textEl.zIndex ?? (idx + 1),
-                  }}
-                >
-                  <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={renderW} height={renderH} />
+              if (el.type === 'text') {
+                const textEl = el as TextNodeElement;
+                return (
+                  <div
+                    key={textEl.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${renderX}px`,
+                      top: `${renderY}px`,
+                      width: `${renderW}px`,
+                      height: `${renderH}px`,
+                      transform: rot ? `rotate(${rot}deg)` : undefined,
+                      transformOrigin: '0 0',
+                      overflow: 'hidden',
+                      pointerEvents: 'none',
+                      userSelect: 'none',
+                      zIndex: textEl.zIndex ?? (idx + 1),
+                    }}
+                  >
+                    <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={renderW} height={renderH} />
                 </div>
               );
             }
@@ -457,6 +458,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               </div>
             );
           })}
+          </div>
         </div>
       </div>
 
