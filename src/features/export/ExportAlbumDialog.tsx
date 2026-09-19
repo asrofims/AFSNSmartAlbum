@@ -996,16 +996,35 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
             The destination folder already contains <strong>{preflightReport.existingFiles.length} file(s)</strong> with matching export names. Proceeding will overwrite and replace them:
           </div>
 
-          <div className={styles.missingList} style={{ maxHeight: '180px', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <div className={styles.conflictList}>
             {preflightReport.existingFiles.map((filename, i) => (
-              <div key={i} className={styles.missingItem}>
-                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>📄 {filename}</span>
-                <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: 600 }}>Will be overwritten</span>
+              <div key={i} className={styles.conflictItem}>
+                <div className={styles.conflictFile}>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0, color: 'var(--color-text-secondary)' }}
+                    aria-hidden="true"
+                  >
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span className={styles.conflictFileName} title={filename}>
+                    {filename}
+                  </span>
+                </div>
+                <span className={styles.conflictBadge}>Will be overwritten</span>
               </div>
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--color-border)' }}>
             <Button
               variant="secondary"
               onClick={() => setIsOverwriteModalOpen(false)}
@@ -1013,9 +1032,9 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
               Cancel / Change Folder
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
+              className={styles.dangerActionButton}
               onClick={handleProceedConfirmed}
-              style={{ backgroundColor: '#ef4444', borderColor: '#dc2626', color: '#ffffff' }}
             >
               Overwrite Existing Files
             </Button>
@@ -1041,16 +1060,16 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
             If you proceed with export, these frames will be rendered using low-resolution thumbnail previews.
           </div>
 
-          <div className={styles.missingList} style={{ maxHeight: '180px', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <div className={styles.conflictList}>
             {preflightReport.missingPhotos.map((item) => (
-              <div key={item.elementId} className={styles.missingItem}>
-                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{item.spreadName}: {item.fileName}</span>
+              <div key={item.elementId} className={styles.missingItemRow}>
+                <span className={styles.missingItemTitle}>{item.spreadName}: {item.fileName}</span>
                 <span className={styles.missingPath} title={item.filePath}>{item.filePath}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--color-border)' }}>
             <Button
               variant="secondary"
               onClick={() => {
@@ -1063,8 +1082,8 @@ export function ExportAlbumDialog({ isOpen, onClose, onStartExport }: ExportAlbu
             </Button>
             <Button
               variant="primary"
+              className={styles.warningActionButton}
               onClick={handleProceedConfirmed}
-              style={{ backgroundColor: '#f59e0b', borderColor: '#d97706', color: '#000000' }}
             >
               Export Using Previews
             </Button>

@@ -727,4 +727,13 @@
 - [x] Remove the misleading recent-project capacity counter from Startup & Projects without changing recent-project retention behavior.
 - [x] Application version metadata bumped to `v1.0.72`.
 
+### Phase 66 — Release v1.0.73: Preflight Overwrite Warning Layout & Modern Crimson Action Button
+
+- [x] Refactor Overwrite Warning preflight file list into clean flex rows with document icons, text overflow truncation, and dedicated warning pill badges.
+- [x] Fix cramped spacing by ensuring the "Will be overwritten" badge is separated and distinct from the target filename.
+- [x] Modernize the destructive "Overwrite Existing Files" button with high-contrast crimson styling, subtle elevation lift (`translateY(-1px)`), luminous glow on hover, and active feedback.
+- [x] Remove inline button background styling that suppressed CSS hover pseudo-classes.
+- [x] Standardize preflight Missing Photos modal list and warning button with matching design tokens.
+- [x] Application version metadata bumped to `v1.0.73`.
+
 
