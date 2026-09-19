@@ -65,23 +65,33 @@ export function AboutDialog() {
           </div>
         </div>
 
-        {/* 2. Technical Specs & Environment Card */}
+        {/* 2. Specs & Official Website Card */}
         <div className={styles.specCard}>
           <div className={styles.specRow}>
             <span className={styles.specLabel}>Developer</span>
             <span className={styles.specValue}>Asrofims · Afsunmedia</span>
           </div>
           <div className={styles.specRow}>
+            <span className={styles.specLabel}>Website</span>
+            <a
+              href={APP_CONFIG.website || 'https://app.afsun.my.id'}
+              className={styles.linkValue}
+              onClick={handleLinkClick(APP_CONFIG.website || 'https://app.afsun.my.id')}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Visit official website (app.afsun.my.id)"
+            >
+              <span>app.afsun.my.id</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+          </div>
+          <div className={styles.specRow}>
             <span className={styles.specLabel}>Platform</span>
             <span className={styles.specValue}>{formatPlatform(appInfo.platform)}</span>
-          </div>
-          <div className={styles.specRow}>
-            <span className={styles.specLabel}>Core Engine</span>
-            <span className={styles.specValue}>Tauri 2 · Rust · SQLite WAL · libvips</span>
-          </div>
-          <div className={styles.specRow}>
-            <span className={styles.specLabel}>License</span>
-            <span className={styles.specValue}>{APP_CONFIG.license}</span>
           </div>
         </div>
 
@@ -110,30 +120,9 @@ export function AboutDialog() {
           </button>
         </div>
 
-        {/* 4. Open Source Foundations */}
-        <div className={styles.ackSection}>
-          <div className={styles.ackHeader}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span>Open Source Technologies</span>
-          </div>
-          <div className={styles.ackChips}>
-            {APP_CONFIG.acknowledgements.map((ack, i) => (
-              <a
-                key={i}
-                href={ack.url}
-                className={styles.ackChip}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleLinkClick(ack.url)}
-                title={`Open ${ack.name} website (${ack.license})`}
-              >
-                <span>{ack.name}</span>
-                <span className={styles.ackLicense}>{ack.license}</span>
-              </a>
-            ))}
-          </div>
+        {/* 4. Footer */}
+        <div className={styles.footer}>
+          <span>Copyright © 2026 Afsunmedia. All rights reserved.</span>
         </div>
       </div>
     </Dialog>

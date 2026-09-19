@@ -40,8 +40,13 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
   const previewBoxH = 54;
   const projection = calculatePreviewProjection(dims.pageWidth, dims.pageHeight, dims.gutterWidth,
     previewBoxW, previewBoxH);
+  const pixelRatio = typeof window === 'undefined' ? 1 : (window.devicePixelRatio || 1);
+  const snapToDevicePixel = (value: number) => Math.round(value * pixelRatio) / pixelRatio;
+  const oneDevicePixel = 1 / pixelRatio;
   const scale = projection.scale;
-  const spineX = projection.spineX;
+  const previewW = snapToDevicePixel(projection.width);
+  const previewH = snapToDevicePixel(projection.height);
+  const spineX = snapToDevicePixel(projection.spineX);
   const spreadBgColor = spread.backgroundColor || project.backgroundColor || '#FFFFFF';
   const leftPageBg = spread.leftPage?.backgroundColor || spreadBgColor;
   const rightPageBg = spread.rightPage?.backgroundColor || spreadBgColor;
@@ -51,8 +56,8 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
       className={styles.miniSpread}
       style={{
         position: 'relative',
-        width: `${projection.width}px`,
-        height: `${projection.height}px`,
+        width: `${previewW}px`,
+        height: `${previewH}px`,
         backgroundColor: spreadBgColor,
         overflow: 'hidden',
       }}
@@ -74,7 +79,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
               left: 0,
               top: 0,
               bottom: 0,
-              width: `${spineX + (dims.gutterWidth === 0 ? 0.5 : 0)}px`,
+              width: `${spineX + (dims.gutterWidth === 0 ? oneDevicePixel : 0)}px`,
               backgroundColor: leftPageBg,
             }}
           />
@@ -118,6 +123,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
           spacing: dims.spacing,
           viewMode: 'spread',
           includeBleed: false,
+          pixelRatio,
         }).map(({ element: el, renderX: finalX, renderY: finalY, renderW: finalW, renderH: finalH }) => {
           const rot = el.rotation || 0;
 

@@ -88,8 +88,126 @@ assert.ok(Math.abs(gapYLeft - targetGapPx) < 1e-6, `gapYLeft ${gapYLeft} should 
 assert.ok(Math.abs(gapYRight - targetGapPx) < 1e-6, `gapYRight ${gapYRight} should match targetGapPx ${targetGapPx}`);
 assert.equal(gapXTop, gapYLeft, 'Horizontal and vertical gaps must be identical!');
 
+// All coordinates and sizes must be pure integers (no subpixel fractions)
+for (const a of aligned) {
+  assert.equal(Number.isInteger(a.renderX), true, `renderX ${a.renderX} must be an integer`);
+  assert.equal(Number.isInteger(a.renderY), true, `renderY ${a.renderY} must be an integer`);
+  assert.equal(Number.isInteger(a.renderW), true, `renderW ${a.renderW} must be an integer`);
+  assert.equal(Number.isInteger(a.renderH), true, `renderH ${a.renderH} must be an integer`);
+}
+
 // Spine fold must seamlessly meet with 1px overlap (no white divider gap)
 assert.ok((f2.renderX + f2.renderW) >= f5.renderX, 'Spine seam must be completely closed');
+
+// Test 6-photo asymmetrical collage matching live user spread (Columns: [f1,f3], [f2,f4], [f5], [f6])
+const liveElements = [
+  { id: 'l1', x: 0.0, y: 0.0, width: 320.0, height: 672.5 },
+  { id: 'l3', x: 0.0, y: 677.5, width: 320.0, height: 672.5 },
+  { id: 'l2', x: 325.0, y: 0.0, width: 320.0, height: 672.5 },
+  { id: 'l4', x: 325.0, y: 677.5, width: 320.0, height: 672.5 },
+  { id: 'l5', x: 650.0, y: 0.0, width: 430.0, height: 1350.0 },
+  { id: 'l6', x: 1080.0, y: 0.0, width: 1080.0, height: 1350.0 },
+];
+
+const liveAligned = alignPreviewElementBounds({
+  elements: liveElements,
+  projection: testProjection,
+  singlePageW: 1080,
+  singlePageH: 1350,
+  gutterW: 0,
+  spacing: 5.0,
+  viewMode: 'spread',
+  includeBleed: false,
+});
+
+const liveById = new Map(liveAligned.map((a) => [a.element.id, a]));
+const l1 = liveById.get('l1')!;
+const l2 = liveById.get('l2')!;
+const l3 = liveById.get('l3')!;
+const l4 = liveById.get('l4')!;
+const l5 = liveById.get('l5')!;
+const l6 = liveById.get('l6')!;
+
+// Vertical column gaps:
+const gapCol1_2 = l2.renderX - (l1.renderX + l1.renderW);
+const gapCol2_5 = l5.renderX - (l2.renderX + l2.renderW);
+const gapCol1_2Bot = l4.renderX - (l3.renderX + l3.renderW);
+const gapCol2_5Bot = l5.renderX - (l4.renderX + l4.renderW);
+
+// Horizontal row gaps:
+const gapRow1_3 = l3.renderY - (l1.renderY + l1.renderH);
+const gapRow2_4 = l4.renderY - (l2.renderY + l2.renderH);
+
+assert.equal(gapCol1_2, targetGapPx, 'gap Col 1->2 must be exactly targetGapPx');
+assert.equal(gapCol2_5, targetGapPx, 'gap Col 2->5 must be exactly targetGapPx');
+assert.equal(gapCol1_2Bot, targetGapPx, 'gap Col 1->2 (bottom) must be exactly targetGapPx');
+assert.equal(gapCol2_5Bot, targetGapPx, 'gap Col 2->5 (bottom) must be exactly targetGapPx');
+assert.equal(gapRow1_3, targetGapPx, 'gap Row 1->3 must be exactly targetGapPx');
+assert.equal(gapRow2_4, targetGapPx, 'gap Row 2->4 must be exactly targetGapPx');
+
+// Center spine must be completely closed (overlap by 1px)
+assert.ok((l5.renderX + l5.renderW) >= l6.renderX, 'Center spine between l5 and l6 must have 0 gap');
+
+// Windows commonly runs the WebView at 125% display scaling. A CSS-integer gap
+// becomes 1.25 device pixels there and rasterizes inconsistently as one or two
+// visible pixels. Both preview sizes must instead align to the device-pixel grid.
+const windowsPixelRatio = 1.25;
+const previewCases = [
+  calculatePreviewProjection(1080, 1350, 0, 550, 330, 'spread', 0),
+  calculatePreviewProjection(1080, 1350, 0, 136, 54, 'spread', 0),
+];
+
+for (const deviceProjection of previewCases) {
+  const deviceAligned = alignPreviewElementBounds({
+    elements: liveElements,
+    projection: deviceProjection,
+    singlePageW: 1080,
+    singlePageH: 1350,
+    gutterW: 0,
+    spacing: 5.0,
+    viewMode: 'spread',
+    includeBleed: false,
+    pixelRatio: windowsPixelRatio,
+  });
+  const deviceById = new Map(deviceAligned.map((a) => [a.element.id, a]));
+  const d1 = deviceById.get('l1')!;
+  const d2 = deviceById.get('l2')!;
+  const d3 = deviceById.get('l3')!;
+  const d4 = deviceById.get('l4')!;
+  const d5 = deviceById.get('l5')!;
+  const expectedDeviceGap = Math.max(
+    1,
+    Math.round(5 * deviceProjection.scale * windowsPixelRatio),
+  );
+
+  const horizontalDeviceGaps = [
+    (d2.renderX - (d1.renderX + d1.renderW)) * windowsPixelRatio,
+    (d5.renderX - (d2.renderX + d2.renderW)) * windowsPixelRatio,
+    (d4.renderX - (d3.renderX + d3.renderW)) * windowsPixelRatio,
+    (d5.renderX - (d4.renderX + d4.renderW)) * windowsPixelRatio,
+  ];
+  const verticalDeviceGaps = [
+    (d3.renderY - (d1.renderY + d1.renderH)) * windowsPixelRatio,
+    (d4.renderY - (d2.renderY + d2.renderH)) * windowsPixelRatio,
+  ];
+
+  for (const gap of [...horizontalDeviceGaps, ...verticalDeviceGaps]) {
+    assert.ok(Math.abs(gap - expectedDeviceGap) < 1e-6,
+      `Device-pixel gap ${gap} should equal ${expectedDeviceGap}`);
+  }
+
+  for (const alignedElement of deviceAligned) {
+    for (const value of [
+      alignedElement.renderX,
+      alignedElement.renderY,
+      alignedElement.renderW,
+      alignedElement.renderH,
+    ]) {
+      assert.ok(Math.abs(value * windowsPixelRatio - Math.round(value * windowsPixelRatio)) < 1e-6,
+        `Preview bound ${value} must align to the 125% device-pixel grid`);
+    }
+  }
+}
 
 console.log('✓ Preview spread, export preview, safe bounds, gap, and spine projection passed.');
 

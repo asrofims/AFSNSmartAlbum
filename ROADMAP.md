@@ -690,3 +690,11 @@
 - [x] Unify photo thumbnail and export preview alignment engines with zero raster aliasing.
 - [x] Application version metadata bumped to `v1.0.69`.
 
+### Phase 62 — Release v1.0.70: Pure Integer Preview Geometry & About Modal Revamp
+
+- [x] Implement pure integer pixel quantization and anchor-first topological neighbor propagation in `alignPreviewElementBounds` to eliminate subpixel rounding jitter and ensure 100% uniform gap rendering in spread previews.
+- [x] Snap `MiniSpreadPreview` container dimensions and spine coordinates to integer pixel boundaries.
+- [x] Revamp About modal (`AboutDialog.tsx`): removed technical specs (Core Engine, License, Open Source Technologies) and added official website link (`app.afsun.my.id`).
+- [x] Integrate print bleed allowances (`includeBleed`, `bleedLeftPx`, `bleedPx`) into topological preview alignment.
+- [x] Application version metadata bumped to `v1.0.70`.
+

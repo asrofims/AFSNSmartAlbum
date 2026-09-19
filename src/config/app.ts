@@ -2,7 +2,7 @@ export const APP_CONFIG = {
   name: 'AFSNSmartAlbum',
   description: 'Professional Photo Album Layout Software',
   projectExtension: '.afsn',
-  website: '',
+  website: 'https://app.afsun.my.id',
   license: 'Proprietary — All Rights Reserved',
   credits: [
     'Afsunmedia - Asrofims',

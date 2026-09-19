@@ -73,6 +73,8 @@ export interface PreviewAlignmentOptions<T = any> {
   spacing: number;
   viewMode: PreviewViewMode;
   includeBleed: boolean;
+  /** CSS-to-device pixel ratio used by the WebView rasterizer. */
+  pixelRatio?: number;
 }
 
 /**
@@ -103,6 +105,7 @@ export function alignPreviewElementBounds<
     spacing,
     viewMode,
     includeBleed,
+    pixelRatio = 1,
   } = options;
 
   const {
@@ -121,19 +124,29 @@ export function alignPreviewElementBounds<
   const viewContentWidth = viewMode === 'spread' ? baseSpreadW : singlePageW;
   const viewLeft = viewOffsetX;
   const tol = 0.15;
+  const rasterScale = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
 
-  // Compute uniform integer pixel gap for the configured project spacing
-  const targetGapPx = spacing > 0 ? Math.max(1, Math.round(spacing * scale)) : 0;
+  // All alignment is performed in integer device pixels. Integer CSS pixels are
+  // insufficient on displays such as Windows at 125% scale: a 1 CSS px gap is
+  // 1.25 device pixels and can therefore rasterize as either one or two pixels
+  // depending on its position in the spread.
+  const targetGapDevicePx = spacing > 0
+    ? Math.max(1, Math.round(spacing * scale * rasterScale))
+    : 0;
 
-  // 1. Initial 1:1 projection
-  const projected = elements.map((el) => {
+  // 1. Quantize every projected edge onto the WebView's physical pixel grid.
+  const nodes = elements.map((el) => {
     const proj = projectPreviewRect(el, projection);
+    const left = Math.round(proj.x * rasterScale);
+    const top = Math.round(proj.y * rasterScale);
+    const right = Math.round((proj.x + proj.width) * rasterScale);
+    const bottom = Math.round((proj.y + proj.height) * rasterScale);
     return {
       element: el,
-      renderX: proj.x,
-      renderY: proj.y,
-      renderW: proj.width,
-      renderH: proj.height,
+      left,
+      top,
+      right,
+      bottom,
       origX: el.x,
       origY: el.y,
       origW: el.width,
@@ -142,11 +155,62 @@ export function alignPreviewElementBounds<
     };
   });
 
-  // 2. 2D Topological Neighbor Graph for Unrotated Elements:
-  // Enforce consistent uniform targetGapPx across adjacent frames sharing standard project spacing
-  const unrotated = projected.filter((p) => !p.rot);
+  const unrotated = nodes.filter((n) => !n.rot);
 
-  // Sort by X ascending to process topological chains from left to right
+  // 2. Anchor outer boundaries and spine folds first, also in device pixels.
+  const spineDevicePx = Math.round(spinePx * rasterScale);
+  const rightPageStartDevicePx = Math.round(rightPageStartPx * rasterScale);
+  const containerWDevicePx = Math.round(containerW * rasterScale);
+  const containerHDevicePx = Math.round(containerH * rasterScale);
+  const bleedDevicePx = Math.round(bleedPx * rasterScale);
+  const bleedLeftDevicePx = Math.round(bleedLeftPx * rasterScale);
+
+  for (const p of unrotated) {
+    const el = p.element;
+    const isPhotoBorder = el.type === 'photo' && Boolean(el.borderEnabled && (el.borderWidth || 0) > 0);
+
+    const touchesLeft = (el.x - viewLeft) <= tol;
+    const touchesTop = el.y <= tol;
+    const touchesRight = (el.x + el.width - viewOffsetX) >= (viewContentWidth - tol);
+    const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
+
+    if (touchesLeft) {
+      p.left = (includeBleed && bleedLeftPx > 0 && viewMode !== 'right-page')
+        ? 0
+        : (viewMode === 'right-page' ? 0 : bleedLeftDevicePx);
+    }
+    if (touchesTop) {
+      p.top = (includeBleed && bleedPx > 0) ? 0 : bleedDevicePx;
+    }
+    if (touchesRight) {
+      p.right = containerWDevicePx + 1; // One physical pixel overlap for clean clipping.
+    }
+    if (touchesBottom) {
+      p.bottom = containerHDevicePx + 1;
+    }
+
+    if (viewMode === 'spread') {
+      const rightPageStartX = singlePageW + gutterW;
+
+      // Frame on Left Page physically touching center spine fold
+      const touchesSpineFromLeft = Math.abs(el.x + el.width - singlePageW) <= tol;
+      if (touchesSpineFromLeft) {
+        const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
+        p.right = spineDevicePx + overlap;
+      }
+
+      // Frame on Right Page physically touching center spine fold
+      const touchesSpineFromRight = Math.abs(el.x - rightPageStartX) <= tol;
+      if (touchesSpineFromRight) {
+        const w = p.right - p.left;
+        p.left = rightPageStartDevicePx;
+        p.right = p.left + w;
+      }
+    }
+  }
+
+  // 3. 2D topological horizontal alignment (left to right).
+  // Adjacent configured gaps receive the exact same physical-pixel width.
   const sortedByX = [...unrotated].sort((a, b) => a.origX - b.origX);
   for (const b of sortedByX) {
     let bestA: typeof b | null = null;
@@ -169,15 +233,21 @@ export function alignPreviewElementBounds<
     if (bestA && spacing > 0) {
       const physGapX = b.origX - (bestA.origX + bestA.origW);
       if (Math.abs(physGapX - spacing) <= 0.5) {
-        const currentScreenGap = b.renderX - (bestA.renderX + bestA.renderW);
-        const diff = targetGapPx - currentScreenGap;
-        b.renderX += diff;
-        b.renderW -= diff;
+        const touchesRightOrSpine = (viewMode === 'spread' && Math.abs(b.origX + b.origW - singlePageW) <= tol)
+          || (b.origX + b.origW - viewOffsetX) >= (viewContentWidth - tol);
+        const newLeft = bestA.right + targetGapDevicePx;
+        if (touchesRightOrSpine) {
+          b.left = newLeft;
+        } else {
+          const w = b.right - b.left;
+          b.left = newLeft;
+          b.right = b.left + w;
+        }
       }
     }
   }
 
-  // Sort by Y ascending to process topological chains from top to bottom
+  // 4. 2D topological vertical alignment (top to bottom).
   const sortedByY = [...unrotated].sort((a, b) => a.origY - b.origY);
   for (const b of sortedByY) {
     let bestC: typeof b | null = null;
@@ -200,78 +270,25 @@ export function alignPreviewElementBounds<
     if (bestC && spacing > 0) {
       const physGapY = b.origY - (bestC.origY + bestC.origH);
       if (Math.abs(physGapY - spacing) <= 0.5) {
-        const currentScreenGap = b.renderY - (bestC.renderY + bestC.renderH);
-        const diff = targetGapPx - currentScreenGap;
-        b.renderY += diff;
-        b.renderH -= diff;
+        const touchesBottom = (b.origY + b.origH) >= (baseSpreadH - tol);
+        const newTop = bestC.bottom + targetGapDevicePx;
+        if (touchesBottom) {
+          b.top = newTop;
+        } else {
+          const h = b.bottom - b.top;
+          b.top = newTop;
+          b.bottom = b.top + h;
+        }
       }
     }
   }
 
-  // 3. Boundary snapping and Center Spine Snapping
-  for (const p of unrotated) {
-    const el = p.element;
-    const isPhotoBorder = el.type === 'photo' && Boolean(el.borderEnabled && (el.borderWidth || 0) > 0);
-
-    const touchesLeft = (el.x - viewLeft) <= tol || p.renderX <= 1.5;
-    const touchesTop = el.y <= tol || p.renderY <= 1.5;
-    const touchesRight = (el.x + el.width - viewOffsetX) >= (viewContentWidth - tol)
-      || (p.renderX + p.renderW >= containerW - 1.5);
-    const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol)
-      || (p.renderY + p.renderH >= containerH - 1.5);
-
-    if (touchesLeft) {
-      p.renderX = 0;
-      if (includeBleed && bleedLeftPx > 0 && viewMode !== 'right-page' && el.x <= tol) {
-        p.renderW += bleedLeftPx;
-      }
-    }
-
-    if (touchesTop) {
-      p.renderY = 0;
-      if (includeBleed && bleedPx > 0 && el.y <= tol) {
-        p.renderH += bleedPx;
-      }
-    }
-
-    if (touchesRight) {
-      p.renderW = Math.max(p.renderW, containerW - p.renderX + 1);
-    }
-
-    if (touchesBottom) {
-      p.renderH = Math.max(p.renderH, containerH - p.renderY + 1);
-    }
-
-    if (viewMode === 'spread') {
-      const rightPageStartX = singlePageW + gutterW;
-
-      // 1. Frame on Left Page touching center spine fold
-      const touchesSpineFromLeft = Math.abs(el.x + el.width - singlePageW) <= tol
-        || Math.abs(p.renderX + p.renderW - spinePx) <= 1.5;
-
-      if (touchesSpineFromLeft) {
-        const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
-        p.renderW = Math.max(p.renderW, spinePx - p.renderX + overlap);
-      }
-
-      // 2. Frame on Right Page touching center spine fold
-      const touchesSpineFromRight = Math.abs(el.x - rightPageStartX) <= tol
-        || Math.abs(p.renderX - rightPageStartPx) <= 1.5;
-
-      if (touchesSpineFromRight) {
-        const shift = p.renderX - rightPageStartPx;
-        p.renderX = rightPageStartPx;
-        p.renderW += shift;
-      }
-    }
-  }
-
-  return projected.map((p) => ({
+  return nodes.map((p) => ({
     element: p.element,
-    renderX: p.renderX,
-    renderY: p.renderY,
-    renderW: p.renderW,
-    renderH: p.renderH,
+    renderX: p.left / rasterScale,
+    renderY: p.top / rasterScale,
+    renderW: Math.max(1, p.right - p.left) / rasterScale,
+    renderH: Math.max(1, p.bottom - p.top) / rasterScale,
   }));
 }
 

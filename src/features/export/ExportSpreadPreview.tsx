@@ -78,8 +78,17 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
   const boxH = 330;
   const projection = calculatePreviewProjection(singlePageW, singlePageH, gutterW,
     boxW, boxH, viewMode, bleed);
-  const { scale, width: containerW, height: containerH, bleedPx, bleedLeftPx, bleedRightPx,
-    spineX: spinePx } = projection;
+  const pixelRatio = typeof window === 'undefined' ? 1 : (window.devicePixelRatio || 1);
+  const snapToDevicePixel = (value: number) => Math.round(value * pixelRatio) / pixelRatio;
+  const oneDevicePixel = 1 / pixelRatio;
+  const { scale } = projection;
+  const containerW = snapToDevicePixel(projection.width);
+  const containerH = snapToDevicePixel(projection.height);
+  const bleedPx = snapToDevicePixel(projection.bleedPx);
+  const bleedLeftPx = snapToDevicePixel(projection.bleedLeftPx);
+  const bleedRightPx = snapToDevicePixel(projection.bleedRightPx);
+  const spinePx = snapToDevicePixel(projection.spineX);
+  const rightPagePx = snapToDevicePixel(projection.rightPageX);
   const safeAreaWidth = Math.max(0, singlePageW - dims.safeMarginOutside - dims.safeMarginSpine);
   const safeAreaHeight = Math.max(0, singlePageH - dims.safeMarginTop - dims.safeMarginBottom);
   const leftSafeArea = projectPreviewRect({
@@ -123,8 +132,9 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
       spacing: dims.spacing,
       viewMode,
       includeBleed,
+      pixelRatio,
     });
-  }, [visibleElements, projection, singlePageW, singlePageH, gutterW, dims.spacing, viewMode, includeBleed]);
+  }, [visibleElements, projection, singlePageW, singlePageH, gutterW, dims.spacing, viewMode, includeBleed, pixelRatio]);
 
   const photoCount = visibleElements.filter((e) => e.type === 'photo').length;
   const textCount = visibleElements.filter((e) => e.type === 'text').length;
@@ -225,7 +235,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     position: 'absolute',
                     left: `${bleedLeftPx}px`,
                     top: `${bleedPx}px`,
-                    width: `${singlePageW * scale + (gutterW === 0 ? 0.5 : 0)}px`,
+                    width: `${Math.max(0, spinePx - bleedLeftPx) + (gutterW === 0 ? oneDevicePixel : 0)}px`,
                     height: `${singlePageH * scale}px`,
                     backgroundColor: leftPageBg,
                   }}
@@ -233,7 +243,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                 <div
                   style={{
                     position: 'absolute',
-                    left: `${projection.rightPageX}px`,
+                    left: `${rightPagePx}px`,
                     top: `${bleedPx}px`,
                     width: `${singlePageW * scale}px`,
                     height: `${singlePageH * scale}px`,
