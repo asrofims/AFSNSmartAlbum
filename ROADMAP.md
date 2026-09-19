@@ -706,3 +706,11 @@
 - [x] Add pixel-level native render regressions for uniform horizontal/vertical gaps and a seam-free layflat spine at 240, 300, and 600 DPI across px, mm, and inch projects.
 - [ ] Manually compare the affected album in native JPEG, PNG, and PDF exports at print resolution.
 
+### Phase 64 — Release v1.0.71: Modern Emerald Update Theme & Settings Cleanup
+
+- [x] Unify toolbar update button styling with an elevated modern emerald green gradient, matching hover/active glow states, and pulse animations.
+- [x] Replace raw emojis in update status buttons with crisp, scalable vector SVG icons.
+- [x] Streamline Software Updates card in Settings dialog by removing redundant technical subtitle copy.
+- [x] Application version metadata bumped to `v1.0.71`.
+
+

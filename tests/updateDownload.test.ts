@@ -41,7 +41,7 @@ async function testSuccessfulDownload() {
   let onProgressCallback: any = null;
 
   const mockUpdate: any = {
-    version: '1.0.70',
+    version: '1.0.71',
     downloadAndInstall: async (onEvent: any) => {
       onProgressCallback = onEvent;
       // Emit initial chunk
@@ -73,7 +73,7 @@ async function testSuccessfulDownload() {
 async function testFailedDownload() {
   console.log('  Testing startUpdateDownload error handling...');
   const mockFailingUpdate: any = {
-    version: '1.0.70',
+    version: '1.0.71',
     downloadAndInstall: async () => {
       throw new Error('Network timeout during package signature verification');
     },
