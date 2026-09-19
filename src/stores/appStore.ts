@@ -1,4 +1,10 @@
 import { create } from 'zustand';
+import {
+  AppPreferences,
+  loadAppPreferences,
+  saveAppPreferences,
+  DEFAULT_APP_PREFERENCES,
+} from '../domain/appPreferences';
 
 interface AppInfo {
   version: string;
@@ -63,6 +69,11 @@ interface AppState {
   setUpdateError: (err: string | null) => void;
   dismissBackgroundNotice: () => void;
   resetBackgroundNotice: () => void;
+
+  // Preferences
+  preferences: AppPreferences;
+  updatePreferences: (patch: Partial<AppPreferences>) => void;
+  resetPreferences: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -78,6 +89,7 @@ export const useAppStore = create<AppState>((set) => ({
   isUpdateModalOpen: false,
   updateAvailableVersion: null,
   settingsActiveTab: 'general',
+  preferences: loadAppPreferences(),
 
   updateStatus: 'idle',
   updateProgress: {
@@ -116,4 +128,14 @@ export const useAppStore = create<AppState>((set) => ({
   setUpdateError: (err) => set({ updateError: err }),
   dismissBackgroundNotice: () => set({ isBackgroundNoticeDismissed: true }),
   resetBackgroundNotice: () => set({ isBackgroundNoticeDismissed: false }),
+  updatePreferences: (patch) =>
+    set((state) => {
+      const updated = { ...state.preferences, ...patch };
+      saveAppPreferences(updated);
+      return { preferences: updated };
+    }),
+  resetPreferences: () => {
+    saveAppPreferences(DEFAULT_APP_PREFERENCES);
+    set({ preferences: { ...DEFAULT_APP_PREFERENCES } });
+  },
 }));
