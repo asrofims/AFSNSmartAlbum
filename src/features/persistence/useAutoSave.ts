@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAlbumStore } from '../../stores/albumStore';
+import { useAppStore } from '../../stores/appStore';
 import { useProjectStore } from '../../stores/projectStore';
 
 const SNAPSHOT_STORAGE_KEY_PREFIX = 'afsn_snapshot_';
@@ -8,6 +9,8 @@ export function useAutoSave() {
   const currentAlbum = useAlbumStore((s) => s.currentAlbum);
   const saveStatus = useAlbumStore((s) => s.saveStatus);
   const currentProject = useProjectStore((s) => s.currentProject);
+  const autoSaveEnabled = useAppStore((s) => s.preferences.autoSaveEnabled);
+  const autoSaveIntervalSeconds = useAppStore((s) => s.preferences.autoSaveIntervalSeconds);
 
   const debounceTimerRef = useRef<number | null>(null);
 
@@ -56,19 +59,23 @@ export function useAutoSave() {
   };
 
   useEffect(() => {
-    if (saveStatus !== 'unsaved' || !currentAlbum) return;
-    debounceTimerRef.current = window.setTimeout(() => { void checkpoint(); }, 8000);
+    if (!autoSaveEnabled || saveStatus !== 'unsaved' || !currentAlbum) return;
+    debounceTimerRef.current = window.setTimeout(
+      () => { void checkpoint(); },
+      autoSaveIntervalSeconds * 1000
+    );
     return () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
     };
-  }, [currentAlbum, saveStatus, currentProject]);
+  }, [autoSaveEnabled, autoSaveIntervalSeconds, currentAlbum, saveStatus, currentProject]);
 
   useEffect(() => {
+    if (!autoSaveEnabled) return;
     const interval = window.setInterval(() => {
       if (useAlbumStore.getState().saveStatus === 'unsaved') void checkpoint();
-    }, 60000);
+    }, Math.max(60000, autoSaveIntervalSeconds * 1000));
     return () => window.clearInterval(interval);
-  }, []);
+  }, [autoSaveEnabled, autoSaveIntervalSeconds]);
 
 }
 

@@ -1,11 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Dialog } from '../../components/ui/Dialog';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Switch } from '../../components/ui/Switch';
 import { useAppStore } from '../../stores/appStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { convertUnit, Unit, UNIT_LABELS } from '../../domain/units';
 import { SNAPPING_LEVELS, SnappingLevel } from '../../domain/editor';
+import type { AutoSaveIntervalSeconds, StartupBehavior } from '../../domain/appPreferences';
+import { isTauri } from '../../utils/platform';
 import styles from './SettingsDialog.module.css';
 
 // ---------------------------------------------------------------------------
@@ -372,6 +375,31 @@ const SHORTCUTS: ShortcutDef[] = [
   },
 ];
 
+interface PhotoCacheStats {
+  fileCount: number;
+  totalBytes: number;
+}
+
+interface CacheCleanupResult {
+  removedFiles: number;
+  reclaimedBytes: number;
+}
+
+function formatCacheBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / (1024 ** unitIndex);
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+const AUTO_SAVE_INTERVAL_OPTIONS: Array<{ value: AutoSaveIntervalSeconds; label: string }> = [
+  { value: 10, label: '10 sec' },
+  { value: 30, label: '30 sec' },
+  { value: 60, label: '1 min' },
+  { value: 300, label: '5 min' },
+];
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -382,6 +410,9 @@ export function SettingsDialog() {
   const setActiveTab = useAppStore((s) => s.setSettingsActiveTab);
   const appInfo = useAppStore((s) => s.appInfo);
   const openUpdateModal = useAppStore((s) => s.openUpdateModal);
+  const updateStatus = useAppStore((s) => s.updateStatus);
+  const preferences = useAppStore((s) => s.preferences);
+  const updatePreferences = useAppStore((s) => s.updatePreferences);
 
   const {
     snappingConfig,
@@ -394,6 +425,83 @@ export function SettingsDialog() {
   // Shortcuts search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [confirmAction, setConfirmAction] = useState<'unused_cache' | null>(null);
+  const [isGeneralActionBusy, setIsGeneralActionBusy] = useState(false);
+  const [generalActionError, setGeneralActionError] = useState<string | null>(null);
+  const [generalActionNotice, setGeneralActionNotice] = useState<string | null>(null);
+  const [cacheStats, setCacheStats] = useState<PhotoCacheStats | null>(null);
+  const [isCacheStatsLoading, setIsCacheStatsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!generalActionNotice) return;
+    const timeout = window.setTimeout(() => setGeneralActionNotice(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [generalActionNotice]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'general') return;
+    if (!isTauri()) {
+      setCacheStats({ fileCount: 0, totalBytes: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    setIsCacheStatsLoading(true);
+    import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke<PhotoCacheStats>('get_photo_cache_stats'))
+      .then((stats) => {
+        if (!cancelled) setCacheStats(stats);
+      })
+      .catch((error) => {
+        if (!cancelled) setGeneralActionError(`Cache information is unavailable: ${String(error)}`);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCacheStatsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeTab]);
+
+  const handleConfirmedGeneralAction = async () => {
+    const action = confirmAction;
+    if (!action) return;
+    setIsGeneralActionBusy(true);
+    setGeneralActionError(null);
+    setGeneralActionNotice(null);
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const cleaned = await invoke<CacheCleanupResult>('clean_unused_photo_cache');
+      const stats = await invoke<PhotoCacheStats>('get_photo_cache_stats');
+      setCacheStats(stats);
+      setGeneralActionNotice(
+        cleaned.removedFiles > 0
+          ? `Removed ${cleaned.removedFiles} unused cache ${cleaned.removedFiles === 1 ? 'file' : 'files'} and reclaimed ${formatCacheBytes(cleaned.reclaimedBytes)}.`
+          : 'No unused cache files were found.'
+      );
+      setConfirmAction(null);
+    } catch (error) {
+      setGeneralActionError(`The operation could not be completed: ${String(error)}`);
+    } finally {
+      setIsGeneralActionBusy(false);
+    }
+  };
+
+  const updateStatusPresentation = useMemo(() => {
+    if (!preferences.automaticUpdateChecks && updateStatus === 'idle') {
+      return { label: 'Manual', className: styles.statusBadgeMuted };
+    }
+    switch (updateStatus) {
+      case 'checking': return { label: 'Checking…', className: styles.statusBadgeMuted };
+      case 'available': return { label: 'Update Available', className: styles.statusBadgeWarning };
+      case 'downloading': return { label: 'Downloading', className: styles.statusBadgeWarning };
+      case 'ready': return { label: 'Restart Required', className: styles.statusBadgeWarning };
+      case 'uptodate': return { label: 'Up to Date', className: styles.statusBadgeActive };
+      case 'error': return { label: 'Check Unavailable', className: styles.statusBadgeDanger };
+      default: return { label: 'Not Checked', className: styles.statusBadgeMuted };
+    }
+  }, [preferences.automaticUpdateChecks, updateStatus]);
 
   // Filter shortcuts
   const filteredShortcuts = useMemo(() => {
@@ -449,21 +557,23 @@ export function SettingsDialog() {
   }, [snappingConfig.threshold]);
 
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={closeSettings}
-      title="Preferences"
-      width={780}
-      height={580}
-      noPadding
-    >
+    <>
+      <Dialog
+        isOpen={isOpen}
+        onClose={closeSettings}
+        title="Preferences"
+        width={780}
+        height={580}
+        noPadding
+        closeOnEscape={!confirmAction}
+      >
       <div className={styles.container}>
         {/* Left Navigation Sidebar */}
         <div className={styles.sidebar}>
           <div className={styles.sidebarNav}>
             <div className={styles.sidebarHeader}>Preferences</div>
 
-            {/* Tab 1: General & App */}
+            {/* Tab 1: General */}
             <button
               type="button"
               className={`${styles.tabBtn} ${activeTab === 'general' ? styles.tabBtnActive : ''}`}
@@ -475,7 +585,7 @@ export function SettingsDialog() {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
               </span>
-              <span>General & App</span>
+              <span>General</span>
             </button>
 
             {/* Tab 2: Canvas & Snapping */}
@@ -538,14 +648,200 @@ export function SettingsDialog() {
         {/* Right Content Area */}
         <div className={styles.contentPane}>
           {/* ================================================================ */}
-          {/* 1. General & App Tab                                              */}
+          {/* 1. General Tab                                                    */}
           {/* ================================================================ */}
           {activeTab === 'general' && (
             <div className={styles.tabContent}>
               <div className={styles.sectionHeader}>
-                <div className={styles.sectionTitle}>General & Application</div>
+                <div className={styles.sectionTitle}>General</div>
                 <div className={styles.sectionSubtitle}>
-                  System preferences, data integrity safeguards, and software version status.
+                  Configure startup behavior, saving safeguards, local storage, and software updates.
+                </div>
+              </div>
+
+              {/* Startup & Projects Card */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div>
+                    <div className={styles.cardTitle}>Startup &amp; Projects</div>
+                    <div className={styles.cardSubtitle}>
+                      Choose what appears when AFSNSmartAlbum starts and manage project history.
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.generalCardBody}>
+                  <div className={styles.controlLabelRow}>
+                    <div>
+                      <div className={styles.infoLabelStrong}>On Launch</div>
+                      <div className={styles.infoHint}>A project file opened from Windows always takes priority.</div>
+                    </div>
+                  </div>
+                  <div className={styles.startupChoiceGrid} role="radiogroup" aria-label="On launch">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={preferences.startupBehavior === 'welcome'}
+                      className={`${styles.startupChoice} ${preferences.startupBehavior === 'welcome' ? styles.startupChoiceActive : ''}`}
+                      onClick={() => updatePreferences({ startupBehavior: 'welcome' as StartupBehavior })}
+                    >
+                      <span className={styles.startupChoiceIcon}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="4" width="18" height="16" rx="2" />
+                          <path d="M3 9h18M8 9v11" />
+                        </svg>
+                      </span>
+                      <span className={styles.startupChoiceText}>
+                        <strong>Welcome Screen</strong>
+                        <small>Start from your recent projects</small>
+                      </span>
+                      <span className={styles.choiceIndicator} aria-hidden="true">
+                        {preferences.startupBehavior === 'welcome' && <span />}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={preferences.startupBehavior === 'reopen_last'}
+                      className={`${styles.startupChoice} ${preferences.startupBehavior === 'reopen_last' ? styles.startupChoiceActive : ''}`}
+                      onClick={() => updatePreferences({ startupBehavior: 'reopen_last' as StartupBehavior })}
+                    >
+                      <span className={styles.startupChoiceIcon}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                          <path d="M3 3v5h5M12 7v5l3 2" />
+                        </svg>
+                      </span>
+                      <span className={styles.startupChoiceText}>
+                        <strong>Last Project</strong>
+                        <small>Continue where you left off</small>
+                      </span>
+                      <span className={styles.choiceIndicator} aria-hidden="true">
+                        {preferences.startupBehavior === 'reopen_last' && <span />}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Saving & Recovery Card */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div>
+                    <div className={styles.cardTitle}>
+                      <span>Saving &amp; Recovery</span>
+                      <span className={preferences.autoSaveEnabled ? styles.statusBadgeActive : styles.statusBadgeMuted}>
+                        {preferences.autoSaveEnabled ? 'Auto-Save On' : 'Manual Save'}
+                      </span>
+                    </div>
+                    <div className={styles.cardSubtitle}>
+                      Automatically save project files while keeping crash-recovery snapshots continuously protected.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={preferences.autoSaveEnabled}
+                    onChange={(autoSaveEnabled) => updatePreferences({ autoSaveEnabled })}
+                    size="md"
+                  />
+                </div>
+
+                <div className={styles.generalCardBody}>
+                  <div className={styles.controlLabelRow}>
+                    <div>
+                      <div className={styles.infoLabelStrong}>Auto-Save After Inactivity</div>
+                      <div className={styles.infoHint}>Applies after the project has been saved as an .afsn file.</div>
+                    </div>
+                  </div>
+                  <div
+                    className={`${styles.intervalSegment} ${!preferences.autoSaveEnabled ? styles.controlDisabled : ''}`}
+                    role="radiogroup"
+                    aria-label="Auto-save interval"
+                    aria-disabled={!preferences.autoSaveEnabled}
+                  >
+                    {AUTO_SAVE_INTERVAL_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={preferences.autoSaveIntervalSeconds === option.value}
+                        className={`${styles.intervalOption} ${preferences.autoSaveIntervalSeconds === option.value ? styles.intervalOptionActive : ''}`}
+                        onClick={() => updatePreferences({ autoSaveIntervalSeconds: option.value })}
+                        disabled={!preferences.autoSaveEnabled}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className={styles.compactSummaryRow}>
+                    <span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+                        <path d="m9 12 2 2 4-4" />
+                      </svg>
+                      Recovery snapshots stay protected
+                    </span>
+                    <span className={styles.summaryPillSuccess}>Always On</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Storage & Cache Card */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div>
+                    <div className={styles.cardTitle}>Storage &amp; Cache</div>
+                    <div className={styles.cardSubtitle}>
+                      Thumbnail and canvas preview files are stored locally and can be regenerated from original photos.
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.generalCardBody}>
+                  <div className={styles.cacheMetricPanel}>
+                    <div className={styles.cacheMetricIcon}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <ellipse cx="12" cy="5" rx="8" ry="3" />
+                        <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+                        <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
+                      </svg>
+                    </div>
+                    <div className={styles.cacheMetricCopy}>
+                      <strong>Photo Preview Cache</strong>
+                      <span>
+                        {isCacheStatsLoading
+                          ? 'Calculating local cache usage…'
+                          : `${cacheStats?.fileCount ?? 0} generated ${cacheStats?.fileCount === 1 ? 'file' : 'files'}`}
+                      </span>
+                    </div>
+                    <span className={styles.cacheSizeValue}>{isCacheStatsLoading ? '—' : formatCacheBytes(cacheStats?.totalBytes ?? 0)}</span>
+                  </div>
+                  <div className={styles.actionStrip}>
+                    <div className={styles.actionStripCopy}>
+                      <strong>Unused Cache</strong>
+                      <span>Active project previews and original photos remain untouched.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.generalActionButton}
+                      onClick={() => setConfirmAction('unused_cache')}
+                      disabled={!isTauri() || isCacheStatsLoading || isGeneralActionBusy}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                      </svg>
+                      Clean Up
+                    </button>
+                  </div>
+                  {(generalActionNotice || generalActionError) && (
+                    <div
+                      className={`${styles.generalNotice} ${generalActionError ? styles.generalNoticeError : ''}`}
+                      role={generalActionError ? 'alert' : 'status'}
+                    >
+                      {generalActionError || generalActionNotice}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -555,31 +851,43 @@ export function SettingsDialog() {
                   <div style={{ flex: 1 }}>
                     <div className={styles.cardTitle}>
                       <span>Software Updates</span>
-                      <span className={styles.statusBadgeActive}>Up to date</span>
+                      <span className={updateStatusPresentation.className}>{updateStatusPresentation.label}</span>
+                    </div>
+                    <div className={styles.cardSubtitle}>
+                      Keep the application current while preserving full control over network checks.
                     </div>
                   </div>
+                  <Switch
+                    checked={preferences.automaticUpdateChecks}
+                    onChange={(automaticUpdateChecks) => updatePreferences({ automaticUpdateChecks })}
+                    size="md"
+                  />
                 </div>
 
-                <div className={styles.thresholdSection}>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>Installed Release</span>
-                    <span className={styles.infoValue}>
-                      <span className={styles.versionPill}>{appInfo.version}</span>
+                <div className={styles.generalCardBody}>
+                  <div className={styles.compactSummaryRow}>
+                    <div>
+                      <div className={styles.infoLabelStrong}>Automatic Update Checks</div>
+                      <div className={styles.infoHint}>Checks silently after startup; offline use is never interrupted.</div>
+                    </div>
+                    <span className={preferences.automaticUpdateChecks ? styles.summaryPillSuccess : styles.summaryPill}>
+                      {preferences.automaticUpdateChecks ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                  <div className={styles.infoRow} style={{ paddingTop: '8px' }}>
-                    <span className={styles.infoLabel}>Update Status</span>
+                  <div className={styles.actionStrip}>
+                    <div className={styles.actionStripCopy}>
+                      <strong>Installed Release</strong>
+                      <span>{appInfo.version}</span>
+                    </div>
                     <button
                       type="button"
-                      className={styles.actionBtn}
-                      onClick={() => {
-                        openUpdateModal();
-                      }}
+                      className={`${styles.generalActionButton} ${styles.generalActionButtonPrimary}`}
+                      onClick={openUpdateModal}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                       </svg>
-                      Check for Updates
+                      Check Now
                     </button>
                   </div>
                 </div>
@@ -1030,6 +1338,25 @@ export function SettingsDialog() {
           )}
         </div>
       </div>
-    </Dialog>
+      </Dialog>
+      <ConfirmDialog
+        isOpen={confirmAction !== null}
+        title="Clean Unused Cache"
+        message="Remove generated cache files that are no longer used by any project?"
+        detail="Active thumbnails and previews remain untouched. This operation cannot be undone, but removed cache files are not original photos."
+        confirmText="Clean Cache"
+        variant="warning"
+        isLoading={isGeneralActionBusy}
+        loadingText="Cleaning…"
+        error={generalActionError}
+        onConfirm={handleConfirmedGeneralAction}
+        onCancel={() => {
+          if (!isGeneralActionBusy) {
+            setConfirmAction(null);
+            setGeneralActionError(null);
+          }
+        }}
+      />
+    </>
   );
 }

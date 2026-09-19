@@ -19,6 +19,7 @@ import { checkForAppUpdates } from './services/updateService';
 export default function App() {
   const projectError = useProjectStore((s) => s.error);
   const isSaving = useProjectStore((s) => s.isSaving);
+  const automaticUpdateChecks = useAppStore((s) => s.preferences.automaticUpdateChecks);
   const [pendingOpenPath, setPendingOpenPath] = useState<string | null>(null);
   const requestOpenFile = (path: string) => {
     if (useProjectStore.getState().isSaving) {
@@ -81,34 +82,54 @@ export default function App() {
 
   // Silent non-blocking background update check (after 4s startup delay)
   useEffect(() => {
+    if (!automaticUpdateChecks) return;
     const timer = setTimeout(async () => {
       try {
-        const { appInfo, setUpdateAvailableVersion, setUpdateCheckResult, setUpdateStatus } = useAppStore.getState();
+        const { appInfo, setUpdateAvailableVersion, setUpdateCheckResult, setUpdateStatus, setUpdateError } = useAppStore.getState();
+        setUpdateStatus('checking');
+        setUpdateError(null);
         const res = await checkForAppUpdates(appInfo.version);
-        if (res && res.hasUpdate && res.latestVersion) {
+        setUpdateCheckResult(res);
+        if (res?.isError) {
+          setUpdateStatus('error');
+          setUpdateError(res.errorMessage || 'Unable to contact update server.');
+        } else if (res && res.hasUpdate && res.latestVersion) {
           console.log('[Updater] Background check detected new version:', res.latestVersion);
           setUpdateAvailableVersion(res.latestVersion);
-          setUpdateCheckResult(res);
           setUpdateStatus('available');
+        } else {
+          setUpdateAvailableVersion(null);
+          setUpdateStatus('uptodate');
         }
       } catch (err) {
         // Silently swallow errors during background check so offline/network issues never interrupt app
         console.warn('[Updater] Background check skipped gracefully:', err);
+        useAppStore.getState().setUpdateStatus('error');
       }
     }, 4000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [automaticUpdateChecks]);
 
   useEffect(() => {
     if (!isTauri()) return;
 
-    // 1. Check if app was started with a project file path (.afsn).
+    // 1. A file association takes priority; otherwise honor the startup preference.
+    let initialLaunchCancelled = false;
     import('@tauri-apps/api/core').then(({ invoke }) => {
       invoke<string | null>('get_initial_open_path')
-        .then((initialPath) => {
+        .then(async (initialPath) => {
+          if (initialLaunchCancelled) return;
           if (initialPath) {
             console.log('[AFSN] Initial project path from CLI:', initialPath);
             requestOpenFile(initialPath);
+            return;
+          }
+
+          if (useAppStore.getState().preferences.startupBehavior === 'reopen_last') {
+            await useProjectStore.getState().loadRecentProjects();
+            if (initialLaunchCancelled || useProjectStore.getState().currentProject) return;
+            const recentProject = useProjectStore.getState().recentProjects[0];
+            if (recentProject) await useProjectStore.getState().openProjectById(recentProject.id);
           }
         })
         .catch((err) => {
@@ -157,6 +178,7 @@ export default function App() {
     });
 
     return () => {
+      initialLaunchCancelled = true;
       if (unlistenFn) unlistenFn();
       if (unlistenCloseWarning) unlistenCloseWarning();
       unsubAlbum();

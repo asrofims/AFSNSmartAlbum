@@ -2,6 +2,7 @@ use crate::db::Database;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 // All image jobs and cache cleanup take this lock before database/file work.
@@ -60,10 +61,52 @@ pub fn cleanup_removed_photo_assets(cache_dir: &Path, ids: &[String]) -> Vec<Str
     warnings
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CacheCleanupReport {
     pub removed_files: usize,
     pub reclaimed_bytes: u64,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCacheStats {
+    pub file_count: usize,
+    pub total_bytes: u64,
+}
+
+pub fn get_photo_cache_stats(app: &AppHandle) -> Result<PhotoCacheStats, String> {
+    let _job = PHOTO_ASSET_JOB.lock().map_err(|_| "Photo cache worker is unavailable".to_string())?;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|err| format!("Failed to resolve application cache directory: {}", err))?;
+
+    measure_asset_directories(&[cache_dir.join("thumbnails"), cache_dir.join("previews")])
+}
+
+fn measure_asset_directories(directories: &[PathBuf]) -> Result<PhotoCacheStats, String> {
+    let mut stats = PhotoCacheStats::default();
+
+    for directory in directories {
+        if !directory.exists() || is_link_directory(directory) || directory.parent().map(is_link_directory).unwrap_or(true) {
+            continue;
+        }
+
+        let entries = fs::read_dir(directory)
+            .map_err(|err| format!("Failed to read cache directory {}: {}", directory.display(), err))?;
+        for entry in entries {
+            let entry = entry.map_err(|err| format!("Failed to inspect cache entry: {}", err))?;
+            let path = entry.path();
+            if !is_generated_cache_asset(&path) {
+                continue;
+            }
+            stats.file_count += 1;
+            stats.total_bytes += entry.metadata().map(|metadata| metadata.len()).unwrap_or(0);
+        }
+    }
+
+    Ok(stats)
 }
 
 pub fn cleanup_orphaned_photo_assets(
@@ -173,6 +216,27 @@ mod tests {
         assert!(!previews.join("photo-interrupted.tmp").exists());
         assert!(previews.join("readme.txt").exists());
 
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn measures_only_generated_photo_cache_assets() {
+        let temp_dir = std::env::temp_dir().join("afsn_asset_cache_stats_test");
+        let _ = fs::remove_dir_all(&temp_dir);
+        let thumbnails = temp_dir.join("thumbnails");
+        let previews = temp_dir.join("previews");
+        fs::create_dir_all(&thumbnails).unwrap();
+        fs::create_dir_all(&previews).unwrap();
+
+        fs::write(thumbnails.join("photo-a.jpg"), b"1234").unwrap();
+        fs::write(previews.join("photo-b.png"), b"123456").unwrap();
+        fs::write(previews.join("notes.txt"), b"not-cache").unwrap();
+
+        let stats = measure_asset_directories(&[thumbnails, previews])
+            .expect("Cache statistics should be available");
+
+        assert_eq!(stats.file_count, 2);
+        assert_eq!(stats.total_bytes, 10);
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }

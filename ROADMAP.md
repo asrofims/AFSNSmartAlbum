@@ -713,4 +713,18 @@
 - [x] Streamline Software Updates card in Settings dialog by removing redundant technical subtitle copy.
 - [x] Application version metadata bumped to `v1.0.71`.
 
+### Phase 65 — Release v1.0.72: General Preferences, Recovery Controls & Safe Cache Maintenance
+
+- [x] Rename the Preferences sidebar entry from `General & App` to the standard desktop label `General`.
+- [x] Expand General Preferences into focused `Startup & Projects`, `Saving & Recovery`, `Storage & Cache`, and `Software Updates` cards.
+- [x] Persist launch behavior, auto-save enablement and interval, and automatic update-check preferences locally for offline startup availability.
+- [x] Support reopening the most recent project while preserving file-association launch priority.
+- [x] Keep crash-recovery snapshots permanently active while allowing project-file auto-save timing to be configured.
+- [x] Report generated preview-cache usage and safely clean only orphaned thumbnails, previews, and interrupted temporary files.
+- [x] Display update state dynamically instead of presenting an unconditional up-to-date status.
+- [x] Replace native General-tab dropdowns with modern startup choice cards and compact auto-save interval segments.
+- [x] Standardize cache/update action rows and show self-dismissing cleanup feedback directly inside the Storage & Cache card.
+- [x] Remove the misleading recent-project capacity counter from Startup & Projects without changing recent-project retention behavior.
+- [x] Application version metadata bumped to `v1.0.72`.
+
 

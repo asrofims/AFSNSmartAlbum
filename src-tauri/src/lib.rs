@@ -108,6 +108,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_commands::get_app_info,
             commands::app_commands::get_db_status,
+            commands::app_commands::get_photo_cache_stats,
+            commands::app_commands::clean_unused_photo_cache,
             commands::app_commands::restart_app,
             commands::app_commands::exit_app,
             commands::app_commands::set_unsaved_status,

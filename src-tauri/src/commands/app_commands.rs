@@ -1,6 +1,7 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
+use crate::asset_cache::{self, CacheCleanupReport, PhotoCacheStats};
 use crate::db::Database;
 
 /// Application information returned to the frontend.
@@ -45,6 +46,25 @@ pub fn get_db_status(db: State<'_, Database>) -> Result<DbStatus, String> {
         schema_version,
         expected_version: Database::expected_version(),
     })
+}
+
+/// Return the total size and file count for generated thumbnail and preview assets.
+#[tauri::command]
+pub async fn get_photo_cache_stats(app: AppHandle) -> Result<PhotoCacheStats, String> {
+    tauri::async_runtime::spawn_blocking(move || asset_cache::get_photo_cache_stats(&app))
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+/// Remove only generated cache assets that are no longer referenced by any project.
+#[tauri::command]
+pub async fn clean_unused_photo_cache(app: AppHandle) -> Result<CacheCleanupReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Database>();
+        asset_cache::cleanup_orphaned_photo_assets(&app, db.inner())
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 /// Gracefully restart the application (used after installing an update).

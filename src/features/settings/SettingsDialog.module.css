@@ -216,6 +216,26 @@
   border-radius: 12px;
 }
 
+.statusBadgeWarning {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.statusBadgeDanger {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.26);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
 /* --------------------------------------------------------------------------
    Calibrated Snapping Levels (Level 1 - Level 5)
    -------------------------------------------------------------------------- */
@@ -728,93 +748,350 @@
 /* --------------------------------------------------------------------------
    General Info Rows & Action Buttons
    -------------------------------------------------------------------------- */
-.infoRow {
+.infoLabelStrong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #f1f5f9);
+}
+
+.infoHint {
+  max-width: 330px;
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--color-text-muted, #64748b);
+}
+
+.generalCardBody {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.controlLabelRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.infoRow:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.infoRow:first-child {
-  padding-top: 0;
-}
-
-.infoLabel {
-  font-size: 12px;
-  color: var(--color-text-secondary, #94a3b8);
-}
-
-.infoValue {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-primary, #f1f5f9);
-  display: flex;
-  align-items: center;
+.startupChoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.actionBtn {
-  display: inline-flex;
+.startupChoice {
+  position: relative;
+  min-width: 0;
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 14px;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-  border: 1px solid rgba(99, 102, 241, 0.5);
-  color: #ffffff;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 13, 19, 0.48);
+  color: var(--color-text-secondary, #94a3b8);
   cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
-  white-space: nowrap;
-  flex-shrink: 0;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.actionBtn:hover {
-  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
-  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
-  transform: translateY(-0.5px);
+.startupChoice:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.055);
+  color: #cbd5e1;
 }
 
-.actionBtn:active {
-  transform: translateY(0);
+.startupChoiceActive,
+.startupChoiceActive:hover {
+  border-color: rgba(56, 189, 248, 0.58);
+  background: linear-gradient(145deg, rgba(2, 132, 199, 0.15), rgba(56, 189, 248, 0.07));
+  color: #e0f2fe;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.05);
 }
 
-.actionBtnSecondary {
+.startupChoiceIcon {
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.035);
+  color: #64748b;
+  transition: inherit;
+}
+
+.startupChoiceActive .startupChoiceIcon {
+  border-color: rgba(56, 189, 248, 0.24);
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.startupChoiceText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.startupChoiceText strong {
+  overflow: hidden;
   color: var(--color-text-primary, #f1f5f9);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.startupChoiceText small {
+  overflow: hidden;
+  color: var(--color-text-muted, #64748b);
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choiceIndicator {
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.startupChoiceActive .choiceIndicator {
+  border-color: #38bdf8;
+}
+
+.choiceIndicator > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+}
+
+.intervalSegment {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+  background: rgba(8, 11, 16, 0.5);
+  transition: opacity 0.15s ease;
+}
+
+.intervalOption {
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted, #64748b);
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
-.actionBtnSecondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.18);
+.intervalOption:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd5e1;
 }
 
-.cardFooter {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+.intervalOptionActive,
+.intervalOptionActive:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.28);
+  background: rgba(56, 189, 248, 0.13);
+  color: #7dd3fc;
+}
+
+.controlDisabled {
+  opacity: 0.42;
+}
+
+.intervalOption:disabled {
+  cursor: not-allowed;
+}
+
+.compactSummaryRow {
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 10.5px;
+  box-sizing: border-box;
+}
+
+.compactSummaryRow > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summaryPill,
+.summaryPillSuccess {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryPillSuccess {
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+}
+
+.cacheMetricPanel {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  border-radius: 8px;
+  background: rgba(2, 132, 199, 0.055);
+}
+
+.cacheMetricIcon {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+}
+
+.cacheMetricCopy,
+.actionStripCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cacheMetricCopy strong,
+.actionStripCopy strong {
+  color: var(--color-text-primary, #f1f5f9);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cacheMetricCopy span,
+.actionStripCopy span {
+  overflow: hidden;
+  color: var(--color-text-muted, #64748b);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cacheSizeValue {
+  color: #7dd3fc;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.actionStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.generalActionButton {
+  height: 31px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.generalActionButton:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(56, 189, 248, 0.09);
+  color: #bae6fd;
+}
+
+.generalActionButtonPrimary {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+}
+
+.generalActionButtonPrimary:hover:not(:disabled) {
+  border-color: #38bdf8;
+  background: #38bdf8;
+  color: #090d16;
+}
+
+.startupChoice:focus-visible,
+.intervalOption:focus-visible,
+.generalActionButton:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.generalActionButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.generalNotice {
+  padding: 8px 10px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 7px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.generalNoticeError {
+  border-color: rgba(244, 63, 94, 0.28);
+  background: rgba(244, 63, 94, 0.1);
+  color: #fda4af;
 }
 
