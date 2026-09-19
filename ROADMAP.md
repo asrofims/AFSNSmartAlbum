@@ -736,4 +736,13 @@
 - [x] Standardize preflight Missing Photos modal list and warning button with matching design tokens.
 - [x] Application version metadata bumped to `v1.0.73`.
 
+### Phase 67 — Release v1.0.74: Spine Margin Decimals & MiniSpreadPreview Gap Rendering
+
+- [x] Enable 1-decimal precision (`precision=1`, `step=0.5`) for `px` and `mm` units across all margin and spacing inputs (Spine, Outside, Top, Bottom, Uniform, Safe Area Inset).
+- [x] Broaden target gap matching tolerance in `alignPreviewElementBounds` to correctly recognize facing-page split spine margins (e.g. 2.5 + 2.5 = 5.0 px).
+- [x] Enforce Physical Gap Invariant in `previewGeometry.ts` guaranteeing intentional canvas gaps (> 0.5 px) never collapse to 0 px in mini preview thumbnails.
+- [x] Render subtle spine crease fold line (`spineX`) in `MiniSpreadPreview` behind page content for clear visual sheet separation.
+- [x] Application version metadata bumped to `v1.0.74`.
+
+
 

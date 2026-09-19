@@ -145,8 +145,8 @@ export function AlbumStructurePanel() {
                 onChange={(val) => updateSafeArea(val, 'all', currentProject)}
                 min={0}
                 max={Math.min(getMaxGapForUnit(unit), Math.max(10, Math.floor(Math.min(currentProject.canvasWidth, currentProject.canvasHeight) / 2)))}
-                step={unit === 'inch' ? 0.05 : unit === 'cm' ? 0.1 : unit === 'px' ? 1 : 0.5}
-                precision={unit === 'px' ? 0 : unit === 'inch' || unit === 'cm' ? 2 : 1}
+                step={unit === 'inch' ? 0.05 : unit === 'cm' ? 0.1 : 0.5}
+                precision={unit === 'inch' || unit === 'cm' ? 2 : 1}
               />
               <span className={styles.unitText}>{unit}</span>
             </div>

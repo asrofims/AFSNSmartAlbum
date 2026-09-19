@@ -2705,8 +2705,8 @@ export function WorkspaceLayout() {
                             }}
                             min={0}
                             max={maxGap}
-                            step={currentSpacingUnit === 'inch' ? 0.05 : currentSpacingUnit === 'cm' ? 0.1 : currentSpacingUnit === 'px' ? 1 : 0.5}
-                            precision={currentSpacingUnit === 'px' ? 0 : currentSpacingUnit === 'inch' || currentSpacingUnit === 'cm' ? 2 : 1}
+                            step={currentSpacingUnit === 'inch' ? 0.05 : currentSpacingUnit === 'cm' ? 0.1 : 0.5}
+                            precision={currentSpacingUnit === 'inch' || currentSpacingUnit === 'cm' ? 2 : 1}
                             suffix={currentSpacingUnit}
                           />
                         );
@@ -2895,8 +2895,8 @@ export function WorkspaceLayout() {
                                 }}
                                 min={0}
                                 max={maxSafeMargin}
-                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                                precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                                 suffix={currentProject.canvasUnit}
                               />
                             </div>
@@ -2920,8 +2920,8 @@ export function WorkspaceLayout() {
                                 }}
                                 min={0}
                                 max={maxSafeMargin}
-                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                                precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                                 suffix={currentProject.canvasUnit}
                               />
                             </div>
@@ -2943,8 +2943,8 @@ export function WorkspaceLayout() {
                                 }}
                                 min={0}
                                 max={maxSafeMargin}
-                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                                precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                                 suffix={currentProject.canvasUnit}
                               />
                             </div>
@@ -2966,8 +2966,8 @@ export function WorkspaceLayout() {
                                 }}
                                 min={0}
                                 max={maxSafeMargin}
-                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                                precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                                 suffix={currentProject.canvasUnit}
                               />
                             </div>
@@ -2989,8 +2989,8 @@ export function WorkspaceLayout() {
                                 }}
                                 min={0}
                                 max={maxSafeMargin}
-                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : currentProject.canvasUnit === 'px' ? 1 : 0.5}
-                                precision={currentProject.canvasUnit === 'px' ? 0 : currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
+                                step={currentProject.canvasUnit === 'inch' ? 0.05 : currentProject.canvasUnit === 'cm' ? 0.1 : 0.5}
+                                precision={currentProject.canvasUnit === 'inch' || currentProject.canvasUnit === 'cm' ? 2 : 1}
                                 suffix={currentProject.canvasUnit}
                               />
                             </div>

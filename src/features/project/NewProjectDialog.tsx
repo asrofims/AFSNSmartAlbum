@@ -68,6 +68,7 @@ export function NewProjectDialog() {
     if (unit === 'inch') return Math.round(val * 100) / 100;
     if (unit === 'cm') return Math.round(val * 100) / 100;
     if (unit === 'mm') return Math.round(val * 10) / 10;
+    if (unit === 'px') return Math.round(val * 10) / 10;
     return Math.round(val);
   };
 
@@ -739,8 +740,8 @@ export function NewProjectDialog() {
                           onChange={setMarginValue}
                           min={0}
                           max={1000}
-                          step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
-                          precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                          step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : 0.5}
+                          precision={canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                         />
                       </div>
                       <div className={styles.unitSelectBox}>
@@ -764,8 +765,8 @@ export function NewProjectDialog() {
                             onChange={setMarginTop}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
-                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : 0.5}
+                            precision={canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div>
@@ -775,8 +776,8 @@ export function NewProjectDialog() {
                             onChange={setMarginBottom}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
-                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : 0.5}
+                            precision={canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div title="Outer trim margin protected from paper cutting">
@@ -786,8 +787,8 @@ export function NewProjectDialog() {
                             onChange={setMarginOutside}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
-                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : 0.5}
+                            precision={canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                         <div title="Spine crease margin. Set to 0 for seamless continuous layout across pages 1 and 2">
@@ -797,8 +798,8 @@ export function NewProjectDialog() {
                             onChange={setMarginSpine}
                             min={0}
                             max={1000}
-                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : canvasUnit === 'px' ? 1 : 0.5}
-                            precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                            step={canvasUnit === 'inch' ? 0.05 : canvasUnit === 'cm' ? 0.1 : 0.5}
+                            precision={canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
                           />
                         </div>
                       </div>
@@ -836,8 +837,8 @@ export function NewProjectDialog() {
                         onChange={(val) => setSpacingValue(Math.max(0, Math.min(val, getMaxGapForUnit(spacingUnit))))}
                         min={0}
                         max={getMaxGapForUnit(spacingUnit)}
-                        step={canvasUnit === 'inch' ? 0.025 : canvasUnit === 'cm' ? 0.05 : canvasUnit === 'px' ? 1 : 0.5}
-                        precision={canvasUnit === 'px' ? 0 : canvasUnit === 'inch' || canvasUnit === 'cm' ? 2 : 1}
+                        step={spacingUnit === 'inch' ? 0.025 : spacingUnit === 'cm' ? 0.05 : 0.5}
+                        precision={spacingUnit === 'inch' || spacingUnit === 'cm' ? 2 : 1}
                       />
                     </div>
                     <div className={styles.unitSelectBox}>

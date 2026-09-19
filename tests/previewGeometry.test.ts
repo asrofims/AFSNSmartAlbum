@@ -209,5 +209,42 @@ for (const deviceProjection of previewCases) {
   }
 }
 
+// Test 4-photo spread with 2.5 spine margin (5.0 gap across center spine fold)
+const spineMarginElements = [
+  { id: 's1', x: 0.0, y: 0.0, width: 537.5, height: 1350.0 },
+  { id: 's2', x: 542.5, y: 0.0, width: 535.0, height: 1350.0 }, // ends at 1077.5 (spine margin 2.5)
+  { id: 's3', x: 1082.5, y: 0.0, width: 535.0, height: 1350.0 }, // starts at 1082.5 (spine margin 2.5)
+  { id: 's4', x: 1622.5, y: 0.0, width: 537.5, height: 1350.0 },
+];
+
+const spineMarginAligned = alignPreviewElementBounds({
+  elements: spineMarginElements,
+  projection: calculatePreviewProjection(1080, 1350, 0, 136, 54, 'spread', 0),
+  singlePageW: 1080,
+  singlePageH: 1350,
+  gutterW: 0,
+  spacing: 5.0,
+  viewMode: 'spread',
+  includeBleed: false,
+  pixelRatio: 1,
+});
+
+const sById = new Map(spineMarginAligned.map((a) => [a.element.id, a]));
+const s1 = sById.get('s1')!;
+const s2 = sById.get('s2')!;
+const s3 = sById.get('s3')!;
+const s4 = sById.get('s4')!;
+
+const gapS1_S2 = s2.renderX - (s1.renderX + s1.renderW);
+const gapS2_S3 = s3.renderX - (s2.renderX + s2.renderW);
+const gapS3_S4 = s4.renderX - (s3.renderX + s3.renderW);
+
+assert.ok(gapS1_S2 >= 1, `Gap between s1 and s2 must be >= 1px, got ${gapS1_S2}`);
+assert.ok(gapS2_S3 >= 1, `Center spine gap between s2 and s3 must be visible (>= 1px), got ${gapS2_S3}`);
+assert.ok(gapS3_S4 >= 1, `Gap between s3 and s4 must be >= 1px, got ${gapS3_S4}`);
+assert.equal(gapS2_S3, gapS1_S2, 'Center spine gap (2.5+2.5=5) must match inter-frame gap!');
+assert.equal(gapS3_S4, gapS1_S2, 'All three gaps must be identical in preview!');
+
 console.log('✓ Preview spread, export preview, safe bounds, gap, and spine projection passed.');
+
 

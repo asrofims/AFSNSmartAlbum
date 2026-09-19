@@ -64,6 +64,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
     >
       {/* Spread Page Background */}
       {leftPageBg === rightPageBg ? (
+
         <div
           style={{
             position: 'absolute',
@@ -96,21 +97,19 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         </>
       )}
 
-      {/* Center Spine Line (Subtle background divider on empty spread canvas or with gutter) */}
-      {(dims.gutterWidth > 0 || (spread.elements || []).length === 0) && (
-        <div
-          style={{
-            position: 'absolute',
-            left: `${spineX}px`,
-            top: 0,
-            bottom: 0,
-            width: '1px',
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            zIndex: 0,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {/* Center Spine Line (Subtle background divider on spread crease fold) */}
+      <div
+        style={{
+          position: 'absolute',
+          left: `${spineX}px`,
+          top: 0,
+          bottom: 0,
+          width: '1px',
+          backgroundColor: 'rgba(255, 255, 255, 0.18)',
+          zIndex: 0,
+          pointerEvents: 'none',
+        }}
+      />
 
       {/* Real-time Rendered Photo & Text Elements */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>

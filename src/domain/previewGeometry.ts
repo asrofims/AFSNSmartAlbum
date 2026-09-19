@@ -230,12 +230,25 @@ export function alignPreviewElementBounds<
       }
     }
 
-    if (bestA && spacing > 0) {
+    if (bestA) {
       const physGapX = b.origX - (bestA.origX + bestA.origW);
-      if (Math.abs(physGapX - spacing) <= 0.5) {
+      const isTargetGap = spacing > 0 && Math.abs(physGapX - spacing) <= Math.max(1.0, spacing * 0.15);
+      if (isTargetGap) {
         const touchesRightOrSpine = (viewMode === 'spread' && Math.abs(b.origX + b.origW - singlePageW) <= tol)
           || (b.origX + b.origW - viewOffsetX) >= (viewContentWidth - tol);
         const newLeft = bestA.right + targetGapDevicePx;
+        if (touchesRightOrSpine) {
+          b.left = newLeft;
+        } else {
+          const w = b.right - b.left;
+          b.left = newLeft;
+          b.right = b.left + w;
+        }
+      } else if (physGapX > 0.5 && b.left <= bestA.right) {
+        // Physical gap invariant: non-zero layout gap must never collapse to 0 or overlap in preview
+        const touchesRightOrSpine = (viewMode === 'spread' && Math.abs(b.origX + b.origW - singlePageW) <= tol)
+          || (b.origX + b.origW - viewOffsetX) >= (viewContentWidth - tol);
+        const newLeft = bestA.right + 1;
         if (touchesRightOrSpine) {
           b.left = newLeft;
         } else {
@@ -267,11 +280,24 @@ export function alignPreviewElementBounds<
       }
     }
 
-    if (bestC && spacing > 0) {
+    if (bestC) {
       const physGapY = b.origY - (bestC.origY + bestC.origH);
-      if (Math.abs(physGapY - spacing) <= 0.5) {
-        const touchesBottom = (b.origY + b.origH) >= (baseSpreadH - tol);
+      const isTargetGap = spacing > 0 && Math.abs(physGapY - spacing) <= Math.max(1.0, spacing * 0.15);
+      if (isTargetGap) {
+        const touchesBottom = (viewMode === 'spread' && (b.origY + b.origH) >= (baseSpreadH - tol))
+          || (b.origY + b.origH) >= (baseSpreadH - tol);
         const newTop = bestC.bottom + targetGapDevicePx;
+        if (touchesBottom) {
+          b.top = newTop;
+        } else {
+          const h = b.bottom - b.top;
+          b.top = newTop;
+          b.bottom = b.top + h;
+        }
+      } else if (physGapY > 0.5 && b.top <= bestC.bottom) {
+        // Physical gap invariant: non-zero layout gap must never collapse to 0 or overlap in preview
+        const touchesBottom = (b.origY + b.origH) >= (baseSpreadH - tol);
+        const newTop = bestC.bottom + 1;
         if (touchesBottom) {
           b.top = newTop;
         } else {
