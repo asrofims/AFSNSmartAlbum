@@ -9,7 +9,7 @@ import { getAllAlbumSpreads, mergeFramePhotoAsset, Spread, getSpreadPageLabel, g
 import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
-import { calculatePreviewProjection, projectPreviewRect } from '../../domain/previewGeometry';
+import { calculatePreviewProjection, alignPreviewElementBounds } from '../../domain/previewGeometry';
 import { Project } from '../../domain/project';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ContextMenu, ContextMenuItem } from '../../components/ui';
@@ -109,38 +109,17 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
 
       {/* Real-time Rendered Photo & Text Elements */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-        {(spread.elements || []).map((el) => {
-          const { x, y, width: w, height: h } = projectPreviewRect(el, projection);
+        {alignPreviewElementBounds({
+          elements: spread.elements || [],
+          projection,
+          singlePageW: dims.pageWidth,
+          singlePageH: dims.pageHeight,
+          gutterW: dims.gutterWidth,
+          spacing: dims.spacing,
+          viewMode: 'spread',
+          includeBleed: false,
+        }).map(({ element: el, renderX: finalX, renderY: finalY, renderW: finalW, renderH: finalH }) => {
           const rot = el.rotation || 0;
-
-          let finalX = x;
-          let finalY = y;
-          let finalW = w;
-          let finalH = h;
-
-          if (!rot) {
-            const tol = 0.15;
-            const singlePageW = dims.pageWidth;
-            const gutterW = dims.gutterWidth;
-            const spinePx = projection.spineX;
-            const rightPageStartPx = projection.rightPageX;
-            const rightPageStartX = singlePageW + gutterW;
-            const photoEl = el as PhotoFrameElement;
-            const isPhotoBorder = el.type === 'photo' && Boolean(photoEl.borderEnabled && (photoEl.borderWidth || 0) > 0);
-
-            // Frame on left page touching spine
-            if (Math.abs(el.x + el.width - singlePageW) <= tol || Math.abs(finalX + finalW - spinePx) <= 1.5) {
-              const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
-              finalW = Math.max(finalW, spinePx - finalX + overlap);
-            }
-
-            // Frame on right page touching spine
-            if (Math.abs(el.x - rightPageStartX) <= tol || Math.abs(finalX - rightPageStartPx) <= 1.5) {
-              const shift = finalX - rightPageStartPx;
-              finalX = rightPageStartPx;
-              finalW += shift;
-            }
-          }
 
           if (el.type === 'text') {
             const textEl = el as TextNodeElement;

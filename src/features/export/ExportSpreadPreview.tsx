@@ -6,7 +6,7 @@ import { Project } from '../../domain/project';
 import { PhotoFrameElement, calculateImageOffset, getCornerRadii, getPhotoAspect } from '../../domain/editor';
 import { TextNodeElement } from '../../domain/text';
 import { getProjectDimensionsInCanvasUnit } from '../../domain/templates';
-import { calculatePreviewProjection, projectPreviewRect } from '../../domain/previewGeometry';
+import { calculatePreviewProjection, projectPreviewRect, alignPreviewElementBounds } from '../../domain/previewGeometry';
 import { calculateExportPixels } from '../../domain/units';
 import { usePhotoStore } from '../../stores/photoStore';
 import styles from './ExportSpreadPreview.module.css';
@@ -79,7 +79,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
   const projection = calculatePreviewProjection(singlePageW, singlePageH, gutterW,
     boxW, boxH, viewMode, bleed);
   const { scale, width: containerW, height: containerH, bleedPx, bleedLeftPx, bleedRightPx,
-    spineX: spinePx, viewOffsetX } = projection;
+    spineX: spinePx } = projection;
   const safeAreaWidth = Math.max(0, singlePageW - dims.safeMarginOutside - dims.safeMarginSpine);
   const safeAreaHeight = Math.max(0, singlePageH - dims.safeMarginTop - dims.safeMarginBottom);
   const leftSafeArea = projectPreviewRect({
@@ -111,6 +111,20 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
       return true;
     });
   }, [spread.elements, viewMode, singlePageW, gutterW]);
+
+  // Normalize frame bounds across 2D Topological Neighbor Graph to enforce uniform pixel gap thickness
+  const alignedElements = useMemo(() => {
+    return alignPreviewElementBounds({
+      elements: visibleElements,
+      projection,
+      singlePageW,
+      singlePageH,
+      gutterW,
+      spacing: dims.spacing,
+      viewMode,
+      includeBleed,
+    });
+  }, [visibleElements, projection, singlePageW, singlePageH, gutterW, dims.spacing, viewMode, includeBleed]);
 
   const photoCount = visibleElements.filter((e) => e.type === 'photo').length;
   const textCount = visibleElements.filter((e) => e.type === 'text').length;
@@ -311,83 +325,8 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
 
           {/* Scaled Rendered Elements */}
           <div className={styles.artworkLayer}>
-            {visibleElements.map((el, idx) => {
-              // Coordinate transformation relative to view container
-              const { x: renderX, y: renderY, width: renderW, height: renderH } =
-                projectPreviewRect(el, projection);
+            {alignedElements.map(({ element: el, renderX: finalRenderX, renderY: finalRenderY, renderW: finalRenderW, renderH: finalRenderH }, idx) => {
               const rot = el.rotation || 0;
-
-              // Strict 1:1 physical positioning matching real canvas
-              let finalRenderX = renderX;
-              let finalRenderY = renderY;
-              let finalRenderW = renderW;
-              let finalRenderH = renderH;
-
-              if (!rot) {
-                // Viewport boundaries in canvas physical coordinates
-                const viewLeft = viewOffsetX;
-                const viewContentWidth = viewMode === 'spread' ? baseSpreadW : singlePageW;
-
-                // Thresholds: snap if frame physically touches or is within 0.15 canvas units or 1.5 screen px
-                const tol = 0.15;
-                const touchesLeft = (el.x - viewLeft) <= tol || finalRenderX <= 1.5;
-                const touchesTop = el.y <= tol || finalRenderY <= 1.5;
-                const touchesRight = (el.x + el.width - viewOffsetX) >= (viewContentWidth - tol)
-                  || (finalRenderX + finalRenderW >= containerW - 1.5);
-                const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol)
-                  || (finalRenderY + finalRenderH >= containerH - 1.5);
-
-                if (touchesLeft) {
-                  finalRenderX = 0;
-                  if (includeBleed && bleedLeftPx > 0 && viewMode !== 'right-page' && el.x <= tol) {
-                    finalRenderW += bleedLeftPx;
-                  }
-                }
-
-                if (touchesTop) {
-                  finalRenderY = 0;
-                  if (includeBleed && bleedPx > 0 && el.y <= tol) {
-                    finalRenderH += bleedPx;
-                  }
-                }
-
-                if (touchesRight) {
-                  // Ensure frame extends to the right boundary with +1px overlap for overflow:hidden clipping
-                  finalRenderW = Math.max(finalRenderW, containerW - finalRenderX + 1);
-                }
-
-                if (touchesBottom) {
-                  // Ensure frame extends to the bottom boundary with +1px overlap for overflow:hidden clipping
-                  finalRenderH = Math.max(finalRenderH, containerH - finalRenderY + 1);
-                }
-
-                // In full spread view, seamlessly join photo frames meeting at the center spine fold
-                if (viewMode === 'spread') {
-                  const rightPageStartX = singlePageW + gutterW;
-                  const rightPageStartPx = projection.rightPageX;
-                  const isPhotoBorder = el.type === 'photo' && Boolean((el as PhotoFrameElement).borderEnabled && ((el as PhotoFrameElement).borderWidth || 0) > 0);
-
-                  // 1. Frame on Left Page touching the center spine fold
-                  const touchesSpineFromLeft = Math.abs(el.x + el.width - singlePageW) <= tol
-                    || Math.abs(finalRenderX + finalRenderW - spinePx) <= 1.5;
-
-                  if (touchesSpineFromLeft) {
-                    // Snap right edge flush to spine, with 1px overlap across zero-gutter fold if no border
-                    const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
-                    finalRenderW = Math.max(finalRenderW, spinePx - finalRenderX + overlap);
-                  }
-
-                  // 2. Frame on Right Page touching the center spine fold
-                  const touchesSpineFromRight = Math.abs(el.x - rightPageStartX) <= tol
-                    || Math.abs(finalRenderX - rightPageStartPx) <= 1.5;
-
-                  if (touchesSpineFromRight) {
-                    const shift = finalRenderX - rightPageStartPx;
-                    finalRenderX = rightPageStartPx;
-                    finalRenderW += shift;
-                  }
-                }
-              }
 
               if (el.type === 'text') {
                 const textEl = el as TextNodeElement;
@@ -396,10 +335,10 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                     key={textEl.id}
                     style={{
                       position: 'absolute',
-                      left: `${renderX}px`,
-                      top: `${renderY}px`,
-                      width: `${renderW}px`,
-                      height: `${renderH}px`,
+                      left: `${finalRenderX}px`,
+                      top: `${finalRenderY}px`,
+                      width: `${finalRenderW}px`,
+                      height: `${finalRenderH}px`,
                       transform: rot ? `rotate(${rot}deg)` : undefined,
                       transformOrigin: '0 0',
                       overflow: 'hidden',
@@ -408,7 +347,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                       zIndex: textEl.zIndex ?? (idx + 1),
                     }}
                   >
-                    <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={renderW} height={renderH} />
+                    <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={finalRenderW} height={finalRenderH} />
                 </div>
               );
             }

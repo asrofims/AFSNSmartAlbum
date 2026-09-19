@@ -681,3 +681,12 @@
 - [x] Verify the center crease and object spacing visually in the running Tauri editor, spread navigator, and export preview.
 - [x] Make Left/Right Page export previews retain bleed only at the outside edge, matching native split slicing, and cover subpixel raster seams at the Left Page cut edge without changing intentional frame borders.
 - [x] Application version metadata bumped to `v1.0.68`.
+
+### Phase 61 — Release v1.0.69: 2D Topological Uniform Gap & Layflat Seam Consistency
+
+- [x] Implement 2D topological spatial neighbor graph in preview geometry (`alignPreviewElementBounds`) to eliminate subpixel rounding asymmetry.
+- [x] Guarantee exact, identical integer pixel gap thickness in both horizontal and vertical directions across rows and columns.
+- [x] Eliminate center spine white divider gap artifacts in export preview and spread navigator.
+- [x] Unify photo thumbnail and export preview alignment engines with zero raster aliasing.
+- [x] Application version metadata bumped to `v1.0.69`.
+

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculatePreviewProjection, projectPreviewRect } from '../src/domain/previewGeometry';
+import { calculatePreviewProjection, projectPreviewRect, alignPreviewElementBounds } from '../src/domain/previewGeometry';
 import { getProjectDimensionsInCanvasUnit } from '../src/domain/templates';
 import type { Project } from '../src/domain/project';
 import type { Spread } from '../src/domain/album';
@@ -46,4 +46,50 @@ const rightSafeArea = projectPreviewRect({ x: 208, y: 10, width: 180, height: 18
 close(rightSafeArea.x, 8 * rightPage.scale);
 close(rightPage.width - rightPage.bleedPx - (rightSafeArea.x + rightSafeArea.width), 12 * rightPage.scale);
 
+// Test alignPreviewElementBounds for 2D topological gap uniformity across rows and columns
+const testProjection = calculatePreviewProjection(1080, 1350, 0, 550, 330, 'spread', 0);
+const gridElements = [
+  { id: 'f1', x: 0.0, y: 0.0, width: 537.5, height: 672.5 },
+  { id: 'f2', x: 542.5, y: 0.0, width: 537.5, height: 672.5 },
+  { id: 'f3', x: 0.0, y: 677.5, width: 537.5, height: 672.5 },
+  { id: 'f4', x: 542.5, y: 677.5, width: 537.5, height: 672.5 },
+  { id: 'f5', x: 1080.0, y: 0.0, width: 1080.0, height: 672.5 },
+  { id: 'f6', x: 1080.0, y: 677.5, width: 1080.0, height: 672.5 },
+];
+
+const aligned = alignPreviewElementBounds({
+  elements: gridElements,
+  projection: testProjection,
+  singlePageW: 1080,
+  singlePageH: 1350,
+  gutterW: 0,
+  spacing: 5.0,
+  viewMode: 'spread',
+  includeBleed: false,
+});
+
+const byId = new Map(aligned.map((a) => [a.element.id, a]));
+const f1 = byId.get('f1')!;
+const f2 = byId.get('f2')!;
+const f3 = byId.get('f3')!;
+const f4 = byId.get('f4')!;
+const f5 = byId.get('f5')!;
+
+const gapXTop = f2.renderX - (f1.renderX + f1.renderW);
+const gapXBot = f4.renderX - (f3.renderX + f3.renderW);
+const gapYLeft = f3.renderY - (f1.renderY + f1.renderH);
+const gapYRight = f4.renderY - (f2.renderY + f2.renderH);
+
+// Must have 100% equal pixel width in both horizontal and vertical directions
+const targetGapPx = Math.max(1, Math.round(5.0 * testProjection.scale));
+assert.ok(Math.abs(gapXTop - targetGapPx) < 1e-6, `gapXTop ${gapXTop} should match targetGapPx ${targetGapPx}`);
+assert.ok(Math.abs(gapXBot - targetGapPx) < 1e-6, `gapXBot ${gapXBot} should match targetGapPx ${targetGapPx}`);
+assert.ok(Math.abs(gapYLeft - targetGapPx) < 1e-6, `gapYLeft ${gapYLeft} should match targetGapPx ${targetGapPx}`);
+assert.ok(Math.abs(gapYRight - targetGapPx) < 1e-6, `gapYRight ${gapYRight} should match targetGapPx ${targetGapPx}`);
+assert.equal(gapXTop, gapYLeft, 'Horizontal and vertical gaps must be identical!');
+
+// Spine fold must seamlessly meet with 1px overlap (no white divider gap)
+assert.ok((f2.renderX + f2.renderW) >= f5.renderX, 'Spine seam must be completely closed');
+
 console.log('✓ Preview spread, export preview, safe bounds, gap, and spine projection passed.');
+
