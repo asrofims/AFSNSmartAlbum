@@ -50,6 +50,8 @@ export function WorkspaceLayout() {
   const openSettings = useAppStore((s) => s.openSettings);
   const openUpdateModal = useAppStore((s) => s.openUpdateModal);
   const updateAvailableVersion = useAppStore((s) => s.updateAvailableVersion);
+  const updateStatus = useAppStore((s) => s.updateStatus);
+  const updateProgress = useAppStore((s) => s.updateProgress);
 
   const currentProject = useProjectStore((s) => s.currentProject);
   const openNewProject = useProjectStore((s) => s.openNewProject);
@@ -969,7 +971,31 @@ export function WorkspaceLayout() {
             </>
           )}
 
-          {updateAvailableVersion && (
+          {updateStatus === 'downloading' ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={openUpdateModal}
+              title="Update is downloading in background. Click to view progress."
+              className={`${styles.updateBtn} ${styles.updateBtnDownloading}`}
+            >
+              <span className={styles.spinnerMini}>⏳</span>
+              <span className={styles.toolbarBtnText}>
+                {updateProgress.percent > 0 ? `Downloading ${updateProgress.percent}%` : 'Downloading...'}
+              </span>
+            </Button>
+          ) : updateStatus === 'ready' ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={openUpdateModal}
+              title="Update is ready to install. Click to restart."
+              className={`${styles.updateBtn} ${styles.updateBtnReady}`}
+            >
+              <span style={{ fontSize: '12px' }}>🎉</span>
+              <span className={styles.toolbarBtnText}>Restart to Update</span>
+            </Button>
+          ) : updateAvailableVersion ? (
             <Button
               variant="primary"
               size="sm"
@@ -981,7 +1007,7 @@ export function WorkspaceLayout() {
               <span className={styles.toolbarBtnText}>Update</span>
               <span className={styles.updateVersionBadge}>({updateAvailableVersion})</span>
             </Button>
-          )}
+          ) : null}
         </div>
       </header>
 

@@ -6,6 +6,21 @@ interface AppInfo {
   platform: string;
 }
 
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'uptodate'
+  | 'error';
+
+export interface UpdateProgress {
+  downloadedBytes: number;
+  totalBytes: number;
+  percent: number;
+}
+
 interface AppState {
   // App info
   appInfo: AppInfo;
@@ -18,6 +33,13 @@ interface AppState {
   isUpdateModalOpen: boolean;
   updateAvailableVersion: string | null;
   settingsActiveTab: string;
+
+  // Background update state
+  updateStatus: UpdateStatus;
+  updateProgress: UpdateProgress;
+  updateCheckResult: any;
+  updateError: string | null;
+  isBackgroundNoticeDismissed: boolean;
   
   // Actions
   setAppInfo: (info: AppInfo) => void;
@@ -34,6 +56,13 @@ interface AppState {
   isExitWarningOpen: boolean;
   openExitWarning: () => void;
   closeExitWarning: () => void;
+
+  setUpdateStatus: (status: UpdateStatus) => void;
+  setUpdateProgress: (downloadedBytes: number, totalBytes: number) => void;
+  setUpdateCheckResult: (res: any) => void;
+  setUpdateError: (err: string | null) => void;
+  dismissBackgroundNotice: () => void;
+  resetBackgroundNotice: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -49,6 +78,16 @@ export const useAppStore = create<AppState>((set) => ({
   isUpdateModalOpen: false,
   updateAvailableVersion: null,
   settingsActiveTab: 'general',
+
+  updateStatus: 'idle',
+  updateProgress: {
+    downloadedBytes: 0,
+    totalBytes: 0,
+    percent: 0,
+  },
+  updateCheckResult: null,
+  updateError: null,
+  isBackgroundNoticeDismissed: false,
   
   setAppInfo: (info) => set({ appInfo: info, isAppInfoLoaded: true }),
   openAbout: () => set({ isAboutOpen: true }),
@@ -64,4 +103,17 @@ export const useAppStore = create<AppState>((set) => ({
   isExitWarningOpen: false,
   openExitWarning: () => set({ isExitWarningOpen: true }),
   closeExitWarning: () => set({ isExitWarningOpen: false }),
+
+  setUpdateStatus: (status) => set({ updateStatus: status }),
+  setUpdateProgress: (downloadedBytes, totalBytes) => {
+    const percent =
+      totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+    set({
+      updateProgress: { downloadedBytes, totalBytes, percent },
+    });
+  },
+  setUpdateCheckResult: (res) => set({ updateCheckResult: res }),
+  setUpdateError: (err) => set({ updateError: err }),
+  dismissBackgroundNotice: () => set({ isBackgroundNoticeDismissed: true }),
+  resetBackgroundNotice: () => set({ isBackgroundNoticeDismissed: false }),
 }));

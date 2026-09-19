@@ -1,0 +1,244 @@
+﻿.card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  background: #181b22;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9998;
+  animation: slideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #e6edf3;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cardSuccess {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+.cardError {
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.iconBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.iconBadgeSuccess {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.iconBadgeError {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.pulseIcon {
+  display: inline-block;
+  animation: pulseDownload 1.6s infinite ease-in-out;
+}
+
+@keyframes pulseDownload {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+.titleArea {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0f6fc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.closeBtn:hover {
+  color: #f0f6fc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #0284c7);
+  border-radius: 3px;
+  transition: width 0.2s ease-out;
+}
+
+.progressBarSuccess {
+  background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.progressIndeterminate {
+  position: absolute;
+  width: 40%;
+  animation: indeterminateBar 1.6s infinite ease-in-out;
+}
+
+@keyframes indeterminateBar {
+  0% { left: -40%; width: 40%; }
+  50% { left: 40%; width: 60%; }
+  100% { left: 100%; width: 40%; }
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.percentText {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #38bdf8;
+}
+
+.percentTextSuccess {
+  color: #34d399;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.btnActionSecondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c9d1d9;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnActionSecondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.btnActionPrimary {
+  background: #0284c7;
+  border: 1px solid #38bdf8;
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnActionPrimary:hover {
+  background: #0369a1;
+}
+
+.btnActionSuccess {
+  background: #059669;
+  border: 1px solid #34d399;
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnActionSuccess:hover {
+  background: #047857;
+}

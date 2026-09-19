@@ -6,6 +6,7 @@ import { SettingsDialog } from './features/settings/SettingsDialog';
 import { NewProjectDialog } from './features/project/NewProjectDialog';
 import { SupportDonationModal } from './features/support/SupportDonationModal';
 import { UpdateModal } from './features/updates/UpdateModal';
+import { BackgroundUpdateIndicator } from './features/updates/BackgroundUpdateIndicator';
 import { ExitWarningModal } from './features/workspace/ExitWarningModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './stores/projectStore';
@@ -82,11 +83,13 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
-        const { appInfo, setUpdateAvailableVersion } = useAppStore.getState();
+        const { appInfo, setUpdateAvailableVersion, setUpdateCheckResult, setUpdateStatus } = useAppStore.getState();
         const res = await checkForAppUpdates(appInfo.version);
         if (res && res.hasUpdate && res.latestVersion) {
           console.log('[Updater] Background check detected new version:', res.latestVersion);
           setUpdateAvailableVersion(res.latestVersion);
+          setUpdateCheckResult(res);
+          setUpdateStatus('available');
         }
       } catch (err) {
         // Silently swallow errors during background check so offline/network issues never interrupt app
@@ -170,6 +173,7 @@ export default function App() {
       <NewProjectDialog />
       <SupportDonationModal />
       <UpdateModal />
+      <BackgroundUpdateIndicator />
       <ExitWarningModal />
       <ConfirmDialog isOpen={pendingOpenPath !== null} title="Unsaved Changes"
         message="Save your changes before opening another project?" variant="warning"

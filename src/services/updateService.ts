@@ -8,6 +8,7 @@
 import { isTauri } from '../utils/platform';
 import { invoke } from '@tauri-apps/api/core';
 import type { Update } from '@tauri-apps/plugin-updater';
+import { useAppStore } from '../stores/appStore';
 
 export interface GitHubReleaseAsset {
   name: string;
@@ -281,6 +282,70 @@ export async function downloadAndInstallAutoUpdate(
 }
 
 /**
+ * Formats raw bytes into readable MB display string.
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 MB';
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(1)} MB`;
+}
+
+/** Testing helper to inject mock Tauri update instance */
+export function setMockTauriUpdate(mock: Update | null) {
+  cachedTauriUpdate = mock;
+}
+
+let activeDownloadPromise: Promise<void> | null = null;
+
+export function isAutoUpdateDownloading(): boolean {
+  return Boolean(activeDownloadPromise);
+}
+
+/**
+ * Downloads and installs the pending auto-update in the background.
+ * Keeps running even if the update modal is closed or unmounted.
+ * Streams real-time progress into useAppStore.
+ */
+export function startUpdateDownload(): Promise<void> {
+  if (activeDownloadPromise) {
+    return activeDownloadPromise;
+  }
+
+  const store = useAppStore.getState();
+  store.setUpdateStatus('downloading');
+  store.setUpdateProgress(0, 0);
+  store.setUpdateError(null);
+  store.resetBackgroundNotice();
+
+  activeDownloadPromise = (async () => {
+    try {
+      await downloadAndInstallAutoUpdate((downloaded, total) => {
+        useAppStore.getState().setUpdateProgress(downloaded, total);
+      });
+      const finalState = useAppStore.getState();
+      finalState.setUpdateStatus('ready');
+      const total = finalState.updateProgress.totalBytes || 1;
+      finalState.setUpdateProgress(total, total);
+      finalState.resetBackgroundNotice();
+    } catch (err: any) {
+      console.error('[Updater] Background download failed:', err);
+      const errMessage =
+        err?.message ||
+        'Failed to download or verify the update signature. You can download the installer manually.';
+      const errorState = useAppStore.getState();
+      errorState.setUpdateStatus('error');
+      errorState.setUpdateError(errMessage);
+      errorState.resetBackgroundNotice();
+      throw err;
+    } finally {
+      activeDownloadPromise = null;
+    }
+  })();
+
+  return activeDownloadPromise;
+}
+
+/**
  * Gracefully restarts the application to finish applying the newly installed update.
  */
 export async function restartApp(): Promise<void> {
@@ -295,3 +360,4 @@ export async function restartApp(): Promise<void> {
     window.location.reload();
   }
 }
+

@@ -1,56 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   checkForAppUpdates,
-  downloadAndInstallAutoUpdate,
+  formatBytes,
   formatStandardDate,
   restartApp,
-  UpdateCheckResult,
+  startUpdateDownload,
 } from '../../services/updateService';
 import { useAppStore } from '../../stores/appStore';
 import { isTauri } from '../../utils/platform';
 import styles from './UpdateModal.module.css';
 
-type UpdateStatus = 'checking' | 'available' | 'downloading' | 'ready' | 'uptodate' | 'error';
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 MB';
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)} MB`;
-}
-
 export function UpdateModal() {
-  const { isUpdateModalOpen: isOpen, closeUpdateModal, appInfo, setUpdateAvailableVersion } = useAppStore();
-  const [status, setStatus] = useState<UpdateStatus>('checking');
-  const [result, setResult] = useState<UpdateCheckResult | null>(null);
-  const [downloadedBytes, setDownloadedBytes] = useState(0);
-  const [totalBytes, setTotalBytes] = useState(0);
-  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const {
+    isUpdateModalOpen: isOpen,
+    closeUpdateModal,
+    appInfo,
+    setUpdateAvailableVersion,
+    updateStatus,
+    setUpdateStatus,
+    updateProgress,
+    updateCheckResult,
+    setUpdateCheckResult,
+    updateError,
+    setUpdateError,
+    resetBackgroundNotice,
+  } = useAppStore();
 
   const runCheck = async () => {
-    setStatus('checking');
-    setErrorDetails(null);
+    setUpdateStatus('checking');
+    setUpdateError(null);
     try {
       const res = await checkForAppUpdates(appInfo.version);
-      setResult(res);
+      setUpdateCheckResult(res);
       if (res.isError) {
-        setStatus('error');
-        setErrorDetails(res.errorMessage || 'Unable to contact update server.');
+        setUpdateStatus('error');
+        setUpdateError(res.errorMessage || 'Unable to contact update server.');
       } else if (res.hasUpdate) {
-        setStatus('available');
+        setUpdateStatus('available');
         setUpdateAvailableVersion(res.latestVersion);
       } else {
-        setStatus('uptodate');
+        setUpdateStatus('uptodate');
         setUpdateAvailableVersion(null);
       }
     } catch (err: any) {
-      setStatus('error');
-      setErrorDetails(err?.message || 'Unexpected error while checking for updates.');
+      setUpdateStatus('error');
+      setUpdateError(err?.message || 'Unexpected error while checking for updates.');
     }
   };
 
   useEffect(() => {
     if (isOpen) {
-      runCheck();
+      if (updateStatus === 'idle' || !updateCheckResult) {
+        runCheck();
+      }
     }
   }, [isOpen]);
 
@@ -66,27 +68,16 @@ export function UpdateModal() {
   };
 
   const handleStartAutoUpdate = async () => {
-    setStatus('downloading');
-    setDownloadedBytes(0);
-    setTotalBytes(0);
-    setErrorDetails(null);
-
     try {
-      await downloadAndInstallAutoUpdate((downloaded, total) => {
-        setDownloadedBytes(downloaded);
-        if (total > 0) {
-          setTotalBytes(total);
-        }
-      });
-      setStatus('ready');
+      await startUpdateDownload();
     } catch (err: any) {
       console.error('[Updater] Download & install failed:', err);
-      setStatus('error');
-      setErrorDetails(
-        err?.message ||
-          'Failed to download or verify the update signature. You can download the installer manually.'
-      );
     }
+  };
+
+  const handleBackgroundClickOrClose = () => {
+    resetBackgroundNotice();
+    closeUpdateModal();
   };
 
   const handleRestart = async () => {
@@ -97,11 +88,13 @@ export function UpdateModal() {
     }
   };
 
-  const percent =
-    totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+  const status = updateStatus === 'idle' ? 'checking' : updateStatus;
+  const result = updateCheckResult;
+  const errorDetails = updateError;
+  const { downloadedBytes, totalBytes, percent } = updateProgress;
 
   return (
-    <div className={styles.overlay} onClick={status === 'downloading' ? undefined : closeUpdateModal}>
+    <div className={styles.overlay} onClick={handleBackgroundClickOrClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className={styles.header}>
@@ -147,16 +140,14 @@ export function UpdateModal() {
               </p>
             </div>
           </div>
-          {status !== 'downloading' && (
-            <button
-              type="button"
-              className={styles.closeBtn}
-              onClick={closeUpdateModal}
-              title="Close"
-            >
-              ✕
-            </button>
-          )}
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={handleBackgroundClickOrClose}
+            title={status === 'downloading' ? 'Continue download in background' : 'Close'}
+          >
+            ✕
+          </button>
         </div>
 
         {/* Body */}
@@ -288,7 +279,7 @@ export function UpdateModal() {
               <button
                 type="button"
                 className={styles.btnSecondary}
-                onClick={closeUpdateModal}
+                onClick={handleBackgroundClickOrClose}
                 title="Continue download in background"
               >
                 Download in Background
