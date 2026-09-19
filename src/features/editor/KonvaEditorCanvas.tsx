@@ -3381,64 +3381,50 @@ export function KonvaEditorCanvas({ zoomLevel, fitTrigger, activeTool, onZoomCha
                     {/* Left & Right Gutter Crease Lines */}
                     <Line
                       points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-                      stroke="rgba(248, 250, 252, 0.95)"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                      shadowColor="rgba(15, 23, 42, 0.95)"
-                      shadowBlur={3}
+                      stroke="rgba(148, 163, 184, 0.75)"
+                      strokeWidth={1}
+                      dash={[5, 4]}
                     />
                     <Line
                       points={[leftPagePixelW + gutterPixelW, 0, leftPagePixelW + gutterPixelW, screenSpreadH]}
-                      stroke="rgba(248, 250, 252, 0.95)"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                      shadowColor="rgba(15, 23, 42, 0.95)"
-                      shadowBlur={3}
+                      stroke="rgba(148, 163, 184, 0.75)"
+                      strokeWidth={1}
+                      dash={[5, 4]}
                     />
                   </>
                 ) : (
-                  <>
-                    {/* Subtle Shadow on Left of Crease */}
-                    <Line
-                      points={[leftPagePixelW - 1, 0, leftPagePixelW - 1, screenSpreadH]}
-                      stroke="rgba(0, 0, 0, 0.15)"
-                      strokeWidth={2}
-                    />
-                    {/* Distinct Center Crease Dashed Line */}
-                    <Line
-                      points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
-                      stroke="rgba(248, 250, 252, 0.95)"
-                      strokeWidth={1.5}
-                      dash={[6, 3]}
-                      shadowColor="rgba(15, 23, 42, 0.95)"
-                      shadowBlur={3}
-                    />
-                  </>
+                  /* Clean Center Crease Dashed Guide */
+                  <Line
+                    points={[leftPagePixelW, 0, leftPagePixelW, screenSpreadH]}
+                    stroke="rgba(148, 163, 184, 0.75)"
+                    strokeWidth={1}
+                    dash={[5, 4]}
+                  />
                 )}
 
                 {/* Top Notch Marker */}
                 <Line
                   points={[
-                    leftPagePixelW + gutterPixelW / 2 - 6, 0,
-                    leftPagePixelW + gutterPixelW / 2 + 6, 0,
-                    leftPagePixelW + gutterPixelW / 2, 8,
+                    leftPagePixelW + gutterPixelW / 2 - 5, 0,
+                    leftPagePixelW + gutterPixelW / 2 + 5, 0,
+                    leftPagePixelW + gutterPixelW / 2, 6,
                   ]}
                   closed
                   fill="#f8fafc"
-                  stroke="#0f172a"
+                  stroke="#475569"
                   strokeWidth={1}
                 />
 
                 {/* Bottom Notch Marker */}
                 <Line
                   points={[
-                    leftPagePixelW + gutterPixelW / 2 - 6, screenSpreadH,
-                    leftPagePixelW + gutterPixelW / 2 + 6, screenSpreadH,
-                    leftPagePixelW + gutterPixelW / 2, screenSpreadH - 8,
+                    leftPagePixelW + gutterPixelW / 2 - 5, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2 + 5, screenSpreadH,
+                    leftPagePixelW + gutterPixelW / 2, screenSpreadH - 6,
                   ]}
                   closed
                   fill="#f8fafc"
-                  stroke="#0f172a"
+                  stroke="#475569"
                   strokeWidth={1}
                 />
               </Group>

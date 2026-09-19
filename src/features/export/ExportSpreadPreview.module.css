@@ -95,15 +95,6 @@
   pointer-events: none;
 }
 
-.spineLine {
-  position: absolute;
-  width: 1px;
-  background: #fff;
-  mix-blend-mode: difference;
-  z-index: 3;
-  pointer-events: none;
-}
-
 .splitCutLine {
   position: absolute;
   width: 0;

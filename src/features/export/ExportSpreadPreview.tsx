@@ -193,28 +193,41 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
 
           {/* Page Background Fill */}
           {viewMode === 'spread' && (
-            <>
+            gutterW === 0 && leftPageBg === rightPageBg ? (
               <div
                 style={{
                   position: 'absolute',
                   left: `${bleedLeftPx}px`,
                   top: `${bleedPx}px`,
-                  width: `${singlePageW * scale}px`,
+                  width: `${(singlePageW * 2) * scale}px`,
                   height: `${singlePageH * scale}px`,
                   backgroundColor: leftPageBg,
                 }}
               />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: `${projection.rightPageX}px`,
-                  top: `${bleedPx}px`,
-                  width: `${singlePageW * scale}px`,
-                  height: `${singlePageH * scale}px`,
-                  backgroundColor: rightPageBg,
-                }}
-              />
-            </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${bleedLeftPx}px`,
+                    top: `${bleedPx}px`,
+                    width: `${singlePageW * scale + (gutterW === 0 ? 0.5 : 0)}px`,
+                    height: `${singlePageH * scale}px`,
+                    backgroundColor: leftPageBg,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${projection.rightPageX}px`,
+                    top: `${bleedPx}px`,
+                    width: `${singlePageW * scale}px`,
+                    height: `${singlePageH * scale}px`,
+                    backgroundColor: rightPageBg,
+                  }}
+                />
+              </>
+            )
           )}
 
           {viewMode === 'left-page' && (
@@ -243,18 +256,18 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
             />
           )}
 
-          {/* Center Spine Fold Guide / Split Slicing Cut Line (for Full Spread) */}
-          {viewMode === 'spread' && (
+          {/* Center Split Slicing Cut Line (for Full Spread when splitPages is active) */}
+          {viewMode === 'spread' && splitPages && (
             <div
-              className={splitPages ? styles.splitCutLine : styles.spineLine}
+              className={styles.splitCutLine}
               style={{
                 left: `${spinePx}px`,
                 top: 0,
                 bottom: 0,
               }}
-              title={splitPages ? '✂ Slicing cut line (pages will be exported as separate files)' : 'Spine center fold line'}
+              title="✂ Slicing cut line (pages will be exported as separate files)"
             >
-              {splitPages && <span className={styles.splitScissors}>✂</span>}
+              <span className={styles.splitScissors}>✂</span>
             </div>
           )}
 
@@ -310,40 +323,70 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
               let finalRenderW = renderW;
               let finalRenderH = renderH;
 
-              // Only extend full-bleed photos into outer bleed margin when includeBleed is ACTIVE
-              // and the frame touches the spread outer boundary in canvas coordinates (tolerance <= 0.05 mm/unit)
-              if (includeBleed && !rot && bleedPx > 0) {
-                const tol = 0.05;
-                const touchesLeft = viewMode !== 'right-page' && (el.x - viewOffsetX) <= tol;
-                const touchesTop = el.y <= tol;
-                const touchesRight = viewMode !== 'left-page'
-                  && (el.x + el.width - viewOffsetX) >= (targetW - tol);
-                const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol);
+              if (!rot) {
+                // Viewport boundaries in canvas physical coordinates
+                const viewLeft = viewOffsetX;
+                const viewContentWidth = viewMode === 'spread' ? baseSpreadW : singlePageW;
+
+                // Thresholds: snap if frame physically touches or is within 0.15 canvas units or 1.5 screen px
+                const tol = 0.15;
+                const touchesLeft = (el.x - viewLeft) <= tol || finalRenderX <= 1.5;
+                const touchesTop = el.y <= tol || finalRenderY <= 1.5;
+                const touchesRight = (el.x + el.width - viewOffsetX) >= (viewContentWidth - tol)
+                  || (finalRenderX + finalRenderW >= containerW - 1.5);
+                const touchesBottom = (el.y + el.height) >= (baseSpreadH - tol)
+                  || (finalRenderY + finalRenderH >= containerH - 1.5);
 
                 if (touchesLeft) {
                   finalRenderX = 0;
-                  finalRenderW += bleedLeftPx;
+                  if (includeBleed && bleedLeftPx > 0 && viewMode !== 'right-page' && el.x <= tol) {
+                    finalRenderW += bleedLeftPx;
+                  }
                 }
+
                 if (touchesTop) {
                   finalRenderY = 0;
-                  finalRenderH += bleedPx;
+                  if (includeBleed && bleedPx > 0 && el.y <= tol) {
+                    finalRenderH += bleedPx;
+                  }
                 }
-                if (touchesRight) {
-                  finalRenderW = containerW - finalRenderX;
-                }
-                if (touchesBottom) {
-                  finalRenderH = containerH - finalRenderY;
-                }
-              }
 
-              // A frame ending exactly at the left-page cut can rasterize one CSS pixel
-              // short of the stage when its fractional position and width are rounded
-              // separately. Let the stage clip that extra pixel; the physical geometry
-              // and any intentional frame border stay unchanged.
-              if (viewMode === 'left-page' && !rot
-                && el.type === 'photo' && !el.borderEnabled
-                && Math.abs(el.x + el.width - singlePageW) <= 0.05) {
-                finalRenderW = Math.max(finalRenderW, containerW - finalRenderX + 1);
+                if (touchesRight) {
+                  // Ensure frame extends to the right boundary with +1px overlap for overflow:hidden clipping
+                  finalRenderW = Math.max(finalRenderW, containerW - finalRenderX + 1);
+                }
+
+                if (touchesBottom) {
+                  // Ensure frame extends to the bottom boundary with +1px overlap for overflow:hidden clipping
+                  finalRenderH = Math.max(finalRenderH, containerH - finalRenderY + 1);
+                }
+
+                // In full spread view, seamlessly join photo frames meeting at the center spine fold
+                if (viewMode === 'spread') {
+                  const rightPageStartX = singlePageW + gutterW;
+                  const rightPageStartPx = projection.rightPageX;
+                  const isPhotoBorder = el.type === 'photo' && Boolean((el as PhotoFrameElement).borderEnabled && ((el as PhotoFrameElement).borderWidth || 0) > 0);
+
+                  // 1. Frame on Left Page touching the center spine fold
+                  const touchesSpineFromLeft = Math.abs(el.x + el.width - singlePageW) <= tol
+                    || Math.abs(finalRenderX + finalRenderW - spinePx) <= 1.5;
+
+                  if (touchesSpineFromLeft) {
+                    // Snap right edge flush to spine, with 1px overlap across zero-gutter fold if no border
+                    const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
+                    finalRenderW = Math.max(finalRenderW, spinePx - finalRenderX + overlap);
+                  }
+
+                  // 2. Frame on Right Page touching the center spine fold
+                  const touchesSpineFromRight = Math.abs(el.x - rightPageStartX) <= tol
+                    || Math.abs(finalRenderX - rightPageStartPx) <= 1.5;
+
+                  if (touchesSpineFromRight) {
+                    const shift = finalRenderX - rightPageStartPx;
+                    finalRenderX = rightPageStartPx;
+                    finalRenderW += shift;
+                  }
+                }
               }
 
               if (el.type === 'text') {
@@ -425,7 +468,7 @@ export const ExportSpreadPreview: React.FC<ExportSpreadPreviewProps> = ({
                   transform: rot ? `rotate(${rot}deg)` : undefined,
                   transformOrigin: '0 0',
                   overflow: 'hidden',
-                  background: imgSrc ? '#ffffff' : '#1e293b',
+                  background: imgSrc ? 'transparent' : '#1e293b',
                   opacity: photoEl.opacity ?? 1,
                   boxSizing: 'border-box',
                   borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,

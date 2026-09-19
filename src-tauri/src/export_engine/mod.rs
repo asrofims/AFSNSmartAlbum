@@ -332,7 +332,11 @@ fn render_photo_element(
 
         // Element is placed purely on the left page (does not cross spine)
         let is_purely_left = (elem.x + elem.width) <= single_page_w + 0.05;
-        if is_purely_left {
+        let touches_spine_from_left = ((elem.x + elem.width) - single_page_w).abs() <= 0.15;
+        if touches_spine_from_left {
+            // Snap right edge exactly flush with spine
+            frame_px_w = (spine_x_px - frame_px_x).max(0) as u32;
+        } else if is_purely_left {
             if frame_px_x + frame_px_w as i64 > spine_x_px {
                 frame_px_w = (spine_x_px - frame_px_x).max(0) as u32;
             }
@@ -340,7 +344,16 @@ fn render_photo_element(
 
         // Element is placed purely on the right page (starts at or after gutter/spine)
         let is_purely_right = elem.x >= (single_page_w + gutter_w - 0.05);
-        if is_purely_right {
+        let touches_spine_from_right = (elem.x - (single_page_w + gutter_w)).abs() <= 0.15;
+        if touches_spine_from_right {
+            let shift = right_start_x_px - frame_px_x;
+            frame_px_x = right_start_x_px;
+            if shift < 0 {
+                frame_px_w = frame_px_w.saturating_sub((-shift) as u32);
+            } else {
+                frame_px_w = frame_px_w.saturating_add(shift as u32);
+            }
+        } else if is_purely_right {
             if frame_px_x < right_start_x_px {
                 let shift = (right_start_x_px - frame_px_x) as u32;
                 frame_px_x = right_start_x_px;

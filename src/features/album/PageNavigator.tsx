@@ -57,50 +57,90 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         overflow: 'hidden',
       }}
     >
-      {/* Left Page Background */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: `${spineX}px`,
-          backgroundColor: leftPageBg,
-        }}
-      />
+      {/* Spread Page Background */}
+      {leftPageBg === rightPageBg ? (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: leftPageBg,
+          }}
+        />
+      ) : (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${spineX + (dims.gutterWidth === 0 ? 0.5 : 0)}px`,
+              backgroundColor: leftPageBg,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              left: `${spineX}px`,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              backgroundColor: rightPageBg,
+            }}
+          />
+        </>
+      )}
 
-      {/* Right Page Background */}
-      <div
-        style={{
-          position: 'absolute',
-          left: `${spineX}px`,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          backgroundColor: rightPageBg,
-        }}
-      />
-
-      {/* Spine / Gutter Guide */}
-      <div
-        style={{
-          position: 'absolute',
-          left: `${spineX}px`,
-          top: 0,
-          bottom: 0,
-          width: '1px',
-          backgroundColor: '#ffffff',
-          mixBlendMode: 'difference',
-          zIndex: 2,
-          pointerEvents: 'none',
-        }}
-      />
+      {/* Center Spine Line (Subtle background divider on empty spread canvas or with gutter) */}
+      {(dims.gutterWidth > 0 || (spread.elements || []).length === 0) && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${spineX}px`,
+            top: 0,
+            bottom: 0,
+            width: '1px',
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            zIndex: 0,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
 
       {/* Real-time Rendered Photo & Text Elements */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
         {(spread.elements || []).map((el) => {
           const { x, y, width: w, height: h } = projectPreviewRect(el, projection);
           const rot = el.rotation || 0;
+
+          let finalX = x;
+          let finalY = y;
+          let finalW = w;
+          let finalH = h;
+
+          if (!rot) {
+            const tol = 0.15;
+            const singlePageW = dims.pageWidth;
+            const gutterW = dims.gutterWidth;
+            const spinePx = projection.spineX;
+            const rightPageStartPx = projection.rightPageX;
+            const rightPageStartX = singlePageW + gutterW;
+            const photoEl = el as PhotoFrameElement;
+            const isPhotoBorder = el.type === 'photo' && Boolean(photoEl.borderEnabled && (photoEl.borderWidth || 0) > 0);
+
+            // Frame on left page touching spine
+            if (Math.abs(el.x + el.width - singlePageW) <= tol || Math.abs(finalX + finalW - spinePx) <= 1.5) {
+              const overlap = (gutterW === 0 && !isPhotoBorder) ? 1 : 0;
+              finalW = Math.max(finalW, spinePx - finalX + overlap);
+            }
+
+            // Frame on right page touching spine
+            if (Math.abs(el.x - rightPageStartX) <= tol || Math.abs(finalX - rightPageStartPx) <= 1.5) {
+              const shift = finalX - rightPageStartPx;
+              finalX = rightPageStartPx;
+              finalW += shift;
+            }
+          }
 
           if (el.type === 'text') {
             const textEl = el as TextNodeElement;
@@ -109,10 +149,10 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                 key={textEl.id}
                 style={{
                   position: 'absolute',
-                  left: `${x}px`,
-                  top: `${y}px`,
-                  width: `${w}px`,
-                  height: `${h}px`,
+                  left: `${finalX}px`,
+                  top: `${finalY}px`,
+                  width: `${finalW}px`,
+                  height: `${finalH}px`,
                   transform: rot ? `rotate(${rot}deg)` : undefined,
                   transformOrigin: '0 0',
                   overflow: 'hidden',
@@ -121,7 +161,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                   zIndex: textEl.zIndex || 2,
                 }}
               >
-                <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={w} height={h} />
+                <TextPreviewCanvas element={textEl} unit={dims.unit} dpi={dims.dpi} width={finalW} height={finalH} />
             </div>
           );
         }
@@ -159,7 +199,7 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
         const cropRot = photoEl.cropRotation || 0;
 
         const [crTl, crTr, crBr, crBl] = getCornerRadii(photoEl);
-        const maxRPx = Math.min(w, h) / 2;
+        const maxRPx = Math.min(finalW, finalH) / 2;
         const rTlPx = Math.min(crTl * scale, maxRPx);
         const rTrPx = Math.min(crTr * scale, maxRPx);
         const rBrPx = Math.min(crBr * scale, maxRPx);
@@ -171,14 +211,14 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
             key={photoEl.id}
             style={{
               position: 'absolute',
-              left: `${x}px`,
-              top: `${y}px`,
-              width: `${w}px`,
-              height: `${h}px`,
+              left: `${finalX}px`,
+              top: `${finalY}px`,
+              width: `${finalW}px`,
+              height: `${finalH}px`,
               transform: rot ? `rotate(${rot}deg)` : undefined,
               transformOrigin: '0 0',
               overflow: 'hidden',
-              background: imgSrc ? '#ffffff' : 'linear-gradient(135deg, #334155, #1e293b)',
+              background: imgSrc ? 'transparent' : 'linear-gradient(135deg, #334155, #1e293b)',
               opacity: photoEl.opacity ?? 1,
               boxSizing: 'border-box',
               borderRadius: hasR ? `${rTlPx}px ${rTrPx}px ${rBrPx}px ${rBlPx}px` : undefined,
@@ -192,10 +232,10 @@ function MiniSpreadPreview({ spread, project }: MiniSpreadPreviewProps) {
                 alt=""
                 style={{
                   position: 'absolute',
-                  left: `${imgLeftPct}%`,
-                  top: `${imgTopPct}%`,
-                  width: `${imgWidthPct}%`,
-                  height: `${imgHeightPct}%`,
+                  left: `calc(${imgLeftPct}% - 1px)`,
+                  top: `calc(${imgTopPct}% - 1px)`,
+                  width: `calc(${imgWidthPct}% + 2px)`,
+                  height: `calc(${imgHeightPct}% + 2px)`,
                   maxWidth: 'none',
                   maxHeight: 'none',
                   transform: cropRot ? `rotate(${cropRot}deg)` : undefined,
