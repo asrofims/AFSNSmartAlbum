@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::db::ElementPayload;
 
+use super::ExportPixelBounds;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextElementPayload {
@@ -672,6 +674,7 @@ fn ranges_to_text_runs(
 }
 
 /// Renders a text node element onto the high-resolution spread canvas
+#[cfg(test)]
 pub fn render_text_element(
     canvas: &mut RgbaImage,
     elem: &ElementPayload,
@@ -679,6 +682,28 @@ pub fn render_text_element(
     offset_y_px: f64,
     scale_factor: f64,
     dpi: u32,
+) {
+    let bounds = ExportPixelBounds::from_element(
+        elem,
+        offset_x_px,
+        offset_y_px,
+        scale_factor,
+    );
+    render_text_element_with_bounds(
+        canvas,
+        elem,
+        scale_factor,
+        dpi,
+        bounds,
+    );
+}
+
+pub(crate) fn render_text_element_with_bounds(
+    canvas: &mut RgbaImage,
+    elem: &ElementPayload,
+    scale_factor: f64,
+    dpi: u32,
+    aligned_bounds: ExportPixelBounds,
 ) {
     let Some(ref raw_payload) = elem.text_payload else {
         return;
@@ -700,10 +725,10 @@ pub fn render_text_element(
     let base_style = &parsed_payload.style;
 
     // Physical bounds on canvas
-    let frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
-    let frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
-    let frame_px_w = (elem.width * scale_factor).round() as u32;
-    let frame_px_h = (elem.height * scale_factor).round() as u32;
+    let frame_px_x = aligned_bounds.x;
+    let frame_px_y = aligned_bounds.y;
+    let frame_px_w = aligned_bounds.width;
+    let frame_px_h = aligned_bounds.height;
 
     if frame_px_w == 0 || frame_px_h == 0 {
         return;

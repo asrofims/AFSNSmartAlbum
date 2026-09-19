@@ -7,7 +7,6 @@ use crate::db::{ElementPayload, ProjectRow, SpreadPayload};
 
 mod bundled_fonts;
 pub mod text_rasterizer;
-pub use text_rasterizer::render_text_element;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -263,6 +262,7 @@ pub fn apply_exif_orientation(mut img: image::DynamicImage, orientation: u32) ->
 fn render_photo_element(
     canvas: &mut RgbaImage,
     elem: &ElementPayload,
+    aligned_bounds: Option<ExportPixelBounds>,
     offset_x_px: f64,
     offset_y_px: f64,
     scale_factor: f64,
@@ -276,10 +276,13 @@ fn render_photo_element(
         return;
     }
 
-    let mut frame_px_x = (elem.x * scale_factor + offset_x_px).round() as i64;
-    let mut frame_px_y = (elem.y * scale_factor + offset_y_px).round() as i64;
-    let mut frame_px_w = (elem.width * scale_factor).round() as u32;
-    let mut frame_px_h = (elem.height * scale_factor).round() as u32;
+    let projected_bounds = aligned_bounds.unwrap_or_else(|| {
+        ExportPixelBounds::from_element(elem, offset_x_px, offset_y_px, scale_factor)
+    });
+    let mut frame_px_x = projected_bounds.x;
+    let mut frame_px_y = projected_bounds.y;
+    let mut frame_px_w = projected_bounds.width;
+    let mut frame_px_h = projected_bounds.height;
 
     let canvas_w = canvas.width() as i64;
     let canvas_h = canvas.height() as i64;
@@ -327,12 +330,16 @@ fn render_photo_element(
     // Strict spine boundary clamping for single-page elements:
     // Prevents floating-point rounding or snapping tolerances from leaking pixels across the center spine.
     if single_page_w > 0.0 {
-        let spine_x_px = (offset_x_px as i64) + (single_page_w * scale_factor).round() as i64;
-        let right_start_x_px = spine_x_px + if gutter_w > 0.0 { (gutter_w * scale_factor).round() as i64 } else { 0 };
+        let coordinate_tolerance = (0.5 / scale_factor).max(1e-7);
+        let spine_x_px = (offset_x_px + single_page_w * scale_factor).round() as i64;
+        let right_start_x_px =
+            (offset_x_px + (single_page_w + gutter_w) * scale_factor).round() as i64;
 
         // Element is placed purely on the left page (does not cross spine)
-        let is_purely_left = (elem.x + elem.width) <= single_page_w + 0.05;
-        let touches_spine_from_left = ((elem.x + elem.width) - single_page_w).abs() <= 0.15;
+        let is_purely_left =
+            (elem.x + elem.width) <= single_page_w + coordinate_tolerance;
+        let touches_spine_from_left =
+            ((elem.x + elem.width) - single_page_w).abs() <= coordinate_tolerance;
         if touches_spine_from_left {
             // Snap right edge exactly flush with spine
             frame_px_w = (spine_x_px - frame_px_x).max(0) as u32;
@@ -343,8 +350,10 @@ fn render_photo_element(
         }
 
         // Element is placed purely on the right page (starts at or after gutter/spine)
-        let is_purely_right = elem.x >= (single_page_w + gutter_w - 0.05);
-        let touches_spine_from_right = (elem.x - (single_page_w + gutter_w)).abs() <= 0.15;
+        let is_purely_right =
+            elem.x >= (single_page_w + gutter_w - coordinate_tolerance);
+        let touches_spine_from_right =
+            (elem.x - (single_page_w + gutter_w)).abs() <= coordinate_tolerance;
         if touches_spine_from_right {
             let shift = right_start_x_px - frame_px_x;
             frame_px_x = right_start_x_px;
@@ -690,6 +699,223 @@ fn render_photo_element(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExportPixelBounds {
+    x: i64,
+    y: i64,
+    width: u32,
+    height: u32,
+}
+
+impl ExportPixelBounds {
+    fn from_element(
+        elem: &ElementPayload,
+        offset_x_px: f64,
+        offset_y_px: f64,
+        scale_factor: f64,
+    ) -> Self {
+        let left = (elem.x * scale_factor + offset_x_px).round() as i64;
+        let top = (elem.y * scale_factor + offset_y_px).round() as i64;
+        let right = ((elem.x + elem.width) * scale_factor + offset_x_px).round() as i64;
+        let bottom = ((elem.y + elem.height) * scale_factor + offset_y_px).round() as i64;
+        Self {
+            x: left,
+            y: top,
+            width: right.saturating_sub(left).max(0) as u32,
+            height: bottom.saturating_sub(top).max(0) as u32,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExportPixelEdges {
+    left: i64,
+    top: i64,
+    right: i64,
+    bottom: i64,
+}
+
+fn effective_spacing_in_canvas_units(
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    export_dpi: u32,
+    canvas_scale: f64,
+) -> f64 {
+    let spacing_value = spread.spacing_value.unwrap_or(project.spacing_value).max(0.0);
+    let spacing_unit = spread.spacing_unit.as_deref()
+        .filter(|unit| !unit.trim().is_empty())
+        .unwrap_or(&project.spacing_unit);
+    let spacing_scale = calculate_export_scale(spacing_unit, project.canvas_dpi, export_dpi);
+    if canvas_scale > 0.0 {
+        spacing_value * spacing_scale / canvas_scale
+    } else {
+        0.0
+    }
+}
+
+fn is_axis_aligned(rotation: f64) -> bool {
+    let normalized = (rotation % 360.0 + 360.0) % 360.0;
+    normalized <= 0.001 || (360.0 - normalized) <= 0.001
+}
+
+/// Projects every frame edge once, then propagates configured equal gaps through
+/// a 2D topological neighbor graph. This avoids the non-additive rounding caused
+/// by independently rounding x/y and width/height in the native exporter.
+fn align_export_element_bounds(
+    project: &ProjectRow,
+    spread: &SpreadPayload,
+    export_dpi: u32,
+    offset_x_px: f64,
+    offset_y_px: f64,
+) -> Vec<ExportPixelBounds> {
+    let scale = calculate_export_scale(&project.canvas_unit, project.canvas_dpi, export_dpi);
+    if scale <= 0.0 {
+        return spread.elements.iter()
+            .map(|_| ExportPixelBounds { x: 0, y: 0, width: 0, height: 0 })
+            .collect();
+    }
+
+    let single_page_w = project.canvas_width;
+    let page_h = project.canvas_height;
+    // The editor and print pipeline use one layflat coordinate plane. Legacy
+    // gutter metadata is deliberately ignored here, as it is in spread rendering.
+    let gutter_w = 0.0;
+    let total_spread_w = single_page_w * 2.0 + gutter_w;
+    let spacing = effective_spacing_in_canvas_units(project, spread, export_dpi, scale);
+    let target_gap_px = (spacing * scale).round().max(0.0) as i64;
+    let coordinate_tolerance = (0.5 / scale).max(1e-7);
+
+    let mut edges: Vec<ExportPixelEdges> = spread.elements.iter().map(|elem| {
+        ExportPixelEdges {
+            left: (elem.x * scale + offset_x_px).round() as i64,
+            top: (elem.y * scale + offset_y_px).round() as i64,
+            right: ((elem.x + elem.width) * scale + offset_x_px).round() as i64,
+            bottom: ((elem.y + elem.height) * scale + offset_y_px).round() as i64,
+        }
+    }).collect();
+
+    let axis_aligned: Vec<usize> = spread.elements.iter().enumerate()
+        .filter_map(|(index, elem)| is_axis_aligned(elem.rotation).then_some(index))
+        .collect();
+
+    let trim_left_px = offset_x_px.round() as i64;
+    let trim_top_px = offset_y_px.round() as i64;
+    let trim_right_px = (offset_x_px + total_spread_w * scale).round() as i64;
+    let trim_bottom_px = (offset_y_px + page_h * scale).round() as i64;
+    let spine_px = (offset_x_px + single_page_w * scale).round() as i64;
+    let right_page_start_px = (offset_x_px + (single_page_w + gutter_w) * scale).round() as i64;
+
+    // Anchor exact trim, page-bottom, and center-spine edges before propagating
+    // adjacent gaps. Pasteboard and crossing objects are not pulled to an edge.
+    for &index in &axis_aligned {
+        let elem = &spread.elements[index];
+        if elem.x.abs() <= coordinate_tolerance {
+            edges[index].left = trim_left_px;
+        }
+        if elem.y.abs() <= coordinate_tolerance {
+            edges[index].top = trim_top_px;
+        }
+        if (elem.x + elem.width - total_spread_w).abs() <= coordinate_tolerance {
+            edges[index].right = trim_right_px;
+        }
+        if (elem.y + elem.height - page_h).abs() <= coordinate_tolerance {
+            edges[index].bottom = trim_bottom_px;
+        }
+        if (elem.x + elem.width - single_page_w).abs() <= coordinate_tolerance {
+            edges[index].right = spine_px;
+        }
+        if (elem.x - (single_page_w + gutter_w)).abs() <= coordinate_tolerance {
+            let width = edges[index].right.saturating_sub(edges[index].left);
+            edges[index].left = right_page_start_px;
+            edges[index].right = right_page_start_px.saturating_add(width);
+        }
+    }
+
+    let mut horizontal_order = axis_aligned.clone();
+    horizontal_order.sort_by(|a, b| spread.elements[*a].x.total_cmp(&spread.elements[*b].x));
+    for &b_index in &horizontal_order {
+        let b = &spread.elements[b_index];
+        let mut best_index: Option<usize> = None;
+        let mut best_right = f64::NEG_INFINITY;
+        for &a_index in &horizontal_order {
+            if a_index == b_index {
+                continue;
+            }
+            let a = &spread.elements[a_index];
+            let right_a = a.x + a.width;
+            if right_a <= b.x + coordinate_tolerance {
+                let overlap_y = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
+                if overlap_y > coordinate_tolerance && right_a > best_right {
+                    best_right = right_a;
+                    best_index = Some(a_index);
+                }
+            }
+        }
+
+        if let Some(a_index) = best_index {
+            let a = &spread.elements[a_index];
+            let physical_gap = b.x - (a.x + a.width);
+            if spacing > 0.0 && (physical_gap - spacing).abs() <= coordinate_tolerance {
+                let new_left = edges[a_index].right.saturating_add(target_gap_px);
+                let anchors_right = (b.x + b.width - single_page_w).abs() <= coordinate_tolerance
+                    || (b.x + b.width - total_spread_w).abs() <= coordinate_tolerance;
+                if anchors_right {
+                    edges[b_index].left = new_left.min(edges[b_index].right);
+                } else {
+                    let width = edges[b_index].right.saturating_sub(edges[b_index].left);
+                    edges[b_index].left = new_left;
+                    edges[b_index].right = new_left.saturating_add(width);
+                }
+            }
+        }
+    }
+
+    let mut vertical_order = axis_aligned;
+    vertical_order.sort_by(|a, b| spread.elements[*a].y.total_cmp(&spread.elements[*b].y));
+    for &b_index in &vertical_order {
+        let b = &spread.elements[b_index];
+        let mut best_index: Option<usize> = None;
+        let mut best_bottom = f64::NEG_INFINITY;
+        for &a_index in &vertical_order {
+            if a_index == b_index {
+                continue;
+            }
+            let a = &spread.elements[a_index];
+            let bottom_a = a.y + a.height;
+            if bottom_a <= b.y + coordinate_tolerance {
+                let overlap_x = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
+                if overlap_x > coordinate_tolerance && bottom_a > best_bottom {
+                    best_bottom = bottom_a;
+                    best_index = Some(a_index);
+                }
+            }
+        }
+
+        if let Some(a_index) = best_index {
+            let a = &spread.elements[a_index];
+            let physical_gap = b.y - (a.y + a.height);
+            if spacing > 0.0 && (physical_gap - spacing).abs() <= coordinate_tolerance {
+                let new_top = edges[a_index].bottom.saturating_add(target_gap_px);
+                let anchors_bottom = (b.y + b.height - page_h).abs() <= coordinate_tolerance;
+                if anchors_bottom {
+                    edges[b_index].top = new_top.min(edges[b_index].bottom);
+                } else {
+                    let height = edges[b_index].bottom.saturating_sub(edges[b_index].top);
+                    edges[b_index].top = new_top;
+                    edges[b_index].bottom = new_top.saturating_add(height);
+                }
+            }
+        }
+    }
+
+    edges.into_iter().map(|edge| ExportPixelBounds {
+        x: edge.left,
+        y: edge.top,
+        width: edge.right.saturating_sub(edge.left).max(0) as u32,
+        height: edge.bottom.saturating_sub(edge.top).max(0) as u32,
+    }).collect()
+}
+
 /// Renders the base layer of a spread (background + photos, without text elements) with sub-step progress callback
 pub fn render_spread_base_to_image_with_progress<F>(
     project: &ProjectRow,
@@ -750,17 +976,16 @@ where
         }
     }
 
-    // Sort elements by z_index and filter photos only
-    let mut sorted_elements = spread.elements.clone();
-    sorted_elements.sort_by_key(|e| e.z_index);
-
-    let photo_elements: Vec<_> = sorted_elements
-        .into_iter()
-        .filter(|elem| elem.r#type != "text" && elem.text_payload.is_none())
+    // Align all object bounds before z-order sorting so photo and text passes use
+    // one identical export-pixel geometry.
+    let aligned_bounds = align_export_element_bounds(project, spread, dpi, offset_x_px, offset_y_px);
+    let mut photo_elements: Vec<_> = spread.elements.iter().enumerate()
+        .filter(|(_, elem)| elem.r#type != "text" && elem.text_payload.is_none())
         .collect();
+    photo_elements.sort_by_key(|(_, elem)| elem.z_index);
 
     let total_photos = photo_elements.len();
-    for (i, elem) in photo_elements.iter().enumerate() {
+    for (i, (element_index, elem)) in photo_elements.iter().enumerate() {
         let keep_running = on_photo_progress(i + 1, total_photos);
         if !keep_running {
             break;
@@ -768,6 +993,7 @@ where
         render_photo_element(
             &mut canvas,
             elem,
+            Some(aligned_bounds[*element_index]),
             offset_x_px,
             offset_y_px,
             scale,
@@ -802,12 +1028,19 @@ pub fn render_spread_text_to_canvas(
         (x_offset_shift, 0.0)
     };
 
-    let mut sorted_elements = spread.elements.clone();
-    sorted_elements.sort_by_key(|e| e.z_index);
+    let aligned_bounds = align_export_element_bounds(project, spread, dpi, offset_x_px, offset_y_px);
+    let mut sorted_elements: Vec<_> = spread.elements.iter().enumerate().collect();
+    sorted_elements.sort_by_key(|(_, elem)| elem.z_index);
 
-    for elem in sorted_elements.iter() {
+    for (element_index, elem) in sorted_elements {
         if elem.r#type == "text" || elem.text_payload.is_some() {
-            render_text_element(canvas, elem, offset_x_px, offset_y_px, scale, dpi);
+            text_rasterizer::render_text_element_with_bounds(
+                canvas,
+                elem,
+                scale,
+                dpi,
+                aligned_bounds[element_index],
+            );
         }
     }
 }
@@ -1088,18 +1321,18 @@ mod tests {
             element.x = x;
             element.y = y;
             let mut canvas = RgbaImage::from_pixel(120, 120, white);
-            render_photo_element(&mut canvas, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
+            render_photo_element(&mut canvas, &element, None, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
             assert!(canvas.pixels().all(|pixel| *pixel == white), "Off-page objects must not be pulled onto the export");
         }
         element.x = -15.0;
         element.y = 20.0;
         let mut crossing = RgbaImage::from_pixel(120, 120, white);
-        render_photo_element(&mut crossing, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
+        render_photo_element(&mut crossing, &element, None, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
         assert_eq!(*crossing.get_pixel(0, 35), red);
         assert_eq!(*crossing.get_pixel(18, 35), white, "Crossing frames must retain their original position");
         element.x = 0.0;
         let mut aligned = RgbaImage::from_pixel(120, 120, white);
-        render_photo_element(&mut aligned, &element, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
+        render_photo_element(&mut aligned, &element, None, 10.0, 10.0, 1.0, true, 100.0, 100.0, 50.0, 0.0);
         assert_eq!(*aligned.get_pixel(0, 35), red, "Trim-aligned photos must still extend into bleed");
         std::fs::remove_file(path).unwrap();
     }
@@ -1123,7 +1356,7 @@ mod tests {
             for opacity in [0.0, 0.5, 1.0] {
                 element.opacity = opacity;
                 let mut canvas = RgbaImage::from_pixel(50, 50, white);
-                render_photo_element(&mut canvas, &element, 0.0, 0.0, 1.0, false, 50.0, 50.0, 0.0, 0.0);
+                render_photo_element(&mut canvas, &element, None, 0.0, 0.0, 1.0, false, 50.0, 50.0, 0.0, 0.0);
                 let fill = *canvas.get_pixel(20, 20);
                 let border = *canvas.get_pixel(10, 20);
                 match opacity {
@@ -1270,6 +1503,198 @@ mod tests {
 
         let scale_px_same = calculate_export_scale("px", 300, 300);
         assert_eq!(scale_px_same, 1.0);
+    }
+
+    fn white_runs(values: impl Iterator<Item = bool>) -> Vec<usize> {
+        let mut runs = Vec::new();
+        let mut current = 0usize;
+        for is_white in values {
+            if is_white {
+                current += 1;
+            } else if current > 0 {
+                runs.push(current);
+                current = 0;
+            }
+        }
+        if current > 0 {
+            runs.push(current);
+        }
+        runs
+    }
+
+    #[test]
+    fn native_export_preserves_uniform_configured_gaps_across_units_and_dpi() {
+        let photo_path = std::env::temp_dir().join(format!(
+            "afsn-export-gap-{}.png",
+            uuid::Uuid::new_v4()
+        ));
+        let red = Rgba([255, 0, 0, 255]);
+        let white = Rgba([255, 255, 255, 255]);
+        RgbaImage::from_pixel(32, 32, red)
+            .save(&photo_path)
+            .unwrap();
+
+        for (unit, spacing_value) in [("px", 5.0), ("mm", 1.0), ("inch", 0.04)] {
+            for dpi in [240, 300, 600] {
+                let scale = calculate_export_scale(unit, 300, dpi);
+                // Fractional projected edges deliberately reproduce the former
+                // 1 px discrepancy caused by separately rounding x and width.
+                let column_width = 30.4 / scale;
+                let top_height = 40.4 / scale;
+                let bottom_height = 35.2 / scale;
+                let second_column_x = column_width + spacing_value;
+                let third_column_x = second_column_x + column_width + spacing_value;
+                let page_width = third_column_x + 45.7 / scale;
+                let bottom_y = top_height + spacing_value;
+                let page_height = bottom_y + bottom_height;
+
+                let project = ProjectRow {
+                    id: format!("gap-{unit}-{dpi}"),
+                    name: "Export Gap Regression".to_string(),
+                    canvas_width: page_width,
+                    canvas_height: page_height,
+                    canvas_unit: unit.to_string(),
+                    canvas_dpi: 300,
+                    spacing_value,
+                    spacing_unit: unit.to_string(),
+                    margin_enabled: false,
+                    margin_value: 0.0,
+                    margin_unit: unit.to_string(),
+                    margin_top: None,
+                    margin_bottom: None,
+                    margin_outside: None,
+                    margin_spine: None,
+                    border_enabled: false,
+                    border_width: 0.0,
+                    border_unit: unit.to_string(),
+                    border_color: "#FFFFFF".to_string(),
+                    background_type: "solid".to_string(),
+                    background_color: "#FFFFFF".to_string(),
+                    file_path: None,
+                    created_at: String::new(),
+                    updated_at: String::new(),
+                };
+
+                let photo = |id: &str, x: f64, y: f64, width: f64, height: f64| {
+                    serde_json::from_value::<ElementPayload>(serde_json::json!({
+                        "id": id,
+                        "filePath": photo_path.to_string_lossy(),
+                        "x": x,
+                        "y": y,
+                        "width": width,
+                        "height": height
+                    }))
+                    .unwrap()
+                };
+                let spread = SpreadPayload {
+                    id: "gap-spread".to_string(),
+                    spread_index: 1,
+                    r#type: "interior".to_string(),
+                    name: "Gap Spread".to_string(),
+                    left_page: None,
+                    right_page: None,
+                    gutter_width: 6.0,
+                    gutter_unit: unit.to_string(),
+                    bleed: 0.0,
+                    safe_area: 0.0,
+                    safe_area_top: None,
+                    safe_area_bottom: None,
+                    safe_area_outside: None,
+                    safe_area_spine: None,
+                    spacing_value: Some(spacing_value),
+                    spacing_unit: Some(unit.to_string()),
+                    background_color: "#FFFFFF".to_string(),
+                    elements: vec![
+                        photo("column-1-top", 0.0, 0.0, column_width, top_height),
+                        photo(
+                            "column-1-bottom",
+                            0.0,
+                            bottom_y,
+                            column_width,
+                            bottom_height,
+                        ),
+                        photo(
+                            "column-2-top",
+                            second_column_x,
+                            0.0,
+                            column_width,
+                            top_height,
+                        ),
+                        photo(
+                            "column-2-bottom",
+                            second_column_x,
+                            bottom_y,
+                            column_width,
+                            bottom_height,
+                        ),
+                        photo(
+                            "column-3-full",
+                            third_column_x,
+                            0.0,
+                            page_width - third_column_x,
+                            page_height,
+                        ),
+                        photo(
+                            "right-page-full",
+                            page_width,
+                            0.0,
+                            page_width,
+                            page_height,
+                        ),
+                    ],
+                };
+
+                let expected_gap = (spacing_value * scale).round() as i64;
+                let bounds = align_export_element_bounds(&project, &spread, dpi, 0.0, 0.0);
+                assert_eq!(
+                    bounds[2].x - (bounds[0].x + bounds[0].width as i64),
+                    expected_gap,
+                    "first horizontal gap differs for {unit} at {dpi} DPI"
+                );
+                assert_eq!(
+                    bounds[4].x - (bounds[2].x + bounds[2].width as i64),
+                    expected_gap,
+                    "second horizontal gap differs for {unit} at {dpi} DPI"
+                );
+                assert_eq!(
+                    bounds[1].y - (bounds[0].y + bounds[0].height as i64),
+                    expected_gap,
+                    "vertical gap differs for {unit} at {dpi} DPI"
+                );
+
+                let rendered = render_spread_to_image(&project, &spread, dpi, false);
+                let left_page_end = (page_width * scale).round() as u32;
+                let horizontal_y = (top_height * scale * 0.5).round() as u32;
+                let horizontal_runs = white_runs(
+                    (0..left_page_end).map(|x| *rendered.get_pixel(x, horizontal_y) == white),
+                );
+                assert_eq!(
+                    horizontal_runs,
+                    vec![expected_gap as usize, expected_gap as usize],
+                    "rendered horizontal gaps differ for {unit} at {dpi} DPI"
+                );
+
+                let vertical_x = (column_width * scale * 0.5).round() as u32;
+                let page_bottom = (page_height * scale).round() as u32;
+                let vertical_runs = white_runs(
+                    (0..page_bottom).map(|y| *rendered.get_pixel(vertical_x, y) == white),
+                );
+                assert_eq!(
+                    vertical_runs,
+                    vec![expected_gap as usize],
+                    "rendered vertical gap differs for {unit} at {dpi} DPI"
+                );
+
+                let spine_x = left_page_end;
+                assert_eq!(
+                    *rendered.get_pixel(spine_x, horizontal_y),
+                    red,
+                    "layflat spine must not gain an export seam for {unit} at {dpi} DPI"
+                );
+            }
+        }
+
+        std::fs::remove_file(photo_path).unwrap();
     }
 
     #[test]

@@ -698,3 +698,11 @@
 - [x] Integrate print bleed allowances (`includeBleed`, `bleedLeftPx`, `bleedPx`) into topological preview alignment.
 - [x] Application version metadata bumped to `v1.0.70`.
 
+### Phase 63 — Native Export Pixel Geometry Consistency
+
+- [x] Quantize native export frame geometry from shared left/right/top/bottom edges instead of independently rounding positions and dimensions.
+- [x] Propagate configured Photo Spacing through a 2D topological neighbor graph while preserving trim, spine, and page-edge anchors.
+- [x] Use the same aligned export-pixel bounds for photo and text objects without mutating stored layout or crop geometry.
+- [x] Add pixel-level native render regressions for uniform horizontal/vertical gaps and a seam-free layflat spine at 240, 300, and 600 DPI across px, mm, and inch projects.
+- [ ] Manually compare the affected album in native JPEG, PNG, and PDF exports at print resolution.
+
