@@ -979,7 +979,9 @@ export function WorkspaceLayout() {
               title="Update is downloading in background. Click to view progress."
               className={`${styles.updateBtn} ${styles.updateBtnDownloading}`}
             >
-              <span className={styles.spinnerMini}>⏳</span>
+              <svg className={styles.spinnerMini} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
               <span className={styles.toolbarBtnText}>
                 {updateProgress.percent > 0 ? `Downloading ${updateProgress.percent}%` : 'Downloading...'}
               </span>
@@ -992,7 +994,9 @@ export function WorkspaceLayout() {
               title="Update is ready to install. Click to restart."
               className={`${styles.updateBtn} ${styles.updateBtnReady}`}
             >
-              <span style={{ fontSize: '12px' }}>🎉</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
               <span className={styles.toolbarBtnText}>Restart to Update</span>
             </Button>
           ) : updateAvailableVersion ? (
@@ -1000,12 +1004,16 @@ export function WorkspaceLayout() {
               variant="primary"
               size="sm"
               onClick={openUpdateModal}
-              title={`Update to ${updateAvailableVersion} is available`}
+              title={`Update to ${updateAvailableVersion} is available. Click to install.`}
               className={styles.updateBtn}
             >
-              <span style={{ fontSize: '12px' }}>⚡</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ flexShrink: 0 }}>
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
               <span className={styles.toolbarBtnText}>Update</span>
-              <span className={styles.updateVersionBadge}>({updateAvailableVersion})</span>
+              <span className={styles.updateVersionBadge}>
+                {updateAvailableVersion.startsWith('v') ? updateAvailableVersion : `v${updateAvailableVersion}`}
+              </span>
             </Button>
           ) : null}
         </div>

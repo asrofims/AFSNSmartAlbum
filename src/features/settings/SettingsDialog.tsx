@@ -557,9 +557,6 @@ export function SettingsDialog() {
                       <span>Software Updates</span>
                       <span className={styles.statusBadgeActive}>Up to date</span>
                     </div>
-                    <div className={styles.cardSubtitle}>
-                      AFSNSmartAlbum automatic offline update engine with cryptographic signature verification.
-                    </div>
                   </div>
                 </div>
 
