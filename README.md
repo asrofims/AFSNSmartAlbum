@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/app-icon.png" width="132" alt="AFSNSmartAlbum application icon" />
 
-  # AFSNSmartAlbum
+  # AFSN SmartAlbum
 
   **Professional offline desktop layout software for photo albums and social media content.**
 
