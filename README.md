@@ -24,9 +24,10 @@ AFSNSmartAlbum combines precise album-spread tools with a dedicated single-page 
 | Accurate `mm`, `cm`, `inch`, and `px` units at the configured project DPI. | Presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Bleed-aware full-spread and split-page export. | Adaptive layouts and four-sided Safe Zone Margins. |
 
-## Release highlights — v1.3.1
+## Release highlights — v1.3.2
 
-- **Pembaruan Algoritma Export** — Optimalisasi efisiensi render dan keandalan pemrosesan ekspor resolusi tinggi untuk album fisik maupun format media sosial.
+- **Bug fixes & UX stability** — Intercepted default browser reload shortcuts (`F5`, `Ctrl+R`, `Ctrl+Shift+R`) to eliminate unwanted reload prompts and safeguard active canvas editing state.
+- **Performance improvements** — Optimized export rendering pipeline and memory efficiency for seamless high-resolution processing across photo albums and social media formats.
 
 ## Highlights
 
