@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,8 +25,10 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.4
-
+## Current release highlights — v1.3.5
+ 
+- **English Localization for Pro Features** — Complete internationalization of all Pro tier notices, dialogs, upgrade prompts, DPI restrictions, AI Smart Analysis hints, and donation modals to English.
+- **In-App Updater "What's New" Delivery** — Synchronized automated release workflow notes so in-app update checks accurately present newly delivered layout expansions, aspect ratio engines, and visual refinements.
 - **Adaptive & Dynamic Layout Engine Enhancements** — Expanded the catalog of Adaptive Balanced layouts across Social Media single-posts (up to 28 variants) and Album spreads (up to 100 variants). Upgraded the Dynamic Layout generator to strictly enforce standard photographic aspect ratios (3:2, 2:3, 4:3, 3:4, 1:1, 16:9, 4:5, 5:4) with uniform proportional scaling and strict safe-margin boundary confinement.
 - **Template Library Usability** — "Matching" filter in My Templates is now disabled by default, ensuring all saved templates in the active folder remain immediately visible and discoverable.
 - **Settings UI & Visual Comfort** — Enhanced the Settings dialog layout with generous 24px row gaps and dedicated buffer padding between description text and toggle switches/buttons, ensuring clean text wrapping and comfortable alignment.
