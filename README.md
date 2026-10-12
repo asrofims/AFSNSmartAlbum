@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,10 +25,10 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.2
+## Current release highlights — v1.3.3
 
-- **Bug fixes & UX stability** — Fixed export layer stacking order so text positioned beneath photo layers is accurately covered in output images, matching editor preview and layer order exactly. Intercepted default browser reload shortcuts (`F5`, `Ctrl+R`, `Ctrl+Shift+R`) to eliminate unwanted reload prompts and safeguard active canvas editing state.
-- **Performance improvements** — Streamlined export rendering pipeline into a unified layer pass with per-frame sharpening, improving export speed and memory efficiency for high-resolution photo albums.
+- **Adaptive Layout Engine & Frame Proportions** — Significantly expanded the catalog of Adaptive Balanced layouts across Social Media single-posts (up to 28 variants) and Album spreads (up to 100 variants). Upgraded the Dynamic Layout ratio generation to enforce standard photographic aspect ratios (3:2, 2:3, 4:3, 3:4, 1:1, 16:9, 4:5, 5:4) with uniform proportional scaling and strict safe-margin boundary confinement.
+- **Settings UI & Visual Comfort** — Enhanced the Settings dialog layout with generous 24px row gaps and dedicated buffer padding between description text and toggle switches/buttons, ensuring clean text wrapping and comfortable alignment.
 
 ## Highlights
 
@@ -128,10 +128,10 @@ The in-app shortcut reference provides the complete, context-aware list.
 
 Use **About AFSNSmartAlbum → Check Updates** to check for a newer signed application release. Project work remains available offline.
 
-AFSNSmartAlbum is independently developed by **Afsunmedia — Asrofims**. The application includes an optional QRIS contribution entry for users who want to support continued development.
+AFSNSmartAlbum is independently developed by **Afsunmedia**. The application includes an optional QRIS contribution entry for users who want to support continued development.
 
 ## License
 
-Copyright © 2026 **Afsunmedia — Asrofims**. All rights reserved.
+Copyright © 2026 **Afsunmedia**. All rights reserved.
 
 AFSNSmartAlbum is proprietary software. Its open-source foundations include [Tauri](https://tauri.app/), [React](https://react.dev/), [Konva](https://konvajs.org/), [SQLite](https://www.sqlite.org/), and [Rayon](https://github.com/rayon-rs/rayon).
