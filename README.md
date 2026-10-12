@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src-tauri/icons/icon.png" width="132" alt="AFSNSmartAlbum application icon" />
+  <img src="assets/app-icon.png" width="132" alt="AFSNSmartAlbum application icon" />
 
   # AFSNSmartAlbum
 
@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,10 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.3
+## Current release highlights — v1.3.4
 
-- **Adaptive Layout Engine & Frame Proportions** — Significantly expanded the catalog of Adaptive Balanced layouts across Social Media single-posts (up to 28 variants) and Album spreads (up to 100 variants). Upgraded the Dynamic Layout ratio generation to enforce standard photographic aspect ratios (3:2, 2:3, 4:3, 3:4, 1:1, 16:9, 4:5, 5:4) with uniform proportional scaling and strict safe-margin boundary confinement.
+- **Adaptive & Dynamic Layout Engine Enhancements** — Expanded the catalog of Adaptive Balanced layouts across Social Media single-posts (up to 28 variants) and Album spreads (up to 100 variants). Upgraded the Dynamic Layout generator to strictly enforce standard photographic aspect ratios (3:2, 2:3, 4:3, 3:4, 1:1, 16:9, 4:5, 5:4) with uniform proportional scaling and strict safe-margin boundary confinement.
+- **Template Library Usability** — "Matching" filter in My Templates is now disabled by default, ensuring all saved templates in the active folder remain immediately visible and discoverable.
 - **Settings UI & Visual Comfort** — Enhanced the Settings dialog layout with generous 24px row gaps and dedicated buffer padding between description text and toggle switches/buttons, ensuring clean text wrapping and comfortable alignment.
+- **Asset & Branding Polish** — Standardized developer attribution to **Afsunmedia** and updated documentation icon asset references (`assets/app-icon.png`) for seamless cross-repository rendering.
 
 ## Highlights
 
