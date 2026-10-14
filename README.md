@@ -27,6 +27,7 @@
 
 ## Current release highlights — v1.3.11
 
+- **Clean Integer Wheel Zoom** — Fixed floating-point precision display artifact (e.g. `254.99999999999997%`) when zooming with the mouse scroll wheel. Zoom percentage calculation and UI indicators are now strictly rounded to clean integer values.
 - **Offline Licensing & Pro Expiry Guard** — Enforces strict local feature re-locking when temporary Pro trial packages expire, even if the application is offline or disconnected by firewall. Prevents bypasses via background countdown timers, offline error-catch validation, and system clock manipulation detection. All Pro capabilities (Adaptive Layout, My Templates, AI Smart Face Framing, and Advanced Export) accurately downgrade to Free upon package expiry.
 - **Silent Background Update Checks** — Eliminated false-alarm panic popups (*"Update Download Failed: Failed to fetch"*) during automatic startup checks when operating without internet. Background checks now run completely silently in the background without interrupting the user.
 - **Calm & Humanized Offline Experience** — Replaced intimidating red error banners and raw technical fetch codes with clear, non-alarmist network status indicators (`📡`). In-app dialogs clearly communicate that all photo albums, projects, design workflows, and exports function 100% normally offline.
