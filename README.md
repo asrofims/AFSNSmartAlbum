@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.10-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.10
+## Current release highlights — v1.3.11
 
-- **DPI-Consistent Text & Font Export Engine** — Fixed font rasterization scaling in native Rust exporter (`text_rasterizer.rs`). Typographic points (`pt`) are now converted to export pixels via universal scaling math matching project unit and canvas DPI. In pixel projects (`px` / Social Media), font sizes remain 100% invariant across all export DPI options (72, 150, 300, 600 DPI) matching the canvas and preview. In physical print projects (`mm`, `cm`, `inch`), font scaling scales proportionally with canvas resolution and text frame bounds with zero distortion or overflow.
-- **Precision Layout Preservation** — Retains high-precision browser-shaped glyph metrics and line-wrap positions across all export DPI settings.
-- **Integrated Server Bulletins & Announcements** — In-app announcements modal displaying official broadcast updates, system maintenance bulletins, and release notes directly from `https://afsn.afsun.my.id/api/support/announcements`. Features 5-row pagination, pinned notice badges, category tags (*Info*, *Update*, *Maintenance*, *Alert*), compact smooth scroll container (`max-height: 360px`), and offline/error recovery with retry actions.
-- **Top Menu Toolbar Reorganization** — Direct `Settings` button now immediately accessible on the primary top menu bar to the right of `File ▾` (`[File ▾] [Settings] [Help ▾]`).
-- **Streamlined Help Menu & Web Support Desk** — Reorganized `Help ▾` dropdown featuring `Contact Us` (redirecting directly to the web portal at `https://afsn.afsun.my.id`), `Announcements`, and `About`.
+- **Offline Licensing & Pro Expiry Guard** — Enforces strict local feature re-locking when temporary Pro trial packages expire, even if the application is offline or disconnected by firewall. Prevents bypasses via background countdown timers, offline error-catch validation, and system clock manipulation detection. All Pro capabilities (Adaptive Layout, My Templates, AI Smart Face Framing, and Advanced Export) accurately downgrade to Free upon package expiry.
+- **Silent Background Update Checks** — Eliminated false-alarm panic popups (*"Update Download Failed: Failed to fetch"*) during automatic startup checks when operating without internet. Background checks now run completely silently in the background without interrupting the user.
+- **Calm & Humanized Offline Experience** — Replaced intimidating red error banners and raw technical fetch codes with clear, non-alarmist network status indicators (`📡`). In-app dialogs clearly communicate that all photo albums, projects, design workflows, and exports function 100% normally offline.
+- **DPI-Consistent Text & Font Export Engine** — Typographic points (`pt`) convert accurately to export pixels matching canvas DPI and project units across all export DPI options (72, 150, 300, 600 DPI) with zero distortion or overflow.
+- **Integrated Server Bulletins & Announcements** — Official broadcast updates, system maintenance bulletins, and release notes accessible directly via top toolbar and Help menu.
 
 ## Highlights
 
