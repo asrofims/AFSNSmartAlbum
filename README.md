@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,15 +25,17 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.11
+## Current release highlights — v1.3.12
 
-- **Clean Integer Wheel Zoom** — Fixed floating-point precision display artifact (e.g. `254.99999999999997%`) when zooming with the mouse scroll wheel. Zoom percentage calculation and UI indicators are now strictly rounded to clean integer values.
-- **Expanded 400% Balanced Canvas & Crop Zoom** — Upgraded maximum canvas and photo crop zoom ceiling to 400% (4x magnification) with optimized canvas background shadow bypass at high zoom. Delivers crisp inspection of fine print details, typography, and focus sharpness while guaranteeing smooth, lag-free 60 FPS Konva canvas panning.
-- **Offline Licensing & Pro Expiry Guard** — Enforces strict local feature re-locking when temporary Pro trial packages expire, even if the application is offline or disconnected by firewall. Prevents bypasses via background countdown timers, offline error-catch validation, and system clock manipulation detection. All Pro capabilities (Adaptive Layout, My Templates, AI Smart Face Framing, and Advanced Export) accurately downgrade to Free upon package expiry.
-- **Silent Background Update Checks** — Eliminated false-alarm panic popups (*"Update Download Failed: Failed to fetch"*) during automatic startup checks when operating without internet. Background checks now run completely silently in the background without interrupting the user.
-- **Calm & Humanized Offline Experience** — Replaced intimidating red error banners and raw technical fetch codes with clear, non-alarmist network status indicators (`📡`). In-app dialogs clearly communicate that all photo albums, projects, design workflows, and exports function 100% normally offline.
-- **DPI-Consistent Text & Font Export Engine** — Typographic points (`pt`) convert accurately to export pixels matching canvas DPI and project units across all export DPI options (72, 150, 300, 600 DPI) with zero distortion or overflow.
-- **Integrated Server Bulletins & Announcements** — Official broadcast updates, system maintenance bulletins, and release notes accessible directly via top toolbar and Help menu.
+- **Drop Shadow Export & Preview Parity** — Calibrated drop shadow rendering across editor canvas, export preview modal, and high-resolution 300 DPI native Rust export engine. Blur radius, horizontal/vertical offsets, opacity, and color now match identically at any export scale or print DPI.
+- **Subpixel Seam Line Elimination** — Completely eliminated visual subpixel hairline seam artifacts underneath photo frames when drop shadows are rendered on the canvas.
+- **Native Konva Noise Filter** — Added fine-grain Noise filter for photo frames and background images to introduce authentic analog photographic film grain. Fully persistent in project database (SQLite migration v26), live on editor canvas, rendered in export preview, and computed with high-speed deterministic pseudo-random noise in the Rust 300 DPI print export pipeline.
+- **Customizable Photo Frame Drop Shadows** — Comprehensive shadow styling in the Appearance inspector: interactive color picker, blur radius, X/Y distance offsets, and opacity slider with grouped undo/redo and layer-aware rendering.
+- **Canvas Background Appearance Controls** — Dedicated Background Appearance inspector card providing live adjustments for background image opacity, blur, grayscale, and noise texture.
+- **Curated Editorial Dynamic Layouts** — Introduced safe-margin-confined dynamic layouts with breathing buffers, randomized spacing biases, and intelligent hero slot assignment prioritizing favorited and high-rated photos.
+- **AI Photo Analysis Race Condition & Cancellation Guard** — Eliminated race conditions that re-triggered photo analysis on project open, and introduced safe cancellation controls accessible via page navigation and settings.
+- **Streamlined Export Destination Feedback** — Enhanced export dialog with clear, prominent visual warnings and validation when destination folders are not yet selected, preventing accidental failed exports.
+- **Modern Slider UI** — Sleek custom slider components featuring dynamic track fill, double-click reset to defaults, and precise numeric entry across all effect controls.
 
 ## Highlights
 
