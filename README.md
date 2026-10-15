@@ -27,6 +27,7 @@
 
 ## Current release highlights — v1.3.12
 
+- **Global Pro Mode 3-Day Rolling Lease & Firewall Defense** — Enforced 3-day rolling lease on Global Pro Mode (LAUNCH_PROMO). When operating offline or when the server connection is blocked by firewall, expired rolling leases automatically downgrade locally to Free via countdown timers, anti-tampering guards, and state reset, preventing indefinite offline Pro retention.
 - **Drop Shadow Export & Preview Parity** — Calibrated drop shadow rendering across editor canvas, export preview modal, and high-resolution 300 DPI native Rust export engine. Blur radius, horizontal/vertical offsets, opacity, and color now match identically at any export scale or print DPI.
 - **Subpixel Seam Line Elimination** — Completely eliminated visual subpixel hairline seam artifacts underneath photo frames when drop shadows are rendered on the canvas.
 - **Native Konva Noise Filter** — Added fine-grain Noise filter for photo frames and background images to introduce authentic analog photographic film grain. Fully persistent in project database (SQLite migration v26), live on editor canvas, rendered in export preview, and computed with high-speed deterministic pseudo-random noise in the Rust 300 DPI print export pipeline.
