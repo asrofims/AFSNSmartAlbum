@@ -27,6 +27,9 @@
 
 ## Current release highlights — v1.3.13
 
+- **Interactive Precision Zoom Slider & Unboxed Toolbar** — Replaced stepped `[-]` and `[+]` zoom buttons with a high-precision, continuous slider (25% – 400%, step 1%) in the workspace toolbar with double-click reset to 100%, real-time percentage readout, and clean unboxed presentation with styled `Fit` button.
+- **Double-Click Canvas to Fit** — Double-clicking any empty area on the canvas (pasteboard or spread background) instantly triggers smooth animated centering and fit-to-screen (`Ctrl+0`).
+- **Safe Margin Hairline Rendering Invariance** — Blue dashed safe margin guides, center gutter creases, and canvas borders maintain strict 1px crisp hairline thickness with `strokeScaleEnabled={false}`, eliminating oversized or fat dashed lines during zoom transitions and gestures.
 - **Group-Aware Adaptive Layout Engine** — Grouped photo frames sharing a group ID are now treated as single unified composite entities (*super-frames*) by the adaptive layout engine. The internal geometry, relative positioning, and aspect ratio of group member frames are strictly preserved with aspect-fit containment, and group metadata remains intact without group breakage.
 - **Unified Group Lock Protection** — If any member photo frame within a group is locked, the entire group is automatically protected as a unified spatial obstacle, preventing layout shifts from altering or tearing grouped frames.
 - **Safe Margin Visual Symmetry in Previews & Export** — Resolved subpixel bottom margin rendering asymmetry across spread/post thumbnails and export preview modal by removing redundant visual shadow offsets and ensuring consistent stroke alignment.
