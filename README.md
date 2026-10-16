@@ -7,12 +7,12 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.13-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
 
-  [Download the latest version](https://github.com/asrofims/AFSNSmartAlbum/releases) · [Visit the website](https://app.afsun.my.id)
+  [Download the latest version](https://github.com/asrofims/AFSNSmartAlbum/releases) · [Visit the website](https://afsn.afsun.my.id)
 </div>
 
 ---
@@ -25,21 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.13
+## Current release highlights — v1.3.14
 
-- **Interactive Precision Zoom Slider & Unboxed Toolbar** — Replaced stepped `[-]` and `[+]` zoom buttons with a high-precision, continuous slider (25% – 400%, step 1%) in the workspace toolbar with double-click reset to 100%, real-time percentage readout, and clean unboxed presentation with styled `Fit` button.
-- **Double-Click Canvas to Fit** — Double-clicking any empty area on the canvas (pasteboard or spread background) instantly triggers smooth animated centering and fit-to-screen (`Ctrl+0`).
-- **Safe Margin Hairline Rendering Invariance** — Blue dashed safe margin guides, center gutter creases, and canvas borders maintain strict 1px crisp hairline thickness with `strokeScaleEnabled={false}`, eliminating oversized or fat dashed lines during zoom transitions and gestures.
-- **Group-Aware Adaptive Layout Engine** — Grouped photo frames sharing a group ID are now treated as single unified composite entities (*super-frames*) by the adaptive layout engine. The internal geometry, relative positioning, and aspect ratio of group member frames are strictly preserved with aspect-fit containment, and group metadata remains intact without group breakage.
-- **Unified Group Lock Protection** — If any member photo frame within a group is locked, the entire group is automatically protected as a unified spatial obstacle, preventing layout shifts from altering or tearing grouped frames.
-- **Safe Margin Visual Symmetry in Previews & Export** — Resolved subpixel bottom margin rendering asymmetry across spread/post thumbnails and export preview modal by removing redundant visual shadow offsets and ensuring consistent stroke alignment.
-- **Layout Cycle HUD & Template Group Counting** — HUD cycle count, keyboard shortcut layout variations, and template panels count composite group entities rather than raw individual frames, reflecting accurate available variations.
-- **Recent Projects User-Friendly Location & Explorer Reveal** — Saved projects in the Welcome Screen recent projects list now display a clean, user-friendly location breadcrumb on disk (e.g. `Documents › Wedding Albums`), accompanied by an interactive chip button to quickly open the containing directory in Windows Explorer.
-- **Dynamic Post & Spread Contextual Menus** — Context menus on the canvas and page drawer dynamically adapt terminology between `Post` and `Spread` depending on project mode, ensuring social media single-post projects present clear `Duplicate Post`, `Add New Post`, and `Paste to All Posts` actions.
-- **Flexible Template Overwrites & Updates** — Layout templates can now be updated/overwritten directly with the active canvas design, duplicated into new presets, or saved with automated non-colliding name suggestions.
-- **Synchronized Parameter Switches** — Export and import parameter checkboxes (drop shadow, background, frame styling) dynamically synchronize with active elements, preventing orphan parameters from being applied to unrelated layouts.
-- **Context Menu Viewport Overflow & Clipping Protection** — Context menus and action dropdowns now render through React Portals (`document.body`) with intelligent auto-flip and boundary clamping, preventing clipping inside scrollable panels or compact workspaces.
-- **Global Pro Mode 3-Day Rolling Lease & Firewall Defense** — Enforced 3-day rolling lease on Global Pro Mode (LAUNCH_PROMO). When operating offline or when the server connection is blocked by firewall, expired rolling leases automatically downgrade locally to Free via countdown timers, anti-tampering guards, and state reset, preventing indefinite offline Pro retention.
+- **Smooth Crop Fit Transition** — Resolved canvas jump/glitch when triggering the Fit button while in photo crop mode. Centering and zoom now smoothly fit the viewport without disruptive leaps.
+- **Pro Donation Card Dynamic Visibility** — The About dialog now dynamically hides the independent development donation card for active paid Pro license users, while retaining visibility for launch promo and free users.
+- **Single-Tab External Browser Navigation** — Resolved duplicate browser tab opening when launching the official website from the About dialog by strictly intercepting link clicks and routing through native shell execution.
+- **Auto AI Photo Analysis on Import** — Fixed photo import lifecycle so newly added photos consistently trigger automatic face detection, landmark analysis, and smart framing orientation.
+- **Compact Unsupported File Drop Notification** — Replaced verbose drop errors with a clean, concise notification (`<file>: Cannot import file. Supported formats: JPG, PNG, WEBP, BMP, TIFF.`), preventing unsupported files from erroneously re-triggering AI analysis.
+- **Clean Background Appearance Inspector** — Background appearance controls automatically hide when no background image is assigned to the current spread/canvas, keeping the inspector tidy.
+- **Official Website URL Synchronization** — Updated all official support and product references to `afsn.afsun.my.id`.
 
 ## Highlights
 
