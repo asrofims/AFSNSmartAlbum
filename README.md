@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,15 +25,17 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.14
+## Current release highlights — v1.3.15
 
-- **Smooth Crop Fit Transition** — Resolved canvas jump/glitch when triggering the Fit button while in photo crop mode. Centering and zoom now smoothly fit the viewport without disruptive leaps.
-- **Pro Donation Card Dynamic Visibility** — The About dialog now dynamically hides the independent development donation card for active paid Pro license users, while retaining visibility for launch promo and free users.
-- **Single-Tab External Browser Navigation** — Resolved duplicate browser tab opening when launching the official website from the About dialog by strictly intercepting link clicks and routing through native shell execution.
-- **Auto AI Photo Analysis on Import** — Fixed photo import lifecycle so newly added photos consistently trigger automatic face detection, landmark analysis, and smart framing orientation.
-- **Compact Unsupported File Drop Notification** — Replaced verbose drop errors with a clean, concise notification (`<file>: Cannot import file. Supported formats: JPG, PNG, WEBP, BMP, TIFF.`), preventing unsupported files from erroneously re-triggering AI analysis.
-- **Clean Background Appearance Inspector** — Background appearance controls automatically hide when no background image is assigned to the current spread/canvas, keeping the inspector tidy.
-- **Official Website URL Synchronization** — Updated all official support and product references to `afsn.afsun.my.id`.
+- **Pre-Flight External Photo Modification Verification** — Master photos modified externally on disk before export are automatically detected; previews are refreshed and the user is prompted with safety options to review on canvas or proceed.
+- **Live Asset Auto-Refresh on Window Focus** — Background asset integrity watcher automatically re-checks disk files upon window focus, updating filmstrip thumbnails and canvas previews live without requiring a project reload.
+- **External Photo Freshness Detection & Reload Action** — Added freshness timestamp checks on open, alongside a dedicated "Reload Photo from Disk" context menu action and toolbar refresh option.
+- **Strict 1:1 Layer Ordering Consistency** — Enforced absolute 1:1 invariant between array order and zIndex across canvas rendering, page drawer navigator, export preview snapshots, and final high-resolution export rendering.
+- **Source Photo Collision & Overwrite Prevention** — Added safety pre-flight check preventing export files from accidentally overwriting active project source photos.
+- **Double-Click Fit Button Spam Guard** — Implemented transition lock preventing rapid double-click jump glitches on the canvas Fit button.
+- **Canvas Zoom Range Expansion (10% - 500%)** — Expanded canvas zoom limits from 25%–400% to 10%–500% with smooth slider and wheel scaling.
+- **Layer Arrangement Actions & Shortcuts** — Added Bring Forward and Send Backward layer controls with dedicated keyboard shortcuts (`Ctrl+]` and `Ctrl+[`).
+- **Smart Layout Pro Showcase** — Translated showcase content to English and seamlessly forwarded user Google account email in upgrade parameters.
 
 ## Highlights
 
