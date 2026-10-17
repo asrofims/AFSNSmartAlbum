@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.17-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,19 +25,19 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.16
+## Current release highlights — v1.3.17
 
-- **Floating Canvas Tool Dock (Select & Hand Tools)** — Added an accessible floating dock right under the File menu for seamless 1-click toggling between the standard Select Tool (`V`) and Hand Tool (`H`).
+- **Filmstrip Folder Submenu Portal Architecture** — Resolved folder collection target picker ("Add to Folder" and "Move to Folder") failing to display by re-architecting submenus into an independent floating portal at `document.body` level, eliminating container overflow clipping.
+- **Smart Horizontal Viewport Boundary Detection** — Automatically detects screen edges and flips submenus to the left when right-clicking photos near the right side of the filmstrip, preventing off-screen menu truncation.
+- **Dynamic Upward-Flip & Viewport Safety Padding** — Resolved context menu crowding and stretching past the bottom edge of the screen by dynamically measuring menu height and flipping upward above filmstrip photos with a guaranteed 16px safety clearance margin.
+- **Compact & Modern Context Menu Styling** — Streamlined menu item padding, dividers, and file metadata header for a cleaner and more compact layout, with slim scrollbars and active highlight states (`.menuItemActive`) on folder actions.
+- **Smooth Submenu Mouse Transitions** — Added a 220ms bridge timer ensuring seamless cursor navigation between menu items and floating submenus without accidental flickering or closures.
+- **Floating Canvas Tool Dock (Select & Hand Tools)** — Accessible floating dock directly beneath the File menu for seamless 1-click toggling between the standard Select Tool (`V`) and Hand Tool (`H`).
 - **Standard Select & Hand Tool Keyboard Shortcuts** — Integrated industry-standard shortcuts (`H` to activate or toggle Hand Pan mode, `V` to switch back to Select pointer), with automatic input element focus protection.
 - **Canvas Dragging & Pan Event Stream Restoration** — Optimized canvas panning by eliminating conflicting pointer event cancellations and synchronizing Konva stage positioning on mousemove for smooth 60fps/120fps glide.
-- **Persistent Grabbing Cursor on Drag** — Maintained a consistent grabbing cursor across the entire window while dragging in Hand Pan mode via global body state rules.
 - **Folder Collection Keyboard & Batch Management** — Enabled keyboard `Delete` and `Backspace` to remove selected folder collections, multi-select mechanism (`Ctrl+Click`, `Shift+Click`), batch delete context menu, and click-outside/Escape unselect protection.
-- **Instant Empty Folder Deletion** — Allowed empty photo folder collections to delete instantly without confirmation dialogs.
-- **Folder Collection Dropdown Menu Cleanup** — Removed redundant select/unselect option from the 3-dot folder dropdown menu, keeping actions focused on rename and delete.
-- **Sticky Add Folder Button** — Ensured the "Add Folder" button stays permanently pinned and visible when photo folder tabs overflow horizontally.
 - **Layer Panel Arrow Navigation Without Reordering** — Allowed `ArrowUp` and `ArrowDown` in the Layers panel to navigate and inspect layers cleanly without altering stacking order.
 - **Layer Context Menu with Group/Ungroup Controls** — Added rich right-click context menu to the Layers panel featuring dedicated Group and Ungroup actions.
-- **Layer Arrange Shortcut Double-Trigger Fix** — Fixed `Ctrl+[` and `Ctrl+]` in the Layers panel jumping 2 positions, ensuring strict 1-step layer ordering adjustments.
 
 ## Highlights
 
