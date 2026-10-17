@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,17 +25,19 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.15
+## Current release highlights — v1.3.16
 
-- **Pre-Flight External Photo Modification Verification** — Master photos modified externally on disk before export are automatically detected; previews are refreshed and the user is prompted with safety options to review on canvas or proceed.
-- **Live Asset Auto-Refresh on Window Focus** — Background asset integrity watcher automatically re-checks disk files upon window focus, updating filmstrip thumbnails and canvas previews live without requiring a project reload.
-- **External Photo Freshness Detection & Reload Action** — Added freshness timestamp checks on open, alongside a dedicated "Reload Photo from Disk" context menu action and toolbar refresh option.
-- **Strict 1:1 Layer Ordering Consistency** — Enforced absolute 1:1 invariant between array order and zIndex across canvas rendering, page drawer navigator, export preview snapshots, and final high-resolution export rendering.
-- **Source Photo Collision & Overwrite Prevention** — Added safety pre-flight check preventing export files from accidentally overwriting active project source photos.
-- **Double-Click Fit Button Spam Guard** — Implemented transition lock preventing rapid double-click jump glitches on the canvas Fit button.
-- **Canvas Zoom Range Expansion (10% - 500%)** — Expanded canvas zoom limits from 25%–400% to 10%–500% with smooth slider and wheel scaling.
-- **Layer Arrangement Actions & Shortcuts** — Added Bring Forward and Send Backward layer controls with dedicated keyboard shortcuts (`Ctrl+]` and `Ctrl+[`).
-- **Smart Layout Pro Showcase** — Translated showcase content to English and seamlessly forwarded user Google account email in upgrade parameters.
+- **Floating Canvas Tool Dock (Select & Hand Tools)** — Added an accessible floating dock right under the File menu for seamless 1-click toggling between the standard Select Tool (`V`) and Hand Tool (`H`).
+- **Standard Select & Hand Tool Keyboard Shortcuts** — Integrated industry-standard shortcuts (`H` to activate or toggle Hand Pan mode, `V` to switch back to Select pointer), with automatic input element focus protection.
+- **Canvas Dragging & Pan Event Stream Restoration** — Optimized canvas panning by eliminating conflicting pointer event cancellations and synchronizing Konva stage positioning on mousemove for smooth 60fps/120fps glide.
+- **Persistent Grabbing Cursor on Drag** — Maintained a consistent grabbing cursor across the entire window while dragging in Hand Pan mode via global body state rules.
+- **Folder Collection Keyboard & Batch Management** — Enabled keyboard `Delete` and `Backspace` to remove selected folder collections, multi-select mechanism (`Ctrl+Click`, `Shift+Click`), batch delete context menu, and click-outside/Escape unselect protection.
+- **Instant Empty Folder Deletion** — Allowed empty photo folder collections to delete instantly without confirmation dialogs.
+- **Folder Collection Dropdown Menu Cleanup** — Removed redundant select/unselect option from the 3-dot folder dropdown menu, keeping actions focused on rename and delete.
+- **Sticky Add Folder Button** — Ensured the "Add Folder" button stays permanently pinned and visible when photo folder tabs overflow horizontally.
+- **Layer Panel Arrow Navigation Without Reordering** — Allowed `ArrowUp` and `ArrowDown` in the Layers panel to navigate and inspect layers cleanly without altering stacking order.
+- **Layer Context Menu with Group/Ungroup Controls** — Added rich right-click context menu to the Layers panel featuring dedicated Group and Ungroup actions.
+- **Layer Arrange Shortcut Double-Trigger Fix** — Fixed `Ctrl+[` and `Ctrl+]` in the Layers panel jumping 2 positions, ensuring strict 1-step layer ordering adjustments.
 
 ## Highlights
 
