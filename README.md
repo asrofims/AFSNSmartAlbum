@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.18-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.19-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,20 +25,17 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.18
+## Current release highlights — v1.3.19
 
-- **AI Smart Face Auto-Crop Framing** — Enhanced `calculateSmartFaceCrop` to strictly safeguard chins, mouths, and lower jaws from being cropped when vertical or portrait-aspect photos are placed into horizontal/square frames, enforcing hard lower-boundary bounds with generous chin padding (`chinPadding`) and adaptive headroom.
-- **Robust AI Face Analysis Mapping** — Fixed face detection data binding across album and layout HUD layers so AI-detected facial landmarks and bounding boxes are accurately resolved from photo IDs for all dynamic layouts.
-- **50-Variant Dynamic Curation** — Expanded the curated aesthetic layout engine to generate and display a rich catalog of 50 diverse layout variations per generation cycle.
-- **Dynamic Seed Variation Randomization** — Implemented a seeded Fisher-Yates array permutation (`seededShuffleArray`) ensuring every click of the "Shuffle Variations" button generates a distinct, diverse, and non-repetitive set of 50 layouts.
-- **Strict Safe Margin Confinement** — Eliminated canvas edge bleeding in dynamic layouts by strictly locking object bounding boxes within user-configured page margins and spine bleed boundaries.
-- **Initial Mode Switch Preservation** — Prevented premature canvas changes by disabling automatic randomization upon switching into Dynamic Adaptive mode, keeping the canvas intact until an option is explicitly selected.
-- **Auto-Apply Initial Variant** — Automatically applies the primary curated dynamic variation (Layout 0) upon generation to deliver immediate on-canvas visual feedback.
-- **Dead-Center Visual Loading Spinner** — Perfectly centered the orbit loading spinner animation and status label vertically and horizontally inside the dynamic layout templates container.
-- **English UI Localization** — Standardized dynamic curation controls and progress feedback to clean, professional English (`"Shuffle Variations"`, `"Curating 50 Best Layouts..."`).
-- **Filmstrip Folder Submenu Portal Architecture** — Resolved folder collection target picker ("Add to Folder" and "Move to Folder") failing to display by re-architecting submenus into an independent floating portal at `document.body` level, eliminating container overflow clipping.
-- **Smart Horizontal Viewport Boundary Detection** — Automatically detects screen edges and flips submenus to the left when right-clicking photos near the right side of the filmstrip, preventing off-screen menu truncation.
-- **Floating Canvas Tool Dock (Select & Hand Tools)** — Accessible floating dock directly beneath the File menu for seamless 1-click toggling between the standard Select Tool (`V`) and Hand Tool (`H`).
+- **Canvas Border in High-Resolution Export** — Added native pixel-perfect inside border rasterization with full bleed compensation directly inside the Rust high-resolution export engine, ensuring borders applied to spreads or individual pages render with 100% fidelity in exported JPEG, PNG, and PDF outputs.
+- **Canvas Border SQLite Database Persistence** — Introduced SQLite schema migration `v27` with 9 dedicated columns to permanently persist and restore spread-level and per-page (left/right) canvas border configurations across application restarts and export pipelines.
+- **Direct Canvas / Background Borders** — Added native support for applying custom inside borders directly to the background canvas across album spreads, individual left/right pages, or social media posts with custom width, color, and units without disturbing edge snapping.
+- **Consistent Frame Border Thickness on Resize** — Fixed momentary visual distortion/thickness stretching during interactive frame resizing, keeping stroke borders locked to their configured physical thickness.
+- **Improved Magnetic Snapping with Frame Borders** — Enhanced canvas edge snapping calculations so frames with active borders snap smoothly and immediately to canvas boundaries.
+- **Two-Photo Shuffle Reliability** — Streamlined photo shuffling when 2 photos are present on the canvas or social media posts, guaranteeing deterministic swaps and rich variation generation without requiring 3 photos.
+- **Quick Hand & Select Tool Toggle (`V` / `H`)** — Double-pressing the `V` shortcut now switches directly to the Hand Tool (matching the double-tap `H` behavior for Select Tool) for fluid canvas navigation.
+- **Cleaner Template Shuffle UX** — Removed unnecessary shuffle toast notifications during layout randomization for a distraction-free editing workflow.
+- **Navigation Thumbnail Strip Sync** — Synchronized frame drop shadows, photo filter effects, and opacity across thumbnail previews in the page navigation bar.
 
 ## Highlights
 
