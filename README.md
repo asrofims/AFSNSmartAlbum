@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.20-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.21-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.20
+## Current release highlights — v1.3.21
 
-- **Dynamic Dimension Input Uninhibited Typing** — Completely overhauled numeric input typing dynamics in `NumberInput`, eliminating premature input rejection when typing intermediate numbers smaller than `min` (such as typing digit `5` toward `50`, or `0.` for decimal increments) and preventing abrupt `0` resets while deleting text. Final boundary sanitation is cleanly deferred until blur or Enter.
-- **Adaptive Professional Dimension Limits** — Introduced unit-aware dimension boundaries supporting up to `50,000 px` for pixel projects (unlocking 4K UHD 3840×2160, 8K, and custom large canvas creation), `500 cm` (5 meters), `5,000 mm` (5 meters), and `200 inches` with tailored step increments and decimal precision.
-- **Clarified Page vs. Spread Geometry & Live Calculation Badge** — Explicitly labeled Album dimension inputs as **Page Width** and **Page Height** (and **Post Width** / **Post Height** for Social Media) alongside a real-time banner badge displaying total open spread dimensions (`2× Page Width × Height`) in both physical units and exact export pixels.
-- **Non-Destructive Clean Orientation Swap** — Eliminated arbitrary ratio multipliers (`1.25x`), allowing seamless non-destructive dimension swapping between Portrait and Landscape modes across New Project creation and Social Media post inspection.
-- **Synchronized Properties Panel & Canvas Frame Transforms** — Harmonized the right sidebar Properties panel and element transform controls (`DimensionsTransformControl.tsx`), removing the hardcoded `max={2000}` limit so photo frames and social media posts scale smoothly up to `50,000 px` with explicit unit badges.
+- **Floating Tools Dock Integration** — Relocated the "Add Text" button from the top navigation bar into the floating canvas pointer tools dock alongside Select (`V`) and Hand (`H`) tools with an intuitive typography icon, active inline-editing feedback, and dedicated keyboard shortcut (`T`).
+- **Stabilized Dynamic Slider Maximums** — Eliminated runaway slider upper bounds across Typography (font size), Transform Effects, Drop Shadow, and Background Blur controls by removing the transient `currentValue * 1.5` feedback loop on drag, coupled with an auto-healing safety sweep for out-of-range font sizes.
+- **Expanded Dynamic Blur Range (up to 500 pt)** — Removed legacy 20 pt clamp on photo and background blur across the editor store and appearance controls, unlocking intense blurs up to 500 pt for large canvas formats, fully synchronized with Rust export engine (`sigma_px` expanded to 2000.0).
+- **Export Dialog Cleanup & Consistency** — Streamlined export dialog by removing redundant format and DPI labels from the footer, eliminating duplicate dimension tags in the preview HUD, and removing the arbitrary estimated file size indicator for a clean, consistent export experience.
+- **Dynamic Large-Canvas Typography & Effects Scaling** — Font size slider, drop shadow offset, and blur controls dynamically adapt their maximum ranges based on canvas diagonal dimensions, allowing crisp, large-scale typography and shadows on 4K, 8K, and high-DPI prints.
+- **Mixed Dimensions Project Indicator** — Workspace header badge clearly displays "Mixed Sizes" when working with multi-post social media projects featuring varying canvas aspect ratios and dimensions.
+- **Adaptive Layout Multi-Gap Formations** — Expanded adaptive layout generator with multi-gap breathing room up to 3x spacing, anchor-aware companion formations, and dynamic variation diversity across shuffle cycles.
 
 ## Highlights
 
