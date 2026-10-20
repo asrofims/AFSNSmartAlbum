@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.23-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.24-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,14 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.23
+## Current release highlights — v1.3.24
 
-- **Canvas Auto-Fit & Centering for Mixed Social Media Projects** — Resolved asynchronous loading race conditions by ensuring full SQLite database resolution before mounting the workspace canvas, and enhanced pasteboard geometry tracking to detect physical canvas dimension changes, ensuring multi-format projects open and switch with automatic, centered canvas fitting.
-- **Comprehensive In-App Tutorial & Guide Hub** — Added an interactive multi-topic guide covering New Project Setup (Album vs. Social Media, print DPI, bleeds, margins), Adaptive Layout & Shuffle Engine, Dynamic Tuning Guide (Mood presets, Canvas Density, Gap Breathing up to 10x, Size Contrast, Anchor Protection), Layout & Templates Guide, AI Smart Face Framing, Export & Lab Print Guide, App Settings, and Keyboard Shortcuts.
-- **Meteor Solid Layout Toolbar Icon & Offline Asset** — Upgraded the Smart Layout toolbar icon to a modern Meteor Solid Layout glyph with an ice-blue to lavender linear gradient (`#E0FBFF` to `#bfa3ff`) when active, backed by a permanent local SVG asset for guaranteed 100% offline rendering.
-- **Pixel-Perfect Toolbar Icon Alignment** — Resolved a 1px sub-pixel rounding offset by explicitly resetting user-agent button padding/line-height and standardizing vector dimensions to even 16px geometry with block rendering, achieving exact integer pixel centering across all header tabs.
-- **Alert Dialog Redundant Action Cleanup** — Removed redundant Cancel buttons on informational and recovery alert dialogs, streamlining user confirmation with a clean, single `[OK]` action.
-- **Dynamic Layout Tuning & Breathing Gaps** — Added a dedicated Tune drawer in Adaptive Layout with intuitive Mood presets (*Balanced*, *Airy & Fine-Art*, *Compact & Full*, *Dramatic Hero*, *Uniform Grid*) and dynamic breathing gap scaling up to 10×.
+- **Photo & Background Blur Export DPI Invariance** — Resolved an issue where photo frame blur and background blur multiplied disproportionately with chosen export DPI metadata (e.g., 4.167× more blurred at 300 DPI on 5000px canvases). Aligned blur pixel scaling with `calculate_pt_to_export_px`, ensuring export blur matches canvas rendering 100% identically across any export resolution.
+- **Unified Element Rendering Pipeline** — Extended canvas unit and project base DPI parameters through `render_photo_element` in the native Rust export engine, bringing photo frames, background artwork, drop shadows, and text into complete cross-DPI harmony.
+- **Guaranteed Visual WYSIWYG Fidelity for Social Media Exports** — Pixel-unit projects maintain exact authored blur sharpness and gradient softness across all export metadata presets (72, 150, 300, 600 DPI) without unexpected wash-out or distortion.
+- **Automated Blur Export Regression Test Suite** — Added `test_render_photo_blur_dpi_invariance_for_pixels` to verify bit-exact pixel rendering invariance between 72 DPI and 300 DPI exports in pixel projects.
 
 ## Highlights
 
