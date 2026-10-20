@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.3.24-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.3.25-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.3.24
+## Current release highlights — v1.3.25
 
-- **Photo & Background Blur Export DPI Invariance** — Resolved an issue where photo frame blur and background blur multiplied disproportionately with chosen export DPI metadata (e.g., 4.167× more blurred at 300 DPI on 5000px canvases). Aligned blur pixel scaling with `calculate_pt_to_export_px`, ensuring export blur matches canvas rendering 100% identically across any export resolution.
-- **Unified Element Rendering Pipeline** — Extended canvas unit and project base DPI parameters through `render_photo_element` in the native Rust export engine, bringing photo frames, background artwork, drop shadows, and text into complete cross-DPI harmony.
-- **Guaranteed Visual WYSIWYG Fidelity for Social Media Exports** — Pixel-unit projects maintain exact authored blur sharpness and gradient softness across all export metadata presets (72, 150, 300, 600 DPI) without unexpected wash-out or distortion.
-- **Automated Blur Export Regression Test Suite** — Added `test_render_photo_blur_dpi_invariance_for_pixels` to verify bit-exact pixel rendering invariance between 72 DPI and 300 DPI exports in pixel projects.
+- **Adaptive Layout Card Typography & Switch Spacing** — Eliminated layout crowding where status strings and titles collided directly with the Exclude switch toggle in the properties sidebar, increasing flex gap separation to 12px and isolating toggle controls with dedicated spacing.
+- **Adaptive Layout Card Icon Pixel Centering** — Replaced fractional box geometry with a standard 32px × 32px container with zero padding and line-height reset, ensuring subpixel rounding errors are completely eliminated across Windows DPI scaling presets (100%, 125%, 150%).
+- **Harmonized Adaptive Layout Vector Glyph** — Synchronized the properties panel Adaptive Layout icon with the official Meteor Solid Layout glyph, featuring an ice-blue to lavender gradient when active and crisp accent states when excluded.
+- **Streamlined Concise Card Narrative** — Removed redundant badge clutter, shortened status labels (*Active in layout* / *Excluded overlay*), and simplified descriptive copy down to punchy single-line explanations for a distraction-free properties workflow.
 
 ## Highlights
 
