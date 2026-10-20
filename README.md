@@ -1,139 +1,122 @@
-<div align="center">
-  <img src="assets/app-icon.png" width="132" alt="AFSNSmartAlbum application icon" />
+# AFSNSmartAlbum-Server
 
-  # AFSNSmartAlbum
-
-  **Professional offline desktop layout software for photo albums and social media content.**
-
-  Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
-
-  [![Release](https://img.shields.io/badge/Release-v1.3.25-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
-  [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
-  [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
-  [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
-
-  [Download the latest version](https://github.com/asrofims/AFSNSmartAlbum/releases) · [Visit the website](https://afsn.afsun.my.id)
-</div>
+> Centralized telemetry, device monitoring, and remote configuration backend for **AFSNSmartAlbum** desktop application.
 
 ---
 
-## Two focused design modes
+## 🚀 Key Features
 
-| Photo Album | Social Media |
-| :--- | :--- |
-| Professional layflat spreads with Left Page, Center Gutter/Spine, and Right Page geometry. | True single-post canvas with no album spine or facing-page assumptions. |
-| Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
-| Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
+1. **Simple, Modern & Mobile-Friendly Dashboard:**
+   - Responsive layout: transforms from a detailed data table on desktop to high-contrast touch cards on mobile smartphones.
+   - Real-time stats: Total installations, Active today, Active this week, verified Google-linked installations, and blocked devices.
+2. **Prisma ORM & MySQL Database:**
+   - Safe migrations, type-safe queries, connection pooling, and automatic database seeding.
+3. **Default Admin Account:**
+   - Automatically seeded on first run (`admin` / `admin123`).
+   - Profile settings panel to change username, display name, and password securely (bcrypt hashed).
+4. **Desktop Connection & Telemetry Management:**
+   - Dedicated **Application Connection Panel** with 1-click **Copy URL** and **Copy API Key**.
+   - Remote toggle to enable/disable telemetry ingestion.
+   - Remote minimum required app version policy.
+   - Device blocking/unblocking with one click.
+   - Optional Google desktop account sign-in: verified name, profile photo, and email. See [setup and deployment](docs/google-sign-in.md).
+5. **Single-Command Operation:**
+   - Run both backend and frontend concurrently in development with `npm run dev`.
+   - Build and serve statically with Express in production with `npm start`.
 
-## Current release highlights — v1.3.25
+---
 
-- **Adaptive Layout Card Typography & Switch Spacing** — Eliminated layout crowding where status strings and titles collided directly with the Exclude switch toggle in the properties sidebar, increasing flex gap separation to 12px and isolating toggle controls with dedicated spacing.
-- **Adaptive Layout Card Icon Pixel Centering** — Replaced fractional box geometry with a standard 32px × 32px container with zero padding and line-height reset, ensuring subpixel rounding errors are completely eliminated across Windows DPI scaling presets (100%, 125%, 150%).
-- **Harmonized Adaptive Layout Vector Glyph** — Synchronized the properties panel Adaptive Layout icon with the official Meteor Solid Layout glyph, featuring an ice-blue to lavender gradient when active and crisp accent states when excluded.
-- **Streamlined Concise Card Narrative** — Removed redundant badge clutter, shortened status labels (*Active in layout* / *Excluded overlay*), and simplified descriptive copy down to punchy single-line explanations for a distraction-free properties workflow.
+## 🛠️ Tech Stack
 
-## Highlights
+- **Backend:** Node.js, Express.js, Prisma ORM
+- **Database:** MySQL 8.0+
+- **Frontend:** React 18, Vite, Tailwind CSS, Lucide Icons
+- **Security:** JWT (Admin session), `bcryptjs`, `X-App-Key` header authentication
 
-### Adaptive layouts that respect the design
+---
 
-Generate layout variations for one or many photos using their native aspect ratios. Safe Zone Margins, locked objects, crop state, and configured Photo Spacing remain part of the layout calculation.
+## ⚙️ Configuration (`.env`)
 
-### Exact multi-frame resizing
+All sensitive database and secret configurations are kept in `.env`:
 
-The 2D Topological Spatial Neighbor Graph preserves physical gaps across rows, columns, and asymmetric collages when a multi-selection is resized—without uniform-position scaling that distorts spacing.
+```env
+# Database Connection (MySQL)
+DATABASE_URL="mysql://afsnsmartalbumserver:gokil123@192.168.101.9:3306/afsnsmartalbumserver"
 
-### Smart Magnetic Snapping
+# Server Port
+PORT=5002
 
-Align objects against canvas edges, centers, Safe Zone Margins, neighboring frames, equal gaps, and—when working on albums—the center spine. Rotation-aware and multi-selection snapping provide precise feedback directly on the canvas.
+# JWT Secret for Admin Sessions
+JWT_SECRET="afsn_smart_album_secure_jwt_secret_key_2026_xyz"
 
-### Non-destructive photo editing
+# Default Admin Account (Auto-created during seed)
+DEFAULT_ADMIN_USERNAME="admin"
+DEFAULT_ADMIN_PASSWORD="admin123"
 
-- Interactive in-frame pan, zoom, and crop rotation
-- Drag-and-drop photo replacement and on-canvas photo swapping
-- Per-corner frame rounding, borders, opacity, rotation, and layer ordering
-- `Reset Ratio` restores native photo proportions without discarding the crop
-- `Reset Crop` recenters the photo and restores `1.0x` crop zoom
+# Desktop App Telemetry Secret Key (Header: X-App-Key)
+DEFAULT_APP_KEY="afsn_app_secret_telemetry_key_2026"
+```
 
-### Professional object workflow
+---
 
-- Multi-select, group, lock, align, distribute, and match frame sizes
-- Unified Layers panel with drag-and-drop stack ordering and grouped folders
-- Rich text frames with presets, styling ranges, rotation, opacity, and content fitting
-- Undo/Redo coverage for normal editing and layout operations
+## 📦 Installation & Setup
 
-### Fast offline photo management
+### 1. Install Dependencies
+Run in the root folder:
+```bash
+# Install server dependencies
+npm install
 
-AFSNSmartAlbum uses an `Original → Preview → Thumbnail` pipeline, keeping full-resolution decoding out of routine canvas interaction. Folder collections, Lightroom-style multi-selection, missing-photo relinking, and generated-cache maintenance are built into the desktop workflow.
+# Install client dependencies
+cd client && npm install && cd ..
+```
 
-## Export and project safety
+### 2. Initialize Database & Seed Default Admin
+Push the schema to MySQL and auto-create the default admin account:
+```bash
+npm run db:push
+```
 
-| Capability | Details |
-| :--- | :--- |
-| **Raster export** | High-quality JPEG and PNG with project-aware DPI metadata and optional print sharpening. |
-| **PDF export** | Multi-page PDF output, including projects whose Social Media posts use different dimensions. |
-| **Album output** | Full layflat spreads or individual Left/Right pages with bleed-aware slicing. |
-| **Project files** | Portable `.afsn` archives with SQLite project data and managed image assets. |
-| **Recovery** | Crash-recovery snapshots, configurable auto-save, and guarded file replacement. |
-| **Privacy** | Local-first processing with no server dependency for editing or export. |
+### 3. Run Application
 
-## Core workflow
+#### Development Mode (Vite Hot-Reload + Nodemon):
+```bash
+npm run dev
+```
 
-1. Create a **Photo Album** or **Social Media** project and choose a preset.
-2. Import folders or photos into the local library.
-3. Drag photos onto the canvas or generate Adaptive Layout variations.
-4. Refine frames, crops, text, layers, spacing, and Safe Zone Margins.
-5. Export production-ready JPEG, PNG, or PDF files.
+#### Production Mode (Single Port 5002):
+```bash
+npm run build
+npm start
+```
+Access the dashboard at `http://localhost:5002`.
 
-## Essential shortcuts
+---
 
-| Shortcut | Action |
-| :--- | :--- |
-| <kbd>Spacebar</kbd> + Drag | Pan the canvas |
-| <kbd>Ctrl</kbd> + Mouse Wheel | Zoom in or out |
-| <kbd>Ctrl</kbd> + <kbd>0</kbd> | Fit and center the active canvas |
-| <kbd>P</kbd> | Open the Properties panel |
-| <kbd>L</kbd> | Open the Layers panel |
-| <kbd>G</kbd> | Open the Smart Layout panel |
-| <kbd>T</kbd> | Add a text frame |
-| <kbd>Ctrl</kbd> + <kbd>A</kbd> | Select all canvas objects |
-| <kbd>Ctrl</kbd> + <kbd>G</kbd> | Group selected objects |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> | Ungroup selected objects |
-| <kbd>Ctrl</kbd> + <kbd>L</kbd> | Lock selected objects |
-| <kbd>Alt</kbd> + Drag | Duplicate while dragging |
-| <kbd>S</kbd> | Swap two selected photos |
-| <kbd>R</kbd> / <kbd>Shift</kbd> + <kbd>R</kbd> | Rotate clockwise / counterclockwise |
+## 📱 Desktop Integration Quick Reference
 
-The in-app shortcut reference provides the complete, context-aware list.
+AFSNSmartAlbum desktop application pings the server using:
 
-## Technology
+- **Method:** `POST`
+- **URL:** `http://<server-ip>:5002/api/telemetry/ping`
+- **Headers:**
+  - `Content-Type: application/json`
+  - `X-App-Key: <APP_API_KEY>`
+- **Payload:**
+```json
+{
+  "installationCode": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "installedAt": "2026-09-27T15:00:00Z",
+  "appVersion": "1.0.0",
+  "osInfo": "Windows 11 Build 22631"
+}
+```
 
-| Area | Stack |
-| :--- | :--- |
-| Desktop runtime | Tauri 2 + Rust |
-| Interface | React 18 + TypeScript + Vite |
-| Canvas | Konva.js + React-Konva |
-| State | Zustand |
-| Persistence | SQLite + Rusqlite |
-| Image processing | Native Rust image pipeline + Rayon |
+---
 
-## System requirements
+## 📚 Agent Skills
 
-| | Minimum | Recommended |
-| :--- | :--- | :--- |
-| Operating system | Windows 10, 64-bit | Windows 11, 64-bit |
-| Processor | Dual-core 2.0 GHz | Modern quad-core Intel Core i5 / AMD Ryzen 5 or better |
-| Memory | 4 GB RAM | 8–16 GB RAM for large projects |
-| Display | 1280 × 800 | 1920 × 1080 or higher |
-| Storage | 200 MB for the application | SSD storage for previews, cache, and project assets |
-
-## Updates and support
-
-Use **About AFSNSmartAlbum → Check Updates** to check for a newer signed application release. Project work remains available offline.
-
-AFSNSmartAlbum is independently developed by **Afsunmedia**. The application includes an optional QRIS contribution entry for users who want to support continued development.
-
-## License
-
-Copyright © 2026 **Afsunmedia**. All rights reserved.
-
-AFSNSmartAlbum is proprietary software. Its open-source foundations include [Tauri](https://tauri.app/), [React](https://react.dev/), [Konva](https://konvajs.org/), [SQLite](https://www.sqlite.org/), and [Rayon](https://github.com/rayon-rs/rayon).
+Agent rules and standardized skills are documented in `.agents/skills/`:
+- [`ui-design`](.agents/skills/ui-design/SKILL.md): Mobile-first design tokens, touch targets, and responsiveness guidelines.
+- [`testing`](.agents/skills/testing/SKILL.md): API endpoint tests, password update verification, and mobile viewport checks.
+- [`telemetry-server`](.agents/skills/telemetry-server/SKILL.md): Architecture specifications, Prisma schema, and security rules.
