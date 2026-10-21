@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,14 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.2
+## Current release highlights — v1.4.3
+
+- **Offline UI Notification Clutter Fix** — Resolved an issue where redundant offline notification cards, empty states, and bottom status alerts were stacked simultaneously in the Assets Panel upon network disruption.
+- **Simplified & Minimalist Connection Status UX** — Redesigned the Assets Panel offline indicator to display a single, compact 1-line bar when cached assets are ready, and a friendly centered empty state when empty.
+- **Modern Cloud Off Iconography** — Replaced legacy WiFi-off glyphs with the clean, modern Cloud Off vector icon matching the application design language.
+- **Relaxed & Friendly Phrasing** — Updated connection disturbance messaging to clear, casual, and friendly English.
+
+## Highlights from v1.4.2
 
 - **Grayscale & Photo Effects in Export Preview** — Resolved an issue where photos with grayscale, blur, or noise filters disappeared from the Export Dialog preview snapshot. Configured cross-origin permissions on preview image loading to prevent canvas tainting (`SecurityError`) and introduced graceful native canvas filter fallbacks for robust rendering under all browser environments.
 - **Resilient Photo Effect Pipeline** — Implemented multi-layered safety fallbacks in `renderPhotoEffectsBitmap` and `ExportPreviewSnapshotCanvas` ensuring seamless rendering even under strict cross-origin browser sandbox restrictions.
