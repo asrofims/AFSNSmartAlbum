@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.1
+## Current release highlights — v1.4.2
+
+- **Grayscale & Photo Effects in Export Preview** — Resolved an issue where photos with grayscale, blur, or noise filters disappeared from the Export Dialog preview snapshot. Configured cross-origin permissions on preview image loading to prevent canvas tainting (`SecurityError`) and introduced graceful native canvas filter fallbacks for robust rendering under all browser environments.
+- **Resilient Photo Effect Pipeline** — Implemented multi-layered safety fallbacks in `renderPhotoEffectsBitmap` and `ExportPreviewSnapshotCanvas` ensuring seamless rendering even under strict cross-origin browser sandbox restrictions.
+
+## Highlights from v1.4.1
 
 - **Graphic Asset SQLite Persistence & Self-Healing Disk Cache** — Resolved an issue where graphic design assets failed to render after saving and reopening a project. Guaranteed `filePath`, `fileUrl`, and asset ID persist reliably across SQLite save cycles with automatic disk cache recovery on load.
 - **Graphic Asset Rendering in Export Snapshot & 300 DPI Output** — Resolved an issue where graphic assets were omitted from the export navigation preview snapshot canvas and the final exported print files. Integrated background disk caching in `graphicAssetService`, pre-resolved local file paths for export, and enabled native Rust export engine rendering at full print resolution.
