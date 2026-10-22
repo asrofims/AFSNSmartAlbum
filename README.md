@@ -27,6 +27,9 @@
 
 ## Current release highlights — v1.4.9
 
+- **Restored Direct In-App Update Download & Installation** — Restored the seamless in-app updater workflow where updates download directly inside the desktop application with a real-time progress bar, eliminating external browser redirects to GitHub download pages.
+- **Autonomous Update Detection (Decoupled from Server Minimum Version)** — Decoupled desktop update detection from the server dashboard's minimum required version. The application independently queries and detects new releases directly from GitHub, treating the server's minimum version strictly as an advisory notice rather than a prerequisite to trigger update discovery.
+- **Live On-Demand Update Verification** — Users can check for updates on-demand at any time using the "Check Again" control in the update modal or top toolbar without closing or restarting the active session.
 - **Layout Template Save Deserialization (`save_layout_template`)** — Fixed Rust Serde backend deserialization error when saving layout templates caused by strict numeric types and optional frame asset metadata fields (`id`, `label`, `assetId`, `thumbnailUrl`, `licenseTier`, etc.).
 - **Template Layout Grid & Visual Boundary** — Resolved excessively thick border outlines and cramped slot positioning during layout template saving, ensuring clean grid borders and consistent visual margin layout.
 - **Dynamic Asset Metadata & Auto-Healing Template Layouts** — Template slots now persist dynamic frame asset references (`assetId`, `assetUrl`, `licenseTier`) instead of bulky bundled binaries. Missing or uncached frame assets are automatically resolved, downloaded, and cached from the server in the background.
