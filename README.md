@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.13-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.13
+## Current release highlights — v1.4.14
 
-- **Modern Template Cards & Action Deck** — Overhauled Saved Templates cards with larger visual preview areas, modern rounded corners, project kind badges, and an intuitive action deck featuring a direct "Apply" button triggering the template tuning modal.
-- **Intelligent Template Matching by Project Kind** — Templates now automatically filter by default according to the active project type (Social Media Post vs. Album Spread), with an informational notice bar and toggle to show all templates.
-- **Streamlined Multi-Selection & Deselect** — Replaced intrusive checkboxes with card-level selection indicators, native `Ctrl` and `Shift` multi-selection combinations, and one-click deselect toggling.
-- **Horizontal Scrollable Filter Chips** — Relocated category filter chips neatly below the folder row with smooth horizontal scrolling and hidden scrollbars.
-- **Smart Layout & Asset Panel Visual Harmonization** — Harmonized sub-navigation tabs, search inputs, tier segmented bars (`[ All | Free | PRO ]`), and filter chips across the Asset, Smart Layout, and Templates panels with unified dark glass slate and glowing cyan styling.
+- **Canvas Image Blank White Fix** — Eliminated the canvas blank white rendering issue when placing more than 24 images on a spread by upgrading the bounded image cache and preventing active bitmap texture unloading.
+- **Active Spread Photo Guard** — Added active canvas spread protection (`activeCanvasPhotoIds`) ensuring all images currently visible on the active spread are strictly exempted from LRU cache eviction.
+- **Expanded Canvas Image Capacity (up to 500 images)** — Scaled `MAX_CANVAS_IMAGE_CACHE` from 24 up to 500 images, allowing seamless creation of complex photo collages, high-density photo mosaics, and yearbooks without memory degradation.
+- **Workspace Cleanup & Disk Optimization** — Purged legacy audit documents, old release notes, duplicate asset files, and unused scratch browser mocks, reclaiming over 20 GB of local storage.
+- **Automated Local Release Infrastructure** — Added a robust local release automation script (`scripts/build-local-release.cjs`) providing reliable, unattended digital signing and schema-strict updater manifests.
 
 
 ## Highlights

@@ -1,25 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.13
+Version: 1.4.14
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.13 ]
+[ WHAT'S NEW IN 1.4.14 ]
 --------------------------------------------------------------------------------
-* Modern Template Cards & Action Deck: Overhauled Saved Templates cards with
-  larger visual preview areas, modern rounded corners, project kind badges, and
-  an intuitive action deck featuring a direct "Apply" button triggering the modal.
-* Intelligent Template Matching by Project Kind: Templates now automatically
-  filter by default according to the active project type (Social Media vs Album),
-  with an informational notice bar and toggle to show all templates.
-* Streamlined Multi-Selection & Deselect: Replaced checkboxes with card-level
-  indicators, native Ctrl and Shift multi-selection, and one-click deselect.
-* Horizontal Scrollable Filter Chips: Relocated category filter chips neatly below
-  the folder row with smooth horizontal scrolling and hidden scrollbars.
-* Smart Layout & Asset Panel Visual Harmonization: Harmonized sub-navigation tabs,
-  search inputs, tier segmented bars ([ All | Free | PRO ]), and filter chips
-  across Asset, Smart Layout, and Templates panels with unified modern styling.
+* Canvas Image Blank White Fix: Eliminated the canvas blank white rendering issue
+  when placing more than 24 images on a spread by upgrading the bounded image
+  cache and preventing active bitmap texture unloading.
+* Active Spread Photo Guard: Added active canvas spread protection
+  (activeCanvasPhotoIds) ensuring all images currently visible on the active
+  spread are strictly exempted from LRU cache eviction.
+* Expanded Canvas Image Capacity (up to 500 images): Scaled MAX_CANVAS_IMAGE_CACHE
+  from 24 up to 500 images, allowing seamless creation of complex photo collages,
+  high-density photo mosaics, and yearbooks without memory degradation.
+* Workspace Cleanup & Disk Optimization: Purged legacy audit documents, old
+  release notes, duplicate asset files, and unused scratch browser mocks,
+  reclaiming over 20 GB of local storage.
+* Automated Local Release Infrastructure: Added a robust local release automation
+  script (scripts/build-local-release.cjs) providing reliable, unattended digital
+  signing and schema-strict updater manifests.
 
 
 [ 1. OVERVIEW ]
