@@ -1,11 +1,29 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.6
+Version: 1.4.7
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.6 ]
+[ WHAT'S NEW IN 1.4.7 ]
+--------------------------------------------------------------------------------
+* Live Update Verification without Restart: Resolved an issue where checking for
+  updates was bypassed if the app was previously marked as up-to-date, allowing
+  users to check for new releases in real time without restarting.
+* Dynamic Toolbar Update Button: Resolved an issue where the top toolbar green
+  update button only showed up after restarting the application. The button now
+  lights up dynamically during active album design sessions as soon as telemetry
+  signals a recommended version or an update is detected.
+* "Check Again" Verification Control: Added a dedicated "Check Again" button in
+  the update modal so users can re-verify update status on demand at any time.
+* Continuous Periodic Background Update Checks: Added automatic background
+  update polling every 15 minutes, as well as upon window focus and network
+  reconnection, ensuring users are promptly notified of new releases while working.
+* Cache-Busting for Manifest & Release Assets: Integrated HTTP no-cache
+  directives and cache-busting query timestamps to prevent Windows network
+  caches, proxies, or CDNs from returning stale latest.json or release metadata.
+
+[ PREVIOUS HIGHLIGHTS (1.4.6) ]
 --------------------------------------------------------------------------------
 * Strict PRO Graphic Design Export Protection: Gated export of graphic design
   assets with PRO status identically to PRO frames. Free tier accounts cannot
