@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.13-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.12
+## Current release highlights — v1.4.13
 
-- **Unified Canvas Border Master Switch** — Streamlined canvas border management into a single master on/off switch; cleanly hides all secondary scope options and controls when inactive to eliminate visual clutter.
-- **Mutual-Exclusive Canvas Border Scopes (`Spread`, `Left`, `Right`, `Both`)** — Introduced a versatile 4-way scope selector allowing users to apply borders around the full spread perimeter, left page only, right page only, or both left and right pages simultaneously separated by the spine gutter.
-- **Zero Border Clashing & Real-time Canvas Rendering** — Eliminated border collision across Konva editor canvas, PageNavigator filmstrip thumbnails, and Tauri high-resolution export pipelines with synchronized real-time width and color updates.
-- **Scope-Aware Border Propagation** — "Apply to All Spreads" and project defaults seamlessly respect the active scope configuration across all album spreads.
+- **Modern Template Cards & Action Deck** — Overhauled Saved Templates cards with larger visual preview areas, modern rounded corners, project kind badges, and an intuitive action deck featuring a direct "Apply" button triggering the template tuning modal.
+- **Intelligent Template Matching by Project Kind** — Templates now automatically filter by default according to the active project type (Social Media Post vs. Album Spread), with an informational notice bar and toggle to show all templates.
+- **Streamlined Multi-Selection & Deselect** — Replaced intrusive checkboxes with card-level selection indicators, native `Ctrl` and `Shift` multi-selection combinations, and one-click deselect toggling.
+- **Horizontal Scrollable Filter Chips** — Relocated category filter chips neatly below the folder row with smooth horizontal scrolling and hidden scrollbars.
+- **Smart Layout & Asset Panel Visual Harmonization** — Harmonized sub-navigation tabs, search inputs, tier segmented bars (`[ All | Free | PRO ]`), and filter chips across the Asset, Smart Layout, and Templates panels with unified dark glass slate and glowing cyan styling.
 
 
 ## Highlights

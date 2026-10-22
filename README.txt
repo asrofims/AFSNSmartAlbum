@@ -1,24 +1,25 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.12
+Version: 1.4.13
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.12 ]
+[ WHAT'S NEW IN 1.4.13 ]
 --------------------------------------------------------------------------------
-* Unified Canvas Border Master Switch: Streamlined canvas border management into
-  a single master on/off switch; cleanly hides all secondary scope options and
-  controls when inactive to eliminate visual clutter.
-* Mutual-Exclusive Canvas Border Scopes (Spread, Left, Right, Both): Introduced
-  a versatile 4-way scope selector allowing users to apply borders around the
-  full spread perimeter, left page only, right page only, or both left and right
-  pages simultaneously separated by the spine gutter.
-* Zero Border Clashing & Real-time Canvas Rendering: Eliminated border collision
-  across Konva editor canvas, PageNavigator filmstrip thumbnails, and Tauri
-  high-resolution export pipelines with synchronized real-time width and color updates.
-* Scope-Aware Border Propagation: "Apply to All Spreads" and project defaults
-  seamlessly respect the active scope configuration across all album spreads.
+* Modern Template Cards & Action Deck: Overhauled Saved Templates cards with
+  larger visual preview areas, modern rounded corners, project kind badges, and
+  an intuitive action deck featuring a direct "Apply" button triggering the modal.
+* Intelligent Template Matching by Project Kind: Templates now automatically
+  filter by default according to the active project type (Social Media vs Album),
+  with an informational notice bar and toggle to show all templates.
+* Streamlined Multi-Selection & Deselect: Replaced checkboxes with card-level
+  indicators, native Ctrl and Shift multi-selection, and one-click deselect.
+* Horizontal Scrollable Filter Chips: Relocated category filter chips neatly below
+  the folder row with smooth horizontal scrolling and hidden scrollbars.
+* Smart Layout & Asset Panel Visual Harmonization: Harmonized sub-navigation tabs,
+  search inputs, tier segmented bars ([ All | Free | PRO ]), and filter chips
+  across Asset, Smart Layout, and Templates panels with unified modern styling.
 
 
 [ 1. OVERVIEW ]
