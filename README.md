@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.4
+## Current release highlights — v1.4.5
+
+- **Safe Graphic Vector Icon in Layers Panel** — Replaced failing image loading (`<img>`) on the Layers Panel with a dedicated, safe vector design icon (`GraphicThumbnailIcon`) with amber/gold styling (`#fbbf24`), completely eliminating broken image icon visuals and disk/network latency when inspecting graphic layers.
+- **Graphic Design PRO Badge Alignment** — Replaced the overflowing `"PRO"` text on graphic cards with a sleek, precise diamond vector icon glassmorphism badge (`badgePro`), identical in design, dimensions, and styling to the Frame catalog PRO badge.
+- **Photo Thumbnail Fallback Concealment** — Added protective `onError` fallback concealing for photo frame thumbnails in the Layers Panel.
+
+## Highlights from v1.4.4
 
 - **Loading Skeleton & Broken Image Elimination** — Completely eliminated native browser broken image visual icons during network asset loading and fallback transitions in both Frames and Graphic Design panels. Image elements are hidden until successfully loaded and then smoothly faded in.
 - **Dark-Slate Animated Shimmer Skeleton** — Overlaid loading card preview boxes with an elegant dark-slate animated shimmer sweep and pulsing placeholder glyphs, masking the checkerboard background during image downloading and decoding.
