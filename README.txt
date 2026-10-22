@@ -1,11 +1,33 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.8
+Version: 1.4.9
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.8 ]
+[ WHAT'S NEW IN 1.4.9 ]
+--------------------------------------------------------------------------------
+* Layout Template Save Deserialization: Fixed Rust Serde backend deserialization
+  error when saving layout templates caused by strict numeric types and
+  optional frame asset metadata fields.
+* Template Layout Grid & Visual Boundary: Resolved excessively thick border
+  outlines and cramped slot positioning during layout template saving, ensuring
+  clean grid borders and consistent visual margin layout.
+* Dynamic Asset Metadata & Auto-Healing Template Layouts: Template slots now
+  persist dynamic frame asset references (assetId, assetUrl, licenseTier) instead
+  of bulky bundled binaries. Missing or uncached frame assets are automatically
+  resolved, downloaded, and cached from the server in the background.
+* English Template Asset Licensing Guard Modal: Added a clean modal alert
+  dialog informing users when an applied template contains Pro assets or
+  currently unavailable assets with a clear confirmation button.
+* Persistent Frame Styling Toggle Switch: Restored the "Include Frame Styling"
+  toggle switch unconditionally in the Save Template modal, enabling users to
+  choose whether slot frames, corners, and dynamic asset styling should be saved.
+* Graphic Assets Renamed to 'Elements': Renamed the "Graphic Design" inspector
+  panel and asset tab to "Elements" across the entire desktop workspace UI for
+  cleaner and more intuitive modern workflow navigation.
+
+[ PREVIOUS HIGHLIGHTS (1.4.8) ]
 --------------------------------------------------------------------------------
 * Safe Cancellation for Project Package Export: Resolved missing stop/cancel
   mechanism in Export Project Package (.zip), allowing users to safely abort
