@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.8-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.9-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,16 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.8
+## Current release highlights — v1.4.9
+
+- **Layout Template Save Deserialization (`save_layout_template`)** — Fixed Rust Serde backend deserialization error when saving layout templates caused by strict numeric types and optional frame asset metadata fields (`id`, `label`, `assetId`, `thumbnailUrl`, `licenseTier`, etc.).
+- **Template Layout Grid & Visual Boundary** — Resolved excessively thick border outlines and cramped slot positioning during layout template saving, ensuring clean grid borders and consistent visual margin layout.
+- **Dynamic Asset Metadata & Auto-Healing Template Layouts** — Template slots now persist dynamic frame asset references (`assetId`, `assetUrl`, `licenseTier`) instead of bulky bundled binaries. Missing or uncached frame assets are automatically resolved, downloaded, and cached from the server in the background.
+- **English Template Asset Licensing Guard Modal** — Added a clean modal alert dialog informing users when an applied template contains Pro assets or currently unavailable assets ("*This template contains assets designed for Pro users / some assets in this template are not currently available. Visual appearance may vary slightly until assets are synchronized.*") with a clear confirmation button ("*Yes, I understand*").
+- **Persistent Frame Styling Toggle Switch** — Restored the "Include Frame Styling" toggle switch unconditionally in the Save Template modal, enabling users to choose whether slot frames, corners, and dynamic asset styling should be saved into the template regardless of slot selection state.
+- **Graphic Assets Renamed to 'Elements'** — Renamed the "Graphic Design" inspector panel and asset tab to "Elements" across the entire desktop workspace UI for cleaner and more intuitive modern workflow navigation.
+
+## Highlights from v1.4.8
 
 - **Safe Cancellation for Project Package Export** — Resolved missing stop/cancel mechanism in Export Project Package (`.zip`), allowing users to safely abort export at any point without crashes, UI lockups, or orphaned files.
 - **Atomic File Cleanup on Abort** — Ensured that cancelling export immediately stops compression, frees all file handles, and cleanly removes temporary files (`.afsn-*.tmp`) without leaving corrupt or incomplete zip archives in the target folder.
