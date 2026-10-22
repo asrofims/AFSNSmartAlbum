@@ -7,6 +7,17 @@ Author: Afsunmedia - Asrofims
 
 [ WHAT'S NEW IN 1.4.9 ]
 --------------------------------------------------------------------------------
+* Restored Direct In-App Update Download & Installation: Restored the seamless
+  in-app updater workflow where updates download directly inside the desktop
+  application with a real-time progress bar, eliminating external browser redirects
+  to GitHub download pages.
+* Autonomous Update Detection (Decoupled from Server Minimum Version): Decoupled
+  desktop update detection from the server dashboard's minimum required version.
+  The application independently queries and detects new releases directly from
+  GitHub, treating the server's minimum version strictly as an advisory notice.
+* Live On-Demand Update Verification: Users can check for updates on-demand at
+  any time using the "Check Again" control in the update modal or top toolbar
+  without closing or restarting the active session.
 * Layout Template Save Deserialization: Fixed Rust Serde backend deserialization
   error when saving layout templates caused by strict numeric types and
   optional frame asset metadata fields.
