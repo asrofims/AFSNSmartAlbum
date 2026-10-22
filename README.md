@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.11
+## Current release highlights — v1.4.12
 
-- **Direct Standalone Installer Download (`📥 Manual Update`)** — Replaced the external GitHub webpage link in the update modal with a direct standalone installer download button, enabling users to immediately download the setup executable (`AFSNSmartAlbum_1.4.11_x64-setup.exe`) to their local disk without navigating through GitHub web pages.
-- **Canonical Setup Binary URL Resolution** — Updated update check routines across native Tauri checks and fallback queries to automatically generate and provide direct `.exe` binary download URLs.
-- **Dual-Action Update Interface Architecture** — Streamlined the update dialog into a versatile dual-action interface: users can trigger the seamless background in-app update via "⚡ Update Now" or manually download the full standalone installer via "📥 Manual Update".
-- **Enhanced Modal Error Resilience** — Retained the direct manual download capability in both "update available" and "network error" states, ensuring users can always retrieve new versions regardless of local updater environment status.
+- **Unified Canvas Border Master Switch** — Streamlined canvas border management into a single master on/off switch; cleanly hides all secondary scope options and controls when inactive to eliminate visual clutter.
+- **Mutual-Exclusive Canvas Border Scopes (`Spread`, `Left`, `Right`, `Both`)** — Introduced a versatile 4-way scope selector allowing users to apply borders around the full spread perimeter, left page only, right page only, or both left and right pages simultaneously separated by the spine gutter.
+- **Zero Border Clashing & Real-time Canvas Rendering** — Eliminated border collision across Konva editor canvas, PageNavigator filmstrip thumbnails, and Tauri high-resolution export pipelines with synchronized real-time width and color updates.
+- **Scope-Aware Border Propagation** — "Apply to All Spreads" and project defaults seamlessly respect the active scope configuration across all album spreads.
 
 
 ## Highlights
