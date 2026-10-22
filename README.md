@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.6-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,14 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.5
+## Current release highlights — v1.4.6
+
+- **Strict PRO Graphic Design Export Protection** — Gated export of graphic design assets with PRO status identically to PRO frames. Free tier accounts cannot export projects containing PRO graphics unless they have an active PRO subscription or the workspace is under Global Promo / Launch Promo.
+- **PRO Graphic Detachment Workflow** — Updated the "Detach PRO Assets" action in the export dialog to automatically remove PRO graphic elements alongside PRO frame detachment, immediately unblocking export.
+- **SQLite Database Persistence for PRO Graphics** — Preserved `is_pro` status across project save and load cycles so PRO status survives restarts and reloads without degradation.
+- **Rust High-Res Export Engine Enforcement** — Added native backend verification in `export_commands.rs` to validate non-pro accounts against projects with PRO graphic elements.
+
+## Highlights from v1.4.5
 
 - **Safe Graphic Vector Icon in Layers Panel** — Replaced failing image loading (`<img>`) on the Layers Panel with a dedicated, safe vector design icon (`GraphicThumbnailIcon`) with amber/gold styling (`#fbbf24`), completely eliminating broken image icon visuals and disk/network latency when inspecting graphic layers.
 - **Graphic Design PRO Badge Alignment** — Replaced the overflowing `"PRO"` text on graphic cards with a sleek, precise diamond vector icon glassmorphism badge (`badgePro`), identical in design, dimensions, and styling to the Frame catalog PRO badge.
