@@ -1,11 +1,30 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.7
+Version: 1.4.8
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.7 ]
+[ WHAT'S NEW IN 1.4.8 ]
+--------------------------------------------------------------------------------
+* Safe Cancellation for Project Package Export: Resolved missing stop/cancel
+  mechanism in Export Project Package (.zip), allowing users to safely abort
+  export at any point without crashes, UI lockups, or orphaned files.
+* Atomic File Cleanup on Abort: Ensured that cancelling export immediately
+  stops compression, frees all file handles, and cleanly removes temporary
+  files (.afsn-*.tmp) without leaving corrupt or incomplete zip archives in the
+  target folder.
+* Interactive Cancel Control in Progress Toast: Added an interactive "Batal"
+  (Cancel) button directly inside the export package real-time progress toast
+  with immediate visual feedback ("Membatalkan...").
+* Graceful Project Store State Recovery: Suppressed disruptive global red error
+  banners upon user-initiated cancellation and immediately released the saving
+  lock (isSaving) to preserve smooth canvas editing.
+* Accessible Cancelled Notification: Enhanced the progress toast to display a
+  calm, accessible "Export Dibatalkan" amber banner with auto-dismiss and
+  manual dismissal controls.
+
+[ PREVIOUS HIGHLIGHTS (1.4.7) ]
 --------------------------------------------------------------------------------
 * Live Update Verification without Restart: Resolved an issue where checking for
   updates was bypassed if the app was previously marked as up-to-date, allowing

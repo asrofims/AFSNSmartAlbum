@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.7-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.8-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,7 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.7
+## Current release highlights — v1.4.8
+
+- **Safe Cancellation for Project Package Export** — Resolved missing stop/cancel mechanism in Export Project Package (`.zip`), allowing users to safely abort export at any point without crashes, UI lockups, or orphaned files.
+- **Atomic File Cleanup on Abort** — Ensured that cancelling export immediately stops compression, frees all file handles, and cleanly removes temporary files (`.afsn-*.tmp`) without leaving corrupt or incomplete zip archives in the target folder.
+- **Interactive Cancel Control in Progress Toast** — Added an interactive "Batal" (Cancel) button directly inside the export package real-time progress toast with immediate visual feedback ("Membatalkan...").
+- **Graceful Project Store State Recovery** — Suppressed disruptive global red error banners upon user-initiated cancellation and immediately released the saving lock (`isSaving`) to preserve smooth canvas editing.
+- **Accessible Cancelled Notification** — Enhanced the progress toast to display a calm, accessible "Export Dibatalkan" amber banner with auto-dismiss and manual dismissal controls.
+
+## Highlights from v1.4.7
 
 - **Live Update Verification without Restart** — Resolved an issue where checking for updates got stuck displaying cached "Up to Date" status even when newer recommended releases were published. Opening the update modal or clicking "Check Now" now always performs a fresh, live network query.
 - **Dynamic Toolbar Update Button** — Resolved an issue where the green "Update" button in the top toolbar only showed up after restarting the application. The button now lights up dynamically during active album design sessions as soon as telemetry signals a recommended version or an update is detected.
