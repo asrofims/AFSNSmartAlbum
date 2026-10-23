@@ -1,23 +1,23 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.16
+Version: 1.4.17
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.16 ]
+[ WHAT'S NEW IN 1.4.17 ]
 --------------------------------------------------------------------------------
-* Recent Project Save State Integrity Fix: Resolved issue where reopening a project
-  from Recent Projects after clicking "Exit Without Saving" or "Don't Save" still
-  marked the project as unsaved (orange save button). The app now cleanly purges crash
-  recovery markers (afsn_dirty and snapshots) upon explicit discard and re-syncs SQLite
-  state from the authoritative .afsn archive file on disk.
-* Clean Workspace Project Close: Fixed toolbar project close (✕) and exit warning modal
-  to discard uncommitted runtime state and recovery flags so discarded changes never
-  leak into future sessions.
-* Reliable Storage Synchronization: Guaranteed that SQLite local cache always matches
-  the authored .afsn document when opening saved projects, while preserving crash recovery
-  protection during unexpected app terminations.
+* Canvas Zoom Slider Focus Trap & Shortcuts Fix: Fixed an issue where adjusting canvas
+  zoom via the bottom toolbar slider trapped DOM focus on <input type="range">,
+  blocking single-key shortcuts V (Select Tool) and H (Hand Tool) as well as
+  Spacebar panning until the "Fit" button was clicked.
+* Precision Editable Text Input Guard: Replaced indiscriminate tagName === 'INPUT'
+  checks with a centralized isEditableTextInput utility, ensuring non-text controls
+  (range sliders, checkboxes, radios, buttons) never block keyboard shortcuts while
+  preserving full typing safety for text layers and search inputs.
+* Instant Focus Release on Slider & Canvas Interaction: Added auto-blur on slider pointer
+  release and canvas pointer interactions so tool switching between Select and Hand
+  tools works smoothly and instantly immediately after zooming.
 
 
 [ 1. OVERVIEW ]

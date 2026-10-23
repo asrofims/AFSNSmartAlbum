@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.17-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.16
+## Current release highlights — v1.4.17
 
-- **Recent Project Save State Integrity Fix** — Resolved issue where reopening a project from Recent Projects after clicking "Exit Without Saving" or "Don't Save" still marked the project as unsaved (orange save button). The app now cleanly purges crash recovery markers (`afsn_dirty` and snapshots) upon explicit discard and re-syncs SQLite state from the authoritative `.afsn` archive file on disk.
-- **Clean Workspace Project Close** — Fixed toolbar project close (`✕`) and exit warning modal to discard uncommitted runtime state and recovery flags so discarded changes never leak into future sessions.
-- **Reliable Storage Synchronization** — Guaranteed that SQLite local cache always matches the authored `.afsn` document when opening saved projects, while preserving crash recovery protection during unexpected app terminations.
+- **Canvas Zoom Slider Focus Trap & Shortcuts Fix** — Fixed an issue where adjusting canvas zoom via the bottom toolbar slider trapped DOM focus on `<input type="range">`, blocking single-key shortcuts `V` (Select Tool) and `H` (Hand Tool) as well as Spacebar panning until the "Fit" button was clicked.
+- **Precision Editable Text Input Guard** — Replaced indiscriminate `tagName === 'INPUT'` checks with a centralized `isEditableTextInput` utility, ensuring non-text controls (range sliders, checkboxes, radios, buttons) never block keyboard shortcuts while preserving full typing safety for text layers and search inputs.
+- **Instant Focus Release on Slider & Canvas Interaction** — Added auto-blur on slider pointer release and canvas pointer interactions so tool switching between Select and Hand tools works smoothly and instantly immediately after zooming.
 
 
 ## Highlights
