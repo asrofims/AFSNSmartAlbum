@@ -1,27 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.14
+Version: 1.4.15
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.14 ]
+[ WHAT'S NEW IN 1.4.15 ]
 --------------------------------------------------------------------------------
-* Canvas Image Blank White Fix: Eliminated the canvas blank white rendering issue
-  when placing more than 24 images on a spread by upgrading the bounded image
-  cache and preventing active bitmap texture unloading.
-* Active Spread Photo Guard: Added active canvas spread protection
-  (activeCanvasPhotoIds) ensuring all images currently visible on the active
-  spread are strictly exempted from LRU cache eviction.
-* Expanded Canvas Image Capacity (up to 500 images): Scaled MAX_CANVAS_IMAGE_CACHE
-  from 24 up to 500 images, allowing seamless creation of complex photo collages,
-  high-density photo mosaics, and yearbooks without memory degradation.
-* Workspace Cleanup & Disk Optimization: Purged legacy audit documents, old
-  release notes, duplicate asset files, and unused scratch browser mocks,
-  reclaiming over 20 GB of local storage.
-* Automated Local Release Infrastructure: Added a robust local release automation
-  script (scripts/build-local-release.cjs) providing reliable, unattended digital
-  signing and schema-strict updater manifests.
+* Canvas Border z-index Ordering Fix: Resolved z-index stacking issues where
+  canvas borders rendered beneath edge photos. Borders now properly frame canvas
+  perimeter content across the editor canvas, export engine, navigator thumbnails,
+  and export preview.
+* Template Filter Selection Retention Fix: Switching template categories, folders,
+  favorites, or search terms now immediately releases stale selections and prunes
+  hidden items, preventing unintended actions on hidden templates.
+* Expanded Template Gallery Scroll Area: Moved the scrollable container above
+  search and filter dropdowns, allowing the entire management controls and cards
+  list to scroll comfortably in a unified view.
+* Simplified Template Export Button: Streamlined the template package export
+  button by removing redundant item count badges for a cleaner UI.
+* Tutorial Panel Icon Harmonization: Standardized all icons in the User Guide &
+  Tutorials panel (HelpTutorialDialog.tsx) to match the latest app UI (Balanced,
+  Dynamic, Mood Presets, and Layout Guides).
 
 
 [ 1. OVERVIEW ]
