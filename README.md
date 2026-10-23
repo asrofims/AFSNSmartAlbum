@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.4.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.15
+## Current release highlights — v1.4.16
 
-- **Canvas Border z-index Ordering Fix** — Resolved z-index stacking issues where canvas borders rendered beneath edge photos. Borders now properly frame canvas perimeter content across the editor canvas, export engine, navigator thumbnails, and export preview.
-- **Template Filter Selection Retention Fix** — Switching template categories, folders, favorites, or search terms now immediately releases stale selections and prunes hidden items, preventing unintended actions on hidden templates.
-- **Expanded Template Gallery Scroll Area** — Moved the scrollable container above search and filter dropdowns, allowing the entire management controls and cards list to scroll comfortably in a unified view.
-- **Simplified Template Export Button** — Streamlined the template package export button by removing redundant item count badges for a cleaner UI.
-- **Tutorial Panel Icon Harmonization** — Standardized all icons in the User Guide & Tutorials panel (`HelpTutorialDialog.tsx`) to match the latest app UI (Balanced, Dynamic, Mood Presets, and Layout Guides).
+- **Recent Project Save State Integrity Fix** — Resolved issue where reopening a project from Recent Projects after clicking "Exit Without Saving" or "Don't Save" still marked the project as unsaved (orange save button). The app now cleanly purges crash recovery markers (`afsn_dirty` and snapshots) upon explicit discard and re-syncs SQLite state from the authoritative `.afsn` archive file on disk.
+- **Clean Workspace Project Close** — Fixed toolbar project close (`✕`) and exit warning modal to discard uncommitted runtime state and recovery flags so discarded changes never leak into future sessions.
+- **Reliable Storage Synchronization** — Guaranteed that SQLite local cache always matches the authored `.afsn` document when opening saved projects, while preserving crash recovery protection during unexpected app terminations.
 
 
 ## Highlights
