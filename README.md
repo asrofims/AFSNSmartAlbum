@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.1
+## Current release highlights — v1.5.2
 
+- **External Drag-and-Drop Overlay Harmonization** — Completely updated the external drop target overlay with Matte Dark Slate aesthetics, subtle inset dashed boundaries, clean white stroke icons, bold white item count badges, and multi-type support for both photos and `.afsn` project files.
+- **Pro Feature Showcase Polish** — Restyled the Pro template paywall and showcase container in the Templates panel with refined Matte Dark Slate surfaces, removing legacy cyan radial glow and borders while harmonizing benefit cards with clean white squircle icons.
+- **Complete Visual Workspace Unification** — Harmonized all dropdown menus, modal dialogs, initialization states, paywall cards, and drag drop targets under the unified Matte Dark Slate design system.
 - **Export Spread Preview Truncation Fix** — Resolved right-edge preview cutoff in the Export Album modal on compact screens by introducing zero-margin containers and dynamic `ResizeObserver` geometry scaling.
-- **Matte Dark Slate Visual Harmonization** — Fully aligned workspace dropdown menus (File & Help) with modern stroke SVG icons, refined column typography, and subtle slate hover states, eliminating legacy emojis and harsh cyan borders.
 - **Zoom Toolbar "Fit" Style Polish** — Restyled the zoom toolbar Fit button with clean neutral slate borders and hover states, integrating seamlessly with adjacent canvas controls.
-- **Help & Tutorial Dialog Refresh** — Modernized user guide cards into clean point-by-point blocks, removed obsolete menu sidebar icons, and improved text wrapping for Measurement Units.
-- **Professional Workspace Initialization Modal** — Redesigned startup preparation state with an indeterminate progress shimmer track, micro-spinner, and enterprise-grade status messaging.
 
 
 ## Highlights

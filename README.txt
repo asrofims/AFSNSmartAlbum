@@ -1,27 +1,29 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.1
+Version: 1.5.2
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.1 ]
+[ WHAT'S NEW IN 1.5.2 ]
 --------------------------------------------------------------------------------
+* External Drag-and-Drop Overlay Harmonization: Completely updated the external
+  drop target overlay with Matte Dark Slate aesthetics, subtle inset dashed
+  boundaries, clean white stroke icons, bold white item count badges, and
+  multi-type support for both photos and .afsn project files.
+* Pro Feature Showcase Polish: Restyled the Pro template paywall and showcase
+  container in the Templates panel with refined Matte Dark Slate surfaces,
+  removing legacy cyan radial glow and borders while harmonizing benefit cards
+  with clean white squircle icons.
+* Complete Visual Workspace Unification: Harmonized all dropdown menus, modal
+  dialogs, initialization states, paywall cards, and drag drop targets under
+  the unified Matte Dark Slate design system.
 * Export Spread Preview Truncation Fix: Resolved right-edge preview cutoff in the
   Export Album modal on compact screens by introducing zero-margin containers and
   dynamic ResizeObserver geometry scaling.
-* Matte Dark Slate Visual Harmonization: Fully aligned workspace dropdown menus
-  (File & Help) with modern stroke SVG icons, refined column typography, and
-  subtle slate hover states, eliminating legacy emojis and harsh cyan borders.
 * Zoom Toolbar "Fit" Style Polish: Restyled the zoom toolbar Fit button with clean
   neutral slate borders and hover states, integrating seamlessly with adjacent
   canvas controls.
-* Help & Tutorial Dialog Refresh: Modernized user guide cards into clean
-  point-by-point blocks, removed obsolete menu sidebar icons, and improved text
-  wrapping for Measurement Units.
-* Professional Workspace Initialization Modal: Redesigned startup preparation state
-  with an indeterminate progress shimmer track, micro-spinner, and enterprise-grade
-  status messaging.
 
 
 [ 1. OVERVIEW ]
