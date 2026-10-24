@@ -1,23 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.4.17
+Version: 1.5.1
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.4.17 ]
+[ WHAT'S NEW IN 1.5.1 ]
 --------------------------------------------------------------------------------
-* Canvas Zoom Slider Focus Trap & Shortcuts Fix: Fixed an issue where adjusting canvas
-  zoom via the bottom toolbar slider trapped DOM focus on <input type="range">,
-  blocking single-key shortcuts V (Select Tool) and H (Hand Tool) as well as
-  Spacebar panning until the "Fit" button was clicked.
-* Precision Editable Text Input Guard: Replaced indiscriminate tagName === 'INPUT'
-  checks with a centralized isEditableTextInput utility, ensuring non-text controls
-  (range sliders, checkboxes, radios, buttons) never block keyboard shortcuts while
-  preserving full typing safety for text layers and search inputs.
-* Instant Focus Release on Slider & Canvas Interaction: Added auto-blur on slider pointer
-  release and canvas pointer interactions so tool switching between Select and Hand
-  tools works smoothly and instantly immediately after zooming.
+* Export Spread Preview Truncation Fix: Resolved right-edge preview cutoff in the
+  Export Album modal on compact screens by introducing zero-margin containers and
+  dynamic ResizeObserver geometry scaling.
+* Matte Dark Slate Visual Harmonization: Fully aligned workspace dropdown menus
+  (File & Help) with modern stroke SVG icons, refined column typography, and
+  subtle slate hover states, eliminating legacy emojis and harsh cyan borders.
+* Zoom Toolbar "Fit" Style Polish: Restyled the zoom toolbar Fit button with clean
+  neutral slate borders and hover states, integrating seamlessly with adjacent
+  canvas controls.
+* Help & Tutorial Dialog Refresh: Modernized user guide cards into clean
+  point-by-point blocks, removed obsolete menu sidebar icons, and improved text
+  wrapping for Measurement Units.
+* Professional Workspace Initialization Modal: Redesigned startup preparation state
+  with an indeterminate progress shimmer track, micro-spinner, and enterprise-grade
+  status messaging.
 
 
 [ 1. OVERVIEW ]

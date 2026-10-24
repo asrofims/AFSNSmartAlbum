@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.4.17-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.4.17
+## Current release highlights — v1.5.1
 
-- **Canvas Zoom Slider Focus Trap & Shortcuts Fix** — Fixed an issue where adjusting canvas zoom via the bottom toolbar slider trapped DOM focus on `<input type="range">`, blocking single-key shortcuts `V` (Select Tool) and `H` (Hand Tool) as well as Spacebar panning until the "Fit" button was clicked.
-- **Precision Editable Text Input Guard** — Replaced indiscriminate `tagName === 'INPUT'` checks with a centralized `isEditableTextInput` utility, ensuring non-text controls (range sliders, checkboxes, radios, buttons) never block keyboard shortcuts while preserving full typing safety for text layers and search inputs.
-- **Instant Focus Release on Slider & Canvas Interaction** — Added auto-blur on slider pointer release and canvas pointer interactions so tool switching between Select and Hand tools works smoothly and instantly immediately after zooming.
+- **Export Spread Preview Truncation Fix** — Resolved right-edge preview cutoff in the Export Album modal on compact screens by introducing zero-margin containers and dynamic `ResizeObserver` geometry scaling.
+- **Matte Dark Slate Visual Harmonization** — Fully aligned workspace dropdown menus (File & Help) with modern stroke SVG icons, refined column typography, and subtle slate hover states, eliminating legacy emojis and harsh cyan borders.
+- **Zoom Toolbar "Fit" Style Polish** — Restyled the zoom toolbar Fit button with clean neutral slate borders and hover states, integrating seamlessly with adjacent canvas controls.
+- **Help & Tutorial Dialog Refresh** — Modernized user guide cards into clean point-by-point blocks, removed obsolete menu sidebar icons, and improved text wrapping for Measurement Units.
+- **Professional Workspace Initialization Modal** — Redesigned startup preparation state with an indeterminate progress shimmer track, micro-spinner, and enterprise-grade status messaging.
 
 
 ## Highlights
