@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.6-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.7-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.6
+## Current release highlights — v1.5.7
 
-- **Freemium Adaptive Layout Experience** — Free users can now freely explore the Adaptive Layout panel and apply the first 4 variations for their selected photos; variations 5 and above display subtle dimmed previews with pure diamond indicators.
-- **Seamless Panel Access for All Users** — Removed the full-panel paywall modal that previously locked Free users out of the Adaptive Layout tab, enabling everyone to test layouts interactively.
-- **Unified Pro Diamond Branding** — Replaced all inconsistent "PRO" text badges with clean, standardized cyan diamond icons across My Templates, Dynamic Mode, and premium layout cards.
-- **Dynamic Mode Pro Gating** — Designated Dynamic variations and mood tuning as Pro features with non-intrusive diamond indicators and clear inline feedback.
-- **Responsive & Uncluttered Workspace** — Shortened notice messages to eliminate text clipping (`...`) in narrow sidebars, removed redundant diamond icons from the primary inspector toolbar, and eliminated repetitive upgrade buttons.
+- **Independent Photo & Canvas Border Configuration** — Added dedicated, decoupled configuration cards for Photo Frame Border and Canvas Perimeter Border in the New Project dialog, each with independent switches, stroke width inputs, unit selectors, and color pickers.
+- **Shared Border State Separation** — Resolved an issue where enabling borders in the Create New Project dialog activated both photo frame borders and canvas perimeter borders simultaneously. Both border systems now operate completely independently.
+- **Real-Time Synchronized Border Preview** — The interactive Live Spread & Post mockup preview and print specification summary in the New Project dialog now render photo frame borders and canvas sheet borders accurately and independently in real time.
+- **Persistent Border Data Integrity** — Canvas borders and photo frame borders persist independently across project saves (`.afsn` project archives, SQLite database, and auto-save checkpoints) with full fidelity when projects are reopened.
+- **Bleed & High-Resolution Export Safety** — Verified full alignment with native Rust rendering engines, guaranteeing that canvas borders and photo frame borders render accurately during full-resolution album and social media export.
 ## Highlights
 
 ### Adaptive layouts that respect the design
