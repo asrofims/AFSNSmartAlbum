@@ -1,29 +1,31 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.4
+Version: 1.5.5
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.4 ]
+[ WHAT'S NEW IN 1.5.5 ]
 --------------------------------------------------------------------------------
-* Redundant Face AI Startup Analysis Fix: Fixed an issue where opening an
-  existing project triggered a full, redundant Face AI re-analysis on all
-  photos. The application now intelligently checks existing database analysis
-  records on project open and skips re-scanning when photos are already analyzed.
-* Selective Missing-Photo Analysis: When importing additional photos into an
-  existing project, the background AI engine scans only newly introduced,
-  unanalyzed photos rather than reprocessing the entire library.
-* Persistent Face AI in Project Packages (.afsn): Face analysis records (bounding
-  boxes, face counts, and detection metadata) are now serialized directly inside
-  .afsn project archives (photo_ai_analyses), making exported projects
-  cross-device portable without re-analysis delays.
-* Length-Resilient AI Preview Validation: Enhanced preview signature matching in
-  the native Rust engine with length-resilient byte size verification, preventing
-  false cache invalidations caused by file timestamp shifts during package extraction.
-* Interactive Face Data Controls Retained: Retained full manual control over
-  the AI pipeline, including the real-time Stop intervention button, Clear Data
-  action, and Re-Analyze controls in the Face Data & Maintenance panel.
+* Color Popover Viewport Edge Adaptation: Fixed vertical color popover clipping
+  when positioned near canvas edges or the bottom spread navigation bar. The
+  popover now intelligently flips upward when space below is limited and space
+  above is larger, constrained with dynamic maxHeight bounds and smooth custom scrolling.
+* Slider Thumb Boundary Confinement: Fixed circular indicator thumbs piercing
+  outside track borders and being sliced into quarter-circles at corner boundaries
+  across the 2D saturation/brightness field and 1D hue slider. Inset radius math
+  mathematically clamps thumb placement within boundaries with 1:1 pointer tracking.
+* Typography Strikethrough Formatting: Added the missing Strikethrough (S)
+  formatting toggle button to the Properties panel formatting group alongside Bold,
+  Italic, and Underline.
+* Typography Properties Panel Harmonization: Redesigned the Typography properties
+  panel into structured Matte Dark Slate cards (Font & Size, Style & Alignment,
+  Colors, Spacing, Typography), improving visual hierarchy, decluttering headings,
+  and clarifying labels (Alignment instead of confusing Text Within Frame and removed
+  redundant Text Frame header).
+* Unified Color Picker Drag Dynamics: Harmonized continuous pointer drag behavior
+  across both canvas inline text editor and sidebar properties inspector with zero
+  dead-zones at edge boundaries.
 
 
 [ 1. OVERVIEW ]
