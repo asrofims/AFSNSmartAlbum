@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,15 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.3
+## Current release highlights — v1.5.4
 
-- **All Variations Selection Stability** — Eliminated selection jumps and circular order shifts when switching to "All Variations" in the template drawer through deterministic canonical photo clustering based on permanent identifiers and intrinsic aspect ratios.
-- **Phantom PRO Asset Export Blocking Fix** — Resolved a critical false-positive issue where exported `.afsn` project archives (ZIP packages) opened on other computers or Free accounts triggered "Detach PRO Assets" warnings and export blocks even after all decorative frame assets were removed.
-- **Active Frame Guard & Data Sanitization** — Enforced strict active frame asset validation across desktop dialogs, workspace pre-export checks, and the native Rust export engine, with automatic purging of orphaned PRO flags during database hydration, persistence, and asset detachment.
-- **Immediate SQLite Persistence on Detach** — Ensured instant database synchronization whenever "Detach PRO Assets" is executed in the Export dialog, keeping disk state aligned with in-memory layout edits before preflight verification.
-- **Offline Profile Picture Fallback** — Fixed broken image icon placeholders on the top toolbar and Google Account settings card when disconnected from the internet, featuring a resilient `UserAvatar` component with a matching SVG people silhouette fallback.
-- **Rich Text Editor & Color Panel Edge Detection** — Implemented viewport boundary detection and collision-safe positioning for both the floating rich text toolbar and color popovers with automatic vertical flipping and dynamic caret arrow alignment.
-
+- **Redundant Face AI Startup Analysis Fix** — Fixed an issue where opening an existing project triggered a full, redundant Face AI re-analysis on all photos. The application now intelligently checks existing database analysis records on project open and skips re-scanning when photos are already analyzed.
+- **Selective Missing-Photo Analysis** — When importing additional photos into an existing project, the background AI engine scans only newly introduced, unanalyzed photos rather than reprocessing the entire library.
+- **Persistent Face AI in Project Packages (.afsn)** — Face analysis records (bounding boxes, face counts, and detection metadata) are now serialized directly inside `.afsn` project archives (`photo_ai_analyses`), making exported projects cross-device portable without re-analysis delays.
+- **Length-Resilient AI Preview Validation** — Enhanced preview signature matching in the native Rust engine with length-resilient byte size verification, preventing false cache invalidations caused by file timestamp shifts during package extraction.
+- **Interactive Face Data Controls Retained** — Retained full manual control over the AI pipeline, including the real-time Stop intervention button, Clear Data action, and Re-Analyze controls in the Face Data & Maintenance panel.
 
 ## Highlights
 
