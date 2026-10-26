@@ -1,29 +1,35 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.2
+Version: 1.5.3
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.2 ]
+[ WHAT'S NEW IN 1.5.3 ]
 --------------------------------------------------------------------------------
-* External Drag-and-Drop Overlay Harmonization: Completely updated the external
-  drop target overlay with Matte Dark Slate aesthetics, subtle inset dashed
-  boundaries, clean white stroke icons, bold white item count badges, and
-  multi-type support for both photos and .afsn project files.
-* Pro Feature Showcase Polish: Restyled the Pro template paywall and showcase
-  container in the Templates panel with refined Matte Dark Slate surfaces,
-  removing legacy cyan radial glow and borders while harmonizing benefit cards
-  with clean white squircle icons.
-* Complete Visual Workspace Unification: Harmonized all dropdown menus, modal
-  dialogs, initialization states, paywall cards, and drag drop targets under
-  the unified Matte Dark Slate design system.
-* Export Spread Preview Truncation Fix: Resolved right-edge preview cutoff in the
-  Export Album modal on compact screens by introducing zero-margin containers and
-  dynamic ResizeObserver geometry scaling.
-* Zoom Toolbar "Fit" Style Polish: Restyled the zoom toolbar Fit button with clean
-  neutral slate borders and hover states, integrating seamlessly with adjacent
-  canvas controls.
+* All Variations Selection Stability: Eliminated selection jumps and circular
+  order shifts when switching to "All Variations" in the template drawer through
+  deterministic canonical photo clustering based on permanent identifiers and
+  intrinsic aspect ratios.
+* Phantom PRO Asset Export Blocking Fix: Resolved a critical false-positive
+  issue where exported .afsn project archives (ZIP packages) opened on other
+  computers or Free accounts triggered "Detach PRO Assets" warnings and export
+  blocks even after all decorative frame assets were removed.
+* Active Frame Guard & Data Sanitization: Enforced strict active frame asset
+  validation across desktop dialogs, workspace pre-export checks, and the
+  native Rust export engine, with automatic purging of orphaned PRO flags
+  during database hydration, persistence, and asset detachment.
+* Immediate SQLite Persistence on Detach: Ensured instant database synchronization
+  whenever "Detach PRO Assets" is executed in the Export dialog, keeping disk
+  state aligned with in-memory layout edits before preflight verification.
+* Offline Profile Picture Fallback: Fixed broken image icon placeholders on the
+  top toolbar and Google Account settings card when disconnected from the
+  internet, featuring a resilient UserAvatar component with a matching SVG
+  people silhouette fallback.
+* Rich Text Editor & Color Panel Edge Detection: Implemented viewport boundary
+  detection and collision-safe positioning for both the floating rich text
+  toolbar and color popovers with automatic vertical flipping and dynamic
+  caret arrow alignment.
 
 
 [ 1. OVERVIEW ]
