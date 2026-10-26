@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.4
+## Current release highlights — v1.5.5
 
-- **Redundant Face AI Startup Analysis Fix** — Fixed an issue where opening an existing project triggered a full, redundant Face AI re-analysis on all photos. The application now intelligently checks existing database analysis records on project open and skips re-scanning when photos are already analyzed.
-- **Selective Missing-Photo Analysis** — When importing additional photos into an existing project, the background AI engine scans only newly introduced, unanalyzed photos rather than reprocessing the entire library.
-- **Persistent Face AI in Project Packages (.afsn)** — Face analysis records (bounding boxes, face counts, and detection metadata) are now serialized directly inside `.afsn` project archives (`photo_ai_analyses`), making exported projects cross-device portable without re-analysis delays.
-- **Length-Resilient AI Preview Validation** — Enhanced preview signature matching in the native Rust engine with length-resilient byte size verification, preventing false cache invalidations caused by file timestamp shifts during package extraction.
-- **Interactive Face Data Controls Retained** — Retained full manual control over the AI pipeline, including the real-time Stop intervention button, Clear Data action, and Re-Analyze controls in the Face Data & Maintenance panel.
+- **Color Popover Viewport Edge Adaptation** — Fixed vertical color popover clipping when positioned near canvas edges or the bottom spread navigation bar. The popover now intelligently flips upward when space below is limited and space above is larger, constrained with dynamic `maxHeight` bounds and smooth custom scrolling.
+- **Slider Thumb Boundary Confinement** — Fixed circular indicator thumbs piercing outside track borders and being sliced into quarter-circles at corner boundaries across the 2D saturation/brightness field and 1D hue slider. Inset radius math mathematically clamps thumb placement within boundaries with 1:1 pointer tracking.
+- **Typography Strikethrough Formatting** — Added the missing Strikethrough (`S`) formatting toggle button to the Properties panel formatting group alongside Bold, Italic, and Underline.
+- **Typography Properties Panel Harmonization** — Redesigned the Typography properties panel into structured Matte Dark Slate cards (`Font & Size`, `Style & Alignment`, `Colors`, `Spacing`, `Typography`), improving visual hierarchy, decluttering headings, and clarifying labels (`Alignment` instead of confusing `Text Within Frame` and removed redundant `Text Frame` header).
+- **Unified Color Picker Drag Dynamics** — Harmonized continuous pointer drag behavior across both canvas inline text editor and sidebar properties inspector with zero dead-zones at edge boundaries.
 
 ## Highlights
 
