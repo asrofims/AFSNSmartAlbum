@@ -1,32 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.5
+Version: 1.5.6
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.5 ]
+[ WHAT'S NEW IN 1.5.6 ]
 --------------------------------------------------------------------------------
-* Color Popover Viewport Edge Adaptation: Fixed vertical color popover clipping
-  when positioned near canvas edges or the bottom spread navigation bar. The
-  popover now intelligently flips upward when space below is limited and space
-  above is larger, constrained with dynamic maxHeight bounds and smooth custom scrolling.
-* Slider Thumb Boundary Confinement: Fixed circular indicator thumbs piercing
-  outside track borders and being sliced into quarter-circles at corner boundaries
-  across the 2D saturation/brightness field and 1D hue slider. Inset radius math
-  mathematically clamps thumb placement within boundaries with 1:1 pointer tracking.
-* Typography Strikethrough Formatting: Added the missing Strikethrough (S)
-  formatting toggle button to the Properties panel formatting group alongside Bold,
-  Italic, and Underline.
-* Typography Properties Panel Harmonization: Redesigned the Typography properties
-  panel into structured Matte Dark Slate cards (Font & Size, Style & Alignment,
-  Colors, Spacing, Typography), improving visual hierarchy, decluttering headings,
-  and clarifying labels (Alignment instead of confusing Text Within Frame and removed
-  redundant Text Frame header).
-* Unified Color Picker Drag Dynamics: Harmonized continuous pointer drag behavior
-  across both canvas inline text editor and sidebar properties inspector with zero
-  dead-zones at edge boundaries.
-
+* Freemium Adaptive Layout Experience: Free users can now freely explore the
+  Adaptive Layout panel and apply the first 4 variations for their selected
+  photos; variations 5 and above display subtle dimmed previews with pure
+  diamond indicators.
+* Seamless Panel Access for All Users: Removed the full-panel paywall modal
+  that previously locked Free users out of the Adaptive Layout tab, enabling
+  everyone to test layouts interactively.
+* Unified Pro Diamond Branding: Replaced all inconsistent "PRO" text badges
+  with clean, standardized cyan diamond icons across My Templates, Dynamic Mode,
+  and premium layout cards.
+* Dynamic Mode Pro Gating: Designated Dynamic variations and mood tuning as
+  Pro features with non-intrusive diamond indicators and clear inline feedback.
+* Responsive & Uncluttered Workspace: Shortened notice messages to eliminate
+  text clipping (...) in narrow sidebars, removed redundant diamond icons from
+  the primary inspector toolbar, and eliminated repetitive upgrade buttons.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
