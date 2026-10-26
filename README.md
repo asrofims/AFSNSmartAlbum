@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.8-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.9-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.8
+## Current release highlights — v1.5.9
 
-- **Canvas Border Persistence Across Project Saves** — Resolved an issue where canvas perimeter borders configured during project creation were lost upon saving the project. Added dedicated SQLite schema migration (v31) and Tauri IPC command `update_project_canvas_border` to maintain persistent canvas border settings.
-- **Inherited Canvas Border in New Spreads & Posts** — Fixed a bug where adding new interior spreads or social media posts after saving failed to display the active canvas border. New spreads now dynamically inherit project canvas border settings with fallback to existing spread configurations for backward compatibility.
-- **Native Package Archive (.afsn) Canvas Border Synchronization** — Updated project package IO serialization and deserialization routines in Rust to preserve full canvas border settings when projects are packaged, exported, and imported across devices.
-- **Robust State Sanitization & Reload Resilience** — Enhanced project store sanitization and reload flows (`saveProject`, `exportProjectAsAfsn`, `openProjectById`, and `loadRecentProjects`) to guarantee canvas border settings never reset across editing sessions.
-- **Bleed & High-Resolution Export Safety** — Verified full alignment with native Rust rendering engines, guaranteeing that canvas borders and photo frame borders render accurately during full-resolution album and social media export.
+- **Frame & Canvas Border Separation & Setting Isolation** — Completely separated Photo Frame Border and Canvas Border settings in the Properties Panel. Applying default settings to Canvas Border no longer impacts Photo Frame Border.
+- **Context-Adaptive Border Properties Visibility** — Automatically hides the redundant baseline photo frame border controls in the project properties panel when an individual photo frame is selected on canvas, eliminating visual clutter.
+- **Modern Interactive Card Selection in Import Templates** — Redesigned the Import Templates modal with sleek interactive selectable cards instead of native checkboxes, featuring immediate visual feedback and checkmark indicators.
+- **Streamlined Template Header & Full-Width Destination Dropdown** — Added live dynamic selection counter (`X of Y selected`) and quick *Select All / Deselect All* toggle in the dialog header, simplified the import action button to a clean "Import" label, and converted the destination folder selector to a full-width dropdown.
+- **Zero-Glitch Selection & Smooth Modal Layout** — Eliminated transient checking messages and button flicker, caching name resolution to ensure smooth and jitter-free card selection without modal bounce.
 ## Highlights
 
 ### Adaptive layouts that respect the design
