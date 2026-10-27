@@ -1,31 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.11
+Version: 1.5.12
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.11 ]
+[ WHAT'S NEW IN 1.5.12 ]
 --------------------------------------------------------------------------------
-* Canvas Border Alignment & Visibility in Export Preview: Canvas perimeter
-  borders are now rendered with crisp subpixel precision and full visual parity
-  in the export preview dialog. Borders align strictly inside page trim boundaries
-  inside bleed margins across Spread, Left Page, Right Page, and Social Media modes.
-* Canvas Background & Border Persistence in Saved Templates: Canvas background
-  color, left/right page background colors, background noise effects, and canvas
-  perimeter border configuration (width, color, enabled states) are now seamlessly
-  saved, packaged, and applied with custom user templates.
-* Rich Text Style & Safe Font Fallback Management: Template presets preserve
-  typography styles, font weights, colors, line heights, and letter spacing. If a
-  saved template references an unavailable system font, a clear notification modal
-  is presented and the typography safely falls back to standard Montserrat without
-  distorting layout geometry.
-* Resilient Template Library Deserialization: Robust error handling in template
-  library database queries ensures that corrupt, legacy, or schema-extended
-  templates never cause the entire template library to fail or disappear.
-* Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview: Interactive
-  export preview snapshot canvas shares multi-stage asset loading, disk cache,
-  CacheStorage fallback, and CORS-safe image decoding as the main editor canvas.
+* Canvas Border State Synchronization & Default Decoupling: Turning off Canvas
+  Border on a spread now reliably decouples and updates project default settings
+  so new spreads and posts stay borderless without automatically re-enabling
+  borders. Duplicating spreads preserves exact border state.
+* Safe Margin Locking & Directed Defaults: Removed automatic onBlur overwriting
+  from Safe Margin inputs. Editing margins on a spread remains isolated, while
+  "Set Default" and "Apply to All" lock uniform or 4-sided directional margins.
+* WYSIWYG Noise & Blur Ordering Parity: Reordered rendering pipeline to evaluate
+  Blur before Noise across editor canvas, background images, photo filters, and
+  native export engine, ensuring grain/noise over blurred photos remains crisp.
+* Export & Navigator Preview Blur Zoom Parity: Eliminated artificial blur overscan
+  scaling in Export Preview and Page Navigator, preventing unwanted magnification.
+* 4-Sided Margin & Canvas Border "Apply to All" Project Sync: Applying 4-sided
+  safe margins or canvas perimeter borders across all spreads automatically
+  synchronizes project defaults for subsequent spreads.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
