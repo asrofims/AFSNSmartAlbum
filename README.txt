@@ -1,12 +1,16 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.10
+Version: 1.5.11
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.10 ]
+[ WHAT'S NEW IN 1.5.11 ]
 --------------------------------------------------------------------------------
+* Canvas Border Alignment & Visibility in Export Preview: Canvas perimeter
+  borders are now rendered with crisp subpixel precision and full visual parity
+  in the export preview dialog. Borders align strictly inside page trim boundaries
+  inside bleed margins across Spread, Left Page, Right Page, and Social Media modes.
 * Canvas Background & Border Persistence in Saved Templates: Canvas background
   color, left/right page background colors, background noise effects, and canvas
   perimeter border configuration (width, color, enabled states) are now seamlessly
@@ -20,10 +24,8 @@ Author: Afsunmedia - Asrofims
   library database queries ensures that corrupt, legacy, or schema-extended
   templates never cause the entire template library to fail or disappear.
 * Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview: Interactive
-  export preview snapshot canvas now shares identical multi-stage asset loading,
-  disk cache, CacheStorage fallback, and CORS-safe image decoding as the main
-  editor canvas, ensuring decorative frame assets and graphics never vanish in
-  export previews.
+  export preview snapshot canvas shares multi-stage asset loading, disk cache,
+  CacheStorage fallback, and CORS-safe image decoding as the main editor canvas.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
