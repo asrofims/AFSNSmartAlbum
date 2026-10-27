@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.9-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.10-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.9
+## Current release highlights — v1.5.10
 
-- **Frame & Canvas Border Separation & Setting Isolation** — Completely separated Photo Frame Border and Canvas Border settings in the Properties Panel. Applying default settings to Canvas Border no longer impacts Photo Frame Border.
-- **Context-Adaptive Border Properties Visibility** — Automatically hides the redundant baseline photo frame border controls in the project properties panel when an individual photo frame is selected on canvas, eliminating visual clutter.
-- **Modern Interactive Card Selection in Import Templates** — Redesigned the Import Templates modal with sleek interactive selectable cards instead of native checkboxes, featuring immediate visual feedback and checkmark indicators.
-- **Streamlined Template Header & Full-Width Destination Dropdown** — Added live dynamic selection counter (`X of Y selected`) and quick *Select All / Deselect All* toggle in the dialog header, simplified the import action button to a clean "Import" label, and converted the destination folder selector to a full-width dropdown.
-- **Zero-Glitch Selection & Smooth Modal Layout** — Eliminated transient checking messages and button flicker, caching name resolution to ensure smooth and jitter-free card selection without modal bounce.
+- **Canvas Background & Border Persistence in Saved Templates** — Canvas background color, left/right page background colors, background noise effects, and canvas perimeter border configuration (width, color, enabled states) are now seamlessly saved, packaged, and applied with custom user templates.
+- **Rich Text Style & Safe Font Fallback Management** — Template presets preserve typography styles, font weights, colors, line heights, and letter spacing. If a saved template references an unavailable system font, a clear notification modal is presented and the typography safely falls back to standard Montserrat without distorting layout geometry.
+- **Resilient Template Library Deserialization** — Robust error handling in template library database queries ensures that corrupt, legacy, or schema-extended templates never cause the entire template library to fail or disappear.
+- **Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview** — Interactive export preview snapshot canvas now shares identical multi-stage asset loading, disk cache, CacheStorage fallback, and CORS-safe image decoding as the main editor canvas, ensuring decorative frame assets and graphics never vanish in export previews.
 ## Highlights
 
 ### Adaptive layouts that respect the design
