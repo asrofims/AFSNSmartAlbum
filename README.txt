@@ -1,28 +1,29 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.9
+Version: 1.5.10
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.9 ]
+[ WHAT'S NEW IN 1.5.10 ]
 --------------------------------------------------------------------------------
-* Frame & Canvas Border Separation & Setting Isolation: Completely separated
-  Photo Frame Border and Canvas Border settings in the Properties Panel.
-  Applying default settings to Canvas Border no longer impacts Photo Frame Border.
-* Context-Adaptive Border Properties Visibility: Automatically hides the
-  redundant baseline photo frame border controls in the project properties panel
-  when an individual photo frame is selected on canvas, eliminating visual clutter.
-* Modern Interactive Card Selection in Import Templates: Redesigned the Import
-  Templates modal with sleek interactive selectable cards instead of native
-  checkboxes, featuring immediate visual feedback and checkmark indicators.
-* Streamlined Template Header & Full-Width Destination Dropdown: Added live dynamic
-  selection counter (X of Y selected) and quick Select All / Deselect All toggle in
-  the dialog header, simplified the import action button to a clean "Import" label,
-  and converted the destination folder selector to a full-width dropdown.
-* Zero-Glitch Selection & Smooth Modal Layout: Eliminated transient checking
-  messages and button flicker, caching name resolution to ensure smooth and
-  jitter-free card selection without modal bounce.
+* Canvas Background & Border Persistence in Saved Templates: Canvas background
+  color, left/right page background colors, background noise effects, and canvas
+  perimeter border configuration (width, color, enabled states) are now seamlessly
+  saved, packaged, and applied with custom user templates.
+* Rich Text Style & Safe Font Fallback Management: Template presets preserve
+  typography styles, font weights, colors, line heights, and letter spacing. If a
+  saved template references an unavailable system font, a clear notification modal
+  is presented and the typography safely falls back to standard Montserrat without
+  distorting layout geometry.
+* Resilient Template Library Deserialization: Robust error handling in template
+  library database queries ensures that corrupt, legacy, or schema-extended
+  templates never cause the entire template library to fail or disappear.
+* Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview: Interactive
+  export preview snapshot canvas now shares identical multi-stage asset loading,
+  disk cache, CacheStorage fallback, and CORS-safe image decoding as the main
+  editor canvas, ensuring decorative frame assets and graphics never vanish in
+  export previews.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
