@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,14 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.11
+## Current release highlights — v1.5.12
 
-- **Canvas Border Alignment & Visibility in Export Preview** — Canvas perimeter borders are now rendered with crisp subpixel precision and full visual parity in the export preview dialog. Borders align strictly inside page trim boundaries inside the bleed margins across Spread, Left Page, Right Page, and Social Media view modes.
-- **Canvas Background & Border Persistence in Saved Templates** — Canvas background color, left/right page background colors, background noise effects, and canvas perimeter border configuration (width, color, enabled states) are now seamlessly saved, packaged, and applied with custom user templates.
-- **Rich Text Style & Safe Font Fallback Management** — Template presets preserve typography styles, font weights, colors, line heights, and letter spacing. If a saved template references an unavailable system font, a clear notification modal is presented and the typography safely falls back to standard Montserrat without distorting layout geometry.
-- **Resilient Template Library Deserialization** — Robust error handling in template library database queries ensures that corrupt, legacy, or schema-extended templates never cause the entire template library to fail or disappear.
-- **Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview** — Interactive export preview snapshot canvas shares multi-stage asset loading, disk cache, CacheStorage fallback, and CORS-safe image decoding as the main editor canvas, ensuring frame assets and graphics never vanish in export previews.
+- **Canvas Border State Synchronization & Default Decoupling** — Turning off Canvas Border on a spread now reliably decouples and updates project default settings so new spreads and posts stay borderless without automatically re-enabling borders. Duplicating spreads preserves exact border state.
+- **Safe Margin Locking & Directed Defaults** — Removed automatic `onBlur` overwriting from Safe Margin inputs. Editing margins on a spread remains isolated, while "Set Default" and "Apply to All" lock uniform or 4-sided directional margins (`top`, `bottom`, `outside`, `spine`).
+- **WYSIWYG Noise & Blur Ordering Parity** — Reordered the rendering pipeline to evaluate Blur before Noise across editor canvas, background images, photo frame filters, and native export engine, ensuring grain/noise applied over blurred photos remains crisp and consistent in editor, preview, and export.
+- **Export & Navigator Preview Blur Zoom Parity** — Eliminated artificial blur overscan scaling in Export Preview Snapshot and Page Navigator, preventing unwanted magnification while preserving clean edge falloff.
+- **4-Sided Margin & Canvas Border "Apply to All" Project Sync** — Applying 4-sided safe margins or canvas perimeter borders across all spreads automatically synchronizes project defaults for subsequent spreads.
+
 ## Highlights
 
 ### Adaptive layouts that respect the design
