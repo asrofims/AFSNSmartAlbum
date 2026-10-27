@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.10-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.10
+## Current release highlights — v1.5.11
 
+- **Canvas Border Alignment & Visibility in Export Preview** — Canvas perimeter borders are now rendered with crisp subpixel precision and full visual parity in the export preview dialog. Borders align strictly inside page trim boundaries inside the bleed margins across Spread, Left Page, Right Page, and Social Media view modes.
 - **Canvas Background & Border Persistence in Saved Templates** — Canvas background color, left/right page background colors, background noise effects, and canvas perimeter border configuration (width, color, enabled states) are now seamlessly saved, packaged, and applied with custom user templates.
 - **Rich Text Style & Safe Font Fallback Management** — Template presets preserve typography styles, font weights, colors, line heights, and letter spacing. If a saved template references an unavailable system font, a clear notification modal is presented and the typography safely falls back to standard Montserrat without distorting layout geometry.
 - **Resilient Template Library Deserialization** — Robust error handling in template library database queries ensures that corrupt, legacy, or schema-extended templates never cause the entire template library to fail or disappear.
-- **Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview** — Interactive export preview snapshot canvas now shares identical multi-stage asset loading, disk cache, CacheStorage fallback, and CORS-safe image decoding as the main editor canvas, ensuring decorative frame assets and graphics never vanish in export previews.
+- **Decorative Frame Asset & Graphic WYSIWYG Parity in Export Preview** — Interactive export preview snapshot canvas shares multi-stage asset loading, disk cache, CacheStorage fallback, and CORS-safe image decoding as the main editor canvas, ensuring frame assets and graphics never vanish in export previews.
 ## Highlights
 
 ### Adaptive layouts that respect the design
