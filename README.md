@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.14
+## Current release highlights — v1.5.15
 
-- **Subpixel Seam Elimination** — Completely eliminated hairline gaps and white seam artifacts between touching frames (`gap = 0`) across the entire rendering pipeline: Canvas Editor, Export Snapshot Preview, and the bottom Navigation Thumbnail Preview (`PageNavigator`).
-- **Supersampled Navigation Clip Geometry** — Upgraded `getPreviewPageEdgeClipPath` and seam dilation geometry to account for 4-way frame adjacency and supersample scaling, preventing downsampling antialiasing cracks from exposing the spread background.
-- **Microsoft Store MSIX Packaging** — Added native MSIX package generation (`npm run build:msix`) matching registered Partner Center Product Identity (`AFSN.AFSNSmartAlbum` / `CN=A1FC6065-B08C-4D55-8164-77B99EFFAA05`) with SHA256 integrity and visual asset staging.
-- **Multi-Target Distribution** — Full multi-target installer readiness covering NSIS auto-updater (`.exe`), WiX offline installer (`.msi`), and Microsoft Store (`.msix`).
+- **Social Media Carousel Slicing & Sequential Export** — Added native Rust export engine support for panoramic carousel project slicing into sequential slides (e.g. 3240×1350 into 3 slides, 4320×1350 into 4 slides, 2160×1080 into 2 slides) with zero remainder pixel loss, atomic sequential file generation (`Post_01_slide_01.jpg`), DPI metadata preservation, and watermark support.
+- **Carousel Presets & Auto-Slice Detection** — Added built-in Instagram Carousel presets (Portrait & Square) with automated aspect-ratio slide count detection and output size estimation.
+- **Smart Magnetic Snapping for Carousel Slides** — Snapping engine now magnetically aligns objects to individual slide centers (`Slide 1 Center X`, `Slide 2 Center X`, etc.) and cut boundaries (`Slide 1 / 2 Boundary`) with intersection crosshair badges.
+- **Carousel Slice Canvas Guides & Toggle Controls** — Interactive dashed slice guidelines rendered directly on the design canvas with an independent "Center" toggle button in the footer bar, post structure panel, and settings dialog.
+- **Unified Visual Styling & Streamlined Export UI** — Standardized slicing lines, scissors markers, and preview badges in Sky Blue across both Album Mode (`Split Pages`) and Social Media Mode (`Carousel Slicing`), with simplified controls and clear dimension indicators.
 
 ## Highlights
 
