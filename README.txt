@@ -1,27 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.12
+Version: 1.5.14
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.12 ]
+[ WHAT'S NEW IN 1.5.14 ]
 --------------------------------------------------------------------------------
-* Canvas Border State Synchronization & Default Decoupling: Turning off Canvas
-  Border on a spread now reliably decouples and updates project default settings
-  so new spreads and posts stay borderless without automatically re-enabling
-  borders. Duplicating spreads preserves exact border state.
-* Safe Margin Locking & Directed Defaults: Removed automatic onBlur overwriting
-  from Safe Margin inputs. Editing margins on a spread remains isolated, while
-  "Set Default" and "Apply to All" lock uniform or 4-sided directional margins.
-* WYSIWYG Noise & Blur Ordering Parity: Reordered rendering pipeline to evaluate
-  Blur before Noise across editor canvas, background images, photo filters, and
-  native export engine, ensuring grain/noise over blurred photos remains crisp.
-* Export & Navigator Preview Blur Zoom Parity: Eliminated artificial blur overscan
-  scaling in Export Preview and Page Navigator, preventing unwanted magnification.
-* 4-Sided Margin & Canvas Border "Apply to All" Project Sync: Applying 4-sided
-  safe margins or canvas perimeter borders across all spreads automatically
-  synchronizes project defaults for subsequent spreads.
+* Subpixel Seam Elimination: Completely eliminated hairline gaps and white seam
+  artifacts between touching frames (gap = 0) across the entire rendering
+  pipeline: Canvas Editor, Export Snapshot Preview, and the bottom Navigation
+  Thumbnail Preview (PageNavigator).
+* Supersampled Navigation Clip Geometry: Upgraded getPreviewPageEdgeClipPath and
+  seam dilation geometry to account for 4-way frame adjacency and supersample
+  scaling, preventing downsampling antialiasing cracks from exposing the spread
+  background.
+* Microsoft Store MSIX Packaging: Added native MSIX package generation (npm run
+  build:msix) matching registered Partner Center Product Identity
+  (AFSN.AFSNSmartAlbum / CN=A1FC6065-B08C-4D55-8164-77B99EFFAA05) with SHA256
+  integrity and visual asset staging.
+* Multi-Target Distribution: Full multi-target installer readiness covering NSIS
+  auto-updater (.exe), WiX offline installer (.msi), and Microsoft Store
+  (.msix).
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
