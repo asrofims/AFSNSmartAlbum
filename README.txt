@@ -1,30 +1,26 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.17
+Version: 1.5.18
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.17 ]
+[ WHAT'S NEW IN 1.5.18 ]
 --------------------------------------------------------------------------------
-* Interactive Export & Carousel Tutorial Guide: Enriched the in-app User Guide
-  with a comprehensive, visual-rich walkthrough of the new Export engine,
-  covering both Commercial Lab Print (Layflat Spreads & Split Pages) and Social
-  Media Carousel workflows.
-* Embedded Visual Diagrams: Added 4 high-definition diagrammatic illustrations
-  directly inside the tutorial tab:
-* *Dual Workflow Comparison*: Photobook Layflat Spread (Spine, Safe Area, Bleed)
-  vs Social Media Continuous Panoramic Slicing.
-* *Dynamic Multi-Post Timeline*: Visual breakdown of independent per-post
-  slicing (Single Post, 3-Slide Carousel, 2-Slide Carousel) and output file
-  naming.
-* *Centered Preview Canvas Anatomy*: Mockup detailing real-time cyan scissor
-  cutlines (✂), overlay tags, output resolution pill, and navigation controls.
-* *Print Boundaries Cross-Section*: Concentric diagram illustrating Bleed Zone
-  (+3 mm), Trim Line, and Blue Safe Area Box.
-* Social Media & Lab Pro Tips: Added best-practice guides for Instagram 4:5
-  portrait feeds (1080×1350 px, 95% JPEG quality) and commercial layflat
-  printing (300 DPI, Include Bleed).
+* Incremental Asset Pagination ("Load More"): Introduced staged pagination (10
+  assets per batch) for both Frames and Elements grids, dramatically reducing
+  memory usage and initial rendering latency when opening the Assets panel.
+* Dynamic Asset Count & Load More Controls: Added an interactive button with
+  remaining asset counter and total count indicators, with automated pagination
+  reset when switching tabs, filtering shapes, or performing searches.
+* Clean Visual Grid for Assets: Streamlined asset cards by removing text title
+  labels from the visual preview, presenting a clean, image-centric design while
+  fully maintaining full-text searchability and categorization in the
+  background.
+* Simplified Hover Tooltips: Refined hover tooltips to provide clean, contextual
+  action descriptions without displaying internal asset identifiers.
+* Tutorial Dialog Polish: Removed redundant card header badges across the user
+  tutorial dialog for a cleaner reading experience.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
