@@ -1,26 +1,30 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.16
+Version: 1.5.17
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.16 ]
+[ WHAT'S NEW IN 1.5.17 ]
 --------------------------------------------------------------------------------
-* Dynamic Per-Post Carousel Slicing: Added intelligent per-post canvas
-  aspect-ratio detection and custom slice count overrides in Social Media Mode,
-  allowing mixed post formats (e.g. panoramic carousel + single portrait post)
-  in a single project with accurate sequential slide generation.
-* Persistent Project Export Configuration: Export settings, including per-post
-  slice overrides, format, resolution, and quality preferences, are now
-  automatically remembered per project across dialog closes and application
-  restarts.
-* Full-Height & Centered Preview Canvas: Standardized the export preview card to
-  a stable full-height container (360px), eliminating layout jumping between
-  portrait and panoramic posts while centering wide canvases perfectly.
-* Minimalist & Streamlined Export UI: Simplified the Carousel Slicing controls
-  with a clean full-width layout, removing redundant badges and hiding physical
-  print bleed margins in Social Media Mode.
+* Interactive Export & Carousel Tutorial Guide: Enriched the in-app User Guide
+  with a comprehensive, visual-rich walkthrough of the new Export engine,
+  covering both Commercial Lab Print (Layflat Spreads & Split Pages) and Social
+  Media Carousel workflows.
+* Embedded Visual Diagrams: Added 4 high-definition diagrammatic illustrations
+  directly inside the tutorial tab:
+* *Dual Workflow Comparison*: Photobook Layflat Spread (Spine, Safe Area, Bleed)
+  vs Social Media Continuous Panoramic Slicing.
+* *Dynamic Multi-Post Timeline*: Visual breakdown of independent per-post
+  slicing (Single Post, 3-Slide Carousel, 2-Slide Carousel) and output file
+  naming.
+* *Centered Preview Canvas Anatomy*: Mockup detailing real-time cyan scissor
+  cutlines (✂), overlay tags, output resolution pill, and navigation controls.
+* *Print Boundaries Cross-Section*: Concentric diagram illustrating Bleed Zone
+  (+3 mm), Trim Line, and Blue Safe Area Box.
+* Social Media & Lab Pro Tips: Added best-practice guides for Instagram 4:5
+  portrait feeds (1080×1350 px, 95% JPEG quality) and commercial layflat
+  printing (300 DPI, Include Bleed).
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
