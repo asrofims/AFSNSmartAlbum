@@ -1,31 +1,26 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.15
+Version: 1.5.16
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.15 ]
+[ WHAT'S NEW IN 1.5.16 ]
 --------------------------------------------------------------------------------
-* Social Media Carousel Slicing & Sequential Export: Added native Rust export
-  engine support for panoramic carousel project slicing into sequential slides
-  (e.g. 3240×1350 into 3 slides, 4320×1350 into 4 slides, 2160×1080 into 2
-  slides) with zero remainder pixel loss, atomic sequential file generation
-  (Post_01_slide_01.jpg), DPI metadata preservation, and watermark support.
-* Carousel Presets & Auto-Slice Detection: Added built-in Instagram Carousel
-  presets (Portrait & Square) with automated aspect-ratio slide count detection
-  and output size estimation.
-* Smart Magnetic Snapping for Carousel Slides: Snapping engine now magnetically
-  aligns objects to individual slide centers (Slide 1 Center X, Slide 2 Center
-  X, etc.) and cut boundaries (Slide 1 / 2 Boundary) with intersection crosshair
-  badges.
-* Carousel Slice Canvas Guides & Toggle Controls: Interactive dashed slice
-  guidelines rendered directly on the design canvas with an independent "Center"
-  toggle button in the footer bar, post structure panel, and settings dialog.
-* Unified Visual Styling & Streamlined Export UI: Standardized slicing lines,
-  scissors markers, and preview badges in Sky Blue across both Album Mode (Split
-  Pages) and Social Media Mode (Carousel Slicing), with simplified controls and
-  clear dimension indicators.
+* Dynamic Per-Post Carousel Slicing: Added intelligent per-post canvas
+  aspect-ratio detection and custom slice count overrides in Social Media Mode,
+  allowing mixed post formats (e.g. panoramic carousel + single portrait post)
+  in a single project with accurate sequential slide generation.
+* Persistent Project Export Configuration: Export settings, including per-post
+  slice overrides, format, resolution, and quality preferences, are now
+  automatically remembered per project across dialog closes and application
+  restarts.
+* Full-Height & Centered Preview Canvas: Standardized the export preview card to
+  a stable full-height container (360px), eliminating layout jumping between
+  portrait and panoramic posts while centering wide canvases perfectly.
+* Minimalist & Streamlined Export UI: Simplified the Carousel Slicing controls
+  with a clean full-width layout, removing redundant badges and hiding physical
+  print bleed margins in Social Media Mode.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
