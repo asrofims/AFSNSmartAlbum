@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.17-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.16
+## Current release highlights — v1.5.17
 
-- **Dynamic Per-Post Carousel Slicing** — Added intelligent per-post canvas aspect-ratio detection and custom slice count overrides in Social Media Mode, allowing mixed post formats (e.g. panoramic carousel + single portrait post) in a single project with accurate sequential slide generation.
-- **Persistent Project Export Configuration** — Export settings, including per-post slice overrides, format, resolution, and quality preferences, are now automatically remembered per project across dialog closes and application restarts.
-- **Full-Height & Centered Preview Canvas** — Standardized the export preview card to a stable full-height container (`360px`), eliminating layout jumping between portrait and panoramic posts while centering wide canvases perfectly.
-- **Minimalist & Streamlined Export UI** — Simplified the Carousel Slicing controls with a clean full-width layout, removing redundant badges and hiding physical print bleed margins in Social Media Mode.
+- **Interactive Export & Carousel Tutorial Guide** — Enriched the in-app User Guide with a comprehensive, visual-rich walkthrough of the new Export engine, covering both Commercial Lab Print (Layflat Spreads & Split Pages) and Social Media Carousel workflows.
+- **Embedded Visual Diagrams** — Added 4 high-definition diagrammatic illustrations directly inside the tutorial tab:
+- *Dual Workflow Comparison*: Photobook Layflat Spread (Spine, Safe Area, Bleed) vs Social Media Continuous Panoramic Slicing.
+- *Dynamic Multi-Post Timeline*: Visual breakdown of independent per-post slicing (Single Post, 3-Slide Carousel, 2-Slide Carousel) and output file naming.
+- *Centered Preview Canvas Anatomy*: Mockup detailing real-time cyan scissor cutlines (`✂`), overlay tags, output resolution pill, and navigation controls.
+- *Print Boundaries Cross-Section*: Concentric diagram illustrating Bleed Zone (+3 mm), Trim Line, and Blue Safe Area Box.
+- **Social Media & Lab Pro Tips** — Added best-practice guides for Instagram 4:5 portrait feeds (1080×1350 px, 95% JPEG quality) and commercial layflat printing (300 DPI, Include Bleed).
 
 ## Highlights
 
