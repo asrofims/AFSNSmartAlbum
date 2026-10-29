@@ -1,26 +1,35 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.18
+Version: 1.5.19
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.18 ]
+[ WHAT'S NEW IN 1.5.19 ]
 --------------------------------------------------------------------------------
-* Incremental Asset Pagination ("Load More"): Introduced staged pagination (10
-  assets per batch) for both Frames and Elements grids, dramatically reducing
-  memory usage and initial rendering latency when opening the Assets panel.
-* Dynamic Asset Count & Load More Controls: Added an interactive button with
-  remaining asset counter and total count indicators, with automated pagination
-  reset when switching tabs, filtering shapes, or performing searches.
-* Clean Visual Grid for Assets: Streamlined asset cards by removing text title
-  labels from the visual preview, presenting a clean, image-centric design while
-  fully maintaining full-text searchability and categorization in the
-  background.
-* Simplified Hover Tooltips: Refined hover tooltips to provide clean, contextual
-  action descriptions without displaying internal asset identifiers.
-* Tutorial Dialog Polish: Removed redundant card header badges across the user
-  tutorial dialog for a cleaner reading experience.
+* Dual Distribution Channel Support: Separated the update mechanism between
+  Standalone Win32 (.exe) direct installers and Microsoft Store (.msix) packages
+  from a single unified codebase.
+* Store Policy Compliance: Implemented automatic bypass of in-app GitHub updater
+  routines for Microsoft Store builds in strict compliance with Microsoft Store
+  Certification Policy 10.1.1.
+* Native Windows Identity Detection: Added native detection using Windows API
+  GetCurrentPackageFamilyName (kernel32.dll) with secondary
+  distribution_channel.json marker redundancy for robust, tamper-resistant
+  channel identification.
+* Store-Adapted Settings & About Dialogs: Displays a dedicated "Microsoft Store
+  Edition" status badge in Settings and About dialogs with a one-click deep link
+  to the Windows Store page (ms-windows-store://...).
+* Suppressed Background Update Toasts: Automatically suppresses background
+  GitHub update notifications and binary downloads for Store installations.
+* Cleaner Asset Cards: Removed visible name labels from frame and element visual
+  cards for a consistent, distraction-free grid display matching modern creative
+  tools.
+* Simplified Hover Titles: Refined hover tooltips on frame and element cards to
+  present clean action guidance without exposing internal asset names.
+* Automated Dual Packaging: Build pipeline automatically produces both the
+  signed NSIS installer for GitHub subscribers and the store-compliant MSIX
+  bundle.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
