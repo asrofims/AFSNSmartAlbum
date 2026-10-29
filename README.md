@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.18-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.19-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,16 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.18
+## Current release highlights — v1.5.19
 
-- **Incremental Asset Pagination ("Load More")** — Introduced staged pagination (10 assets per batch) for both Frames and Elements grids, dramatically reducing memory usage and initial rendering latency when opening the Assets panel.
-- **Dynamic Asset Count & Load More Controls** — Added an interactive button with remaining asset counter and total count indicators, with automated pagination reset when switching tabs, filtering shapes, or performing searches.
-- **Clean Visual Grid for Assets** — Streamlined asset cards by removing text title labels from the visual preview, presenting a clean, image-centric design while fully maintaining full-text searchability and categorization in the background.
-- **Simplified Hover Tooltips** — Refined hover tooltips to provide clean, contextual action descriptions without displaying internal asset identifiers.
-- **Tutorial Dialog Polish** — Removed redundant card header badges across the user tutorial dialog for a cleaner reading experience.
+- **Dual Distribution Channel Support** — Separated the update mechanism between Standalone Win32 (`.exe`) direct installers and Microsoft Store (`.msix`) packages from a single unified codebase.
+- **Store Policy Compliance** — Implemented automatic bypass of in-app GitHub updater routines for Microsoft Store builds in strict compliance with Microsoft Store Certification Policy 10.1.1.
+- **Native Windows Identity Detection** — Added native detection using Windows API `GetCurrentPackageFamilyName` (`kernel32.dll`) with secondary `distribution_channel.json` marker redundancy for robust, tamper-resistant channel identification.
+- **Store-Adapted Settings & About Dialogs** — Displays a dedicated "Microsoft Store Edition" status badge in Settings and About dialogs with a one-click deep link to the Windows Store page (`ms-windows-store://...`).
+- **Suppressed Background Update Toasts** — Automatically suppresses background GitHub update notifications and binary downloads for Store installations.
+- **Cleaner Asset Cards** — Removed visible name labels from frame and element visual cards for a consistent, distraction-free grid display matching modern creative tools.
+- **Simplified Hover Titles** — Refined hover tooltips on frame and element cards to present clean action guidance without exposing internal asset names.
+- **Automated Dual Packaging** — Build pipeline automatically produces both the signed NSIS installer for GitHub subscribers and the store-compliant MSIX bundle.
 
 ## Highlights
 
