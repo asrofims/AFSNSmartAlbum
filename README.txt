@@ -1,22 +1,21 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.20
+Version: 1.5.21
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.20 ]
+[ WHAT'S NEW IN 1.5.21 ]
 --------------------------------------------------------------------------------
-* Clean Unplated Store App Icon: Added complete multi-resolution asset
-  generation (altform-unplated and altform-lightunplated) with resources.pri
-  package indexing for the Microsoft Store package, ensuring the app icon
-  renders with full transparency on the Windows taskbar and start menu without
-  colored backplates.
-* Reliable Store Deep Linking: Implemented native Windows launcher command
-  (open_store_page) using the system shell to open the official Microsoft Store
-  product page directly when clicking "Open in Store" or "Store Updates".
-* Dual Distribution Consistency: Maintained full parity between standalone
-  direct installer (.exe) with GitHub auto-updater and Store MSIX package with
+* Microsoft Store Deep Link Execution: Fixed the Store update button handler to
+  invoke the native Win32 ShellExecuteW API (shell32.dll), ensuring the official
+  Microsoft Store application launches directly to the AFSNSmartAlbum product
+  page instead of falling back to the user's Documents folder.
+* Unplated Visual Assets: Maintained clean, unplated visual assets
+  (Square44x44Logo.targetsize-*_altform-unplated.png) and resources.pri package
+  indexing for seamless, borderless taskbar and start menu display.
+* Dual Distribution Continuity: Retained 100% parity between standalone
+  installer (.exe) with GitHub auto-updater and Store MSIX package with
   automated Windows Store servicing.
 
 [ 1. OVERVIEW ]
