@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.20-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.21-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.20
+## Current release highlights — v1.5.21
 
-- **Clean Unplated Store App Icon** — Added complete multi-resolution asset generation (`altform-unplated` and `altform-lightunplated`) with `resources.pri` package indexing for the Microsoft Store package, ensuring the app icon renders with full transparency on the Windows taskbar and start menu without colored backplates.
-- **Reliable Store Deep Linking** — Implemented native Windows launcher command (`open_store_page`) using the system shell to open the official Microsoft Store product page directly when clicking "Open in Store" or "Store Updates".
-- **Dual Distribution Consistency** — Maintained full parity between standalone direct installer (`.exe`) with GitHub auto-updater and Store MSIX package with automated Windows Store servicing.
+- **Microsoft Store Deep Link Execution** — Fixed the Store update button handler to invoke the native Win32 `ShellExecuteW` API (`shell32.dll`), ensuring the official Microsoft Store application launches directly to the AFSNSmartAlbum product page instead of falling back to the user's Documents folder.
+- **Unplated Visual Assets** — Maintained clean, unplated visual assets (`Square44x44Logo.targetsize-*_altform-unplated.png`) and `resources.pri` package indexing for seamless, borderless taskbar and start menu display.
+- **Dual Distribution Continuity** — Retained 100% parity between standalone installer (`.exe`) with GitHub auto-updater and Store MSIX package with automated Windows Store servicing.
 
 ## Highlights
 
