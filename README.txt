@@ -1,35 +1,23 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.19
+Version: 1.5.20
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.19 ]
+[ WHAT'S NEW IN 1.5.20 ]
 --------------------------------------------------------------------------------
-* Dual Distribution Channel Support: Separated the update mechanism between
-  Standalone Win32 (.exe) direct installers and Microsoft Store (.msix) packages
-  from a single unified codebase.
-* Store Policy Compliance: Implemented automatic bypass of in-app GitHub updater
-  routines for Microsoft Store builds in strict compliance with Microsoft Store
-  Certification Policy 10.1.1.
-* Native Windows Identity Detection: Added native detection using Windows API
-  GetCurrentPackageFamilyName (kernel32.dll) with secondary
-  distribution_channel.json marker redundancy for robust, tamper-resistant
-  channel identification.
-* Store-Adapted Settings & About Dialogs: Displays a dedicated "Microsoft Store
-  Edition" status badge in Settings and About dialogs with a one-click deep link
-  to the Windows Store page (ms-windows-store://...).
-* Suppressed Background Update Toasts: Automatically suppresses background
-  GitHub update notifications and binary downloads for Store installations.
-* Cleaner Asset Cards: Removed visible name labels from frame and element visual
-  cards for a consistent, distraction-free grid display matching modern creative
-  tools.
-* Simplified Hover Titles: Refined hover tooltips on frame and element cards to
-  present clean action guidance without exposing internal asset names.
-* Automated Dual Packaging: Build pipeline automatically produces both the
-  signed NSIS installer for GitHub subscribers and the store-compliant MSIX
-  bundle.
+* Clean Unplated Store App Icon: Added complete multi-resolution asset
+  generation (altform-unplated and altform-lightunplated) with resources.pri
+  package indexing for the Microsoft Store package, ensuring the app icon
+  renders with full transparency on the Windows taskbar and start menu without
+  colored backplates.
+* Reliable Store Deep Linking: Implemented native Windows launcher command
+  (open_store_page) using the system shell to open the official Microsoft Store
+  product page directly when clicking "Open in Store" or "Store Updates".
+* Dual Distribution Consistency: Maintained full parity between standalone
+  direct installer (.exe) with GitHub auto-updater and Store MSIX package with
+  automated Windows Store servicing.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
