@@ -1,22 +1,31 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.5.21
+Version: 1.5.22
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.5.21 ]
+[ WHAT'S NEW IN 1.5.22 ]
 --------------------------------------------------------------------------------
-* Microsoft Store Deep Link Execution: Fixed the Store update button handler to
-  invoke the native Win32 ShellExecuteW API (shell32.dll), ensuring the official
-  Microsoft Store application launches directly to the AFSNSmartAlbum product
-  page instead of falling back to the user's Documents folder.
-* Unplated Visual Assets: Maintained clean, unplated visual assets
-  (Square44x44Logo.targetsize-*_altform-unplated.png) and resources.pri package
-  indexing for seamless, borderless taskbar and start menu display.
-* Dual Distribution Continuity: Retained 100% parity between standalone
-  installer (.exe) with GitHub auto-updater and Store MSIX package with
-  automated Windows Store servicing.
+* Floating Smart Layout Navigation Widget: Added a draggable,
+  translucent-to-solid glassmorphism HUD directly on the canvas with pointer
+  capture, dynamic viewport clamping, and instant hotkey toggle (W). Includes
+  layout cycle controls (< Prev, Next >, S shuffle), archetype selector (Mood:
+  <Archetype>), and one-click layout regeneration (🎲 Generate).
+* Dynamic Composition Archetypes & Interactive Tuning: Integrated 6 distinct
+  layout composition archetypes (Staggered Diamond, Editorial Hero, Clean Grid,
+  Fine-Art Gallery, Dynamic Cascade, Balanced Mosaic) with real-time parametric
+  controls for density, contrast, edge margins, alignment rhythm, and aspect
+  diversity.
+* Vision Sharpness Detection & Quality Warning Indicators: Automated Laplacian
+  variance analysis for photo sharpness on import, introducing an Amber warning
+  badge (#f59e0b) on filmstrip thumbnails with misfocus blur alerts (Sharpness:
+  <score> / 150), while prioritizing sharpest imagery for dominant hero frames.
+* Tutorial & Quick Reference Documentation: Expanded the in-app Tutorial panel
+  with comprehensive documentation for the Floating Widget canvas workflow,
+  hotkey W, interactive Dynamic Tuning modal, composition archetypes, and
+  color-coded filmstrip badges (Amber sharpness warning, Purple face detection,
+  Green used checkmark, Red missing image).
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
