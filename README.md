@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.21-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.22-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.21
+## Current release highlights — v1.5.22
 
-- **Microsoft Store Deep Link Execution** — Fixed the Store update button handler to invoke the native Win32 `ShellExecuteW` API (`shell32.dll`), ensuring the official Microsoft Store application launches directly to the AFSNSmartAlbum product page instead of falling back to the user's Documents folder.
-- **Unplated Visual Assets** — Maintained clean, unplated visual assets (`Square44x44Logo.targetsize-*_altform-unplated.png`) and `resources.pri` package indexing for seamless, borderless taskbar and start menu display.
-- **Dual Distribution Continuity** — Retained 100% parity between standalone installer (`.exe`) with GitHub auto-updater and Store MSIX package with automated Windows Store servicing.
+- **Floating Smart Layout Navigation Widget** — Added a draggable, translucent-to-solid glassmorphism HUD directly on the canvas with pointer capture, dynamic viewport clamping, and instant hotkey toggle (`W`). Includes layout cycle controls (`< Prev`, `Next >`, `S` shuffle), archetype selector (`Mood: <Archetype>`), and one-click layout regeneration (`🎲 Generate`).
+- **Dynamic Composition Archetypes & Interactive Tuning** — Integrated 6 distinct layout composition archetypes (Staggered Diamond, Editorial Hero, Clean Grid, Fine-Art Gallery, Dynamic Cascade, Balanced Mosaic) with real-time parametric controls for density, contrast, edge margins, alignment rhythm, and aspect diversity.
+- **Vision Sharpness Detection & Quality Warning Indicators** — Automated Laplacian variance analysis for photo sharpness on import, introducing an Amber warning badge (`#f59e0b`) on filmstrip thumbnails with misfocus blur alerts (`Sharpness: <score> / 150`), while prioritizing sharpest imagery for dominant hero frames.
+- **Tutorial & Quick Reference Documentation** — Expanded the in-app Tutorial panel with comprehensive documentation for the Floating Widget canvas workflow, hotkey `W`, interactive Dynamic Tuning modal, composition archetypes, and color-coded filmstrip badges (Amber sharpness warning, Purple face detection, Green used checkmark, Red missing image).
 
 ## Highlights
 
