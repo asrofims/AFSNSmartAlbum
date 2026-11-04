@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.5.22-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.6.0-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,12 +25,19 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.5.22
+## Current release highlights — v1.6.0
 
-- **Floating Smart Layout Navigation Widget** — Added a draggable, translucent-to-solid glassmorphism HUD directly on the canvas with pointer capture, dynamic viewport clamping, and instant hotkey toggle (`W`). Includes layout cycle controls (`< Prev`, `Next >`, `S` shuffle), archetype selector (`Mood: <Archetype>`), and one-click layout regeneration (`🎲 Generate`).
-- **Dynamic Composition Archetypes & Interactive Tuning** — Integrated 6 distinct layout composition archetypes (Staggered Diamond, Editorial Hero, Clean Grid, Fine-Art Gallery, Dynamic Cascade, Balanced Mosaic) with real-time parametric controls for density, contrast, edge margins, alignment rhythm, and aspect diversity.
-- **Vision Sharpness Detection & Quality Warning Indicators** — Automated Laplacian variance analysis for photo sharpness on import, introducing an Amber warning badge (`#f59e0b`) on filmstrip thumbnails with misfocus blur alerts (`Sharpness: <score> / 150`), while prioritizing sharpest imagery for dominant hero frames.
-- **Tutorial & Quick Reference Documentation** — Expanded the in-app Tutorial panel with comprehensive documentation for the Floating Widget canvas workflow, hotkey `W`, interactive Dynamic Tuning modal, composition archetypes, and color-coded filmstrip badges (Amber sharpness warning, Purple face detection, Green used checkmark, Red missing image).
+- **Seamless Live Cover Sizing** — Dynamically updates photo framing at 60 FPS during interactive resizing, completely eliminating frozen cache artifacts, empty white margins, and black fill exposures when appearance effects (noise, blur, grayscale) or shadows are active.
+- **Instant Effect Re-caching** — Automatically re-applies high-fidelity visual effects at the final resolved dimensions the moment transformation finishes.
+- **Smooth Crop Zoom** — Eliminated cache freezing during in-frame crop mode zoom gestures.
+- **Scrollable Dropdown Fix** — Resolved an issue where scrolling the Preset Template dropdown (and other Select menus) with the mouse wheel or scrollbar caused the menu to close prematurely.
+- **Auto-Scroll to Active Option** — Automatically scrolls the active preset into view upon opening the dropdown or using keyboard navigation.
+- **Canvas-Only Snapping Isolation** — Pasteboard objects located outside the canvas are cleanly ignored from snapping calculations, keeping alignment guides strictly relevant to on-canvas designs.
+- **Center-Middle Target Bullseye** — The pink glowing center bullseye target is strictly constrained to the true spread/page center-middle intersection.
+- **Tightened Proximity Catch** — Proximity threshold refined to 25mm for responsive, non-intrusive snapping.
+- Added undo/redo history support for resetting line actions.
+- Cleaned up redundant icons and streamlined alignment actions across right-click context menus and Properties panels.
+- Standardized circle and ellipse default shape geometries.
 
 ## Highlights
 
