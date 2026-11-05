@@ -1,24 +1,25 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.3
+Version: 1.6.4
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.3 ]
+[ WHAT'S NEW IN 1.6.4 ]
 --------------------------------------------------------------------------------
-* Resolved issue where opening a project file marked it as dirty with unsaved
-  changes.
-* Fixed photo adjustments and rounded shape persistence across project packages.
-* Harmonized selection style and border toggle interactions for complex
-  polygons.
-* Professional non-destructive Photo Adjustments (Exposure, Contrast,
-  Highlights, Shadows, Whites, Blacks, Saturation, Vibrance, Warmth, Tint).
-* Fillet-rounded polygons, stars, and triangles with configurable corner radius
-  across editor and export engines.
-* Proportional ratio lock and precision resizing for closed vector shapes.
-* Updated in-app tutorials for photo adjustments, appearance controls, and
-  project packaging.
+* Balanced portrait-dominated additional pattern pools with wide aspect ratios
+  and orientation diversity.
+* Harmonized Smart Layout Mood labels across tuning cards, floating widget, and
+  sidebar panels.
+* Fixed multi-selection batch detachment of decorative frames with full
+  undo/redo support.
+* Dynamic Adaptive Patterns engine (Zigzag, Arch, Valley, Offset Columns, Split
+  Cascade, Hero Cascade, Alternating Rhythm).
+* Interactive horizontal Pattern Selector strip with smooth overflow edge fades
+  and wheel navigation.
+* Real-time photo adjustments rendering for album spread navigator thumbnails.
+* Non-destructive background appearance adjustments synchronized with native
+  export and project packages.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
