@@ -1,14 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.1
+Version: 1.6.2
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.1 ]
+[ WHAT'S NEW IN 1.6.2 ]
 --------------------------------------------------------------------------------
-* Stability and performance fixes across desktop operations.
-* Enhanced user experience and workflow optimizations.
+* Stabilized rotated object magnetic snapping and dimension guides across canvas
+  pasteboards.
+* Fixed selection styling and border toggles across mixed multi-selection of
+  photos and closed shapes.
+* Resolved export preflight font dependency detection and rasterization edge
+  cases.
+* Portable Project Package (.zip) export with Complete and Recovery copy
+  workflows and embedded assets.
+* Design Dependencies preflight review dialog verifying photos, fonts, and
+  graphics before export.
+* Dedicated interactive Project ZIP & Recovery tutorial in the User Guide &
+  Tutorials hub.
+* Typography panel enhancements with unified letter-spacing, line-height
+  controls, and font preflight.
+* Refined template package photo slot persistence and layout templates workflow.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
