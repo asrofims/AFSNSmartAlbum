@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.6.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.6.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,16 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.6.2
+## Current release highlights — v1.6.3
 
-- Stabilized rotated object magnetic snapping and dimension guides across canvas pasteboards.
-- Fixed selection styling and border toggles across mixed multi-selection of photos and closed shapes.
-- Resolved export preflight font dependency detection and rasterization edge cases.
-- Portable Project Package (.zip) export with Complete and Recovery copy workflows and embedded assets.
-- Design Dependencies preflight review dialog verifying photos, fonts, and graphics before export.
-- Dedicated interactive Project ZIP & Recovery tutorial in the User Guide & Tutorials hub.
-- Typography panel enhancements with unified letter-spacing, line-height controls, and font preflight.
-- Refined template package photo slot persistence and layout templates workflow.
+- Resolved issue where opening a project file marked it as dirty with unsaved changes.
+- Fixed photo adjustments and rounded shape persistence across project packages.
+- Harmonized selection style and border toggle interactions for complex polygons.
+- Professional non-destructive Photo Adjustments (Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Saturation, Vibrance, Warmth, Tint).
+- Fillet-rounded polygons, stars, and triangles with configurable corner radius across editor and export engines.
+- Proportional ratio lock and precision resizing for closed vector shapes.
+- Updated in-app tutorials for photo adjustments, appearance controls, and project packaging.
 
 ## Highlights
 
