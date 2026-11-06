@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.6.6-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.6.7-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.6.6
+## Current release highlights — v1.6.7
 
-- Fixed closed-shape Constrain Proportions restoring unwanted side-midpoint handles on canvas Transformer.
-- Aligned Transformer corner handle visibility consistently across render props and synchronous attachment.
-- Defaulted photo Constrain Proportions session preference to Off, matching closed shapes.
-- Unified Shape iconography with new reusable ShapeIcon component across toolbar and Layers panel.
-- Comprehensive SSR regression suite verifying real Konva Transformer anchor visibility and toggle states.
+- Preserved background photo Appearance switches and tuning during library asset synchronization.
+- Prevented authored Light, Color, and Effects adjustments from resetting to default on background images.
+- Maintained background crop, opacity, fit, and adjustment state across spread navigation and project reloads.
+- Explicit whitelist synchronization for background photo metadata (file paths, previews, and dimensions).
+- Extended test coverage validating all background adjustment combinations across cover and interior spreads.
 
 ## Highlights
 
