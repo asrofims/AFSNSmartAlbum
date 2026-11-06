@@ -1,25 +1,26 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.4
+Version: 1.6.5
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.4 ]
+[ WHAT'S NEW IN 1.6.5 ]
 --------------------------------------------------------------------------------
-* Balanced portrait-dominated additional pattern pools with wide aspect ratios
-  and orientation diversity.
-* Harmonized Smart Layout Mood labels across tuning cards, floating widget, and
-  sidebar panels.
-* Fixed multi-selection batch detachment of decorative frames with full
-  undo/redo support.
-* Dynamic Adaptive Patterns engine (Zigzag, Arch, Valley, Offset Columns, Split
-  Cascade, Hero Cascade, Alternating Rhythm).
-* Interactive horizontal Pattern Selector strip with smooth overflow edge fades
-  and wheel navigation.
-* Real-time photo adjustments rendering for album spread navigator thumbnails.
-* Non-destructive background appearance adjustments synchronized with native
-  export and project packages.
+* Corrected wide internal gap artifacts with small edge-pinned photo groups
+  across additional Dynamic patterns.
+* Resolved pattern parameter lookup fallback in album store when regenerating
+  dynamic layouts.
+* Fixed layout cycle HUD update propagation when cycling through dynamic pattern
+  variations.
+* Two-axis unit-relative local whitespace quality assessment engine
+  (getPatternSpacingQuality).
+* Centered and balanced narrow middle connectors and balanced Split subgroups
+  across dynamic patterns.
+* Spread pattern starts tracking with historical recency caching to guarantee
+  variation diversity upon regeneration.
+* Synchronized AI face detection preferences across Layout Cycle HUD and
+  Templates Panel.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
