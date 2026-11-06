@@ -1,22 +1,22 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.6
+Version: 1.6.7
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.6 ]
+[ WHAT'S NEW IN 1.6.7 ]
 --------------------------------------------------------------------------------
-* Fixed closed-shape Constrain Proportions restoring unwanted side-midpoint
-  handles on canvas Transformer.
-* Aligned Transformer corner handle visibility consistently across render props
-  and synchronous attachment.
-* Defaulted photo Constrain Proportions session preference to Off, matching
-  closed shapes.
-* Unified Shape iconography with new reusable ShapeIcon component across toolbar
-  and Layers panel.
-* Comprehensive SSR regression suite verifying real Konva Transformer anchor
-  visibility and toggle states.
+* Preserved background photo Appearance switches and tuning during library asset
+  synchronization.
+* Prevented authored Light, Color, and Effects adjustments from resetting to
+  default on background images.
+* Maintained background crop, opacity, fit, and adjustment state across spread
+  navigation and project reloads.
+* Explicit whitelist synchronization for background photo metadata (file paths,
+  previews, and dimensions).
+* Extended test coverage validating all background adjustment combinations
+  across cover and interior spreads.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
