@@ -1,26 +1,22 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.5
+Version: 1.6.6
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.5 ]
+[ WHAT'S NEW IN 1.6.6 ]
 --------------------------------------------------------------------------------
-* Corrected wide internal gap artifacts with small edge-pinned photo groups
-  across additional Dynamic patterns.
-* Resolved pattern parameter lookup fallback in album store when regenerating
-  dynamic layouts.
-* Fixed layout cycle HUD update propagation when cycling through dynamic pattern
-  variations.
-* Two-axis unit-relative local whitespace quality assessment engine
-  (getPatternSpacingQuality).
-* Centered and balanced narrow middle connectors and balanced Split subgroups
-  across dynamic patterns.
-* Spread pattern starts tracking with historical recency caching to guarantee
-  variation diversity upon regeneration.
-* Synchronized AI face detection preferences across Layout Cycle HUD and
-  Templates Panel.
+* Fixed closed-shape Constrain Proportions restoring unwanted side-midpoint
+  handles on canvas Transformer.
+* Aligned Transformer corner handle visibility consistently across render props
+  and synchronous attachment.
+* Defaulted photo Constrain Proportions session preference to Off, matching
+  closed shapes.
+* Unified Shape iconography with new reusable ShapeIcon component across toolbar
+  and Layers panel.
+* Comprehensive SSR regression suite verifying real Konva Transformer anchor
+  visibility and toggle states.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
