@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.6.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.6.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,15 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.6.4
+## Current release highlights — v1.6.5
 
-- Balanced portrait-dominated additional pattern pools with wide aspect ratios and orientation diversity.
-- Harmonized Smart Layout Mood labels across tuning cards, floating widget, and sidebar panels.
-- Fixed multi-selection batch detachment of decorative frames with full undo/redo support.
-- Dynamic Adaptive Patterns engine (Zigzag, Arch, Valley, Offset Columns, Split Cascade, Hero Cascade, Alternating Rhythm).
-- Interactive horizontal Pattern Selector strip with smooth overflow edge fades and wheel navigation.
-- Real-time photo adjustments rendering for album spread navigator thumbnails.
-- Non-destructive background appearance adjustments synchronized with native export and project packages.
+- Corrected wide internal gap artifacts with small edge-pinned photo groups across additional Dynamic patterns.
+- Resolved pattern parameter lookup fallback in album store when regenerating dynamic layouts.
+- Fixed layout cycle HUD update propagation when cycling through dynamic pattern variations.
+- Two-axis unit-relative local whitespace quality assessment engine (`getPatternSpacingQuality`).
+- Centered and balanced narrow middle connectors and balanced Split subgroups across dynamic patterns.
+- Spread pattern starts tracking with historical recency caching to guarantee variation diversity upon regeneration.
+- Synchronized AI face detection preferences across Layout Cycle HUD and Templates Panel.
 
 ## Highlights
 
