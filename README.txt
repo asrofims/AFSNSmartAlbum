@@ -1,22 +1,25 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.7
+Version: 1.6.8
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.7 ]
+[ WHAT'S NEW IN 1.6.8 ]
 --------------------------------------------------------------------------------
-* Preserved background photo Appearance switches and tuning during library asset
-  synchronization.
-* Prevented authored Light, Color, and Effects adjustments from resetting to
-  default on background images.
-* Maintained background crop, opacity, fit, and adjustment state across spread
-  navigation and project reloads.
-* Explicit whitelist synchronization for background photo metadata (file paths,
-  previews, and dimensions).
-* Extended test coverage validating all background adjustment combinations
-  across cover and interior spreads.
+* Eliminated first-switch background image flash during spread navigation via an
+  LRU cache and proactive multi-spread warm preloading.
+* Ensured background image cache is cleanly purged and freed when nodes unmount
+  or reload.
+* Prevented duplicate folder assignments by automatically removing moved photos
+  from prior custom folders while preserving the All Photos library.
+* Smart context menu target filtering for Move to Folder: automatically hides
+  folders already containing the selected photo(s) and disables the menu item
+  when no eligible targets remain.
+* Enhanced folder deletion workflow with explicit confirmation dialog and
+  cleanup of member photo assignments.
+* Polished filmstrip tray navigation, folder tab styling, and horizontal scroll
+  containment.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
