@@ -1,22 +1,18 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.2
+Version: 1.7.3
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.2 ]
+[ WHAT'S NEW IN 1.7.3 ]
 --------------------------------------------------------------------------------
-* Cast photo shadows from cropped image alpha across the editor, Navigator,
-  export preview, and native export.
-* Maintain shadow offsets along page axes while visible masks accurately follow
-  object rotation and horizontal/vertical flips.
-* Enable full Drop Shadow controls for SVG icons, using edited SVG alpha so
-  hidden parts and transparent gaps stay clear in previews and exports.
-* Preserve shadow settings through Save, Save As, bundled project ZIP archives,
-  and styled layout templates.
-* Keep raster decorations as catalog references in layout templates, honoring
-  the Drop Shadows option when applying or sharing templates.
+* Allow official asset server host in WebView Content Security Policy (img-src)
+  to render Stickers & Ornaments thumbnails across all desktop binaries.
+* Preserve lightweight browsing with optimized thumbnail previews without
+  premature full-resolution downloads.
+* Ensure reliable asset downloads, offline disk caching, and seamless canvas
+  placement for stickers, ornaments, and decorative graphics.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
