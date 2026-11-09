@@ -1,25 +1,22 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.1
+Version: 1.7.2
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.1 ]
+[ WHAT'S NEW IN 1.7.2 ]
 --------------------------------------------------------------------------------
-* Insert editable font combinations from Text Styles and choose from 12 bundled
-  font families offline.
-* Keep Properties focused on the selected objects, with collapsible cards that
-  remember which sections are open.
-* Browse Iconify and Pixabay with server-configured filters. Pro entitlement is
-  checked when exporting artwork from these providers.
-* Edit individual SVG fills and strokes, preview their parts, and restore the
-  original insertion size of an icon.
-* See dark artwork more clearly in Assets and Layers, with lightweight previews
-  for newly placed images.
-* Save editable text groups and asset references in reusable layout templates.
-* Find layouts that span both pages in Balanced and Dynamic mode when the spine
-  width is zero.
+* Cast photo shadows from cropped image alpha across the editor, Navigator,
+  export preview, and native export.
+* Maintain shadow offsets along page axes while visible masks accurately follow
+  object rotation and horizontal/vertical flips.
+* Enable full Drop Shadow controls for SVG icons, using edited SVG alpha so
+  hidden parts and transparent gaps stay clear in previews and exports.
+* Preserve shadow settings through Save, Save As, bundled project ZIP archives,
+  and styled layout templates.
+* Keep raster decorations as catalog references in layout templates, honoring
+  the Drop Shadows option when applying or sharing templates.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
