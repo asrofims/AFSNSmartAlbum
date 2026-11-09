@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.6.8-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.7.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,14 +25,15 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.6.8
+## Current release highlights — v1.7.1
 
-- Eliminated first-switch background image flash during spread navigation via an LRU cache and proactive multi-spread warm preloading.
-- Ensured background image cache is cleanly purged and freed when nodes unmount or reload.
-- Prevented duplicate folder assignments by automatically removing moved photos from prior custom folders while preserving the All Photos library.
-- Smart context menu target filtering for Move to Folder: automatically hides folders already containing the selected photo(s) and disables the menu item when no eligible targets remain.
-- Enhanced folder deletion workflow with explicit confirmation dialog and cleanup of member photo assignments.
-- Polished filmstrip tray navigation, folder tab styling, and horizontal scroll containment.
+- Insert editable font combinations from Text Styles and choose from 12 bundled font families offline.
+- Keep Properties focused on the selected objects, with collapsible cards that remember which sections are open.
+- Browse Iconify and Pixabay with server-configured filters. Pro entitlement is checked when exporting artwork from these providers.
+- Edit individual SVG fills and strokes, preview their parts, and restore the original insertion size of an icon.
+- See dark artwork more clearly in Assets and Layers, with lightweight previews for newly placed images.
+- Save editable text groups and asset references in reusable layout templates.
+- Find layouts that span both pages in Balanced and Dynamic mode when the spine width is zero.
 
 ## Highlights
 
