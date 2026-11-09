@@ -1,25 +1,25 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.6.8
+Version: 1.7.1
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.6.8 ]
+[ WHAT'S NEW IN 1.7.1 ]
 --------------------------------------------------------------------------------
-* Eliminated first-switch background image flash during spread navigation via an
-  LRU cache and proactive multi-spread warm preloading.
-* Ensured background image cache is cleanly purged and freed when nodes unmount
-  or reload.
-* Prevented duplicate folder assignments by automatically removing moved photos
-  from prior custom folders while preserving the All Photos library.
-* Smart context menu target filtering for Move to Folder: automatically hides
-  folders already containing the selected photo(s) and disables the menu item
-  when no eligible targets remain.
-* Enhanced folder deletion workflow with explicit confirmation dialog and
-  cleanup of member photo assignments.
-* Polished filmstrip tray navigation, folder tab styling, and horizontal scroll
-  containment.
+* Insert editable font combinations from Text Styles and choose from 12 bundled
+  font families offline.
+* Keep Properties focused on the selected objects, with collapsible cards that
+  remember which sections are open.
+* Browse Iconify and Pixabay with server-configured filters. Pro entitlement is
+  checked when exporting artwork from these providers.
+* Edit individual SVG fills and strokes, preview their parts, and restore the
+  original insertion size of an icon.
+* See dark artwork more clearly in Assets and Layers, with lightweight previews
+  for newly placed images.
+* Save editable text groups and asset references in reusable layout templates.
+* Find layouts that span both pages in Balanced and Dynamic mode when the spine
+  width is zero.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
