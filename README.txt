@@ -1,22 +1,19 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.4
+Version: 1.7.5
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.4 ]
+[ WHAT'S NEW IN 1.7.5 ]
 --------------------------------------------------------------------------------
-* Multi-Selection Typography: Edit text color, background highlight, font size,
-  and paragraph alignment across multiple selected text frames simultaneously,
-  with mixed-value indicators and single-step Undo.
-* Responsive Photo Adjustments: Instant arrow key and step-button adjustment for
-  Light, Color, Effects, and Opacity controls with immediate canvas feedback and
-  gesture grouping.
-* Robust Asset Previews: Resilient preview loading and retry mechanisms for
-  online stickers, ornaments, and frame assets.
-* Page-Specific Image Backgrounds: Enhanced split spread and full spread
-  background image cropping, persistence, and native export fidelity.
+* Color Picker: Keeps the picker inside the window near screen edges and in
+  scrolling panels. Choose custom colors with the built-in controls, hex field,
+  or eyedropper.
+* Font Combinations: Drag any text in a group to move the whole combination
+  together, including during quick drags.
+* Match Text Width: Match selected text frames to the reference width while
+  keeping each frame's alignment point in place.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
