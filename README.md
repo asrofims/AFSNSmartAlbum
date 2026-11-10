@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.7.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.7.6-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.7.5
+## Current release highlights — v1.7.6
 
-- **Color Picker** — Keeps the picker inside the window near screen edges and in scrolling panels. Choose custom colors with the built-in controls, hex field, or eyedropper.
-- **Font Combinations** — Drag any text in a group to move the whole combination together, including during quick drags.
-- **Match Text Width** — Match selected text frames to the reference width while keeping each frame's alignment point in place.
+- **Border Dash & Dot Symmetry** — Symmetric corner diagonals and consistent dash/dot distribution on frame borders across the canvas and export engine.
+- **Adaptive Layout Style Persistence** — Preserved dashed and dotted border styles across Adaptive Layout variations and photo slot changes.
+- **Diagonal Handle Snapping** — Smooth magnetic snapping for diagonal corner handles to canvas edges, margins, and 1:1 square ratio without aspect distortion.
+- **Template Preview Clarity** — Crisp vector text representations and text counters in layout template previews.
 
 ## Highlights
 
