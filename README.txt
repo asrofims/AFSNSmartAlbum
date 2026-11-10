@@ -1,14 +1,18 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.7
+Version: 1.7.8
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.7 ]
+[ WHAT'S NEW IN 1.7.8 ]
 --------------------------------------------------------------------------------
-* Stability and performance fixes across desktop operations.
-* Enhanced user experience and workflow optimizations.
+* Streamlined Layout Template workflow: all object styling parameters (borders,
+  corner radii, drop shadows, opacity, and photo effects) are now automatically
+  captured and applied without extra option dialogues.
+* Retained Placement Mode options (Fit Within Safe Margins / Original Size)
+  during template application for flexible canvas adaptation.
+* Direct .afsnt template export with complete style attributes.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
