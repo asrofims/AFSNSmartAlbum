@@ -1,19 +1,20 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.5
+Version: 1.7.6
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.5 ]
+[ WHAT'S NEW IN 1.7.6 ]
 --------------------------------------------------------------------------------
-* Color Picker: Keeps the picker inside the window near screen edges and in
-  scrolling panels. Choose custom colors with the built-in controls, hex field,
-  or eyedropper.
-* Font Combinations: Drag any text in a group to move the whole combination
-  together, including during quick drags.
-* Match Text Width: Match selected text frames to the reference width while
-  keeping each frame's alignment point in place.
+* Border Dash & Dot Symmetry: Symmetric corner diagonals and consistent dash/dot
+  distribution on frame borders across the canvas and export engine.
+* Adaptive Layout Style Persistence: Preserved dashed and dotted border styles
+  across Adaptive Layout variations and photo slot changes.
+* Diagonal Handle Snapping: Smooth magnetic snapping for diagonal corner handles
+  to canvas edges, margins, and 1:1 square ratio without aspect distortion.
+* Template Preview Clarity: Crisp vector text representations and text counters
+  in layout template previews.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
