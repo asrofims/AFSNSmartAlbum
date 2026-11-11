@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.8.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.8.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,16 +25,10 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.8.1
+## Current release highlights — v1.8.2
 
-- Auto Build Album Generation: Automatically generate complete, balanced, and aesthetic multi-spread photo albums from imported photo libraries in seconds.
-- Smart Chronological Pacing: Intelligently detects event and scene boundaries using natural time-gap clustering to group related moments into cohesive narrative spreads.
-- Three-Tier Editorial Safe Margin Diversity: Generates visually diverse safe margins across spreads spanning ~0.8cm (Compact / Bold) to ~1.7cm (Balanced / Classic) up to ~3.0cm (Airy / Fine-Art Gallery) while strictly adhering to print blade safety bounds (>= 6mm).
-- No Empty Page Guarantee: Ensures that multi-photo spreads always distribute frames across facing pages or center-spanning hero layouts without leaving facing pages empty.
-- Unified Pro Upgrade Architecture: Centralized the Pro upgrade workflow across the application (Auto Build dialog, Workspace toolbar, Templates panel, Export dialog, and License settings) directing users to the official unified upgrade portal.
-- Single Pro Action Button: Streamlined the Auto Build showcase with a single ice-blue/cyan gradient action button in the pinned dialog footer.
-- Persistent Auto Build Options: Remembers photo selection filters (All photos vs. Selected photos) across dialog reopenings for a seamless authoring experience.
-- Random Seed Layout Variation: Provides fresh, handcrafted layout variations across aesthetic moods every time Auto Build is executed.
+- Stability and performance fixes across desktop operations.
+- Enhanced user experience and workflow optimizations.
 
 ## Highlights
 
