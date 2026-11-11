@@ -1,18 +1,22 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.8
+Version: 1.7.9
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.8 ]
+[ WHAT'S NEW IN 1.7.9 ]
 --------------------------------------------------------------------------------
-* Streamlined Layout Template workflow: all object styling parameters (borders,
-  corner radii, drop shadows, opacity, and photo effects) are now automatically
-  captured and applied without extra option dialogues.
-* Retained Placement Mode options (Fit Within Safe Margins / Original Size)
-  during template application for flexible canvas adaptation.
-* Direct .afsnt template export with complete style attributes.
+* Per-Page Target Scope for Adaptive Layout: Choose between Left Page, Full
+  Spread, or Right Page when generating or cycling smart layouts and shuffling
+  photos on album spreads.
+* Isolated Page Shuffling: Freely shuffle or cycle photos on one page without
+  altering the approved composition, aspect ratios, or crops of the opposite
+  page.
+* Keyboard Shortcuts & HUD Controls: Use [ for Left Page, ] for Right Page, and
+  \ for Full Spread in the canvas Layout Cycle HUD and Floating Widget.
+* Independent Variation Memory: Automatically preserves the layout variation
+  cycle position per scope and per spread with full atomic Undo/Redo support.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
