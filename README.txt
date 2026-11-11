@@ -1,23 +1,26 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.11
+Version: 1.7.12
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.11 ]
+[ WHAT'S NEW IN 1.7.12 ]
 --------------------------------------------------------------------------------
-* Navigator Spread Thumbnail Border Alignment: Fixed an issue where the left
-  edge of spread preview thumbnails in the Page Navigator appeared cut off or
-  clipped. Restored 1:1 coordinate alignment on .miniSpreadArtwork (inset: 0) so
-  outer canvas borders and edge-aligned photo frames remain fully visible
-  without negative coordinate clipping.
-* Thin Canvas Border Display: Ensured a 1-display-pixel minimum threshold
-  (MINI_PREVIEW_SUPERSAMPLE) for spread and page canvas borders in thumbnails,
-  guaranteeing that subtle 1-2 pt borders render crisply and symmetrically on
-  all sides.
-* Enhanced visual parity between the real Konva editing canvas and the miniature
-  album spreads navigator tray.
+* Page Navigator Preview Edge Clipping: Resolved an issue where the right and
+  bottom edges of post and spread thumbnails appeared truncated or cut off on
+  displays with non-integer scaling (such as 125% and 150% Windows DPI).
+* Physical Device Pixel Snapping: Introduced calculateMiniPreviewLayout to snap
+  miniature thumbnail containers to exact whole device pixels using physical
+  ceiling calculations, eliminating Chromium subpixel layout floor clipping.
+* Four-Side Margin Symmetry: Added symmetric subpixel centering offsets to
+  guarantee that margins and thin borders render with identical physical pixel
+  widths on left, top, right, and bottom in both Social Media single-page mode
+  and Album spread mode.
+* Dynamic Screen Resolution Tracking: Added display pixel ratio listeners via
+  W3C resolution media query tracking, ensuring thumbnails dynamically re-adjust
+  when moving the application window between monitors with different DPI
+  settings.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
