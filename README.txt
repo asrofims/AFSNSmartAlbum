@@ -1,22 +1,25 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.9
+Version: 1.7.10
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.9 ]
+[ WHAT'S NEW IN 1.7.10 ]
 --------------------------------------------------------------------------------
-* Per-Page Target Scope for Adaptive Layout: Choose between Left Page, Full
-  Spread, or Right Page when generating or cycling smart layouts and shuffling
-  photos on album spreads.
-* Isolated Page Shuffling: Freely shuffle or cycle photos on one page without
-  altering the approved composition, aspect ratios, or crops of the opposite
-  page.
-* Keyboard Shortcuts & HUD Controls: Use [ for Left Page, ] for Right Page, and
-  \ for Full Spread in the canvas Layout Cycle HUD and Floating Widget.
-* Independent Variation Memory: Automatically preserves the layout variation
-  cycle position per scope and per spread with full atomic Undo/Redo support.
+* Streamlined Photo Crop Inspector: Removed redundant Rotate Photo Crop and
+  Align to Frame controls from the upper zoom card, keeping all alignment and
+  rotation actions unified in the dedicated Actions & Alignment panel.
+* Export Preview Split Guide Alignment: Centered the page split cut line
+  symmetrically on the center spine axis with zero lateral offset.
+* Clean Flat Slice Visuals: Removed asymmetrical drop shadow on export preview
+  split slicing guides for crisp, professional alignment matching Adobe InDesign
+  and Pixellu SmartAlbums.
+* Responsive Scissors Badge Dead-Centering: Auto-aligned the scissors badge at
+  the exact vertical and horizontal center (50% / 50%) of the cut line across
+  all display DPIs and preview zoom levels with clean contrast shadow.
+* Re-mount Stability: Ensured seamless visual consistency when toggling between
+  Full Spread and Split Pages layout modes in the export dialog.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
