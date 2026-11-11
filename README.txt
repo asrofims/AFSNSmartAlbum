@@ -1,35 +1,14 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.8.1
+Version: 1.8.2
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.8.1 ]
+[ WHAT'S NEW IN 1.8.2 ]
 --------------------------------------------------------------------------------
-* Auto Build Album Generation: Automatically generate complete, balanced, and
-  aesthetic multi-spread photo albums from imported photo libraries in seconds.
-* Smart Chronological Pacing: Intelligently detects event and scene boundaries
-  using natural time-gap clustering to group related moments into cohesive
-  narrative spreads.
-* Three-Tier Editorial Safe Margin Diversity: Generates visually diverse safe
-  margins across spreads spanning ~0.8cm (Compact / Bold) to ~1.7cm (Balanced /
-  Classic) up to ~3.0cm (Airy / Fine-Art Gallery) while strictly adhering to
-  print blade safety bounds (>= 6mm).
-* No Empty Page Guarantee: Ensures that multi-photo spreads always distribute
-  frames across facing pages or center-spanning hero layouts without leaving
-  facing pages empty.
-* Unified Pro Upgrade Architecture: Centralized the Pro upgrade workflow across
-  the application (Auto Build dialog, Workspace toolbar, Templates panel, Export
-  dialog, and License settings) directing users to the official unified upgrade
-  portal.
-* Single Pro Action Button: Streamlined the Auto Build showcase with a single
-  ice-blue/cyan gradient action button in the pinned dialog footer.
-* Persistent Auto Build Options: Remembers photo selection filters (All photos
-  vs. Selected photos) across dialog reopenings for a seamless authoring
-  experience.
-* Random Seed Layout Variation: Provides fresh, handcrafted layout variations
-  across aesthetic moods every time Auto Build is executed.
+* Stability and performance fixes across desktop operations.
+* Enhanced user experience and workflow optimizations.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
