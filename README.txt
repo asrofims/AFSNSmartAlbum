@@ -1,26 +1,35 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.12
+Version: 1.8.1
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.12 ]
+[ WHAT'S NEW IN 1.8.1 ]
 --------------------------------------------------------------------------------
-* Page Navigator Preview Edge Clipping: Resolved an issue where the right and
-  bottom edges of post and spread thumbnails appeared truncated or cut off on
-  displays with non-integer scaling (such as 125% and 150% Windows DPI).
-* Physical Device Pixel Snapping: Introduced calculateMiniPreviewLayout to snap
-  miniature thumbnail containers to exact whole device pixels using physical
-  ceiling calculations, eliminating Chromium subpixel layout floor clipping.
-* Four-Side Margin Symmetry: Added symmetric subpixel centering offsets to
-  guarantee that margins and thin borders render with identical physical pixel
-  widths on left, top, right, and bottom in both Social Media single-page mode
-  and Album spread mode.
-* Dynamic Screen Resolution Tracking: Added display pixel ratio listeners via
-  W3C resolution media query tracking, ensuring thumbnails dynamically re-adjust
-  when moving the application window between monitors with different DPI
-  settings.
+* Auto Build Album Generation: Automatically generate complete, balanced, and
+  aesthetic multi-spread photo albums from imported photo libraries in seconds.
+* Smart Chronological Pacing: Intelligently detects event and scene boundaries
+  using natural time-gap clustering to group related moments into cohesive
+  narrative spreads.
+* Three-Tier Editorial Safe Margin Diversity: Generates visually diverse safe
+  margins across spreads spanning ~0.8cm (Compact / Bold) to ~1.7cm (Balanced /
+  Classic) up to ~3.0cm (Airy / Fine-Art Gallery) while strictly adhering to
+  print blade safety bounds (>= 6mm).
+* No Empty Page Guarantee: Ensures that multi-photo spreads always distribute
+  frames across facing pages or center-spanning hero layouts without leaving
+  facing pages empty.
+* Unified Pro Upgrade Architecture: Centralized the Pro upgrade workflow across
+  the application (Auto Build dialog, Workspace toolbar, Templates panel, Export
+  dialog, and License settings) directing users to the official unified upgrade
+  portal.
+* Single Pro Action Button: Streamlined the Auto Build showcase with a single
+  ice-blue/cyan gradient action button in the pinned dialog footer.
+* Persistent Auto Build Options: Remembers photo selection filters (All photos
+  vs. Selected photos) across dialog reopenings for a seamless authoring
+  experience.
+* Random Seed Layout Variation: Provides fresh, handcrafted layout variations
+  across aesthetic moods every time Auto Build is executed.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
