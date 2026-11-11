@@ -1,25 +1,23 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.7.10
+Version: 1.7.11
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.7.10 ]
+[ WHAT'S NEW IN 1.7.11 ]
 --------------------------------------------------------------------------------
-* Streamlined Photo Crop Inspector: Removed redundant Rotate Photo Crop and
-  Align to Frame controls from the upper zoom card, keeping all alignment and
-  rotation actions unified in the dedicated Actions & Alignment panel.
-* Export Preview Split Guide Alignment: Centered the page split cut line
-  symmetrically on the center spine axis with zero lateral offset.
-* Clean Flat Slice Visuals: Removed asymmetrical drop shadow on export preview
-  split slicing guides for crisp, professional alignment matching Adobe InDesign
-  and Pixellu SmartAlbums.
-* Responsive Scissors Badge Dead-Centering: Auto-aligned the scissors badge at
-  the exact vertical and horizontal center (50% / 50%) of the cut line across
-  all display DPIs and preview zoom levels with clean contrast shadow.
-* Re-mount Stability: Ensured seamless visual consistency when toggling between
-  Full Spread and Split Pages layout modes in the export dialog.
+* Navigator Spread Thumbnail Border Alignment: Fixed an issue where the left
+  edge of spread preview thumbnails in the Page Navigator appeared cut off or
+  clipped. Restored 1:1 coordinate alignment on .miniSpreadArtwork (inset: 0) so
+  outer canvas borders and edge-aligned photo frames remain fully visible
+  without negative coordinate clipping.
+* Thin Canvas Border Display: Ensured a 1-display-pixel minimum threshold
+  (MINI_PREVIEW_SUPERSAMPLE) for spread and page canvas borders in thumbnails,
+  guaranteeing that subtle 1-2 pt borders render crisply and symmetrically on
+  all sides.
+* Enhanced visual parity between the real Konva editing canvas and the miniature
+  album spreads navigator tray.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
