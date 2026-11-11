@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.7.10-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.7.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.7.10
+## Current release highlights — v1.7.11
 
-- Streamlined Photo Crop Inspector: Removed redundant Rotate Photo Crop and Align to Frame controls from the upper zoom card, keeping all alignment and rotation actions unified in the dedicated Actions & Alignment panel.
-- Export Preview Split Guide Alignment: Centered the page split cut line symmetrically on the center spine axis with zero lateral offset.
-- Clean Flat Slice Visuals: Removed asymmetrical drop shadow on export preview split slicing guides for crisp, professional alignment matching Adobe InDesign and Pixellu SmartAlbums.
-- Responsive Scissors Badge Dead-Centering: Auto-aligned the scissors badge at the exact vertical and horizontal center (50% / 50%) of the cut line across all display DPIs and preview zoom levels with clean contrast shadow.
-- Re-mount Stability: Ensured seamless visual consistency when toggling between Full Spread and Split Pages layout modes in the export dialog.
+- Navigator Spread Thumbnail Border Alignment: Fixed an issue where the left edge of spread preview thumbnails in the Page Navigator appeared cut off or clipped. Restored 1:1 coordinate alignment on `.miniSpreadArtwork` (`inset: 0`) so outer canvas borders and edge-aligned photo frames remain fully visible without negative coordinate clipping.
+- Thin Canvas Border Display: Ensured a 1-display-pixel minimum threshold (`MINI_PREVIEW_SUPERSAMPLE`) for spread and page canvas borders in thumbnails, guaranteeing that subtle 1-2 pt borders render crisply and symmetrically on all sides.
+- Enhanced visual parity between the real Konva editing canvas and the miniature album spreads navigator tray.
 
 ## Highlights
 
