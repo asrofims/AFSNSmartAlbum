@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.7.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.7.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,12 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.7.11
+## Current release highlights — v1.7.12
 
-- Navigator Spread Thumbnail Border Alignment: Fixed an issue where the left edge of spread preview thumbnails in the Page Navigator appeared cut off or clipped. Restored 1:1 coordinate alignment on `.miniSpreadArtwork` (`inset: 0`) so outer canvas borders and edge-aligned photo frames remain fully visible without negative coordinate clipping.
-- Thin Canvas Border Display: Ensured a 1-display-pixel minimum threshold (`MINI_PREVIEW_SUPERSAMPLE`) for spread and page canvas borders in thumbnails, guaranteeing that subtle 1-2 pt borders render crisply and symmetrically on all sides.
-- Enhanced visual parity between the real Konva editing canvas and the miniature album spreads navigator tray.
+- Page Navigator Preview Edge Clipping: Resolved an issue where the right and bottom edges of post and spread thumbnails appeared truncated or cut off on displays with non-integer scaling (such as 125% and 150% Windows DPI).
+- Physical Device Pixel Snapping: Introduced `calculateMiniPreviewLayout` to snap miniature thumbnail containers to exact whole device pixels using physical ceiling calculations, eliminating Chromium subpixel layout floor clipping.
+- Four-Side Margin Symmetry: Added symmetric subpixel centering offsets to guarantee that margins and thin borders render with identical physical pixel widths on left, top, right, and bottom in both Social Media single-page mode and Album spread mode.
+- Dynamic Screen Resolution Tracking: Added display pixel ratio listeners via W3C `resolution` media query tracking, ensuring thumbnails dynamically re-adjust when moving the application window between monitors with different DPI settings.
 
 ## Highlights
 
