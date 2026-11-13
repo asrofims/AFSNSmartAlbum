@@ -1,14 +1,36 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.8.2
+Version: 1.9.0
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.8.2 ]
+[ WHAT'S NEW IN 1.9.0 ]
 --------------------------------------------------------------------------------
-* Stability and performance fixes across desktop operations.
-* Enhanced user experience and workflow optimizations.
+* Multi-Project Tabbed Workspace: Open and manage multiple albums or social
+  media projects simultaneously within a single window with dedicated project
+  tabs.
+* Independent Tab Sessions: Each open project tab preserves its own album data,
+  photo library, folder collection selections, viewport zoom/pan coordinates,
+  and Undo/Redo history stacks.
+* Dynamic Real-Time Gap & Margin Adjustment: Interactive photo gap and safe
+  margin adjustments powered by a 2D Topological Spatial Neighbor Graph that
+  preserves native aspect ratios, photo crops, and external whitespace.
+* Workspace Album Preview: High-fidelity, frameless grid overview of all album
+  spreads or social posts with independent 50%–250% zoom and instant
+  jump-to-editor navigation.
+* Bilingual User Guide & Tutorials: Seamless language switching between English
+  and Bahasa Indonesia directly within the integrated tutorial panel.
+* Enhanced Project Navigation: Open Recent submenu in the File menu showing up
+  to 10 recent projects with automatic tab reuse and recovery integration.
+* Safe Multi-Tab Lifecycle: Dirty project indicators, unsaved changes
+  confirmation prompts, and atomic file write protection during active
+  background saves or exports.
+* Simplified Auto Build Workflow: Automatic chronological scene clustering,
+  responsive photo gap and margin controls in canvas units, and real-time
+  thumbnail previews.
+* Stability and Performance: Optimized canvas rendering, memory management
+  across multi-tab workflows, and verified quality gate reliability.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
