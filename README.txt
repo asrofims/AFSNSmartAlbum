@@ -1,21 +1,19 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.1
+Version: 1.9.2
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.1 ]
+[ WHAT'S NEW IN 1.9.2 ]
 --------------------------------------------------------------------------------
-* Clean Tab & Menu File Paths: Removed the Windows verbatim \\?\ prefix (and
-  normalized \\?\UNC\ paths) across .afsn package import, Save, rename, project
-  store hydration, tab tooltips, and recent project menus.
-* Tab Activity Feedback During Photo Operations: Added a smooth animated gray
-  activity icon in the active project tab while importing photos, running AI
-  photo analysis, cancelling, relinking, or removing photos.
-* Clear Tab Lock Indicators: Dimmed locked inactive project tabs with
-  informative hover tooltips on tabs, Close, and New Project buttons, plus a
-  toast notice when attempting to switch or close tabs while busy.
+* Direct Update & Restart Execution: Clicking Update Now or Restart Now
+  immediately proceeds to download or restart whenever no unsaved project
+  changes or active operations are in progress, eliminating redundant
+  confirmation dialogs.
+* Unsaved Changes Protection: Retained unsaved-project review when dirty tabs or
+  pending project operations exist, updated to warning styling and non-blocking
+  download handoff into the Update progress dialog.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
