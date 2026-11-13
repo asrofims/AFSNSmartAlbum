@@ -1,36 +1,21 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.0
+Version: 1.9.1
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.0 ]
+[ WHAT'S NEW IN 1.9.1 ]
 --------------------------------------------------------------------------------
-* Multi-Project Tabbed Workspace: Open and manage multiple albums or social
-  media projects simultaneously within a single window with dedicated project
-  tabs.
-* Independent Tab Sessions: Each open project tab preserves its own album data,
-  photo library, folder collection selections, viewport zoom/pan coordinates,
-  and Undo/Redo history stacks.
-* Dynamic Real-Time Gap & Margin Adjustment: Interactive photo gap and safe
-  margin adjustments powered by a 2D Topological Spatial Neighbor Graph that
-  preserves native aspect ratios, photo crops, and external whitespace.
-* Workspace Album Preview: High-fidelity, frameless grid overview of all album
-  spreads or social posts with independent 50%–250% zoom and instant
-  jump-to-editor navigation.
-* Bilingual User Guide & Tutorials: Seamless language switching between English
-  and Bahasa Indonesia directly within the integrated tutorial panel.
-* Enhanced Project Navigation: Open Recent submenu in the File menu showing up
-  to 10 recent projects with automatic tab reuse and recovery integration.
-* Safe Multi-Tab Lifecycle: Dirty project indicators, unsaved changes
-  confirmation prompts, and atomic file write protection during active
-  background saves or exports.
-* Simplified Auto Build Workflow: Automatic chronological scene clustering,
-  responsive photo gap and margin controls in canvas units, and real-time
-  thumbnail previews.
-* Stability and Performance: Optimized canvas rendering, memory management
-  across multi-tab workflows, and verified quality gate reliability.
+* Clean Tab & Menu File Paths: Removed the Windows verbatim \\?\ prefix (and
+  normalized \\?\UNC\ paths) across .afsn package import, Save, rename, project
+  store hydration, tab tooltips, and recent project menus.
+* Tab Activity Feedback During Photo Operations: Added a smooth animated gray
+  activity icon in the active project tab while importing photos, running AI
+  photo analysis, cancelling, relinking, or removing photos.
+* Clear Tab Lock Indicators: Dimmed locked inactive project tabs with
+  informative hover tooltips on tabs, Close, and New Project buttons, plus a
+  toast notice when attempting to switch or close tabs while busy.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
