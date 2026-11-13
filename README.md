@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.3-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.3
+## Current release highlights — v1.9.4
 
-- Non-Blocking Background Update Downloads: Standalone updates now download and verify signatures in the background while the Welcome Screen and open projects remain usable, showing live progress in the toolbar.
-- Explicit Install and Restart Workflow: Separated package verification from installation so updates install only when clicking **Install and Restart**, reviewing unsaved tabs or active project operations before handing off to the installer.
-- Windows Installer Recovery & UI Polish: Restores the application window if Windows installer launch fails, refines update status labels and modal keyboard accessibility, and keeps Standalone update indicators hidden on Microsoft Store builds.
+- Window Maximize & Restore Canvas Centering: Keeps the album spread accurately centered when restoring or maximizing from minimized or small window sizes by guarding against collapsed or clamped viewport scroll snapshots.
+- Resize Paint Synchronization: Flushes canvas stage resizes synchronously before paint so previous-size frames do not trail or ghost across the editor viewport during resize transitions.
+- Developer Attribution Standardization: Standardized developer and copyright branding to **AFSN** across the About dialog, application metadata, Windows installer, license terms, and documentation.
 
 ## Highlights
 
@@ -129,10 +129,10 @@ The in-app shortcut reference provides the complete, context-aware list.
 
 Use **About AFSNSmartAlbum → Check Updates** to check for a newer signed application release. Project work remains available offline.
 
-AFSNSmartAlbum is independently developed by **Afsunmedia**. The application includes an optional QRIS contribution entry for users who want to support continued development.
+AFSNSmartAlbum is independently developed by **AFSN**. The application includes an optional QRIS contribution entry for users who want to support continued development.
 
 ## License
 
-Copyright © 2026 **Afsunmedia**. All rights reserved.
+Copyright © 2026 **AFSN**. All rights reserved.
 
 AFSNSmartAlbum is proprietary software. Its open-source foundations include [Tauri](https://tauri.app/), [React](https://react.dev/), [Konva](https://konvajs.org/), [SQLite](https://www.sqlite.org/), and [Rayon](https://github.com/rayon-rs/rayon).
