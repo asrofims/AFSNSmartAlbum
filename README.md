@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.4-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.5-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,9 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.4
+## Current release highlights — v1.9.5
 
-- Window Maximize & Restore Canvas Centering: Keeps the album spread accurately centered when restoring or maximizing from minimized or small window sizes by guarding against collapsed or clamped viewport scroll snapshots.
-- Resize Paint Synchronization: Flushes canvas stage resizes synchronously before paint so previous-size frames do not trail or ghost across the editor viewport during resize transitions.
-- Developer Attribution Standardization: Standardized developer and copyright branding to **AFSN** across the About dialog, application metadata, Windows installer, license terms, and documentation.
+- Software Update Modal UI: Simplified the primary update action label in the Software Update Available dialog to **Download** for clearer, cleaner action hierarchy alongside **Later**.
 
 ## Highlights
 
