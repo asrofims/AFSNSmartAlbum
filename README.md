@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.8.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.0-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,10 +25,17 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.8.2
+## Current release highlights — v1.9.0
 
-- Stability and performance fixes across desktop operations.
-- Enhanced user experience and workflow optimizations.
+- Multi-Project Tabbed Workspace: Open and manage multiple albums or social media projects simultaneously within a single window with dedicated project tabs.
+- Independent Tab Sessions: Each open project tab preserves its own album data, photo library, folder collection selections, viewport zoom/pan coordinates, and Undo/Redo history stacks.
+- Dynamic Real-Time Gap & Margin Adjustment: Interactive photo gap and safe margin adjustments powered by a 2D Topological Spatial Neighbor Graph that preserves native aspect ratios, photo crops, and external whitespace.
+- Workspace Album Preview: High-fidelity, frameless grid overview of all album spreads or social posts with independent 50%–250% zoom and instant jump-to-editor navigation.
+- Bilingual User Guide & Tutorials: Seamless language switching between English and Bahasa Indonesia directly within the integrated tutorial panel.
+- Enhanced Project Navigation: Open Recent submenu in the File menu showing up to 10 recent projects with automatic tab reuse and recovery integration.
+- Safe Multi-Tab Lifecycle: Dirty project indicators, unsaved changes confirmation prompts, and atomic file write protection during active background saves or exports.
+- Simplified Auto Build Workflow: Automatic chronological scene clustering, responsive photo gap and margin controls in canvas units, and real-time thumbnail previews.
+- Stability and Performance: Optimized canvas rendering, memory management across multi-tab workflows, and verified quality gate reliability.
 
 ## Highlights
 
