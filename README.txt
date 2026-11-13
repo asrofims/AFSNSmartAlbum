@@ -1,19 +1,23 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.2
+Version: 1.9.3
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: Afsunmedia - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.2 ]
+[ WHAT'S NEW IN 1.9.3 ]
 --------------------------------------------------------------------------------
-* Direct Update & Restart Execution: Clicking Update Now or Restart Now
-  immediately proceeds to download or restart whenever no unsaved project
-  changes or active operations are in progress, eliminating redundant
-  confirmation dialogs.
-* Unsaved Changes Protection: Retained unsaved-project review when dirty tabs or
-  pending project operations exist, updated to warning styling and non-blocking
-  download handoff into the Update progress dialog.
+* Non-Blocking Background Update Downloads: Standalone updates now download and
+  verify signatures in the background while the Welcome Screen and open projects
+  remain usable, showing live progress in the toolbar.
+* Explicit Install and Restart Workflow: Separated package verification from
+  installation so updates install only when clicking Install and Restart,
+  reviewing unsaved tabs or active project operations before handing off to the
+  installer.
+* Windows Installer Recovery & UI Polish: Restores the application window if
+  Windows installer launch fails, refines update status labels and modal
+  keyboard accessibility, and keeps Standalone update indicators hidden on
+  Microsoft Store builds.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
