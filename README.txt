@@ -1,15 +1,21 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.5
+Version: 1.9.4
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.5 ]
+[ WHAT'S NEW IN 1.9.4 ]
 --------------------------------------------------------------------------------
-* Software Update Modal UI: Simplified the primary update action label in the
-  Software Update Available dialog to Download for clearer, cleaner action
-  hierarchy alongside Later.
+* Window Maximize & Restore Canvas Centering: Keeps the album spread accurately
+  centered when restoring or maximizing from minimized or small window sizes by
+  guarding against collapsed or clamped viewport scroll snapshots.
+* Resize Paint Synchronization: Flushes canvas stage resizes synchronously
+  before paint so previous-size frames do not trail or ghost across the editor
+  viewport during resize transitions.
+* Developer Attribution Standardization: Standardized developer and copyright
+  branding to AFSN across the About dialog, application metadata, Windows
+  installer, license terms, and documentation.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
