@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.2-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.1-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,10 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.2
+## Current release highlights — v1.9.1
 
-- Direct Update & Restart Execution: Clicking **Update Now** or **Restart Now** immediately proceeds to download or restart whenever no unsaved project changes or active operations are in progress, eliminating redundant confirmation dialogs.
-- Unsaved Changes Protection: Retained unsaved-project review when dirty tabs or pending project operations exist, updated to warning styling and non-blocking download handoff into the Update progress dialog.
+- Clean Tab & Menu File Paths: Removed the Windows verbatim `\\?\` prefix (and normalized `\\?\UNC\` paths) across `.afsn` package import, Save, rename, project store hydration, tab tooltips, and recent project menus.
+- Tab Activity Feedback During Photo Operations: Added a smooth animated gray activity icon in the active project tab while importing photos, running AI photo analysis, cancelling, relinking, or removing photos.
+- Clear Tab Lock Indicators: Dimmed locked inactive project tabs with informative hover tooltips on tabs, Close, and New Project buttons, plus a toast notice when attempting to switch or close tabs while busy.
 
 ## Highlights
 
