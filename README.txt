@@ -1,23 +1,21 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.3
+Version: 1.9.4
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
-Author: Afsunmedia - Asrofims
+Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.3 ]
+[ WHAT'S NEW IN 1.9.4 ]
 --------------------------------------------------------------------------------
-* Non-Blocking Background Update Downloads: Standalone updates now download and
-  verify signatures in the background while the Welcome Screen and open projects
-  remain usable, showing live progress in the toolbar.
-* Explicit Install and Restart Workflow: Separated package verification from
-  installation so updates install only when clicking Install and Restart,
-  reviewing unsaved tabs or active project operations before handing off to the
-  installer.
-* Windows Installer Recovery & UI Polish: Restores the application window if
-  Windows installer launch fails, refines update status labels and modal
-  keyboard accessibility, and keeps Standalone update indicators hidden on
-  Microsoft Store builds.
+* Window Maximize & Restore Canvas Centering: Keeps the album spread accurately
+  centered when restoring or maximizing from minimized or small window sizes by
+  guarding against collapsed or clamped viewport scroll snapshots.
+* Resize Paint Synchronization: Flushes canvas stage resizes synchronously
+  before paint so previous-size frames do not trail or ghost across the editor
+  viewport during resize transitions.
+* Developer Attribution Standardization: Standardized developer and copyright
+  branding to AFSN across the About dialog, application metadata, Windows
+  installer, license terms, and documentation.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
@@ -133,7 +131,7 @@ Contribution & Donations:
 
 [ 6. LICENSE & CREDITS ]
 --------------------------------------------------------------------------------
-AFSNSmartAlbum is copyright © Afsunmedia - Asrofims. All rights reserved.
+AFSNSmartAlbum is copyright © AFSN - Asrofims. All rights reserved.
 
 Built with Open Source technologies:
   * Tauri (MIT / Apache-2.0)
