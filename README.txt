@@ -1,15 +1,30 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.5
+Version: 1.9.6
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.5 ]
+[ WHAT'S NEW IN 1.9.6 ]
 --------------------------------------------------------------------------------
-* Software Update Modal UI: Simplified the primary update action label in the
-  Software Update Available dialog to Download for clearer, cleaner action
-  hierarchy alongside Later.
+* Editable Album Spread Dimensions: Edit both facing pages of an active interior
+  Album spread in Properties → Dimensions with live Spread Size previews, Resize
+  Canvas Only, and Resize & Adapt layout fitting that preserves topological
+  physical gaps, shared frame edges, and photo-filled shapes across Current,
+  All, and New Only scopes in a single Undo step (persisted in SQLite schema v35
+  and .afsn format 7).
+* Print Bleed in Album Export: Moved bleed configuration from canvas and
+  Navigator guides into an optional Print Bleed section in Export Album, keeping
+  trim size as the default, displaying a dashed red Trim Guide and live output
+  pixel dimensions, and preserving per-spread allowances while keeping Social
+  Media exports at exact post sizes.
+* Page Edge Guide & Carousel Center Support: Added the Page Edge toggle
+  alongside Safe and Center in the Navigator (enabled by default in Album and
+  Social Media) to display a zoom-independent solid teal perimeter guide, and
+  enabled Center in Social Media when posts support carousel slicing.
+* Unified Canvas & Guide Visuals: Removed the editor sheet drop shadow across
+  Album and Social Media and standardized Navigator indicator purple across
+  Album center creases and Social Media slice guides.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
