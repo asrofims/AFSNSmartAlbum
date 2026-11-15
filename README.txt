@@ -1,27 +1,24 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.7
+Version: 1.9.8
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.7 ]
+[ WHAT'S NEW IN 1.9.8 ]
 --------------------------------------------------------------------------------
-* Live Layout Template Preview & Repair: Preview the active design's editable
-  photos, objects, and styles at the template size in Apply Template, inspect
-  missing photo slots and surplus photos, review unavailable assets by name with
-  Use Standard Frame, Skip Decoration, or replacement choices, and apply the
-  template and resize only the active spread or post in a single Undo step.
-* Multi-Object Corner Resize Snapping: Snap corner resizing of multi-object
-  selections to enabled canvas guides and nearby artwork using resized selection
-  bounds, including fixed-gap topological spacing and transparent artwork
-  padding.
-* Workspace Album Preview Motion & Framing: Animated card scaling and column
-  reflow across zoom levels while preserving the scroll anchor, stabilized
-  artwork and decoded text rendering, clipped grid bounds to prevent edge
-  hairlines, and added a subtle teal Page Edge around preview cards.
-* Layers Panel Header: Streamlined the Layers panel header to display the total
-  layer count on the left and Select All / Clear Selection on the right.
+* Auto Build Fill Existing Frames: Fill existing photo frames on the current
+  spread/post or across the entire project in Auto Build while preserving frame
+  geometry, matching selected photos by aspect ratio and available face analysis
+  in capture-time order, reviewing all target spreads with capacity and unplaced
+  photo details in one scrollable preview with Shuffle and replacement support,
+  and applying in a single Undo step.
+* Photo Analysis Reminder: Display a dismissible reminder above Analyze in the
+  Page Navigator when an active Pro project has unanalyzed available photos,
+  respecting reduced-motion preferences and reopening when new pending photos
+  are added.
+* Album & Post Preview Page Edge: Kept the teal Page Edge border at a crisp
+  one-screen-pixel thickness throughout zoom animations and grid column reflow.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
