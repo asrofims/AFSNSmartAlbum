@@ -1,30 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.6
+Version: 1.9.7
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.6 ]
+[ WHAT'S NEW IN 1.9.7 ]
 --------------------------------------------------------------------------------
-* Editable Album Spread Dimensions: Edit both facing pages of an active interior
-  Album spread in Properties → Dimensions with live Spread Size previews, Resize
-  Canvas Only, and Resize & Adapt layout fitting that preserves topological
-  physical gaps, shared frame edges, and photo-filled shapes across Current,
-  All, and New Only scopes in a single Undo step (persisted in SQLite schema v35
-  and .afsn format 7).
-* Print Bleed in Album Export: Moved bleed configuration from canvas and
-  Navigator guides into an optional Print Bleed section in Export Album, keeping
-  trim size as the default, displaying a dashed red Trim Guide and live output
-  pixel dimensions, and preserving per-spread allowances while keeping Social
-  Media exports at exact post sizes.
-* Page Edge Guide & Carousel Center Support: Added the Page Edge toggle
-  alongside Safe and Center in the Navigator (enabled by default in Album and
-  Social Media) to display a zoom-independent solid teal perimeter guide, and
-  enabled Center in Social Media when posts support carousel slicing.
-* Unified Canvas & Guide Visuals: Removed the editor sheet drop shadow across
-  Album and Social Media and standardized Navigator indicator purple across
-  Album center creases and Social Media slice guides.
+* Live Layout Template Preview & Repair: Preview the active design's editable
+  photos, objects, and styles at the template size in Apply Template, inspect
+  missing photo slots and surplus photos, review unavailable assets by name with
+  Use Standard Frame, Skip Decoration, or replacement choices, and apply the
+  template and resize only the active spread or post in a single Undo step.
+* Multi-Object Corner Resize Snapping: Snap corner resizing of multi-object
+  selections to enabled canvas guides and nearby artwork using resized selection
+  bounds, including fixed-gap topological spacing and transparent artwork
+  padding.
+* Workspace Album Preview Motion & Framing: Animated card scaling and column
+  reflow across zoom levels while preserving the scroll anchor, stabilized
+  artwork and decoded text rendering, clipped grid bounds to prevent edge
+  hairlines, and added a subtle teal Page Edge around preview cards.
+* Layers Panel Header: Streamlined the Layers panel header to display the total
+  layer count on the left and Select All / Clear Selection on the right.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
