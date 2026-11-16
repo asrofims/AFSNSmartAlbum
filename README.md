@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.9-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.10-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,11 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.9
+## Current release highlights — v1.9.10
 
-- Adaptive Layout AI Training & Portable `.afsnai` Auto-Backup: Automatically learn settled manual photo frame layouts and post-generation refinements in the background for Pro users, normalize geometry across units, DPI, and canvas sizes, and persist learned patterns in SQLite schema v36 alongside portable `.afsnai` snapshots in `<Documents>/AFSNSmartAlbum/AI-Backup`.
-- Dynamic AI Variations & Composition Ranking: Rank learned and built-in layouts in **Dynamic** with the **Default** pattern using measured crop and composition quality, prioritize distinct opening choices across Smart Layout and Auto Build, and synthesize validated row/column, split-slot, and merge-slot variants labeled as `AI Variation`.
-- AI Layout Training Inspector & Bilingual Tutorial: Manage learned patterns in **Settings → AI & Smart Framing** with SVG pattern diagrams, Pin, Mute, per-pattern delete, and `.afsnai` import/export controls, accompanied by a complete English and Indonesian in-app **AI Layout Training** guide.
+- Training Data Pagination & Filtering: Show learned layout patterns and training history in independent batches of 12 with a Load More control below each list, and restart the pattern list when changing the photo-count filter.
+- Layout Learning Persistence & Backup Verification: Preserve full imported history and pattern settings in SQLite, report failed writes, validate backup destination folders before applying them, and confirm irreversible Training Data actions.
+- Settings UI Refinement: Use switches as the status indicator in Settings and remove redundant status badges from Floating Smart Layout Widget, Auto-Save, Magnetic Snapping, and Face Detection.
 
 ## Highlights
 
