@@ -1,24 +1,26 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.8
+Version: 1.9.9
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.8 ]
+[ WHAT'S NEW IN 1.9.9 ]
 --------------------------------------------------------------------------------
-* Auto Build Fill Existing Frames: Fill existing photo frames on the current
-  spread/post or across the entire project in Auto Build while preserving frame
-  geometry, matching selected photos by aspect ratio and available face analysis
-  in capture-time order, reviewing all target spreads with capacity and unplaced
-  photo details in one scrollable preview with Shuffle and replacement support,
-  and applying in a single Undo step.
-* Photo Analysis Reminder: Display a dismissible reminder above Analyze in the
-  Page Navigator when an active Pro project has unanalyzed available photos,
-  respecting reduced-motion preferences and reopening when new pending photos
-  are added.
-* Album & Post Preview Page Edge: Kept the teal Page Edge border at a crisp
-  one-screen-pixel thickness throughout zoom animations and grid column reflow.
+* Adaptive Layout AI Training & Portable .afsnai Auto-Backup: Automatically
+  learn settled manual photo frame layouts and post-generation refinements in
+  the background for Pro users, normalize geometry across units, DPI, and canvas
+  sizes, and persist learned patterns in SQLite schema v36 alongside portable
+  .afsnai snapshots in <Documents>/AFSNSmartAlbum/AI-Backup.
+* Dynamic AI Variations & Composition Ranking: Rank learned and built-in layouts
+  in Dynamic with the Default pattern using measured crop and composition
+  quality, prioritize distinct opening choices across Smart Layout and Auto
+  Build, and synthesize validated row/column, split-slot, and merge-slot
+  variants labeled as AI Variation.
+* AI Layout Training Inspector & Bilingual Tutorial: Manage learned patterns in
+  Settings → AI & Smart Framing with SVG pattern diagrams, Pin, Mute,
+  per-pattern delete, and .afsnai import/export controls, accompanied by a
+  complete English and Indonesian in-app AI Layout Training guide.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
