@@ -1,22 +1,27 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.10
+Version: 1.9.11
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.10 ]
+[ WHAT'S NEW IN 1.9.11 ]
 --------------------------------------------------------------------------------
-* Training Data Pagination & Filtering: Show learned layout patterns and
-  training history in independent batches of 12 with a Load More control below
-  each list, and restart the pattern list when changing the photo-count filter.
-* Layout Learning Persistence & Backup Verification: Preserve full imported
-  history and pattern settings in SQLite, report failed writes, validate backup
-  destination folders before applying them, and confirm irreversible Training
-  Data actions.
-* Settings UI Refinement: Use switches as the status indicator in Settings and
-  remove redundant status badges from Floating Smart Layout Widget, Auto-Save,
-  Magnetic Snapping, and Face Detection.
+* Streaming Auto Analyze on Import: Stream auto photo analysis immediately as
+  preview-ready events arrive from photo registration, batching analysis
+  smoothly and maintaining a single session across sequential imports.
+* Photo Analysis Reminder Popover: Keep popover mounted while shifting between
+  Analyzing and Waiting states, showing actionable remaining counts upon
+  completion and honoring native cancellation.
+* Adaptive Layout Learning & Seed Diversity: Apply seed and recent-composition
+  history after personalized ranking in Generate to guarantee distinct layouts
+  across cycles and preserve seed order across preview limits and Apply
+  navigation.
+* Mood Intent Preservation in AI Layouts: Preserve explicit Mood selections
+  (Hero, Grid, Fine-Art, Mosaic, Diamond, Cascade) when Layout Learning is
+  active, prioritizing structurally compatible candidates before scoring.
+* Enhanced Cascade Layouts: Diversified Cascade mood layouts with bounded
+  asymmetric tier allocations and consistent stair travel offsets.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
