@@ -1,27 +1,18 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.11
+Version: 1.9.12
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.11 ]
+[ WHAT'S NEW IN 1.9.12 ]
 --------------------------------------------------------------------------------
-* Streaming Auto Analyze on Import: Stream auto photo analysis immediately as
-  preview-ready events arrive from photo registration, batching analysis
-  smoothly and maintaining a single session across sequential imports.
-* Photo Analysis Reminder Popover: Keep popover mounted while shifting between
-  Analyzing and Waiting states, showing actionable remaining counts upon
-  completion and honoring native cancellation.
-* Adaptive Layout Learning & Seed Diversity: Apply seed and recent-composition
-  history after personalized ranking in Generate to guarantee distinct layouts
-  across cycles and preserve seed order across preview limits and Apply
-  navigation.
-* Mood Intent Preservation in AI Layouts: Preserve explicit Mood selections
-  (Hero, Grid, Fine-Art, Mosaic, Diamond, Cascade) when Layout Learning is
-  active, prioritizing structurally compatible candidates before scoring.
-* Enhanced Cascade Layouts: Diversified Cascade mood layouts with bounded
-  asymmetric tier allocations and consistent stair travel offsets.
+* Small Gaps in Export Preview: Preserve fractional photo bounds and resolve
+  edge coverage on a bounded supersampled render surface (up to 3072 px per
+  edge) before downsampling once to device-resolution preview, preventing narrow
+  1–5 px photo gaps from disappearing on high-DPI displays while keeping
+  authored spacing, crop geometry, zero-gap seam coverage, and native export
+  unchanged.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
