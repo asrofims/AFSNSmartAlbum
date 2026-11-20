@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.11-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.12-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,9 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.11
+## Current release highlights — v1.9.12
 
-- Streaming Auto Analyze on Import: Stream auto photo analysis immediately as preview-ready events arrive from photo registration, batching analysis smoothly and maintaining a single session across sequential imports.
-- Photo Analysis Reminder Popover: Keep popover mounted while shifting between Analyzing and Waiting states, showing actionable remaining counts upon completion and honoring native cancellation.
-- Adaptive Layout Learning & Seed Diversity: Apply seed and recent-composition history after personalized ranking in Generate to guarantee distinct layouts across cycles and preserve seed order across preview limits and Apply navigation.
-- Mood Intent Preservation in AI Layouts: Preserve explicit Mood selections (Hero, Grid, Fine-Art, Mosaic, Diamond, Cascade) when Layout Learning is active, prioritizing structurally compatible candidates before scoring.
-- Enhanced Cascade Layouts: Diversified Cascade mood layouts with bounded asymmetric tier allocations and consistent stair travel offsets.
+- Small Gaps in Export Preview: Preserve fractional photo bounds and resolve edge coverage on a bounded supersampled render surface (up to 3072 px per edge) before downsampling once to device-resolution preview, preventing narrow 1–5 px photo gaps from disappearing on high-DPI displays while keeping authored spacing, crop geometry, zero-gap seam coverage, and native export unchanged.
 
 ## Highlights
 
