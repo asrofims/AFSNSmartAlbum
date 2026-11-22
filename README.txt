@@ -1,18 +1,41 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.12
+Version: 1.9.13
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.12 ]
+[ WHAT'S NEW IN 1.9.13 ]
 --------------------------------------------------------------------------------
-* Small Gaps in Export Preview: Preserve fractional photo bounds and resolve
-  edge coverage on a bounded supersampled render surface (up to 3072 px per
-  edge) before downsampling once to device-resolution preview, preventing narrow
-  1–5 px photo gaps from disappearing on high-DPI displays while keeping
-  authored spacing, crop geometry, zero-gap seam coverage, and native export
-  unchanged.
+* Social Media Dynamic Composition Selection: Added visual duplicate filtering
+  across multi-photo Social Media layouts and improved Default-pattern ranking
+  for readable frame proportions, density-aware whitespace, cohesion, and
+  canvas-axis flow across square, portrait, Story, and landscape formats.
+* Advisory Layout Learning: Updated Pro Adaptive Layout AI Training to surface
+  learned layouts strictly as optional suggestions in Smart Layout's Dynamic
+  Default pattern while preserving built-in starters, ordering, Mood intent, and
+  independent Auto Build generation.
+* Consistent Photo Gaps in Review Grid: Switched Album and Social Media review
+  grid cards to the shared bounded proof renderer with exact 2:1 downsampling
+  stages so narrow photo gaps render evenly across card sizes and display scales
+  without loading originals.
+* Auto Build Preferences & Safe Margins: Remember per-project Photo Gap and Safe
+  Margin Auto/manual settings across sessions with unit/DPI conversion,
+  automatically store zero Safe Margins on full-bleed Social Media Auto Build
+  posts, and store Spine 0 for album spreads with frames crossing the fold.
+* Live Layout Template Preview: Resolved cached graphic image decorations
+  asynchronously before Apply without requiring original downloads or catalog
+  entries.
+* Zero-Spine Safe Area Guides & Spacing: Rendered one continuous Safe Area
+  outline in both the editor canvas and Full Spread Export Preview when
+  effective Spine margin is zero, and preserved Photo Spacing across the fold
+  for facing-page Adaptive Layout frames at Spine 0.
+* Modal Text Selection Safety: Prevented accidental dismissal of Auto Build and
+  shared Dialog/ConfirmDialog modals when dragging text selections from input
+  fields onto the backdrop.
+* Welcome Screen & Open Project Transition: Kept the Welcome Screen mounted full
+  width during Open Project dialogs and initial project loading with proper
+  native picker parenting and transition locking.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
