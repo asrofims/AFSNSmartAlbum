@@ -1,41 +1,30 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.13
+Version: 1.9.14
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.13 ]
+[ WHAT'S NEW IN 1.9.14 ]
 --------------------------------------------------------------------------------
-* Social Media Dynamic Composition Selection: Added visual duplicate filtering
-  across multi-photo Social Media layouts and improved Default-pattern ranking
-  for readable frame proportions, density-aware whitespace, cohesion, and
-  canvas-axis flow across square, portrait, Story, and landscape formats.
-* Advisory Layout Learning: Updated Pro Adaptive Layout AI Training to surface
-  learned layouts strictly as optional suggestions in Smart Layout's Dynamic
-  Default pattern while preserving built-in starters, ordering, Mood intent, and
-  independent Auto Build generation.
-* Consistent Photo Gaps in Review Grid: Switched Album and Social Media review
-  grid cards to the shared bounded proof renderer with exact 2:1 downsampling
-  stages so narrow photo gaps render evenly across card sizes and display scales
-  without loading originals.
-* Auto Build Preferences & Safe Margins: Remember per-project Photo Gap and Safe
-  Margin Auto/manual settings across sessions with unit/DPI conversion,
-  automatically store zero Safe Margins on full-bleed Social Media Auto Build
-  posts, and store Spine 0 for album spreads with frames crossing the fold.
-* Live Layout Template Preview: Resolved cached graphic image decorations
-  asynchronously before Apply without requiring original downloads or catalog
-  entries.
-* Zero-Spine Safe Area Guides & Spacing: Rendered one continuous Safe Area
-  outline in both the editor canvas and Full Spread Export Preview when
-  effective Spine margin is zero, and preserved Photo Spacing across the fold
-  for facing-page Adaptive Layout frames at Spine 0.
-* Modal Text Selection Safety: Prevented accidental dismissal of Auto Build and
-  shared Dialog/ConfirmDialog modals when dragging text selections from input
-  fields onto the backdrop.
-* Welcome Screen & Open Project Transition: Kept the Welcome Screen mounted full
-  width during Open Project dialogs and initial project loading with proper
-  native picker parenting and transition locking.
+* Balanced Social Media Equal-Frame Grids: Retained uniform equal-frame grids
+  (including 3×3 for 9 photos) during Balanced duplicate selection and added
+  validated factor grids for 10+ photos (including 3×4 / 4×3 for 12 photos and
+  4×4 for 16 photos) while preserving per-side Safe Margins, Photo Spacing, and
+  locked-frame handling.
+* Project Tab Quick Rename & Close Feedback: Double-click any project tab title
+  to rename directly with Enter/blur commit and Escape cancel, paired with a
+  compact 20px close button and refined hover/press feedback.
+* Consistent Project & Collection Scroll Edges: Added shared conditional 28px
+  transparent left/right edge fade masks for Project Tabs and Folder Collections
+  with hidden scrollbars, smooth wheel/trackpad scrolling, unmasked add buttons,
+  and automatic keyboard-focus reveal.
+* Refined New Project Mode Selector: Restyled Photo Album and Social Media mode
+  buttons with softer fills, clean borders, updated open-spread/stacked-photo
+  icons, and a clearer portrait/landscape page geometry icon.
+* Preview Zoom Fractional Scroll Boundary: Fixed fractional DOM scroll-clamp
+  drift during rapid zoom reversals in the Album/Post Preview grid so the
+  pre-zoom design anchor remains stable without overriding manual scrolling.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
