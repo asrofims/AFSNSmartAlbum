@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.13-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,16 +25,13 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.13
+## Current release highlights — v1.9.14
 
-- **Social Media Dynamic Composition Selection** — Added visual duplicate filtering across multi-photo Social Media layouts and improved Default-pattern ranking for readable frame proportions, density-aware whitespace, cohesion, and canvas-axis flow across square, portrait, Story, and landscape formats.
-- **Advisory Layout Learning** — Updated Pro Adaptive Layout AI Training to surface learned layouts strictly as optional suggestions in Smart Layout's Dynamic Default pattern while preserving built-in starters, ordering, Mood intent, and independent Auto Build generation.
-- **Consistent Photo Gaps in Review Grid** — Switched Album and Social Media review grid cards to the shared bounded proof renderer with exact 2:1 downsampling stages so narrow photo gaps render evenly across card sizes and display scales without loading originals.
-- **Auto Build Preferences & Safe Margins** — Remember per-project Photo Gap and Safe Margin Auto/manual settings across sessions with unit/DPI conversion, automatically store zero Safe Margins on full-bleed Social Media Auto Build posts, and store Spine 0 for album spreads with frames crossing the fold.
-- **Live Layout Template Preview** — Resolved cached graphic image decorations asynchronously before Apply without requiring original downloads or catalog entries.
-- **Zero-Spine Safe Area Guides & Spacing** — Rendered one continuous Safe Area outline in both the editor canvas and Full Spread Export Preview when effective Spine margin is zero, and preserved Photo Spacing across the fold for facing-page Adaptive Layout frames at Spine 0.
-- **Modal Text Selection Safety** — Prevented accidental dismissal of Auto Build and shared Dialog/ConfirmDialog modals when dragging text selections from input fields onto the backdrop.
-- **Welcome Screen & Open Project Transition** — Kept the Welcome Screen mounted full width during Open Project dialogs and initial project loading with proper native picker parenting and transition locking.
+- **Balanced Social Media Equal-Frame Grids** — Retained uniform equal-frame grids (including 3×3 for 9 photos) during Balanced duplicate selection and added validated factor grids for 10+ photos (including 3×4 / 4×3 for 12 photos and 4×4 for 16 photos) while preserving per-side Safe Margins, Photo Spacing, and locked-frame handling.
+- **Project Tab Quick Rename & Close Feedback** — Double-click any project tab title to rename directly with Enter/blur commit and Escape cancel, paired with a compact 20px close button and refined hover/press feedback.
+- **Consistent Project & Collection Scroll Edges** — Added shared conditional 28px transparent left/right edge fade masks for Project Tabs and Folder Collections with hidden scrollbars, smooth wheel/trackpad scrolling, unmasked add buttons, and automatic keyboard-focus reveal.
+- **Refined New Project Mode Selector** — Restyled Photo Album and Social Media mode buttons with softer fills, clean borders, updated open-spread/stacked-photo icons, and a clearer portrait/landscape page geometry icon.
+- **Preview Zoom Fractional Scroll Boundary** — Fixed fractional DOM scroll-clamp drift during rapid zoom reversals in the Album/Post Preview grid so the pre-zoom design anchor remains stable without overriding manual scrolling.
 
 ## Highlights
 
