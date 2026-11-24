@@ -1,30 +1,16 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.14
+Version: 1.9.15
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.14 ]
+[ WHAT'S NEW IN 1.9.15 ]
 --------------------------------------------------------------------------------
-* Balanced Social Media Equal-Frame Grids: Retained uniform equal-frame grids
-  (including 3×3 for 9 photos) during Balanced duplicate selection and added
-  validated factor grids for 10+ photos (including 3×4 / 4×3 for 12 photos and
-  4×4 for 16 photos) while preserving per-side Safe Margins, Photo Spacing, and
-  locked-frame handling.
-* Project Tab Quick Rename & Close Feedback: Double-click any project tab title
-  to rename directly with Enter/blur commit and Escape cancel, paired with a
-  compact 20px close button and refined hover/press feedback.
-* Consistent Project & Collection Scroll Edges: Added shared conditional 28px
-  transparent left/right edge fade masks for Project Tabs and Folder Collections
-  with hidden scrollbars, smooth wheel/trackpad scrolling, unmasked add buttons,
-  and automatic keyboard-focus reveal.
-* Refined New Project Mode Selector: Restyled Photo Album and Social Media mode
-  buttons with softer fills, clean borders, updated open-spread/stacked-photo
-  icons, and a clearer portrait/landscape page geometry icon.
-* Preview Zoom Fractional Scroll Boundary: Fixed fractional DOM scroll-clamp
-  drift during rapid zoom reversals in the Album/Post Preview grid so the
-  pre-zoom design anchor remains stable without overriding manual scrolling.
+* Legible Favorites on Used Filmstrip Photos: Applied used-photo dimming and
+  grayscale strictly to loaded thumbnail pixels so favorite stars and status
+  overlays retain full color and opacity while preserving hover brightness,
+  image-loading fade, and photo interactions.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
