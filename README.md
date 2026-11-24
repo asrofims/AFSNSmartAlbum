@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.14-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,13 +25,9 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.14
+## Current release highlights — v1.9.15
 
-- **Balanced Social Media Equal-Frame Grids** — Retained uniform equal-frame grids (including 3×3 for 9 photos) during Balanced duplicate selection and added validated factor grids for 10+ photos (including 3×4 / 4×3 for 12 photos and 4×4 for 16 photos) while preserving per-side Safe Margins, Photo Spacing, and locked-frame handling.
-- **Project Tab Quick Rename & Close Feedback** — Double-click any project tab title to rename directly with Enter/blur commit and Escape cancel, paired with a compact 20px close button and refined hover/press feedback.
-- **Consistent Project & Collection Scroll Edges** — Added shared conditional 28px transparent left/right edge fade masks for Project Tabs and Folder Collections with hidden scrollbars, smooth wheel/trackpad scrolling, unmasked add buttons, and automatic keyboard-focus reveal.
-- **Refined New Project Mode Selector** — Restyled Photo Album and Social Media mode buttons with softer fills, clean borders, updated open-spread/stacked-photo icons, and a clearer portrait/landscape page geometry icon.
-- **Preview Zoom Fractional Scroll Boundary** — Fixed fractional DOM scroll-clamp drift during rapid zoom reversals in the Album/Post Preview grid so the pre-zoom design anchor remains stable without overriding manual scrolling.
+- **Legible Favorites on Used Filmstrip Photos** — Applied used-photo dimming and grayscale strictly to loaded thumbnail pixels so favorite stars and status overlays retain full color and opacity while preserving hover brightness, image-loading fade, and photo interactions.
 
 ## Highlights
 
