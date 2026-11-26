@@ -7,7 +7,7 @@
 
   Design faster with adaptive layouts, precise physical geometry, non-destructive photo cropping, and native high-resolution export—all without sending client photos to the cloud.
 
-  [![Release](https://img.shields.io/badge/Release-v1.9.15-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.9.16-38bdf8?style=for-the-badge)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)](https://github.com/asrofims/AFSNSmartAlbum/releases)
   [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=for-the-badge&logo=tauri&logoColor=111827)](https://tauri.app/)
   [![License](https://img.shields.io/badge/License-Proprietary-64748b?style=for-the-badge)](#license)
@@ -25,9 +25,11 @@
 | Physical units in `mm`, `cm`, `inch`, or `px`, calculated at the configured project DPI. | Built-in presets for Instagram, Facebook, Pinterest, YouTube, TikTok, and LinkedIn. |
 | Full-spread or split-page print export with bleed-aware geometry. | Every post can have an independent width and height within the same project. |
 
-## Current release highlights — v1.9.15
+## Current release highlights — v1.9.16
 
-- **Legible Favorites on Used Filmstrip Photos** — Applied used-photo dimming and grayscale strictly to loaded thumbnail pixels so favorite stars and status overlays retain full color and opacity while preserving hover brightness, image-loading fade, and photo interactions.
+- **Online Asset Refresh & Connection Recovery** — Revalidate online asset discovery without replacing already browsed pages, ordering, or pagination while keeping loaded previews mounted and preserving results during transient failures.
+- **Smart Preview Retry & Backoff** — Automatically retry failed asset previews with bounded backoff (750 ms / 2 s / 5 s), pause retries while offline, resume automatically on reconnect, and respect provider `Retry-After` headers when refreshing failed previews.
+- **Clearer Connection Diagnostics** — Distinguish between **No Internet Connection**, **Asset Service Unavailable**, and **Asset Service Timed Out** states (including on populated catalogs), keep Refresh locked until request completion, and clearly label frame cache statistics as **Cached Frames**.
 
 ## Highlights
 
