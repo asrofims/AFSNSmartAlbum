@@ -1,16 +1,23 @@
 ================================================================================
 AFSNSmartAlbum — Professional Photo Album Layout Software
-Version: 1.9.15
+Version: 1.9.16
 Website / Repository: https://github.com/asrofims/AFSNSmartAlbum
 Author: AFSN - Asrofims
 ================================================================================
 
-[ WHAT'S NEW IN 1.9.15 ]
+[ WHAT'S NEW IN 1.9.16 ]
 --------------------------------------------------------------------------------
-* Legible Favorites on Used Filmstrip Photos: Applied used-photo dimming and
-  grayscale strictly to loaded thumbnail pixels so favorite stars and status
-  overlays retain full color and opacity while preserving hover brightness,
-  image-loading fade, and photo interactions.
+* Online Asset Refresh & Connection Recovery: Revalidate online asset discovery
+  without replacing already browsed pages, ordering, or pagination while keeping
+  loaded previews mounted and preserving results during transient failures.
+* Smart Preview Retry & Backoff: Automatically retry failed asset previews with
+  bounded backoff (750 ms / 2 s / 5 s), pause retries while offline, resume
+  automatically on reconnect, and respect provider Retry-After headers when
+  refreshing failed previews.
+* Clearer Connection Diagnostics: Distinguish between No Internet Connection,
+  Asset Service Unavailable, and Asset Service Timed Out states (including on
+  populated catalogs), keep Refresh locked until request completion, and clearly
+  label frame cache statistics as Cached Frames.
 
 [ 1. OVERVIEW ]
 --------------------------------------------------------------------------------
